@@ -6,7 +6,7 @@ CREATE TABLE labels (
   name       text NOT NULL,
   kind       text NOT NULL,
   color      text,
-  rule       text,                          -- 자연어 규칙 (Superhuman Auto Labels 방식)
+  rule       text,                          -- natural-language rule, Superhuman Auto Labels style
   rule_model text,
   person_id  uuid REFERENCES persons(id) ON DELETE CASCADE,  -- kind='person'
   archived   boolean NOT NULL DEFAULT false,
@@ -15,16 +15,17 @@ CREATE TABLE labels (
   CONSTRAINT labels_uq UNIQUE (kind, name)
 );
 
--- 자연어 라벨 규칙 (A4 §2.3). A4 표기 대응: compiled→rule, compiled_by→rule_by,
--- compiled_at→rule_at, corrections→corrections_30d. positives/negatives는 uuid[](items.id).
+-- Natural-language label rules (A4 §2.3). A4 naming map: compiled→rule, compiled_by→rule_by,
+-- compiled_at→rule_at, corrections→corrections_30d. positives/negatives are uuid[] (items.id).
 CREATE TABLE label_rules (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   label_id       uuid NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
-  prompt         text NOT NULL,                    -- 사용자가 적은 원문 (SSOT)
-  rule           jsonb NOT NULL DEFAULT '{}'::jsonb, -- 컴파일 결과 CompiledRule (A4 §2.3)
+  prompt         text NOT NULL,                    -- the user's original text (source of truth)
+  rule           jsonb NOT NULL DEFAULT '{}'::jsonb, -- compiled result, CompiledRule (A4 §2.3)
   rule_by        text,                             -- 'claude-sonnet-5' | 'user'
   rule_at        timestamptz,
-  probe_embedding vector(768),                     -- CompiledRule.semantic 임베딩 (A4 §2.3 kNN 폴백)
+  probe_embedding vector(768),                     -- CompiledRule.semantic embedding
+                                                   -- (A4 §2.3 kNN fallback)
   tier           text NOT NULL DEFAULT 'T0',
   positives      uuid[] NOT NULL DEFAULT '{}',     -- items.id
   negatives      uuid[] NOT NULL DEFAULT '{}',

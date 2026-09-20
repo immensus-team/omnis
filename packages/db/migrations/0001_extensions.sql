@@ -1,5 +1,5 @@
 -- 0001_extensions.sql
--- A3 §1 규약: 확장 3개 + 역할 3개. 역할은 클러스터 전역이므로 재실행 안전해야 한다.
+-- A3 §1 conventions: 3 extensions + 3 roles. Roles are cluster-wide, so re-running must be safe.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -8,10 +8,10 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'omnis_owner') THEN
-    CREATE ROLE omnis_owner NOLOGIN;        -- DDL·마이그레이션
+    CREATE ROLE omnis_owner NOLOGIN;        -- DDL and migrations
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'omnis_hub') THEN
-    CREATE ROLE omnis_hub NOLOGIN;          -- 허브 프로세스, DML만
+    CREATE ROLE omnis_hub NOLOGIN;          -- hub process, DML only
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'omnis_sync') THEN
     CREATE ROLE omnis_sync NOLOGIN REPLICATION;   -- zero-cache: REPLICATION + SELECT
