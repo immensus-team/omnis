@@ -1,25 +1,25 @@
 #!/bin/bash
-# 채널 시크릿 하나를 macOS Keychain에 저장한다. 값은 프롬프트로만 받는다 —
-# 셸 히스토리에 남지 않는다(A6 §9). 이름은 A1 §1.3 / A6 §9 스킴 그대로:
-#   omnis.<channel>.<kind>.<external_id>  (예: omnis.slack.xoxb.T0XXXXXXX)
+# Stores one channel secret in the macOS Keychain. The value is only ever read from a prompt —
+# it never lands in shell history (A6 §9). Names follow the A1 §1.3 / A6 §9 scheme verbatim:
+#   omnis.<channel>.<kind>.<external_id>  (e.g. omnis.slack.xoxb.T0XXXXXXX)
 #
-# 사용법: tools/auth-kit/keychain-add.sh <item> [account]
-#   item    Keychain service 이름 (필수)
-#   account 생략 시 281932556+jinhologankim@users.noreply.github.com (Logan 본인 식별용, A6 §9)
+# Usage: tools/auth-kit/keychain-add.sh <item> [account]
+#   item    Keychain service name (required)
+#   account defaults to 281932556+jinhologankim@users.noreply.github.com (identifies Logan himself, A6 §9)
 #
-# GUI 세션에서만 동작한다 — SSH 셸(Background 세션)에서는 security가
-# "User interaction is not allowed"로 거절한다(ops/mini/RUNBOOK.md §4).
+# Only works in a GUI session — in an SSH shell (Background session) security rejects it
+# with "User interaction is not allowed" (ops/mini/RUNBOOK.md §4).
 set -euo pipefail
 
-item="${1:?사용법: keychain-add.sh <item> [account]}"
+item="${1:?usage: keychain-add.sh <item> [account]}"
 account="${2:-281932556+jinhologankim@users.noreply.github.com}"
 
 read -r -s -p "Value for $item (account=$account): " secret
 echo
 if [ -z "$secret" ]; then
-  echo "빈 값 — 저장하지 않음" >&2
+  echo "Empty value — not stored" >&2
   exit 1
 fi
 
 security add-generic-password -U -s "$item" -a "$account" -w "$secret"
-echo "저장됨: $item (account=$account)"
+echo "Stored: $item (account=$account)"
