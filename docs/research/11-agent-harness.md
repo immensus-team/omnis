@@ -4,7 +4,7 @@ Fetched 2026-09-20 unless noted.
 
 ## 1. TL;DR
 
-Vercel AI SDK는 현재 메이저 v7 (npm `ai@7.0.107`, 2026-09-18)로, `ToolLoopAgent`/`Agent` 인터페이스와 tool-approval, provider registry, AI Gateway를 갖춘 LLM 호출 계층으로는 최적이다. "Vercel Eve"는 실존하는 오픈소스 프레임워크(2026-06-17 공개, filesystem-first, durable, Vercel Functions 위에서 실행)이지만 서버리스·Vercel 우선 전제가 강해 24/7 Mac mini 허브(KakaoTalk.app, 상시 소켓, 로컬 Postgres)와는 궁합이 나쁘다. omnis의 "kernel"(이벤트버스+스케줄러+승인게이트)은 이미 있는 Postgres 위에 직접 만들고, LLM 호출만 AI SDK 7로 얇게 감싸는 게 제일 싸고 빠르다. Temporal/Restate/Inngest/Trigger.dev는 필요해지면 나중에. OpenClaw(★390k)와 Hermes Agent(이미 mini에서 구동 중)에서 커넥터 플러그인 구조와 승인 게이트 패턴을 훔쳐올 것.
+Vercel AI SDK is now on major v7 (npm `ai@7.0.107`, 2026-09-18) and is the best fit as the LLM-call layer, with its `ToolLoopAgent`/`Agent` interface, tool approval, provider registry, and AI Gateway. "Vercel Eve" is a real open-source framework (released 2026-06-17, filesystem-first, durable, running on top of Vercel Functions), but its strong serverless/Vercel-first assumptions make it a poor match for a 24/7 Mac mini hub (KakaoTalk.app, always-on sockets, local Postgres). Build omnis's "kernel" (event bus + scheduler + approval gate) directly on the Postgres that already exists, and wrap only the LLM calls thinly with AI SDK 7 — that is the cheapest and fastest route. Temporal/Restate/Inngest/Trigger.dev can come later, if and when they're needed. Steal the connector-plugin structure and the approval-gate pattern from OpenClaw (390k★) and Hermes Agent (already running on the mini).
 
 ## 2. Facts
 
