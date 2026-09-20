@@ -1,12 +1,12 @@
-# ~/.omnis/local-agent.toml (미니). install.sh가 없을 때만 복사한다 — 이미 있으면 건드리지 않는다.
-# A2-D15: 런타임은 TOML에만 선언한다. plist의 --runtimes는 이 목록에서 고르는 필터라
-# 여기 [[runtime]] 블록이 없으면 local-agent가 ConfigError로 죽는다.
+# ~/.omnis/local-agent.toml (mini). install.sh copies it only when it is absent — an existing file is left untouched.
+# A2-D15: runtimes are declared in TOML only. The plist's --runtimes is a filter that picks from this list, so
+# with no [[runtime]] block here local-agent dies with a ConfigError.
 host = "mini"
 hub_url = "http://127.0.0.1:8787"
 token_keychain_item = "omnis.bridge.token.mini"
 
-# Codex만. Claude Code·claude-ds는 맥북 전용이다(A6 §10.2).
-# Codex가 로그인돼 있지 않아도 브리지는 뜨고 이 런타임만 unavailable로 남는다.
+# Codex only. Claude Code and claude-ds are MacBook-only (A6 §10.2).
+# Even when Codex is not logged in, the bridge still starts and only this runtime stays unavailable.
 [[runtime]]
 kind = "codex"
 binary = "/opt/homebrew/bin/codex"
