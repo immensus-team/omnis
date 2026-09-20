@@ -9,6 +9,8 @@
     { "path": "./packages/adapters/slack" },
     { "path": "./packages/adapters/gmail" },
     { "path": "./packages/adapters/google-calendar" },
-    { "path": "./apps/local-agent" }
+    { "path": "./apps/local-agent" },
+    { "path": "./packages/ui" },
+    { "path": "./apps/desktop" }
   ]
 }
