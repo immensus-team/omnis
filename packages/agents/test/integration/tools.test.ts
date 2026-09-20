@@ -27,7 +27,7 @@ beforeAll(async () => {
   itemId = returningId(
     await pool.query<{ id: string }>(
       `INSERT INTO items (thread_id, account_id, external_id, kind, subject, body, sent_at)
-       VALUES ($1,$2,'it_tools','email','견적','내일까지 보내드릴게요', now())
+       VALUES ($1,$2,'it_tools','email','Quote','I will send it by tomorrow', now())
        ON CONFLICT (account_id, external_id) WHERE external_id IS NOT NULL
          DO UPDATE SET body = EXCLUDED.body RETURNING id`,
       [threadId, accountId],
@@ -63,7 +63,7 @@ describe("tool palette (A4 §1.5)", () => {
     const set = toolRegistry(["propose_task"]);
     const out = (await set.propose_task?.execute?.(
       {
-        title: "견적서 보내기",
+        title: "Send the quote",
         source_item_id: itemId,
         due_basis: "stated",
         owner: "me",
@@ -77,14 +77,14 @@ describe("tool palette (A4 §1.5)", () => {
       "SELECT title, created_by FROM tasks WHERE id = $1",
       [out.task_id],
     );
-    expect(rows[0]).toMatchObject({ title: "견적서 보내기", created_by: "agent" });
+    expect(rows[0]).toMatchObject({ title: "Send the quote", created_by: "agent" });
   });
 
   it("propose_delegation stores a pending delegate approval linked to the thread", async () => {
     const set = toolRegistry(["propose_task", "propose_delegation"]);
     const task = (await set.propose_task?.execute?.(
       {
-        title: "리팩터링 위임",
+        title: "Delegate the refactor",
         source_item_id: itemId,
         due_basis: "none",
         owner: "agent",
@@ -98,8 +98,8 @@ describe("tool palette (A4 §1.5)", () => {
         task_id: task.task_id,
         runtime: "claude_code",
         host: "mini",
-        brief: "이 모듈을 정리해줘",
-        acceptance: ["테스트 통과"],
+        brief: "Clean up this module",
+        acceptance: ["tests pass"],
         est_minutes: 45,
         confidence: 0.7,
       },

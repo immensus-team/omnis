@@ -16,7 +16,7 @@ beforeEach(async () => {
   configureAgents({ pool });
   noteId = returningId(
     await pool.query<{ id: string }>(
-      "INSERT INTO notes (body) VALUES ('김 대표님께 견적 다시 확인') RETURNING id",
+      "INSERT INTO notes (body) VALUES ('Reconfirm the quote with CEO Kim') RETURNING id",
     ),
   );
 });
@@ -25,9 +25,9 @@ afterAll(() => pool.end());
 const res = (candidates: unknown[]) => ({
   loop: "note_route" as const,
   run_id: "00000000-0000-0000-0000-0000000000dd",
-  output: { candidates, confidence: 0.9, rationale: "같은 주제", injection_flags: [] },
+  output: { candidates, confidence: 0.9, rationale: "same topic", injection_flags: [] },
   confidence: 0.9,
-  rationale: "같은 주제",
+  rationale: "same topic",
   escalate: false,
   injection_flags: [],
   unresolved: [],
@@ -70,7 +70,7 @@ describe("noteRouteLoop (A4 §8)", () => {
       ),
     );
     await noteRouteLoop.apply(
-      res([{ kind: "thread", id: threadId, confidence: 0.99, why: "같은 견적 건" }]) as never,
+      res([{ kind: "thread", id: threadId, confidence: 0.99, why: "same quote thread" }]) as never,
       ctx(noteId),
     );
     const { rows } = await pool.query<{ route_state: string; routed_to_thread_id: string | null }>(
@@ -88,7 +88,7 @@ describe("noteRouteLoop (A4 §8)", () => {
           kind: "thread",
           id: "00000000-0000-0000-0000-0000000000ee",
           confidence: 0.3,
-          why: "약함",
+          why: "weak",
         },
       ]) as never,
       ctx(noteId),
@@ -105,7 +105,7 @@ describe("noteRouteLoop (A4 §8)", () => {
       kind: "person" as const,
       id: `00000000-0000-0000-0000-00000000000${n}`,
       confidence: 0.9 - n / 100,
-      why: `후보 ${n}`,
+      why: `candidate ${n}`,
     });
     await noteRouteLoop.apply(
       res([strong(1), strong(2), strong(3), strong(4), { ...strong(5), confidence: 0.2 }]) as never,

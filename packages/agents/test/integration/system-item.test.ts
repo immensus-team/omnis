@@ -10,8 +10,11 @@ afterAll(() => pool.end());
 
 describe("writeSystemItem (A4 §1.6)", () => {
   it("creates the system account/thread once and appends an item", async () => {
-    const a = await writeSystemItem({ body: "자동 처리 실패 1건", meta: { loop: "draft" } });
-    const b = await writeSystemItem({ body: "자동 처리 실패 2건" });
+    const a = await writeSystemItem({
+      body: "1 automatic processing failure",
+      meta: { loop: "draft" },
+    });
+    const b = await writeSystemItem({ body: "2 automatic processing failures" });
     expect(a).not.toBe(b);
 
     const { rows } = await pool.query<{
@@ -28,8 +31,10 @@ describe("writeSystemItem (A4 §1.6)", () => {
     );
     expect(rows.length).toBeGreaterThanOrEqual(2);
     expect(rows[0]).toMatchObject({ kind: "system", status: "received" });
-    expect(rows.map((r) => r.body)).toContain("자동 처리 실패 1건");
-    expect(rows.find((r) => r.body === "자동 처리 실패 1건")?.meta).toEqual({ loop: "draft" });
+    expect(rows.map((r) => r.body)).toContain("1 automatic processing failure");
+    expect(rows.find((r) => r.body === "1 automatic processing failure")?.meta).toEqual({
+      loop: "draft",
+    });
 
     const { rows: accs } = await pool.query<{ n: string }>(
       "SELECT count(*)::text AS n FROM accounts WHERE channel = 'system' AND external_id = 'omnis'",
@@ -49,7 +54,7 @@ describe("writeSystemItem (A4 §1.6)", () => {
       [accountId],
     );
     const threadId = thr.rows[0]?.id ?? "";
-    const id = await writeSystemItem({ body: "이 스레드에 남긴다", thread_id: threadId });
+    const id = await writeSystemItem({ body: "Left on this thread", thread_id: threadId });
     const { rows } = await pool.query<{ thread_id: string; account_id: string }>(
       "SELECT thread_id, account_id FROM items WHERE id = $1",
       [id],
@@ -60,7 +65,10 @@ describe("writeSystemItem (A4 §1.6)", () => {
 
   it("throws when the given thread does not exist", async () => {
     await expect(
-      writeSystemItem({ body: "없는 스레드", thread_id: "00000000-0000-0000-0000-000000000000" }),
+      writeSystemItem({
+        body: "missing thread",
+        thread_id: "00000000-0000-0000-0000-000000000000",
+      }),
     ).rejects.toThrow(/thread not found/);
   });
 });

@@ -32,7 +32,7 @@ beforeEach(async () => {
   itemId = returningId(
     await pool.query<{ id: string }>(
       `INSERT INTO items (thread_id, account_id, kind, body, sent_at)
-       VALUES ($1,$2,'message','내일까지 견적서 보내드릴게요', now()) RETURNING id`,
+       VALUES ($1,$2,'message','I will send the quote by tomorrow', now()) RETURNING id`,
       [threadId, accountId],
     ),
   );
@@ -44,9 +44,9 @@ afterAll(() => pool.end());
 const result = (tasks: unknown[], injection_flags: string[] = []) => ({
   loop: "task" as const,
   run_id: "00000000-0000-0000-0000-0000000000bb",
-  output: { tasks, confidence: 0.9, rationale: "약속 문장", injection_flags },
+  output: { tasks, confidence: 0.9, rationale: "promise sentence", injection_flags },
   confidence: 0.9,
-  rationale: "약속 문장",
+  rationale: "promise sentence",
   escalate: false,
   injection_flags,
   unresolved: [],
@@ -76,8 +76,8 @@ describe("taskLoop (A4 §4.2)", () => {
   it("drops tasks below the confidence floor without storing them", async () => {
     await taskLoop.apply(
       result([
-        { title: "확실한 약속", owner: "me", due_basis: "stated", confidence: 0.8 },
-        { title: "애매한 추측", owner: "me", due_basis: "inferred", confidence: 0.69 },
+        { title: "Confirmed promise", owner: "me", due_basis: "stated", confidence: 0.8 },
+        { title: "Vague guess", owner: "me", due_basis: "inferred", confidence: 0.69 },
       ]) as never,
       ctx(),
     );
@@ -85,14 +85,14 @@ describe("taskLoop (A4 §4.2)", () => {
       "SELECT title FROM tasks WHERE source_item_id = $1",
       [itemId],
     );
-    expect(rows.map((r) => r.title)).toEqual(["확실한 약속"]);
+    expect(rows.map((r) => r.title)).toEqual(["Confirmed promise"]);
   });
 
   it("stores at most three tasks per item", async () => {
     await taskLoop.apply(
       result(
         [1, 2, 3, 4, 5].map((n) => ({
-          title: `할 일 ${n}`,
+          title: `Task ${n}`,
           owner: "me",
           due_basis: "none",
           confidence: 0.9,
@@ -110,13 +110,13 @@ describe("taskLoop (A4 §4.2)", () => {
   it("merges into the existing task when duplicate_of is set", async () => {
     const existing = returningId(
       await pool.query<{ id: string }>(
-        "INSERT INTO tasks (title, created_by) VALUES ('기존 할 일','agent') RETURNING id",
+        "INSERT INTO tasks (title, created_by) VALUES ('Existing task','agent') RETURNING id",
       ),
     );
     await taskLoop.apply(
       result([
         {
-          title: "같은 할 일",
+          title: "Same task",
           owner: "me",
           due_basis: "none",
           confidence: 0.9,
@@ -141,6 +141,7 @@ describe("taskLoop (A4 §4.2)", () => {
     await taskLoop.apply(
       result([
         {
+          // FROZEN fixture — Korean sample the Korean-language GUI_CHANNEL matcher must match.
           title: "카카오톡으로 견적 안내 돌리기",
           owner: "agent",
           due_basis: "none",
@@ -162,6 +163,7 @@ describe("taskLoop (A4 §4.2)", () => {
       result(
         [
           {
+            // FROZEN fixture — same Korean routing sample as above (matches GUI_CHANNEL).
             title: "카카오톡으로 견적 안내 돌리기",
             owner: "agent",
             due_basis: "none",
