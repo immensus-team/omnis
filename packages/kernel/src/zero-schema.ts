@@ -313,6 +313,12 @@ export const zeroSchema = createSchema({
   // 조용히 `undefined`를 반환한다(gate-06 스파이크가 예견한 API 드리프트 #2). A21은 이 API 경로를
   // 실제로 호출한 적이 없어(원시 WAL 드레인만 테스트) 지금까지 드러나지 않았다.
   enableLegacyQueries: true,
+  // US-A27 편차(같은 드리프트 계열, gate-06이 예견한 #2의 짝): `zero.mutate.<table>.update(...)`
+  // 같은 CRUD 뮤테이터(A5-D9 DraftCard onDiscard가 쓰는 패턴 — 이 스토리 범위에서 Tiptap Composer/커스텀
+  // 뮤테이터는 만들지 않으므로 기본 CRUD 경로가 유일한 쓰기 경로다)도 `enableLegacyMutators` 없이는
+  // `DBMutator<S>`가 `{}` 타입이 되어 `.items` 프로퍼티가 아예 없다(zero-client/src/client/crud.d.ts).
+  // A22는 쓰기를 쓴 적이 없어 지금까지 드러나지 않았다.
+  enableLegacyMutators: true,
 }) satisfies Schema;
 
 export const ZERO_TABLES: readonly string[] = Object.keys(zeroSchema.tables);
