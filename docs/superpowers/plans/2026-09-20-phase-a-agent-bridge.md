@@ -2,66 +2,66 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 맥북·미니 두 호스트에서 도는 `local-agent` 브리지 데몬과 그 와이어 타입(`@omnis/protocol`의 `src/bridge.ts`)을 만들어, Claude Code와 Codex 런타임의 턴을 허브가 읽을 수 있는 durable/ephemeral/cold 3티어 이벤트로 정규화한다.
+**Goal:** Build the `local-agent` bridge daemon that runs on both hosts (MacBook and mini) and its wire types (`src/bridge.ts` in `@omnis/protocol`), normalizing Claude Code and Codex runtime turns into durable/ephemeral/cold three-tier events the hub can read.
 
-**Architecture:** `@omnis/protocol/src/bridge.ts`가 JSON-RPC 2.0 페이로드의 zod 스키마·에러 코드·per-request 버전 협상을 소유하는 리프 계층이고, `apps/local-agent`가 그 타입만 의존하는 단일 Node 22 프로세스로서 허브에 WebSocket을 dial한다. 브리지 안에서 `RuntimeAdapter` 구현체(Claude Code = 턴당 서브프로세스, Codex = 상주 `app-server` 자식 1개)가 런타임 원본 스트림을 `turn.item.*` 이벤트로 매핑하고, 세션 레지스트리가 안정적인 `session_key`와 회전하는 `session_id`를 분리해 보관한다. 실행 경로는 전부 모의 런타임 프로세스로 계약 테스트되며, 위임 RPC는 선언만 하고 승인 증거 없이는 `-32006`으로 거절한다.
+**Architecture:** `@omnis/protocol/src/bridge.ts` is the leaf layer that owns the zod schemas, error codes, and per-request version negotiation for JSON-RPC 2.0 payloads, and `apps/local-agent` is a single Node 22 process that depends only on those types and dials a WebSocket to the hub. Inside the bridge, the `RuntimeAdapter` implementations (Claude Code = a subprocess per turn, Codex = one resident `app-server` child) map the runtime's native streams into `turn.item.*` events, and the session registry keeps the stable `session_key` separate from the rotating `session_id`. Every execution path is contract-tested against a mock runtime process, and the delegation RPC only declares itself — without approval evidence it rejects with `-32006`.
 
-**Tech Stack:** Node 22 · TypeScript `5.6.3` strict · pnpm `9.12.3` workspaces · zod `^3.24.1`(= `@omnis/protocol`이 고정, US-A11 — zod 4는 어느 패키지도 쓰지 않는다) · `ws` 8.18.x(WebSocket 클라이언트) · `smol-toml` 1.3.x(TOML 파서, Node 22에 내장 TOML 없음) · vitest `2.1.9`(프로젝트 `unit`/`contract`/`integration`) · Biome 1.x · Codex `app-server` `rust-v0.155.1` 핀 · Claude Code ≥ 2.1.223(`cross_project_resume` 판정 기준)
+**Tech Stack:** Node 22 · TypeScript `5.6.3` strict · pnpm `9.12.3` workspaces · zod `^3.24.1`(= pinned by `@omnis/protocol`, US-A11 — no package uses zod 4) · `ws` 8.18.x (WebSocket client) · `smol-toml` 1.3.x (TOML parser; Node 22 ships no built-in TOML) · vitest `2.1.9` (project `unit`/`contract`/`integration`) · Biome 1.x · Codex `app-server` `rust-v0.155.1` pin · Claude Code ≥ 2.1.223 (the `cross_project_resume` threshold)
 
-버전은 계약 §2의 전 워크스페이스 핀(FIXED)을 그대로 쓴다 — caret으로 느슨하게 풀지 않는다.
+Versions use the contract §2 workspace-wide pins (FIXED) as-is — do not loosen them with carets.
 
-**Spec:** /Users/logankim/AI-Workspaces/omnis/docs/spec/00-omnis-design.md + 이 계획이 구현하는 부록: `A2-agent-session-bridge.md`(전체), `A6-ops-infra.md` §10(local-agent 설치·LaunchAgent), `00-omnis-design.md` §9·§4.2, `A7-dev-process.md` §1·§2·§5·§7, 계약 문서 `docs/superpowers/plans/2026-09-20-phase-a-interfaces.md`
+**Spec:** /Users/logankim/AI-Workspaces/omnis/docs/spec/00-omnis-design.md + the appendices this plan implements: `A2-agent-session-bridge.md` (complete), `A6-ops-infra.md` §10 (local-agent installation · LaunchAgent), `00-omnis-design.md` §9·§4.2, `A7-dev-process.md` §1·§2·§5·§7, contract document `docs/superpowers/plans/2026-09-20-phase-a-interfaces.md`
 
 ## Global Constraints
 
-- Node 22 + pnpm workspaces. 새 패키지는 `pnpm-workspace.yaml`의 `apps/*`·`packages/*` 글롭에 이미 들어간다(A7 §1).
-- TypeScript strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`. 루트 `tsconfig.base.json`을 extend하고 `references`로 빌드 순서를 잡는다(A7 §1·§2).
-- Postgres 17(A3). 이 계획은 DB에 직접 붙지 않는다 — 브리지는 허브에만 말한다.
-- 허브는 `127.0.0.1:8787`에만 bind한다(마스터 §4.2). 미니 브리지는 루프백으로, 맥북 브리지는 Tailscale Serve가 `/api/`로 마운트한 `wss://<mini>.ts.net/api/bridge`로 붙는다.
-- 마이그레이션은 append-only 파일 `packages/db/migrations/000N_<name>.sql` + 추적 테이블 `_omnis_migrations`(A3 §8). 이 계획은 마이그레이션 파일을 **추가하지도 수정하지도 않는다**.
-- 승인 게이트(US-A07)가 서기 전에는 비가역 tool(`send`/`delete`/`delegate`/`calendar_write`)을 어디에도 배선하지 않는다(A7 §7 공통 금지). 이 계획의 `delegate.run`은 **선언 + 거절**까지만이다.
-- 테스트를 삭제하거나 스킵해서 통과시키지 않는다(A7 §7 공통 금지).
-- provider SDK는 해당 어댑터 패키지 안에서만 import한다(A7 §7 공통 금지). `apps/local-agent`는 `@omnis/protocol` 외의 내부 패키지를 import하지 않는다.
-- Keychain 아이템 이름은 A1 규칙 `omnis.<channel>.<kind>.<external_id>`, 브리지 토큰은 `omnis.bridge.token.<host>`(A2 §2.1). account 필드는 `281932556+jinhologankim@users.noreply.github.com`.
-- 스토리 티어는 A7 §4를 따르고(US-A16/A18/A19 = Opus, US-A17/A19b/A20 = Sonnet), DeepSeek 디프는 전부 Sonnet 이상이 리뷰한다.
-- 커밋 메시지는 `<story-id>: <한 줄 요약>`(A7 §6) + 본문에 충족한 acceptance criteria, 마지막 줄은 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`. (계약 §9는 실제 실행 모델을 적도록 `Co-Authored-By: Claude <tier>` / `Co-Authored-By: DeepSeek V4.1 Flash <noreply@deepseek.com>`를 요구한다 — 아래 각 태스크의 `git commit` 명령은 계약 §9 형식으로 적었다. 불일치는 open question으로 남긴다.)
+- Node 22 + pnpm workspaces. New packages are already covered by the `apps/*`·`packages/*` globs in `pnpm-workspace.yaml` (A7 §1).
+- TypeScript strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`. Extend the root `tsconfig.base.json` and set build order via `references` (A7 §1·§2).
+- Postgres 17(A3). This plan never connects to the DB directly — the bridge talks only to the hub.
+- The hub binds only to `127.0.0.1:8787` (master §4.2). The mini bridge connects over loopback; the MacBook bridge connects to `wss://<mini>.ts.net/api/bridge`, mounted at `/api/` by Tailscale Serve.
+- Migrations are append-only files `packages/db/migrations/000N_<name>.sql` plus the tracking table `_omnis_migrations` (A3 §8). This plan **neither adds nor modifies** any migration file.
+- Until the approval gate (US-A07) exists, do not wire the irreversible tools (`send`/`delete`/`delegate`/`calendar_write`) to anything (A7 §7 common prohibitions). `delegate.run` in this plan goes only as far as **declaration plus refusal**.
+- Do not delete or skip tests to make them pass (A7 §7 common prohibitions).
+- Import provider SDKs only inside their own adapter package (A7 §7 common prohibitions). `apps/local-agent` imports no internal package other than `@omnis/protocol`.
+- Keychain item names follow the A1 rule `omnis.<channel>.<kind>.<external_id>`; bridge tokens are `omnis.bridge.token.<host>` (A2 §2.1). The account field is `281932556+jinhologankim@users.noreply.github.com`.
+- Story tiers follow A7 §4 (US-A16/A18/A19 = Opus, US-A17/A19b/A20 = Sonnet), and every DeepSeek diff is reviewed by Sonnet or above.
+- Commit messages are `<story-id>: <one-line summary>` (A7 §6) plus the acceptance criteria met in the body, and the last line is `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`. (Contract §9 requires recording the actual execution model as `Co-Authored-By: Claude <tier>` / `Co-Authored-By: DeepSeek V4.1 Flash <noreply@deepseek.com>` — the `git commit` commands under each task below are written in the contract §9 format. The mismatch is left as an open question.)
 
-## 읽기 순서와 전역 YAGNI
+## Reading order and global YAGNI
 
-구현자는 착수 전 **A2 §0(결정표 A2-D1~D16)과 §1(개념 모델)** 을 읽는다. 이 두 절을 안 읽으면 `session_key`/`session_id` 분리의 이유를 모른 채 하나로 합치게 되고, 그게 이 계획 전체를 무효화한다.
+Before starting, the implementer reads **A2 §0 (decision table A2-D1~D16) and §1 (conceptual model)**. Without these two sections you will merge `session_key`/`session_id` into one without knowing why they are split, and that invalidates this entire plan.
 
-Phase A에서 **만들지 않는 것**(A2·A7이 명시적으로 뒤로 미룬 것):
+**What is NOT built** in Phase A (what A2·A7 explicitly deferred):
 
-- Hermes 어댑터(A2 §4.4, Phase B 읽기 전용부터). `RuntimeKind`에 `'hermes'`는 있지만 어댑터 팩토리는 Phase A에서 이 값을 모른다.
-- `'omnis'` 런타임 어댑터(A2 §1.1). 어댑터 팩토리의 `switch`에서 명시적으로 throw한다 — 조용히 무시하면 나중에 위임 대상 후보에 섞인다.
-- `ingest.scan` / `ingest.read` 구현(A7 §7 "Phase B 시드 메모"). 메서드 이름은 `HUB_METHODS`에 있지만 디스패처는 `-32601`을 돌려준다.
-- 위임 **실행** 경로(A2 §5). `delegate.run`은 `approval_id` 없으면 `-32006`이고, 있어도 Phase A에서는 승인 발급자(US-A07 커널)가 아직 서명을 주지 않으므로 실행 분기를 만들지 않는다.
-- `session.read_summary`의 요약 **생성**(A2 §6의 T1 모델 호출). 브리지는 요약을 만들지 않는다 — 허브가 만든다. 브리지 쪽 RPC는 `-32003`으로 강등한다.
-- 터미널에서 Logan이 직접 연 세션 스캔·import(A2 §2.3).
-- 재시도 자동화(A2 §5.4). 재시도는 언제나 사람이 누른다.
+- The Hermes adapter (A2 §4.4, starting read-only in Phase B). `'hermes'` exists in `RuntimeKind`, but the adapter factory does not know this value in Phase A.
+- The `'omnis'` runtime adapter (A2 §1.1). It throws explicitly in the adapter factory's `switch` — ignoring it silently would later mix it into the delegation target candidates.
+- Implementations of `ingest.scan` / `ingest.read` (A7 §7 "Phase B seed note"). The method names are in `HUB_METHODS`, but the dispatcher returns `-32601`.
+- The delegation **execution** path (A2 §5). `delegate.run` returns `-32006` without an `approval_id`, and even with one, the approval issuer (the US-A07 kernel) does not sign yet in Phase A, so no execution branch is built.
+- Summary **generation** for `session.read_summary` (the T1 model call in A2 §6). The bridge does not produce summaries — the hub does. The bridge-side RPC is downgraded to `-32003`.
+- Scanning and importing sessions Logan opened directly in a terminal (A2 §2.3).
+- Retry automation (A2 §5.4). A human always triggers the retry.
 
 ---
 
-## US-A16 — 브리지 프로토콜 타입 (Task 1~4)
+## US-A16 — Bridge protocol types (Task 1~4)
 
-> **목표**(A7 §7): 브리지 프로토콜 타입(session_key/session_id/capabilities, MCP 2026-07-28 버전 협상)
-> **산출물**: `packages/protocol/src/bridge.ts`
-> **검증 명령**: `pnpm --filter @omnis/protocol test`
-> **티어**: Opus · **의존**: US-A11(`packages/protocol` 스캐폴드와 `src/adapter.ts`·`src/approval.ts`)
+> **Goal** (A7 §7): bridge protocol types (session_key/session_id/capabilities, MCP 2026-07-28 version negotiation)
+> **Deliverable**: `packages/protocol/src/bridge.ts`
+> **Verification command**: `pnpm --filter @omnis/protocol test`
+> **Tier**: Opus · **Depends on**: US-A11 (`packages/protocol` scaffold plus `src/adapter.ts`·`src/approval.ts`)
 
-### Task 1: 브리지 코어 타입 (US-A16, tier: Opus)
+### Task 1: Bridge core types (US-A16, tier: Opus)
 
 **Files:**
 - Create: `packages/protocol/src/bridge.ts`
 - Test: `packages/protocol/test/bridge-types.test.ts`
 
 **Interfaces:**
-- Consumes: `HostId`, `RuntimeKind`, `Attachment`, `SessionKey`, `SessionId`(모두 `packages/protocol/src/adapter.ts`, 계약 §3.1~3.2, US-A11 산출)
+- Consumes: `HostId`, `RuntimeKind`, `Attachment`, `SessionKey`, `SessionId` (all from `packages/protocol/src/adapter.ts`, contract §3.1~3.2, US-A11 output)
 - Produces: `PROTOCOL_VERSION: "2026-09-20"`, `META_KEYS`, `RuntimeCapabilities`(zod + type), `AgentRuntime`(zod + type), `PermissionProfile`, `SessionOrigin`, `SessionState`, `RuntimeState`
 
-**읽을 것:** A2 §1.1(4개 객체), §1.2(capabilities 자기기술), §7.1(permission profile). **만들지 말 것:** `AgentSession` 전체 row 타입 — 그건 A3의 `agent_sessions` 테이블 소유이고 브리지는 `session_key`로만 말한다.
+**Read:** A2 §1.1 (the four objects), §1.2 (capabilities self-description), §7.1 (permission profile). **Do not build:** the full `AgentSession` row type — that belongs to the `agent_sessions` table in A3, and the bridge speaks only in `session_key`.
 
-1. - [ ] 실패 테스트를 쓴다: `packages/protocol/test/bridge-types.test.ts`
+1. - [ ] Write the failing test: `packages/protocol/test/bridge-types.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -103,16 +103,16 @@ describe("bridge core types", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/protocol test`
-   기대 실패: `Failed to resolve import "../src/bridge.js" from "test/bridge-types.test.ts"`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/protocol test`
+   Expected failure: `Failed to resolve import "../src/bridge.js" from "test/bridge-types.test.ts"`
 
-3. - [ ] 최소 구현을 쓴다: `packages/protocol/src/bridge.ts`
+3. - [ ] Write the minimal implementation: `packages/protocol/src/bridge.ts`
 
 ```ts
 import { z } from "zod";
 import { HostId, RuntimeKind } from "./adapter.js";
 
-/** A2-D3: initialize 핸드셰이크 없음. 모든 요청의 params._meta에 이 버전을 싣는다. */
+/** A2-D3: no initialize handshake. Every request carries this version in params._meta. */
 export const PROTOCOL_VERSION = "2026-09-20" as const;
 
 export const META_KEYS = {
@@ -121,7 +121,7 @@ export const META_KEYS = {
   origin: "ai.omnis/origin",
 } as const;
 
-/** A2 §7.1. profile은 origin과 purpose에서만 결정되고 프롬프트로 바뀌지 않는다. */
+/** A2 §7.1. The profile is determined only by origin and purpose, and a prompt never changes it. */
 export const PermissionProfile = z.enum(["observe", "workspace", "trusted"]);
 export type PermissionProfile = z.infer<typeof PermissionProfile>;
 
@@ -134,7 +134,7 @@ export type SessionState = z.infer<typeof SessionState>;
 export const RuntimeState = z.enum(["online", "degraded", "offline"]);
 export type RuntimeState = z.infer<typeof RuntimeState>;
 
-/** A2 §1.2. features는 런타임 원문을 손대지 않고 그대로 싣는다. */
+/** A2 §1.2. features carries the runtime's native strings through untouched. */
 export const RuntimeCapabilities = z.object({
   resume: z.boolean(),
   cross_project_resume: z.boolean(),
@@ -148,7 +148,7 @@ export const RuntimeCapabilities = z.object({
 });
 export type RuntimeCapabilities = z.infer<typeof RuntimeCapabilities>;
 
-/** A2 §1.1. transport='http'면 binary_path=null, allowed_roots=[]. */
+/** A2 §1.1. transport='http' means binary_path=null, allowed_roots=[]. */
 export const AgentRuntime = z.object({
   id: z.string().uuid(),
   runtime: RuntimeKind,
@@ -165,34 +165,34 @@ export const AgentRuntime = z.object({
 export type AgentRuntime = z.infer<typeof AgentRuntime>;
 ```
 
-4. - [ ] 테스트를 돌린다: `pnpm --filter @omnis/protocol test` → 4 passed
+4. - [ ] Run the tests: `pnpm --filter @omnis/protocol test` → 4 passed
 
-5. - [ ] 커밋한다:
+5. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A16 add packages/protocol/src/bridge.ts packages/protocol/test/bridge-types.test.ts
-git -C omnis/.worktrees/US-A16 commit -m "US-A16: 브리지 코어 타입(capabilities·AgentRuntime·PROTOCOL_VERSION)
+git -C omnis/.worktrees/US-A16 commit -m "US-A16: bridge core types (capabilities·AgentRuntime·PROTOCOL_VERSION)
 
-- A2 §1.1/§1.2의 AgentRuntime·RuntimeCapabilities를 zod로 고정
-- features 배열은 런타임 원문 통과
-- transport='http'에서 binary_path=null/allowed_roots=[] 허용
+- Pin AgentRuntime·RuntimeCapabilities from A2 §1.1/§1.2 as zod schemas
+- The features array passes runtime strings through untouched
+- Allow binary_path=null/allowed_roots=[] when transport='http'
 
 Co-Authored-By: Claude Opus <noreply@anthropic.com>"
 ```
 
-### Task 2: 와이어 페이로드 스키마 (US-A16, tier: Opus)
+### Task 2: Wire payload schemas (US-A16, tier: Opus)
 
 **Files:**
 - Modify: `packages/protocol/src/bridge.ts`
 - Test: `packages/protocol/test/bridge-wire.test.ts`
 
 **Interfaces:**
-- Consumes: Task 1의 `AgentRuntime`·`PermissionProfile`·`SessionOrigin`·`SessionState`, `SessionKey`/`SessionId`/`Attachment`(adapter.ts), `HumanInterrupt`(계약 §3.4, `src/approval.ts`)
+- Consumes: Task 1's `AgentRuntime`·`PermissionProfile`·`SessionOrigin`·`SessionState`, `SessionKey`/`SessionId`/`Attachment` (adapter.ts), `HumanInterrupt` (contract §3.4, `src/approval.ts`)
 - Produces: `TurnInput`, `SessionCreateParams`/`SessionCreateResult`, `SessionResumeParams`/`SessionResumeResult`, `TurnStartParams`/`TurnStartResult`, `TurnCancelParams`/`TurnCancelResult`, `SessionCloseParams`/`SessionCloseResult`, `BridgeDiscoverResult`, `DelegationBrief`, `BridgeItemKind`, `SessionRegistered`, `TurnStarted`, `ItemStarted`, `ItemDelta`, `ItemCompleted`, `TurnUsage`, `TurnCompleted`, `ApprovalRequestedParams`, `HealthNotification`, `SessionSummary`
 
-**읽을 것:** A2 §3.2(hub→bridge 표), §3.3(bridge→hub 표), §5.2(브리프 5필드), §6(SessionSummary). **만들지 말 것:** `kind`를 `agent_turn`/`tool_call` 외로 늘리지 않는다 — reasoning은 item이 아니라 델타다(A2 §3.3).
+**Read:** A2 §3.2 (hub→bridge table), §3.3 (bridge→hub table), §5.2 (the five brief fields), §6 (SessionSummary). **Do not build:** do not extend `kind` beyond `agent_turn`/`tool_call` — reasoning is a delta, not an item (A2 §3.3).
 
-1. - [ ] 실패 테스트를 쓴다: `packages/protocol/test/bridge-wire.test.ts`
+1. - [ ] Write the failing test: `packages/protocol/test/bridge-wire.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -252,10 +252,10 @@ describe("bridge wire payloads", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/protocol test`
-   기대 실패: `SyntaxError: The requested module '../src/bridge.js' does not provide an export named 'SessionCreateParams'`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/protocol test`
+   Expected failure: `SyntaxError: The requested module '../src/bridge.js' does not provide an export named 'SessionCreateParams'`
 
-3. - [ ] 최소 구현을 `packages/protocol/src/bridge.ts` 끝에 덧붙인다:
+3. - [ ] Append the minimal implementation to the end of `packages/protocol/src/bridge.ts`:
 
 ```ts
 import { Attachment, SessionId, SessionKey } from "./adapter.js";
@@ -302,7 +302,7 @@ export const BridgeDiscoverResult = z.object({
   runtimes: z.array(AgentRuntime),
 });
 
-/** A2 §5.2. 5필드 고정, verify 없는 위임은 만들지 않는다. */
+/** A2 §5.2. Five fixed fields; never create a delegation without verify. */
 export const DelegationBrief = z.object({
   approval_id: z.string().uuid(),
   target: z.object({ runtime: RuntimeKind, host: HostId, cwd: z.string().min(1) }),
@@ -319,7 +319,7 @@ export const DelegationBrief = z.object({
 });
 
 // --- bridge → hub (A2 §3.3) ---
-/** reasoning은 item이 아니다. kind는 이 둘뿐이다. */
+/** reasoning is not an item. These two are the only values of kind. */
 export const BridgeItemKind = z.enum(["agent_turn", "tool_call"]);
 export type BridgeItemKind = z.infer<typeof BridgeItemKind>;
 
@@ -372,7 +372,7 @@ export const HealthNotification = z.object({
   at: z.string().datetime(),
 });
 
-/** A2 §6. raw 델타·reasoning 원문은 여기에 담기지 않는다(A2-D13). */
+/** A2 §6. Raw deltas and reasoning text are not carried here (A2-D13). */
 export const SessionSummary = z.object({
   session_key: SessionKey, runtime: RuntimeKind, host: HostId, purpose: z.string(),
   state: SessionState, opened_at: z.string().datetime(), last_turn_at: z.string().datetime().nullable(),
@@ -388,34 +388,34 @@ export const SessionSummary = z.object({
 });
 ```
 
-4. - [ ] 테스트를 돌린다: `pnpm --filter @omnis/protocol test` → 6 passed (bridge-wire) + 4 passed (bridge-types)
+4. - [ ] Run the tests: `pnpm --filter @omnis/protocol test` → 6 passed (bridge-wire) + 4 passed (bridge-types)
 
-5. - [ ] 커밋한다:
+5. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A16 add packages/protocol/src/bridge.ts packages/protocol/test/bridge-wire.test.ts
-git -C omnis/.worktrees/US-A16 commit -m "US-A16: 브리지 와이어 페이로드 zod 스키마
+git -C omnis/.worktrees/US-A16 commit -m "US-A16: bridge wire payload zod schemas
 
-- A2 §3.2/§3.3의 모든 params/result/notification 페이로드
-- DelegationBrief: output='file'이면 output_path 필수(refine)
-- ItemDelta.channel 기본값 output, reasoning은 델타 전용
+- Every params/result/notification payload from A2 §3.2/§3.3
+- DelegationBrief: output_path is required when output='file' (refine)
+- ItemDelta.channel defaults to output; reasoning is delta-only
 
 Co-Authored-By: Claude Opus <noreply@anthropic.com>"
 ```
 
-### Task 3: 에러 코드와 메서드 목록 (US-A16, tier: Opus)
+### Task 3: Error codes and method lists (US-A16, tier: Opus)
 
 **Files:**
 - Modify: `packages/protocol/src/bridge.ts`
 - Test: `packages/protocol/test/bridge-errors.test.ts`
 
 **Interfaces:**
-- Consumes: 없음(리프)
+- Consumes: none (leaf)
 - Produces: `BRIDGE_ERRORS`, `JSONRPC_ERRORS`, `BridgeErrorCode`, `BridgeError`, `HUB_METHODS`, `BRIDGE_METHODS`, `HubMethod`, `BridgeMethod`, `toJsonRpcError(e: unknown): { code: number; message: string; data?: unknown }`
 
-**읽을 것:** A2 §3.4(에러 코드표 12개 + JSON-RPC 표준 5개). **만들지 말 것:** 에러 코드를 새로 발명하지 않는다. 표에 없는 상황은 `-32603 internal`로 접는다.
+**Read:** A2 §3.4 (the 12-code error table plus the 5 JSON-RPC standard codes). **Do not build:** do not invent new error codes. Situations not in the table fold into `-32603 internal`.
 
-1. - [ ] 실패 테스트를 쓴다: `packages/protocol/test/bridge-errors.test.ts`
+1. - [ ] Write the failing test: `packages/protocol/test/bridge-errors.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -452,13 +452,13 @@ describe("bridge errors", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/protocol test`
-   기대 실패: `SyntaxError: ... does not provide an export named 'BRIDGE_ERRORS'`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/protocol test`
+   Expected failure: `SyntaxError: ... does not provide an export named 'BRIDGE_ERRORS'`
 
-3. - [ ] 최소 구현을 `packages/protocol/src/bridge.ts`에 덧붙인다:
+3. - [ ] Append the minimal implementation to `packages/protocol/src/bridge.ts`:
 
 ```ts
-/** JSON-RPC 2.0 표준 코드. A2 §3.4가 omnis 범위를 이 위에 얹는다. */
+/** JSON-RPC 2.0 standard codes. A2 §3.4 layers the omnis range on top of these. */
 export const JSONRPC_ERRORS = {
   PARSE: -32700, INVALID_REQUEST: -32600, METHOD_NOT_FOUND: -32601,
   INVALID_PARAMS: -32602, INTERNAL: -32603,
@@ -503,33 +503,33 @@ export type HubMethod = typeof HUB_METHODS[number];
 export type BridgeMethod = typeof BRIDGE_METHODS[number];
 ```
 
-4. - [ ] 테스트를 돌린다: `pnpm --filter @omnis/protocol test` → 4 passed (bridge-errors)
+4. - [ ] Run the tests: `pnpm --filter @omnis/protocol test` → 4 passed (bridge-errors)
 
-5. - [ ] 커밋한다:
+5. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A16 add packages/protocol/src/bridge.ts packages/protocol/test/bridge-errors.test.ts
-git -C omnis/.worktrees/US-A16 commit -m "US-A16: 브리지 에러 코드·메서드 목록·toJsonRpcError
+git -C omnis/.worktrees/US-A16 commit -m "US-A16: bridge error codes, method lists, and toJsonRpcError
 
-- A2 §3.4의 omnis 12코드 + JSON-RPC 표준 5코드
-- HUB_METHODS/BRIDGE_METHODS 고정, BridgeError.name = 클래스명
+- The 12 omnis codes from A2 §3.4 plus the 5 JSON-RPC standard codes
+- Pin HUB_METHODS/BRIDGE_METHODS; BridgeError.name = the class name
 
 Co-Authored-By: Claude Opus <noreply@anthropic.com>"
 ```
 
-### Task 4: per-request 버전 협상 (US-A16, tier: Opus)
+### Task 4: per-request version negotiation (US-A16, tier: Opus)
 
 **Files:**
 - Modify: `packages/protocol/src/bridge.ts`, `packages/protocol/src/index.ts`
 - Test: `packages/protocol/test/bridge-version.test.ts`
 
 **Interfaces:**
-- Consumes: Task 1의 `PROTOCOL_VERSION`·`META_KEYS`·`SessionOrigin`, Task 3의 `BridgeError`·`BRIDGE_ERRORS`
+- Consumes: Task 1's `PROTOCOL_VERSION`·`META_KEYS`·`SessionOrigin`, Task 3's `BridgeError`·`BRIDGE_ERRORS`
 - Produces: `SUPPORTED_PROTOCOL_VERSIONS: readonly ["2026-09-20"]`, `RpcMeta`(zod), `withMeta<P>(params, meta?)`, `assertProtocolVersion(params: unknown): void`
 
-**읽을 것:** A2-D3, §3.1(공통 형태). **만들지 말 것:** `initialize` 핸드셰이크, 버전 불일치 시 연결 종료. 불일치는 **그 요청만** 거절한다 — 그래야 브리지와 허브를 따로 배포할 수 있다.
+**Read:** A2-D3, §3.1 (common shape). **Do not build:** the `initialize` handshake, or closing the connection on a version mismatch. A mismatch rejects **only that request** — that is what lets the bridge and the hub be deployed separately.
 
-1. - [ ] 실패 테스트를 쓴다: `packages/protocol/test/bridge-version.test.ts`
+1. - [ ] Write the failing test: `packages/protocol/test/bridge-version.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -570,10 +570,10 @@ describe("per-request version negotiation", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/protocol test`
-   기대 실패: `SyntaxError: ... does not provide an export named 'withMeta'`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/protocol test`
+   Expected failure: `SyntaxError: ... does not provide an export named 'withMeta'`
 
-3. - [ ] 최소 구현을 `packages/protocol/src/bridge.ts`에 덧붙인다:
+3. - [ ] Append the minimal implementation to `packages/protocol/src/bridge.ts`:
 
 ```ts
 export const SUPPORTED_PROTOCOL_VERSIONS = [PROTOCOL_VERSION] as const;
@@ -594,7 +594,7 @@ export function withMeta<P extends Record<string, unknown>>(
   return { ...params, _meta };
 }
 
-/** A2-D3: 불일치는 연결을 끊지 않고 이 요청만 -32010으로 거절한다. */
+/** A2-D3: a mismatch does not drop the connection; it rejects only this request with -32010. */
 export function assertProtocolVersion(params: unknown): void {
   const meta = (params as { _meta?: unknown } | null | undefined)?._meta;
   const parsed = RpcMeta.safeParse(meta);
@@ -609,46 +609,46 @@ export function assertProtocolVersion(params: unknown): void {
 }
 ```
 
-4. - [ ] `packages/protocol/src/index.ts`에 한 줄을 더한다: `export * from "./bridge.js";`
+4. - [ ] Add one line to `packages/protocol/src/index.ts`: `export * from "./bridge.js";`
 
-5. - [ ] 테스트와 타입체크를 돌린다: `pnpm --filter @omnis/protocol test` → 5 passed, `pnpm typecheck` → exit 0
+5. - [ ] Run the tests and typecheck: `pnpm --filter @omnis/protocol test` → 5 passed, `pnpm typecheck` → exit 0
 
-6. - [ ] 커밋한다:
+6. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A16 add packages/protocol/src/bridge.ts packages/protocol/src/index.ts packages/protocol/test/bridge-version.test.ts
-git -C omnis/.worktrees/US-A16 commit -m "US-A16: per-request 프로토콜 버전 협상(withMeta/assertProtocolVersion)
+git -C omnis/.worktrees/US-A16 commit -m "US-A16: per-request protocol version negotiation (withMeta/assertProtocolVersion)
 
-- A2-D3 MCP 2026-07-28 모델: initialize 핸드셰이크 없음
-- 버전 불일치는 연결 종료가 아니라 -32010 + data.supported
-- index.ts에서 bridge.ts re-export
+- The A2-D3 MCP 2026-07-28 model: no initialize handshake
+- A version mismatch is not a connection close but -32010 + data.supported
+- Re-export bridge.ts from index.ts
 
 Co-Authored-By: Claude Opus <noreply@anthropic.com>"
 ```
 
 ---
 
-## US-A17 — `local-agent` 데몬 (Task 5~10)
+## US-A17 — The `local-agent` daemon (Task 5~10)
 
-> **목표**(A7 §7): `apps/local-agent` 데몬 스캐폴드(Tailscale 연결, 세션 등록)
-> **산출물**: `apps/local-agent/src/main.ts`
-> **검증 명령**: `pnpm --filter @omnis/local-agent test`
-> **티어**: Sonnet · **의존**: US-A16
+> **Goal** (A7 §7): `apps/local-agent` daemon scaffold (Tailscale connection, session registration)
+> **Deliverable**: `apps/local-agent/src/main.ts`
+> **Verification command**: `pnpm --filter @omnis/local-agent test`
+> **Tier**: Sonnet · **Depends on**: US-A16
 
-### Task 5: 패키지 스캐폴드와 한 줄 JSON 로거 (US-A17, tier: Sonnet)
+### Task 5: Package scaffold and single-line JSON logger (US-A17, tier: Sonnet)
 
 **Files:**
 - Create: `apps/local-agent/package.json`, `apps/local-agent/tsconfig.json`, `apps/local-agent/vitest.config.ts`, `apps/local-agent/src/logger.ts`
 - Test: `apps/local-agent/test/logger.test.ts`
 
 **Interfaces:**
-- Consumes: `@omnis/protocol`(workspace 의존만 선언)
-- Consumes (서버 카운터파트): 허브의 **`WS /bridge`** 엔드포인트 — 정확한 주소는 미니 루프백 `ws://127.0.0.1:8787/bridge`, 맥북은 Tailscale Serve를 통과한 `wss://<mini>.ts.net/api/bridge`. 이 서버는 **`2026-09-20-phase-a-kernel-and-db.md`의 `hub-bridge-ws` 태스크(US-A10, T24 뒤)가 구현한다**(계약 §5 `WS /bridge` 행). 이 계획은 dial하는 클라이언트 쪽만 만든다 — 상대가 없는 게 아니라 다른 계획이 소유한다. 그쪽이 머지되기 전에는 Task 8·19의 fake/mock 소켓으로 테스트하고, end-to-end 연결은 `hub-bridge-ws` 머지 후 US-A20 계약 테스트로 확인한다.
-- Produces: `Logger` 인터페이스, `createLogger(pkg: string, opts?: { sink?: (line: string) => void; now?: () => Date }): Logger`
+- Consumes: `@omnis/protocol` (declares the workspace dependency only)
+- Consumes (server counterpart): the hub's **`WS /bridge`** endpoint — the exact address is `ws://127.0.0.1:8787/bridge` over mini loopback, and `wss://<mini>.ts.net/api/bridge` for the MacBook through Tailscale Serve. That server is **implemented by the `hub-bridge-ws` task (US-A10, after T24) in `2026-09-20-phase-a-kernel-and-db.md`** (the `WS /bridge` row in contract §5). This plan builds only the dialing client side — the counterpart is not missing, it is owned by another plan. Until that side merges, test with the fake/mock sockets in Task 8·19, and confirm the end-to-end connection with the US-A20 contract tests after `hub-bridge-ws` merges.
+- Produces: the `Logger` interface, `createLogger(pkg: string, opts?: { sink?: (line: string) => void; now?: () => Date }): Logger`
 
-**읽을 것:** 계약 §9(로그 규약), A7 §1(의존 방향). **만들지 말 것:** pino·winston 같은 로깅 라이브러리. 필수 키 5개짜리 한 줄 JSON이면 끝이고, 의존성 하나가 브리지 부팅 경로에 들어갈 이유가 없다.
+**Read:** contract §9 (logging convention), A7 §1 (dependency direction). **Do not build:** a logging library such as pino or winston. A single line of JSON with the five required keys is enough, and there is no reason for another dependency on the bridge boot path.
 
-1. - [ ] 실패 테스트를 쓴다: `apps/local-agent/test/logger.test.ts`
+1. - [ ] Write the failing test: `apps/local-agent/test/logger.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -675,10 +675,10 @@ describe("createLogger", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/local-agent test`
-   기대 실패: `ERR_PNPM_NO_MATCHING_PROJECT  No projects matched the filters in "/Users/logankim/AI-Workspaces/omnis"`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/local-agent test`
+   Expected failure: `ERR_PNPM_NO_MATCHING_PROJECT  No projects matched the filters in "/Users/logankim/AI-Workspaces/omnis"`
 
-3. - [ ] `apps/local-agent/package.json`을 만든다:
+3. - [ ] Create `apps/local-agent/package.json`:
 
 ```json
 {
@@ -705,9 +705,9 @@ describe("createLogger", () => {
 }
 ```
 
-   `typescript`/`vitest`는 계약 §2의 고정 핀이다(전 워크스페이스 동일: `vitest 2.1.9` · `typescript 5.6.3` · `zod ^3.24.1` · `pg 8.13.1` · `packageManager pnpm@9.12.3`). caret을 붙이면 워크스페이스에 두 버전이 설치돼 `pnpm test`가 패키지마다 다른 러너로 돈다.
+   `typescript`/`vitest` are the fixed pins from contract §2 (identical across the workspace: `vitest 2.1.9` · `typescript 5.6.3` · `zod ^3.24.1` · `pg 8.13.1` · `packageManager pnpm@9.12.3`). Adding a caret installs two versions in the workspace, and `pnpm test` then runs a different runner per package.
 
-4. - [ ] `apps/local-agent/tsconfig.json`과 `apps/local-agent/vitest.config.ts`를 만든다:
+4. - [ ] Create `apps/local-agent/tsconfig.json` and `apps/local-agent/vitest.config.ts`:
 
 ```json
 {
@@ -726,7 +726,7 @@ export default defineConfig({
 });
 ```
 
-5. - [ ] `apps/local-agent/src/logger.ts`를 만든다:
+5. - [ ] Create `apps/local-agent/src/logger.ts`:
 
 ```ts
 export type LogLevel = "debug" | "info" | "warn" | "error";
@@ -759,21 +759,21 @@ export function createLogger(
 }
 ```
 
-6. - [ ] `pnpm install`로 워크스페이스를 링크한 뒤 테스트를 돌린다: `pnpm --filter @omnis/local-agent test` → 2 passed
+6. - [ ] Link the workspace with `pnpm install`, then run the tests: `pnpm --filter @omnis/local-agent test` → 2 passed
 
-7. - [ ] 커밋한다:
+7. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A17 add apps/local-agent
-git -C omnis/.worktrees/US-A17 commit -m "US-A17: local-agent 패키지 스캐폴드 + 한 줄 JSON 로거
+git -C omnis/.worktrees/US-A17 commit -m "US-A17: local-agent package scaffold + single-line JSON logger
 
-- @omnis/protocol만 의존(A7 §1 의존 방향)
-- 계약 §9 로그 필수 키 5개(ts/level/pkg/msg/trace_id)
+- Depends only on @omnis/protocol (A7 §1 dependency direction)
+- The five required log keys from contract §9 (ts/level/pkg/msg/trace_id)
 
 Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 ```
 
-### Task 6: TOML 설정과 우선순위 해석 (US-A17, tier: Sonnet)
+### Task 6: TOML config and precedence resolution (US-A17, tier: Sonnet)
 
 **Files:**
 - Create: `apps/local-agent/src/config.ts`
@@ -783,9 +783,9 @@ Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 - Consumes: `HostId`(@omnis/protocol)
 - Produces: `ProcessRuntimeConfig`, `HttpRuntimeConfig`, `RuntimeConfig`, `LocalAgentConfig`, `ConfigSource = "cli"|"env"|"toml"|"default"`, `LoadConfigResult`, `HOST_DEFAULTS`, `normalizeHubUrl(input: string): string`, `loadConfig(input: { argv: string[]; env: NodeJS.ProcessEnv; tomlText?: string }): LoadConfigResult`, `ConfigError`
 
-**읽을 것:** A2-D15, A2 §2.1(TOML 예시 둘 + 필드 분기표 + `allowed_roots` 거부 규칙), 계약 §8. **만들지 말 것:** `[[runtime]]`을 CLI나 환경변수로 추가·수정하는 경로. `allowed_roots`가 명령줄에서 바뀔 수 있으면 A2-D12의 경로 상한이 의미를 잃는다.
+**Read:** A2-D15, A2 §2.1 (the two TOML examples plus the field branching table and the `allowed_roots` rejection rule), contract §8. **Do not build:** a path that adds or modifies `[[runtime]]` from the CLI or the environment. If `allowed_roots` could change on the command line, the path ceiling in A2-D12 loses its meaning.
 
-1. - [ ] 실패 테스트를 쓴다: `apps/local-agent/test/config.test.ts`
+1. - [ ] Write the failing test: `apps/local-agent/test/config.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -869,10 +869,10 @@ describe("loadConfig precedence (A2-D15)", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/local-agent test`
-   기대 실패: `Failed to resolve import "../src/config.js"`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/local-agent test`
+   Expected failure: `Failed to resolve import "../src/config.js"`
 
-3. - [ ] `apps/local-agent/src/config.ts`를 만든다:
+3. - [ ] Create `apps/local-agent/src/config.ts`:
 
 ```ts
 import { parse as parseToml } from "smol-toml";
@@ -890,7 +890,7 @@ export interface ProcessRuntimeConfig {
   allowed_roots: string[];
   pinned_version?: string;
   default_model?: string;
-  /** 게이트 ⑪ 스위치(Task 12). 미지정이면 origin 기본값(A2-D11). 계약 §8의 필드 목록에는 게이트가 닫힐 때 합친다. */
+  /** Gate ⑪ switch (Task 12). Unset means the origin default (A2-D11). It joins the field list in contract §8 once the gate closes. */
   bare?: boolean;
 }
 export interface HttpRuntimeConfig {
@@ -912,7 +912,7 @@ export interface LoadConfigResult {
   provenance: Record<"host" | "hub_url" | "token_keychain_item", ConfigSource>;
 }
 
-/** 계약 §8. host-config.ts(US-A19b)가 이 표를 재사용한다. */
+/** Contract §8. host-config.ts (US-A19b) reuses this table. */
 export const HOST_DEFAULTS: Record<HostId, { hub_url: string; token_keychain_item: string }> = {
   mini: { hub_url: "ws://127.0.0.1:8787/bridge", token_keychain_item: "omnis.bridge.token.mini" },
   macbook: { hub_url: "wss://omnis-hub.your-tailnet.ts.net/api/bridge", token_keychain_item: "omnis.bridge.token.macbook" },
@@ -922,7 +922,7 @@ const PROCESS_KINDS = new Set(["claude_code", "codex", "claude_ds"]);
 const PROCESS_ONLY_FIELDS = ["binary", "allowed_roots", "pinned_version", "default_model", "bare"];
 const HTTP_ONLY_FIELDS = ["base_url", "session_header_mode"];
 
-/** A6 §10의 plist는 `--hub http://127.0.0.1:8787`을 넘긴다. 브리지가 쓰는 것은 ws(s) + /bridge다. */
+/** The plist in A6 §10 passes `--hub http://127.0.0.1:8787`. What the bridge uses is ws(s) + /bridge. */
 export function normalizeHubUrl(input: string): string {
   const u = new URL(input);
   if (u.protocol === "http:") u.protocol = "ws:";
@@ -969,7 +969,7 @@ function parseRuntime(raw: Record<string, unknown>, homeDir: string): RuntimeCon
     const out: ProcessRuntimeConfig = { kind: kind as ProcessRuntimeConfig["kind"], binary, allowed_roots };
     if (typeof raw.pinned_version === "string") out.pinned_version = raw.pinned_version;
     if (typeof raw.default_model === "string") out.default_model = raw.default_model;
-    if (typeof raw.bare === "boolean") out.bare = raw.bare;   // 게이트 ⑪ 스위치. 없으면 Task 12가 origin 기본값을 쓴다
+    if (typeof raw.bare === "boolean") out.bare = raw.bare;   // gate ⑪ switch. If absent, Task 12 uses the origin default
     return out;
   }
   if (kind === "hermes") {
@@ -1021,22 +1021,22 @@ export function loadConfig(input: { argv: string[]; env: NodeJS.ProcessEnv; toml
 }
 ```
 
-4. - [ ] 테스트를 돌린다: `pnpm --filter @omnis/local-agent test` → 8 passed
+4. - [ ] Run the tests: `pnpm --filter @omnis/local-agent test` → 8 passed
 
-5. - [ ] 커밋한다:
+5. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A17 add apps/local-agent/src/config.ts apps/local-agent/test/config.test.ts apps/local-agent/package.json
-git -C omnis/.worktrees/US-A17 commit -m "US-A17: TOML 설정 + CLI>env>TOML>default 우선순위(A2-D15)
+git -C omnis/.worktrees/US-A17 commit -m "US-A17: TOML config + CLI>env>TOML>default precedence (A2-D15)
 
-- [[runtime]]은 TOML 전용, --runtimes는 필터만 한다
-- allowed_roots에 \$HOME·/ 오면 기동 거부
-- A6 plist의 http base URL을 ws(s)+/bridge로 정규화
+- [[runtime]] is TOML-only; --runtimes only filters
+- Refuse to start if allowed_roots contains \$HOME or /
+- Normalize the http base URL from the A6 plist into ws(s)+/bridge
 
 Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 ```
 
-### Task 7: 세션 레지스트리와 경로 상한 (US-A17, tier: Sonnet)
+### Task 7: Session registry and path ceiling (US-A17, tier: Sonnet)
 
 **Files:**
 - Create: `apps/local-agent/src/paths.ts`, `apps/local-agent/src/session-registry.ts`
@@ -1044,11 +1044,11 @@ Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `SessionKey`, `SessionId`, `SessionState`, `SessionOrigin`, `PermissionProfile`, `RuntimeKind`, `BridgeError`, `BRIDGE_ERRORS`(@omnis/protocol)
-- Produces: `assertPathAllowed(cwd: string, allowedRoots: string[]): string`(정규화된 realpath 반환), `SessionRecord`, `SessionRegistry`(메서드 `create`/`get`/`require`/`bindSessionId`/`setState`/`list`/`close`)
+- Produces: `assertPathAllowed(cwd: string, allowedRoots: string[]): string` (returns the normalized realpath), `SessionRecord`, `SessionRegistry` (methods `create`/`get`/`require`/`bindSessionId`/`setState`/`list`/`close`)
 
-**읽을 것:** A2-D1(키/아이디 분리), A2-D12(경로 재검증), §7.2(디렉터리 상한). **만들지 말 것:** 세션을 디스크에 영속화하지 않는다 — 재연결 시 `session.registered`로 재신고하면 허브가 `session_key` 기준 upsert한다(A2 §2.2 5항).
+**Read:** A2-D1 (key/id separation), A2-D12 (path revalidation), §7.2 (directory ceiling). **Do not build:** the bridge does not persist sessions to disk — on reconnect it re-announces via `session.registered` and the hub upserts on `session_key` (A2 §2.2 item 5).
 
-1. - [ ] 실패 테스트를 쓴다: `apps/local-agent/test/session-registry.test.ts`
+1. - [ ] Write the failing test: `apps/local-agent/test/session-registry.test.ts`
 
 ```ts
 import { mkdtempSync, mkdirSync, symlinkSync } from "node:fs";
@@ -1124,17 +1124,17 @@ describe("SessionRegistry", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/local-agent test`
-   기대 실패: `Failed to resolve import "../src/paths.js"`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/local-agent test`
+   Expected failure: `Failed to resolve import "../src/paths.js"`
 
-3. - [ ] `apps/local-agent/src/paths.ts`를 만든다:
+3. - [ ] Create `apps/local-agent/src/paths.ts`:
 
 ```ts
 import { realpathSync } from "node:fs";
 import { resolve, sep } from "node:path";
 import { BRIDGE_ERRORS, BridgeError } from "@omnis/protocol";
 
-/** A2-D12: 허브가 보낸 cwd는 브리지가 재검증한다. 심볼릭 링크는 realpath 후 재검사. */
+/** A2-D12: the bridge revalidates the cwd the hub sends. Symlinks are re-checked after realpath. */
 export function assertPathAllowed(cwd: string, allowedRoots: string[]): string {
   let real: string;
   try {
@@ -1152,7 +1152,7 @@ export function assertPathAllowed(cwd: string, allowedRoots: string[]): string {
 }
 ```
 
-4. - [ ] `apps/local-agent/src/session-registry.ts`를 만든다:
+4. - [ ] Create `apps/local-agent/src/session-registry.ts`:
 
 ```ts
 import {
@@ -1176,7 +1176,7 @@ export interface SessionRecord {
 
 export type SessionCreateInput = Omit<SessionRecord, "session_id" | "state" | "last_turn_at">;
 
-/** 브리지는 자기가 만든 세션만 관리한다(A2 §2.3). 디스크에 영속화하지 않는다. */
+/** The bridge manages only the sessions it created (A2 §2.3). It does not persist them to disk. */
 export class SessionRegistry {
   readonly #byKey = new Map<string, SessionRecord>();
 
@@ -1196,7 +1196,7 @@ export class SessionRegistry {
     return rec;
   }
 
-  /** 런타임이 세션을 새로 만들면 이 값만 바뀐다. session_key와 thread는 유지된다. */
+  /** When the runtime creates a new session, only this value changes. The session_key and thread are kept. */
   bindSessionId(key: string, sessionId: string): SessionRecord {
     const rec = this.require(key);
     rec.session_id = sessionId;
@@ -1216,21 +1216,21 @@ export class SessionRegistry {
 }
 ```
 
-5. - [ ] 테스트를 돌린다: `pnpm --filter @omnis/local-agent test` → 6 passed
+5. - [ ] Run the tests: `pnpm --filter @omnis/local-agent test` → 6 passed
 
-6. - [ ] 커밋한다:
+6. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A17 add apps/local-agent/src/paths.ts apps/local-agent/src/session-registry.ts apps/local-agent/test/session-registry.test.ts
-git -C omnis/.worktrees/US-A17 commit -m "US-A17: 세션 레지스트리(session_key≠session_id) + allowed_roots 재검증
+git -C omnis/.worktrees/US-A17 commit -m "US-A17: session registry (session_key≠session_id) + allowed_roots revalidation
 
-- A2-D1: session_id 회전에도 session_key와 thread는 유지
-- A2-D12: realpath 후 재검사, 밖이면 -32005
+- A2-D1: session_key and thread survive session_id rotation
+- A2-D12: re-check after realpath; -32005 if outside
 
 Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 ```
 
-### Task 8: 허브 WebSocket 클라이언트와 재연결 백오프 (US-A17, tier: Sonnet)
+### Task 8: Hub WebSocket client and reconnect backoff (US-A17, tier: Sonnet)
 
 **Files:**
 - Create: `apps/local-agent/src/keychain.ts`, `apps/local-agent/src/hub-client.ts`
@@ -1238,12 +1238,12 @@ Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `LocalAgentConfig`(Task 6), `Logger`(Task 5), `withMeta`, `toJsonRpcError`, `BridgeMethod`, `HubMethod`(@omnis/protocol)
-- Consumes (서버 카운터파트): 허브 `WS /bridge` — `ws://127.0.0.1:8787/bridge`(미니) / `wss://<mini>.ts.net/api/bridge`(맥북). 오너는 `2026-09-20-phase-a-kernel-and-db.md`의 `hub-bridge-ws` 태스크(US-A10)다. 이 태스크는 그 서버를 만들지 않고 dial만 한다.
-- Produces: `readKeychainSecret(item, account?, exec?)`, `backoffDelayMs(attempt: number, rand?: () => number): number`, `SocketLike`, `HubClientDeps`, `HubClient`(메서드 `start`/`stop`/`notify`/`request`)
+- Consumes (server counterpart): the hub `WS /bridge` — `ws://127.0.0.1:8787/bridge` (mini) / `wss://<mini>.ts.net/api/bridge` (MacBook). The owner is the `hub-bridge-ws` task (US-A10) in `2026-09-20-phase-a-kernel-and-db.md`. This task does not build that server; it only dials it.
+- Produces: `readKeychainSecret(item, account?, exec?)`, `backoffDelayMs(attempt: number, rand?: () => number): number`, `SocketLike`, `HubClientDeps`, `HubClient` (methods `start`/`stop`/`notify`/`request`)
 
-**읽을 것:** A2 §2.2(접속·인증·재연결 6단계), §3.1(JSON-RPC 공통 형태). **만들지 말 것:** 허브→브리지 dial 경로(A2-D2: 브리지만 dial한다). 허브 쪽 `WS /bridge` 서버 구현도 여기서 만들지 않는다 — `hub-bridge-ws`(kernel-and-db) 소유다. 하트비트를 직접 발명하지 않는다 — 30초 `health` 알림이 그 역할이다.
+**Read:** A2 §2.2 (the six steps of connect · authenticate · reconnect), §3.1 (common JSON-RPC shape). **Do not build:** a hub→bridge dial path (A2-D2: only the bridge dials). Do not build the hub-side `WS /bridge` server here either — `hub-bridge-ws` (kernel-and-db) owns it. Do not invent a heartbeat — the 30-second `health` notification serves that role.
 
-1. - [ ] 실패 테스트를 쓴다: `apps/local-agent/test/hub-client.test.ts`
+1. - [ ] Write the failing test: `apps/local-agent/test/hub-client.test.ts`
 
 ```ts
 import { describe, expect, it, vi } from "vitest";
@@ -1321,10 +1321,10 @@ describe("HubClient", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/local-agent test`
-   기대 실패: `Failed to resolve import "../src/hub-client.js"`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/local-agent test`
+   Expected failure: `Failed to resolve import "../src/hub-client.js"`
 
-3. - [ ] `apps/local-agent/src/keychain.ts`를 만든다:
+3. - [ ] Create `apps/local-agent/src/keychain.ts`:
 
 ```ts
 import { execFile } from "node:child_process";
@@ -1333,7 +1333,7 @@ import { promisify } from "node:util";
 const run = promisify(execFile);
 export const KEYCHAIN_ACCOUNT = "281932556+jinhologankim@users.noreply.github.com";
 
-/** 값은 절대 로그·이벤트·에러 메시지에 싣지 않는다(A2 §7.2). */
+/** Never put the value in logs, events, or error messages (A2 §7.2). */
 export async function readKeychainSecret(
   item: string,
   account: string = KEYCHAIN_ACCOUNT,
@@ -1346,7 +1346,7 @@ export async function readKeychainSecret(
 }
 ```
 
-4. - [ ] `apps/local-agent/src/hub-client.ts`를 만든다:
+4. - [ ] Create `apps/local-agent/src/hub-client.ts`:
 
 ```ts
 import { randomUUID } from "node:crypto";
@@ -1370,7 +1370,7 @@ export interface HubClientDeps {
   onClose?: () => void;
 }
 
-/** A2 §2.2 5항: 1s → 2s → 4s → … → 30s 상한, ±20% jitter. */
+/** A2 §2.2 item 5: 1s → 2s → 4s → … → 30s ceiling, ±20% jitter. */
 export function backoffDelayMs(attempt: number, rand: () => number = Math.random): number {
   const base = Math.min(1000 * 2 ** attempt, 30_000);
   return Math.round(base * (0.8 + 0.4 * rand()));
@@ -1466,21 +1466,21 @@ export class HubClient {
 }
 ```
 
-5. - [ ] 테스트를 돌린다: `pnpm --filter @omnis/local-agent test` → 5 passed
+5. - [ ] Run the tests: `pnpm --filter @omnis/local-agent test` → 5 passed
 
-6. - [ ] 커밋한다:
+6. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A17 add apps/local-agent/src/hub-client.ts apps/local-agent/src/keychain.ts apps/local-agent/test/hub-client.test.ts
-git -C omnis/.worktrees/US-A17 commit -m "US-A17: 허브 WS JSON-RPC 클라이언트 + 지수 백오프 재연결
+git -C omnis/.worktrees/US-A17 commit -m "US-A17: hub WS JSON-RPC client + exponential backoff reconnect
 
-- A2-D2: 브리지만 dial, Authorization: Bearer <keychain token>
-- 1s→30s ±20% jitter 백오프, 양방향 요청/알림 처리
+- A2-D2: only the bridge dials, Authorization: Bearer <keychain token>
+- 1s→30s ±20% jitter backoff, bidirectional request/notification handling
 
 Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 ```
 
-### Task 9: 끊긴 동안의 durable outbox (US-A17, tier: Sonnet)
+### Task 9: The durable outbox while disconnected (US-A17, tier: Sonnet)
 
 **Files:**
 - Create: `apps/local-agent/src/outbox.ts`
@@ -1488,11 +1488,11 @@ Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `BridgeMethod`(@omnis/protocol)
-- Produces: `OutboxEntry`, `Outbox`(생성자 `{ path, maxBytes? }`, 메서드 `append`/`drain`/`sizeBytes`/`length`)
+- Produces: `OutboxEntry`, `Outbox` (constructor `{ path, maxBytes? }`, methods `append`/`drain`/`sizeBytes`/`length`)
 
-**읽을 것:** A2 §2.2 "끊긴 동안의 턴". **만들지 말 것:** ephemeral 델타를 큐에 넣지 않는다. 재전송 성공/실패 상태 머신을 만들지 않는다 — drain이 던지면 남은 줄은 파일에 그대로 남는다.
+**Read:** A2 §2.2 "turns while disconnected". **Do not build:** do not queue ephemeral deltas. Do not build a resend success/failure state machine — if drain throws, the remaining lines stay in the file as they are.
 
-1. - [ ] 실패 테스트를 쓴다: `apps/local-agent/test/outbox.test.ts`
+1. - [ ] Write the failing test: `apps/local-agent/test/outbox.test.ts`
 
 ```ts
 import { mkdtempSync } from "node:fs";
@@ -1533,10 +1533,10 @@ describe("Outbox", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/local-agent test`
-   기대 실패: `Failed to resolve import "../src/outbox.js"`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/local-agent test`
+   Expected failure: `Failed to resolve import "../src/outbox.js"`
 
-3. - [ ] `apps/local-agent/src/outbox.ts`를 만든다:
+3. - [ ] Create `apps/local-agent/src/outbox.ts`:
 
 ```ts
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -1545,7 +1545,7 @@ import type { BridgeMethod } from "@omnis/protocol";
 
 export interface OutboxEntry { method: BridgeMethod; params: Record<string, unknown>; at?: string }
 
-/** A2 §2.2: durable만 쌓는다. ephemeral 델타는 버린다. approval.requested는 절대 안 버린다. */
+/** A2 §2.2: queue durable events only. Ephemeral deltas are dropped. approval.requested is never dropped. */
 export class Outbox {
   readonly #path: string;
   readonly #maxBytes: number;
@@ -1575,7 +1575,7 @@ export class Outbox {
   length(): number { return this.#buf.length; }
   sizeBytes(): number { return Buffer.byteLength(this.#serialise(), "utf8"); }
 
-  /** 순서대로 보내고 성공한 것만 지운다. 던지면 남은 것은 파일에 그대로 남는다. */
+  /** Send in order and delete only what succeeded. If it throws, the rest stays in the file. */
   async drain(send: (e: OutboxEntry) => Promise<void>): Promise<void> {
     while (this.#buf.length > 0) {
       const head = this.#buf[0] as OutboxEntry;
@@ -1595,21 +1595,21 @@ export class Outbox {
 }
 ```
 
-4. - [ ] 테스트를 돌린다: `pnpm --filter @omnis/local-agent test` → 3 passed
+4. - [ ] Run the tests: `pnpm --filter @omnis/local-agent test` → 3 passed
 
-5. - [ ] 커밋한다:
+5. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A17 add apps/local-agent/src/outbox.ts apps/local-agent/test/outbox.test.ts
-git -C omnis/.worktrees/US-A17 commit -m "US-A17: 재연결용 durable outbox(~/.omnis/outbox.ndjson, 50MB)
+git -C omnis/.worktrees/US-A17 commit -m "US-A17: durable outbox for reconnect (~/.omnis/outbox.ndjson, 50MB)
 
-- A2 §2.2: 순서 보존 flush, approval.requested는 절대 버리지 않음
-- ephemeral 델타는 큐에 넣지 않는다
+- A2 §2.2: order-preserving flush; approval.requested is never dropped
+- Ephemeral deltas are never queued
 
 Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 ```
 
-### Task 10: RPC 디스패처와 `delegate.run` 거절 (US-A17, tier: Sonnet)
+### Task 10: RPC dispatcher and `delegate.run` refusal (US-A17, tier: Sonnet)
 
 **Files:**
 - Create: `apps/local-agent/src/rpc-dispatch.ts`, `apps/local-agent/src/main.ts`
@@ -1619,9 +1619,9 @@ Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 - Consumes: Task 4 `assertProtocolVersion`, Task 3 `BRIDGE_ERRORS`/`JSONRPC_ERRORS`/`BridgeError`, Task 2 `SessionCreateParams`/`TurnStartParams`/`TurnCancelParams`/`SessionCloseParams`/`BridgeDiscoverResult`, Task 6 `loadConfig`, Task 7 `SessionRegistry`/`assertPathAllowed`, Task 8 `HubClient`
 - Produces: `RuntimeAdapter`, `EventSink`, `TurnHandle`, `DispatchDeps`, `createDispatcher(deps: DispatchDeps): (method: string, params: unknown) => Promise<unknown>`, `main(argv, env): Promise<void>`
 
-**읽을 것:** A2 §3.2(메서드표), §4 앞머리(RuntimeAdapter/EventSink), §5.1 마지막 문단(`approval_id` 없는 `delegate.run`은 와이어에서 거절). **만들지 말 것:** `delegate.run`의 실행 분기. `ingest.*` 구현. `session.read_summary`의 요약 생성.
+**Read:** A2 §3.2 (method table), the top of §4 (RuntimeAdapter/EventSink), the last paragraph of §5.1 (`delegate.run` without an `approval_id` is rejected at the wire). **Do not build:** the execution branch of `delegate.run`. Implementations of `ingest.*`. Summary generation for `session.read_summary`.
 
-1. - [ ] 실패 테스트를 쓴다: `apps/local-agent/test/rpc-dispatch.test.ts`
+1. - [ ] Write the failing test: `apps/local-agent/test/rpc-dispatch.test.ts`
 
 ```ts
 import { withMeta } from "@omnis/protocol";
@@ -1694,10 +1694,10 @@ describe("rpc dispatcher", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/local-agent test`
-   기대 실패: `Failed to resolve import "../src/rpc-dispatch.js"`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/local-agent test`
+   Expected failure: `Failed to resolve import "../src/rpc-dispatch.js"`
 
-3. - [ ] `apps/local-agent/src/rpc-dispatch.ts`를 만든다:
+3. - [ ] Create `apps/local-agent/src/rpc-dispatch.ts`:
 
 ```ts
 import { randomUUID } from "node:crypto";
@@ -1757,7 +1757,7 @@ export function createDispatcher(deps: DispatchDeps): (method: string, params: u
   return async (method: string, params: unknown): Promise<unknown> => {
     assertProtocolVersion(params);
     if (PHASE_B_METHODS.has(method)) {
-      throw new BridgeError(JSONRPC_ERRORS.METHOD_NOT_FOUND, `${method} is Phase B (A7 §7 Phase B 시드 메모)`);
+      throw new BridgeError(JSONRPC_ERRORS.METHOD_NOT_FOUND, `${method} is Phase B (A7 §7 Phase B seed note)`);
     }
     if (!(HUB_METHODS as readonly string[]).includes(method)) {
       throw new BridgeError(JSONRPC_ERRORS.METHOD_NOT_FOUND, `unknown method: ${method}`);
@@ -1818,11 +1818,11 @@ export function createDispatcher(deps: DispatchDeps): (method: string, params: u
       }
 
       case "session.read_summary":
-        // 요약은 허브가 만든다(A2 §6). 브리지는 생성 경로를 갖지 않는다.
+        // The hub produces summaries (A2 §6). The bridge has no generation path.
         throw new BridgeError(BRIDGE_ERRORS.CAPABILITY_UNSUPPORTED, "session.read_summary is served by the hub, not the bridge");
 
       case "delegate.run": {
-        // A2 §5.1: 허브가 서명한 approval_id 없이는 와이어에서 거절한다. Phase A에는 실행 분기가 없다.
+        // A2 §5.1: without a hub-signed approval_id, reject at the wire. Phase A has no execution branch.
         const approvalId = (params as { approval_id?: unknown }).approval_id;
         if (typeof approvalId !== "string" || approvalId.length === 0) {
           deps.logger.error("delegate.run without approval_id", { host: deps.host });
@@ -1838,7 +1838,7 @@ export function createDispatcher(deps: DispatchDeps): (method: string, params: u
 }
 ```
 
-4. - [ ] `apps/local-agent/src/main.ts`를 만들어 조각을 잇는다:
+4. - [ ] Create `apps/local-agent/src/main.ts` to wire the pieces together:
 
 ```ts
 import { readFileSync } from "node:fs";
@@ -1891,31 +1891,31 @@ if (process.argv[1]?.endsWith("main.js") === true) {
 }
 ```
 
-5. - [ ] 테스트와 타입체크를 돌린다: `pnpm --filter @omnis/local-agent test` → 6 passed, `pnpm typecheck` → exit 0
+5. - [ ] Run the tests and typecheck: `pnpm --filter @omnis/local-agent test` → 6 passed, `pnpm typecheck` → exit 0
 
-6. - [ ] 커밋한다:
+6. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A17 add apps/local-agent/src/rpc-dispatch.ts apps/local-agent/src/main.ts apps/local-agent/test/rpc-dispatch.test.ts
-git -C omnis/.worktrees/US-A17 commit -m "US-A17: RPC 디스패처 + main 엔트리(delegate.run은 -32006으로 거절)
+git -C omnis/.worktrees/US-A17 commit -m "US-A17: RPC dispatcher + main entry (delegate.run rejects with -32006)
 
-- 버전 협상 → 메서드 라우팅 → params zod 파싱 순서 고정
-- ingest.* 는 Phase B라 -32601, session.read_summary는 허브 소유라 -32003
-- session.create는 슬롯만 만들고 프로세스를 띄우지 않는다
+- Fix the order: version negotiation → method routing → params zod parsing
+- ingest.* is Phase B so -32601; session.read_summary is hub-owned so -32003
+- session.create only creates a slot and never spawns a process
 
 Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 ```
 
 ---
 
-## US-A18 — Claude Code 브리지 (Task 11~12)
+## US-A18 — Claude Code bridge (Task 11~12)
 
-> **목표**(A7 §7): Claude Code 브리지(`claude -p --output-format stream-json --resume` 래핑)
-> **산출물**: `apps/local-agent/src/bridges/claude-code.ts`
-> **검증 명령**: `pnpm --filter @omnis/local-agent test`
-> **티어**: Opus · **의존**: US-A17
+> **Goal** (A7 §7): Claude Code bridge (wrapping `claude -p --output-format stream-json --resume`)
+> **Deliverable**: `apps/local-agent/src/bridges/claude-code.ts`
+> **Verification command**: `pnpm --filter @omnis/local-agent test`
+> **Tier**: Opus · **Depends on**: US-A17
 
-### Task 11: stream-json 파서와 durable 디바운스 (US-A18, tier: Opus)
+### Task 11: stream-json parser and durable debounce (US-A18, tier: Opus)
 
 **Files:**
 - Create: `apps/local-agent/src/bridges/stream-json.ts`, `apps/local-agent/src/bridges/durable-debounce.ts`
@@ -1925,9 +1925,9 @@ Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 - Consumes: `BridgeMethod`, `BridgeItemKind`(@omnis/protocol)
 - Produces: `BridgeEmit = { method: BridgeMethod; params: Record<string, unknown> }`, `StreamJsonState`, `newStreamJsonState()`, `mapStreamJsonEvent(raw, ctx): BridgeEmit[]`, `truncateToolResult(body: string): { body: string; truncated: boolean }`, `createDurableDebouncer(emit, opts)`
 
-**읽을 것:** A2 §4.1(이벤트 → Item 매핑표 전체), A2-D4(3티어). **만들지 말 것:** `system/init` 전문을 durable로 올리지 않는다(실측 28KB). `content_block_stop`을 처리하지 않는다 — `assistant`가 확정판이다.
+**Read:** A2 §4.1 (the entire event → Item mapping table), A2-D4 (three tiers). **Do not build:** do not lift the full `system/init` payload into durable (measured at 28KB). Do not handle `content_block_stop` — `assistant` is the authoritative version.
 
-1. - [ ] 실패 테스트를 쓴다: `apps/local-agent/test/stream-json.test.ts`
+1. - [ ] Write the failing test: `apps/local-agent/test/stream-json.test.ts`
 
 ```ts
 import { describe, expect, it, vi } from "vitest";
@@ -2009,10 +2009,10 @@ describe("createDurableDebouncer (A2-D4)", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/local-agent test`
-   기대 실패: `Failed to resolve import "../src/bridges/stream-json.js"`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/local-agent test`
+   Expected failure: `Failed to resolve import "../src/bridges/stream-json.js"`
 
-3. - [ ] `apps/local-agent/src/bridges/durable-debounce.ts`를 만든다:
+3. - [ ] Create `apps/local-agent/src/bridges/durable-debounce.ts`:
 
 ```ts
 import type { BridgeMethod } from "@omnis/protocol";
@@ -2020,8 +2020,8 @@ import type { BridgeMethod } from "@omnis/protocol";
 export interface DurableEvent { method: BridgeMethod; params: Record<string, unknown> }
 
 /**
- * A2-D4: turn.item.started에서 row를 만들고, UPDATE는 500ms 디바운스 또는 turn.item.completed에만.
- * 같은 item_id의 started 중복은 버리고, completed 연타는 마지막 것만 남긴다.
+ * A2-D4: create the row on turn.item.started; UPDATE only on the 500ms debounce or on turn.item.completed.
+ * Drop duplicate started events for the same item_id, and keep only the last of a burst of completed events.
  */
 export function createDurableDebouncer(
   emit: (e: DurableEvent) => void,
@@ -2061,7 +2061,7 @@ export function createDurableDebouncer(
 }
 ```
 
-4. - [ ] `apps/local-agent/src/bridges/stream-json.ts`를 만든다:
+4. - [ ] Create `apps/local-agent/src/bridges/stream-json.ts`:
 
 ```ts
 import type { BridgeItemKind, BridgeMethod } from "@omnis/protocol";
@@ -2100,7 +2100,7 @@ function item(ctx: Ctx, itemId: string, extra: Record<string, unknown>): Record<
   return { session_key: ctx.session_key, turn_id: ctx.turn_id, item_id: itemId, ...extra };
 }
 
-/** A2 §4.1 매핑표. 표에 없는 이벤트는 빈 배열 → cold 티어에만 남는다. */
+/** A2 §4.1 mapping table. Events not in the table return an empty array → they stay in the cold tier only. */
 export function mapStreamJsonEvent(raw: unknown, ctx: Ctx): BridgeEmit[] {
   const ev = raw as Record<string, unknown>;
   const type = ev.type;
@@ -2181,35 +2181,35 @@ export function mapStreamJsonEvent(raw: unknown, ctx: Ctx): BridgeEmit[] {
 }
 ```
 
-5. - [ ] 테스트를 돌린다: `pnpm --filter @omnis/local-agent test` → 8 passed
+5. - [ ] Run the tests: `pnpm --filter @omnis/local-agent test` → 8 passed
 
-6. - [ ] 커밋한다:
+6. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A18 add apps/local-agent/src/bridges apps/local-agent/test/stream-json.test.ts
-git -C omnis/.worktrees/US-A18 commit -m "US-A18: stream-json 이벤트 → Item 매핑 + durable 500ms 디바운스
+git -C omnis/.worktrees/US-A18 commit -m "US-A18: stream-json event → Item mapping + 500ms durable debounce
 
-- A2 §4.1 표 전량, system/init은 session_id·capabilities만 승격
-- 미지 이벤트는 durable 0건(cold 전용), tool_result 8KB 축약
+- The full A2 §4.1 table; system/init promotes only session_id·capabilities
+- Unknown events produce 0 durable rows (cold only); tool_result is truncated at 8KB
 
 Co-Authored-By: Claude Opus <noreply@anthropic.com>"
 ```
 
-### Task 12: Claude Code 어댑터와 claude-ds 변형 (US-A18, tier: Opus)
+### Task 12: Claude Code adapter and the claude-ds variant (US-A18, tier: Opus)
 
 **Files:**
 - Create: `apps/local-agent/src/bridges/claude-code.ts`
 - Test: `apps/local-agent/test/claude-code.test.ts`
 
 **Interfaces:**
-- Consumes: Task 11의 `mapStreamJsonEvent`/`newStreamJsonState`/`createDurableDebouncer`, Task 10의 `RuntimeAdapter`/`EventSink`/`TurnHandle`, Task 7의 `SessionRecord`
+- Consumes: Task 11's `mapStreamJsonEvent`/`newStreamJsonState`/`createDurableDebouncer`, Task 10's `RuntimeAdapter`/`EventSink`/`TurnHandle`, Task 7's `SessionRecord`
 - Produces: `PERMISSION_MODE`, `permissionModeFor(profile, origin)`, `buildClaudeArgs(opts): string[]`, `parseClaudeCapabilities(versionLine: string): { version, capabilities }`, `ClaudeCodeAdapter`, `createClaudeDsAdapter(cfg)`
 
-**읽을 것:** A2-D5, A2-D8, A2-D11, §4.1, §4.3(claude-ds 차이표), §7.1. **만들지 말 것:** 상주 프로세스. Agent SDK. `--settings` hook 주입의 정확한 표면(S-A2-1 미검증) — 플래그 자리만 비워 두고 hook 승격은 US-A20의 mock으로 검증한다.
+**Read:** A2-D5, A2-D8, A2-D11, §4.1, §4.3 (the claude-ds difference table), §7.1. **Do not build:** a resident process. The Agent SDK. The exact surface of `--settings` hook injection (S-A2-1 unverified) — leave only the flag slot open, and verify hook promotion with the US-A20 mock.
 
-**`--bare`는 인증 방식을 바꾼다(프로브 실측, `tools/spikes/_probes/2026-09-20-cli-probes.md` §2).** `--bare` 아래에서 Anthropic 인증은 **`ANTHROPIC_API_KEY` 또는 `--settings`의 `apiKeyHelper`로 한정**되고 OAuth·Keychain은 아예 읽지 않는다. 즉 `--bare`로 도는 위임 턴은 Claude 구독(T3)을 못 타고 토큰 과금(T2급)이 된다 — A2-D11이 "위임은 구독 바이너리를 탄다"고 가정한 것과 어긋난다. **위임 런 모드를 어느 쪽으로 할지는 게이트 ⑪(S-A2-1) / 마스터 §19 Q13이 결정한다.** 그 결정이 나기 전이므로 Phase A 브리지는 **두 호출 방식을 모두 지원**한다: `bare` 설정 플래그(`ClaudeAdapterConfig.bare?: boolean`)가 강제/금지를 주고, 미지정이면 A2-D11의 보수값(비human origin = `--bare`)으로 떨어진다. claude-ds(DeepSeek, API 키)는 영향 없음 — `--bare`가 자연스러운 모드라 `bare: true`로 고정한다.
+**`--bare` changes the authentication path (probe measurement, `tools/spikes/_probes/2026-09-20-cli-probes.md` §2).** Under `--bare`, Anthropic authentication is **limited to `ANTHROPIC_API_KEY` or `apiKeyHelper` in `--settings`** and OAuth·Keychain are not read at all. That means a delegation turn running with `--bare` cannot use the Claude subscription (T3) and is billed per token (T2-class) — which conflicts with what A2-D11 assumed, that "delegation rides the subscription binary". **Which way to run delegation is decided by gate ⑪ (S-A2-1) / master §19 Q13.** Since that decision has not been made, the Phase A bridge **supports both call modes**: the `bare` config flag (`ClaudeAdapterConfig.bare?: boolean`) forces or forbids it, and when unset it falls back to the A2-D11 conservative value (non-human origin = `--bare`). claude-ds (DeepSeek, API key) is unaffected — `--bare` is the natural mode, so it is pinned to `bare: true`.
 
-1. - [ ] 실패 테스트를 쓴다: `apps/local-agent/test/claude-code.test.ts`
+1. - [ ] Write the failing test: `apps/local-agent/test/claude-code.test.ts`
 
 ```ts
 import { BridgeError } from "@omnis/protocol";
@@ -2234,10 +2234,10 @@ describe("buildClaudeArgs (A2-D5)", () => {
     expect(buildClaudeArgs({ prompt: "x", model: "sonnet", profile: "trusted", origin: "human", sessionId: null })).not.toContain("--bare");
   });
 
-  it("lets the bare flag override the origin default in both directions (게이트 ⑪ 미확정)", () => {
-    // 구독 인증으로 위임을 돌리는 쪽으로 게이트 ⑪이 정해지면 bare:false
+  it("lets the bare flag override the origin default in both directions (gate ⑪ undecided)", () => {
+    // If gate ⑪ decides to run delegation on subscription auth, bare:false
     expect(buildClaudeArgs({ prompt: "x", model: "sonnet", profile: "workspace", origin: "delegation", sessionId: null, bare: false })).not.toContain("--bare");
-    // API 키로 human 턴까지 격리하는 쪽으로 정해지면 bare:true
+    // If it decides to isolate even human turns behind an API key, bare:true
     expect(buildClaudeArgs({ prompt: "x", model: "sonnet", profile: "trusted", origin: "human", sessionId: null, bare: true })).toContain("--bare");
   });
 
@@ -2254,7 +2254,7 @@ describe("permissionModeFor (A2 §7.1)", () => {
     expect(permissionModeFor("workspace", "delegation")).toBe("manual");
     expect(permissionModeFor("trusted", "human")).toBe("bypassPermissions");
     for (const mode of Object.values(PERMISSION_MODE)) expect(CLI_MODES).toContain(mode);
-    expect(Object.values(PERMISSION_MODE)).not.toContain("default");  // claude 2.1.274에 없는 값
+    expect(Object.values(PERMISSION_MODE)).not.toContain("default");  // a value claude 2.1.274 does not have
   });
 
   it("never yields bypassPermissions outside trusted+human", () => {
@@ -2284,10 +2284,10 @@ describe("parseClaudeCapabilities", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/local-agent test`
-   기대 실패: `Failed to resolve import "../src/bridges/claude-code.js"`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/local-agent test`
+   Expected failure: `Failed to resolve import "../src/bridges/claude-code.js"`
 
-3. - [ ] `apps/local-agent/src/bridges/claude-code.ts`를 만든다:
+3. - [ ] Create `apps/local-agent/src/bridges/claude-code.ts`:
 
 ```ts
 import { spawn } from "node:child_process";
@@ -2302,11 +2302,11 @@ import { createDurableDebouncer } from "./durable-debounce.js";
 import { mapStreamJsonEvent, newStreamJsonState } from "./stream-json.js";
 
 /**
- * profile → --permission-mode 매핑(A2 §7.1, 계약 §8).
- * claude 2.1.274 실측 리터럴은 acceptEdits|auto|bypassPermissions|manual|dontAsk|plan 6종뿐이고
- * 'default'라는 값은 존재하지 않는다(tools/spikes/_probes/2026-09-20-cli-probes.md §3).
- * 게이트 ⑫(S-A2-2)가 확정하기 전까지 이 표는 pending이지만, 불변식은 지금 고정이다:
- * bypassPermissions는 trusted + origin='human'에서만 나온다.
+ * profile → --permission-mode mapping (A2 §7.1, contract §8).
+ * The literals measured on claude 2.1.274 are only the six acceptEdits|auto|bypassPermissions|manual|dontAsk|plan,
+ * and no value named 'default' exists (tools/spikes/_probes/2026-09-20-cli-probes.md §3).
+ * This table stays pending until gate ⑫ (S-A2-2) settles it, but the invariant is fixed now:
+ * bypassPermissions is emitted only for trusted + origin='human'.
  */
 export const PERMISSION_MODE: Record<PermissionProfile, string> = {
   observe: "plan",
@@ -2329,10 +2329,10 @@ export interface ClaudeArgsOpts {
   sessionId: string | null;
   strictMcpConfig?: boolean;
   /**
-   * `--bare`를 켤지. 미지정이면 A2-D11의 보수값(비human origin = bare).
-   * `--bare`는 인증 경로를 ANTHROPIC_API_KEY / apiKeyHelper로 한정하고 OAuth·Keychain을 읽지 않는다
-   * (claude 2.1.274 실측). 위임 런을 구독으로 돌릴지 API 키로 돌릴지는 게이트 ⑪ / 마스터 §19 Q13이 정한다 —
-   * 정해질 때까지 두 방식을 다 지원하려고 이 플래그가 있다.
+   * Whether to turn on `--bare`. When unset, the A2-D11 conservative value (non-human origin = bare).
+   * `--bare` limits the auth path to ANTHROPIC_API_KEY / apiKeyHelper and does not read OAuth·Keychain
+   * (measured on claude 2.1.274). Whether delegation runs on the subscription or on an API key is decided by
+   * gate ⑪ / master §19 Q13 — this flag exists so both modes are supported until then.
    */
   bare?: boolean;
 }
@@ -2341,7 +2341,7 @@ export function buildClaudeArgs(o: ClaudeArgsOpts): string[] {
   const args = ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", o.model,
     "--permission-mode", permissionModeFor(o.profile, o.origin)];
   if (o.sessionId !== null) args.push("--resume", o.sessionId);
-  if (o.bare ?? o.origin !== "human") args.push("--bare");           // A2-D11 기본값, 게이트 ⑪이 뒤집을 수 있다
+  if (o.bare ?? o.origin !== "human") args.push("--bare");           // A2-D11 default; gate ⑪ may flip it
   if (o.strictMcpConfig === true) args.push("--strict-mcp-config");  // A2 §4.3
   args.push(o.prompt);
   return args;
@@ -2372,13 +2372,13 @@ export interface ClaudeAdapterConfig {
   binary: string;
   defaultModel: string;
   strictMcpConfig?: boolean;
-  /** 게이트 ⑪ 확정 전까지의 스위치. 미지정이면 origin 기본값(A2-D11). TOML `[[runtime]]`의 `bare`가 여기로 온다. */
+  /** The switch until gate ⑪ is settled. Unset means the origin default (A2-D11). `bare` from TOML `[[runtime]]` arrives here. */
   bare?: boolean;
   env?: NodeJS.ProcessEnv;
   spawnFn?: typeof spawn;
 }
 
-/** A2-D5: 턴당 서브프로세스. 상주시키지 않는다. A2-D8: claude-ds는 이 클래스의 설정 변형이다. */
+/** A2-D5: a subprocess per turn. Do not make it resident. A2-D8: claude-ds is a config variant of this class. */
 export class ClaudeCodeAdapter implements RuntimeAdapter {
   readonly kind: RuntimeKind;
   constructor(private readonly cfg: ClaudeAdapterConfig) { this.kind = cfg.kind; }
@@ -2414,11 +2414,11 @@ export class ClaudeCodeAdapter implements RuntimeAdapter {
     });
 
     createInterface({ input: child.stdout }).on("line", (line) => {
-      sink.raw(line);                                  // cold 티어
+      sink.raw(line);                                  // cold tier
       let ev: unknown;
-      try { ev = JSON.parse(line); } catch { return; } // 미지 형식도 파서를 죽이지 않는다
+      try { ev = JSON.parse(line); } catch { return; } // an unknown format must not kill the parser
       for (const emit of mapStreamJsonEvent(ev, { session_key: s.session_key, turn_id: turnId, state })) {
-        if (emit.method === "turn.item.delta") sink.delta(emit.params);   // ephemeral, 저장 안 함
+        if (emit.method === "turn.item.delta") sink.delta(emit.params);   // ephemeral, never stored
         else if (emit.method === "session.registered" || emit.method === "health") sink.itemStarted(emit.params);
         else debounced.push({ method: emit.method, params: emit.params });
       }
@@ -2432,7 +2432,7 @@ export class ClaudeCodeAdapter implements RuntimeAdapter {
 
   async cancel(h: TurnHandle, reason: string): Promise<boolean> { return h.cancel(reason); }
 
-  async close(): Promise<void> { /* 턴당 프로세스라 닫을 상주 자원이 없다 */ }
+  async close(): Promise<void> { /* process-per-turn, so there is no resident resource to close */ }
 
   async #capture(args: string[]): Promise<string> {
     return await new Promise<string>((resolve, reject) => {
@@ -2445,59 +2445,59 @@ export class ClaudeCodeAdapter implements RuntimeAdapter {
   }
 }
 
-/** A2 §4.3: 바이너리·모델 alias·키 출처만 다르다. 비용은 result.cost_usd를 믿지 않는다. */
+/** A2 §4.3: only the binary, the model alias, and the key source differ. For cost, do not trust result.cost_usd. */
 export function createClaudeDsAdapter(cfg: { binary: string; apiKey: string; model?: string; spawnFn?: typeof spawn }): ClaudeCodeAdapter {
   return new ClaudeCodeAdapter({
     kind: "claude_ds",
     binary: cfg.binary,
     defaultModel: cfg.model ?? "deepseek-flash",
     strictMcpConfig: true,
-    bare: true,              // API 키로만 돌므로 --bare가 자연스러운 모드(프로브 §2). 게이트 ⑪과 무관하다.
+    bare: true,              // runs on an API key only, so --bare is the natural mode (probe §2). Unrelated to gate ⑪.
     env: { DEEPSEEK_API_KEY: cfg.apiKey },
     ...(cfg.spawnFn === undefined ? {} : { spawnFn: cfg.spawnFn }),
   });
 }
 ```
 
-4. - [ ] 테스트를 돌린다: `pnpm --filter @omnis/local-agent test` → 10 passed
+4. - [ ] Run the tests: `pnpm --filter @omnis/local-agent test` → 10 passed
 
-5. - [ ] 커밋한다:
+5. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A18 add apps/local-agent/src/bridges/claude-code.ts apps/local-agent/test/claude-code.test.ts
-git -C omnis/.worktrees/US-A18 commit -m "US-A18: Claude Code 어댑터(턴당 서브프로세스) + claude-ds 변형
+git -C omnis/.worktrees/US-A18 commit -m "US-A18: Claude Code adapter (subprocess per turn) + claude-ds variant
 
-- A2-D5 플래그 조합 고정, A2-D11 비human origin은 --bare가 기본값
-- --bare는 ANTHROPIC_API_KEY/apiKeyHelper 인증만 탄다(프로브 실측) → bare 플래그로 양쪽 호출 모두 지원, 위임 모드는 게이트 ⑪ / 마스터 §19 Q13이 확정
-- --permission-mode는 CLI 실측 리터럴만: observe→plan, workspace→manual, trusted→bypassPermissions
-- bypassPermissions는 trusted+human에서만(그 외는 BridgeError)
-- A2-D8: claude-ds는 별도 클래스가 아니라 설정 변형(bare: true 고정)
+- Pin the A2-D5 flag combination; for A2-D11 the non-human origin defaults to --bare
+- --bare uses only ANTHROPIC_API_KEY/apiKeyHelper auth (probe measurement) → the bare flag supports both call modes; the delegation mode is settled by gate ⑪ / master §19 Q13
+- --permission-mode uses only the measured CLI literals: observe→plan, workspace→manual, trusted→bypassPermissions
+- bypassPermissions only for trusted+human (anything else is a BridgeError)
+- A2-D8: claude-ds is a config variant, not a separate class (bare: true pinned)
 
 Co-Authored-By: Claude Opus <noreply@anthropic.com>"
 ```
 
 ---
 
-## US-A19 — Codex 브리지 (Task 13~15)
+## US-A19 — Codex bridge (Task 13~15)
 
-> **목표**(A7 §7): Codex 브리지(`app-server` JSON-RPC, 버전 핀)
-> **산출물**: `apps/local-agent/src/bridges/codex.ts`
-> **검증 명령**: `pnpm --filter @omnis/local-agent test`
-> **티어**: Opus · **의존**: US-A17
+> **Goal** (A7 §7): Codex bridge (`app-server` JSON-RPC, version pin)
+> **Deliverable**: `apps/local-agent/src/bridges/codex.ts`
+> **Verification command**: `pnpm --filter @omnis/local-agent test`
+> **Tier**: Opus · **Depends on**: US-A17
 
-### Task 13: `app-server` stdio JSON-RPC 클라이언트 (US-A19, tier: Opus)
+### Task 13: `app-server` stdio JSON-RPC client (US-A19, tier: Opus)
 
 **Files:**
 - Create: `apps/local-agent/src/bridges/app-server-client.ts`
 - Test: `apps/local-agent/test/app-server-client.test.ts`
 
 **Interfaces:**
-- Consumes: 없음
-- Produces: `AppServerClient`(생성자 `{ stdin: NodeJS.WritableStream; stdout: NodeJS.ReadableStream }`, 메서드 `request`/`on`/`close`)
+- Consumes: none
+- Produces: `AppServerClient` (constructor `{ stdin: NodeJS.WritableStream; stdout: NodeJS.ReadableStream }`, methods `request`/`on`/`close`)
 
-**읽을 것:** A2-D6, §4.2 앞머리. **만들지 말 것:** 재시작·헬스체크 루프를 여기 넣지 않는다 — 상주 프로세스 수명 관리는 Task 14의 어댑터 책임이다.
+**Read:** A2-D6, the top of §4.2. **Do not build:** do not put a restart or health-check loop here — managing the resident process lifetime is the Task 14 adapter's responsibility.
 
-1. - [ ] 실패 테스트를 쓴다: `apps/local-agent/test/app-server-client.test.ts`
+1. - [ ] Write the failing test: `apps/local-agent/test/app-server-client.test.ts`
 
 ```ts
 import { PassThrough } from "node:stream";
@@ -2537,17 +2537,17 @@ describe("AppServerClient", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/local-agent test`
-   기대 실패: `Failed to resolve import "../src/bridges/app-server-client.js"`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/local-agent test`
+   Expected failure: `Failed to resolve import "../src/bridges/app-server-client.js"`
 
-3. - [ ] `apps/local-agent/src/bridges/app-server-client.ts`를 만든다:
+3. - [ ] Create `apps/local-agent/src/bridges/app-server-client.ts`:
 
 ```ts
 import { createInterface } from "node:readline";
 
 type Handler = (params: unknown) => void;
 
-/** A2-D6: 상주 app-server 자식 1개를 stdio로 붙든다. 줄바꿈 구분 JSON-RPC 2.0. */
+/** A2-D6: hold one resident app-server child over stdio. Newline-delimited JSON-RPC 2.0. */
 export class AppServerClient {
   #nextId = 1;
   readonly #pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: unknown) => void }>();
@@ -2578,7 +2578,7 @@ export class AppServerClient {
 
   #onLine(line: string): void {
     let msg: { id?: number; method?: string; params?: unknown; result?: unknown; error?: unknown };
-    try { msg = JSON.parse(line); } catch { return; }   // 미지 형식도 파서를 죽이지 않는다
+    try { msg = JSON.parse(line); } catch { return; }   // an unknown format must not kill the parser
     if (typeof msg.id === "number" && msg.method === undefined) {
       const p = this.#pending.get(msg.id);
       this.#pending.delete(msg.id);
@@ -2594,33 +2594,33 @@ export class AppServerClient {
 }
 ```
 
-4. - [ ] 테스트를 돌린다: `pnpm --filter @omnis/local-agent test` → 3 passed
+4. - [ ] Run the tests: `pnpm --filter @omnis/local-agent test` → 3 passed
 
-5. - [ ] 커밋한다:
+5. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A19 add apps/local-agent/src/bridges/app-server-client.ts apps/local-agent/test/app-server-client.test.ts
-git -C omnis/.worktrees/US-A19 commit -m "US-A19: Codex app-server stdio JSON-RPC 클라이언트
+git -C omnis/.worktrees/US-A19 commit -m "US-A19: Codex app-server stdio JSON-RPC client
 
-- 줄 단위 프레이밍, id 상관, 알림 핸들러
-- 깨진 줄은 무시하고 스트림을 계속 읽는다
+- Line-based framing, id correlation, notification handlers
+- A malformed line is ignored and the stream keeps being read
 
 Co-Authored-By: Claude Opus <noreply@anthropic.com>"
 ```
 
-### Task 14: Codex 이벤트 매핑과 승인 변환 (US-A19, tier: Opus)
+### Task 14: Codex event mapping and approval conversion (US-A19, tier: Opus)
 
 **Files:**
 - Create: `apps/local-agent/src/bridges/codex.ts`
 - Test: `apps/local-agent/test/codex.test.ts`
 
 **Interfaces:**
-- Consumes: Task 13의 `AppServerClient`, Task 11의 `BridgeEmit`, Task 10의 `RuntimeAdapter`/`EventSink`
+- Consumes: Task 13's `AppServerClient`, Task 11's `BridgeEmit`, Task 10's `RuntimeAdapter`/`EventSink`
 - Produces: `KNOWN_CODEX_ITEM_TYPES`, `REASONING_DELTA_METHODS`, `mapAppServerEvent(method, params, ctx): BridgeEmit[]`, `codexDecisionToResponse(d)`, `CodexAdapter`
 
-**읽을 것:** A2 §4.2(이벤트표 + 승인 매핑표 + 버전 드리프트). **만들지 말 것:** reasoning 델타를 durable로 승격하지 않는다(표에 "durable 승격 금지"라고 못박혀 있다). `acceptWithExecpolicyAmendment`를 UI에 노출하지 않는다(S-A2-3 미검증 → decline으로 강등).
+**Read:** A2 §4.2 (event table + approval mapping table + version drift). **Do not build:** do not promote reasoning deltas to durable (the table pins "no durable promotion"). Do not expose `acceptWithExecpolicyAmendment` in the UI (S-A2-3 unverified → downgrade to decline).
 
-1. - [ ] 실패 테스트를 쓴다: `apps/local-agent/test/codex.test.ts`
+1. - [ ] Write the failing test: `apps/local-agent/test/codex.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -2662,7 +2662,7 @@ describe("mapAppServerEvent (A2 §4.2)", () => {
   });
 });
 
-describe("codexDecisionToResponse (A2 §4.2 승인표)", () => {
+describe("codexDecisionToResponse (A2 §4.2 approval table)", () => {
   it("maps accept / decline straight through", () => {
     expect(codexDecisionToResponse("accept")).toEqual({ decision: "accept" });
     expect(codexDecisionToResponse("decline")).toEqual({ decision: "ignore" });
@@ -2678,10 +2678,10 @@ describe("codexDecisionToResponse (A2 §4.2 승인표)", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/local-agent test`
-   기대 실패: `Failed to resolve import "../src/bridges/codex.js"`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/local-agent test`
+   Expected failure: `Failed to resolve import "../src/bridges/codex.js"`
 
-3. - [ ] `apps/local-agent/src/bridges/codex.ts`를 만든다:
+3. - [ ] Create `apps/local-agent/src/bridges/codex.ts`:
 
 ```ts
 import { spawn } from "node:child_process";
@@ -2691,7 +2691,7 @@ import type { SessionRecord } from "../session-registry.js";
 import { AppServerClient } from "./app-server-client.js";
 import type { BridgeEmit } from "./stream-json.js";
 
-/** A2 §4.2: 이 목록에 없는 item/started는 kind='tool_call', label=item.type으로 일반화한다. */
+/** A2 §4.2: an item/started not in this list is generalized to kind='tool_call', label=item.type. */
 export const KNOWN_CODEX_ITEM_TYPES = [
   "agentMessage", "commandExecution", "fileChange", "mcpToolCall",
   "dynamicToolCall", "collabToolCall", "webSearch", "imageView",
@@ -2708,7 +2708,7 @@ export function codexDecisionToResponse(d: CodexDecision): HumanResponse {
   switch (d) {
     case "accept": return { decision: "accept" };
     case "acceptForSession": return { decision: "accept", decided_args: { session_rules: true } };
-    // S-A2-3 전까지 amendment payload 스키마를 모르므로 edit 경로를 UI에 노출하지 않는다.
+    // Until S-A2-3 the amendment payload schema is unknown, so the edit path is not exposed in the UI.
     case "acceptWithExecpolicyAmendment":
     case "decline":
     case "cancel":
@@ -2769,12 +2769,12 @@ export function mapAppServerEvent(method: string, params: unknown, ctx: Ctx): Br
     } }];
   }
 
-  return [];   // 미지 이벤트는 cold 전용
+  return [];   // unknown events are cold-only
 }
 
 export interface CodexAdapterConfig { binary: string; spawnFn?: typeof spawn; capabilities: RuntimeCapabilities; version: string }
 
-/** A2-D6: 상주 app-server 자식 1개가 여러 thread/턴을 처리한다. */
+/** A2-D6: one resident app-server child handles multiple threads/turns. */
 export class CodexAdapter implements RuntimeAdapter {
   readonly kind: RuntimeKind = "codex";
   #client: AppServerClient | null = null;
@@ -2826,22 +2826,22 @@ export class CodexAdapter implements RuntimeAdapter {
 }
 ```
 
-4. - [ ] 테스트를 돌린다: `pnpm --filter @omnis/local-agent test` → 8 passed
+4. - [ ] Run the tests: `pnpm --filter @omnis/local-agent test` → 8 passed
 
-5. - [ ] 커밋한다:
+5. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A19 add apps/local-agent/src/bridges/codex.ts apps/local-agent/test/codex.test.ts
-git -C omnis/.worktrees/US-A19 commit -m "US-A19: Codex 이벤트 매핑 + 승인 결정 변환
+git -C omnis/.worktrees/US-A19 commit -m "US-A19: Codex event mapping + approval decision conversion
 
-- 미지 item 타입은 kind='tool_call', label=item.type으로 일반화
-- reasoning 델타 4종은 ephemeral 전용(durable 승격 금지)
-- acceptWithExecpolicyAmendment는 S-A2-3까지 ignore로 강등
+- Unknown item types are generalized to kind='tool_call', label=item.type
+- The four reasoning delta methods are ephemeral-only (no durable promotion)
+- acceptWithExecpolicyAmendment is downgraded to ignore until S-A2-3
 
 Co-Authored-By: Claude Opus <noreply@anthropic.com>"
 ```
 
-### Task 15: 버전 핀과 드리프트 강등 (US-A19, tier: Opus)
+### Task 15: Version pin and drift downgrade (US-A19, tier: Opus)
 
 **Files:**
 - Create: `apps/local-agent/src/bridges/codex-probe.ts`
@@ -2851,9 +2851,9 @@ Co-Authored-By: Claude Opus <noreply@anthropic.com>"
 - Consumes: `RuntimeCapabilities`, `RuntimeState`(@omnis/protocol)
 - Produces: `CODEX_PINNED_VERSION = "rust-v0.155.1"`, `CODEX_CAPABILITIES`, `probeCodexVersion(versionLine: string, pinned?: string): { version: string; state: RuntimeState; capabilities: RuntimeCapabilities }`
 
-**읽을 것:** A2-D6, §4.2 "버전 드리프트 대응". **만들지 말 것:** 자동 업그레이드·핀 해제. 핀 해제는 계약 테스트 전량 통과 시에만 사람이 한다.
+**Read:** A2-D6, §4.2 "handling version drift". **Do not build:** automatic upgrades or pin removal. A human unpins only after every contract test passes.
 
-1. - [ ] 실패 테스트를 쓴다: `apps/local-agent/test/codex-probe.test.ts`
+1. - [ ] Write the failing test: `apps/local-agent/test/codex-probe.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -2886,15 +2886,15 @@ describe("probeCodexVersion (A2-D6)", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/local-agent test`
-   기대 실패: `Failed to resolve import "../src/bridges/codex-probe.js"`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/local-agent test`
+   Expected failure: `Failed to resolve import "../src/bridges/codex-probe.js"`
 
-3. - [ ] `apps/local-agent/src/bridges/codex-probe.ts`를 만든다:
+3. - [ ] Create `apps/local-agent/src/bridges/codex-probe.ts`:
 
 ```ts
 import type { RuntimeCapabilities, RuntimeState } from "@omnis/protocol";
 
-/** A2-D6. 핀 해제는 계약 테스트 전량 통과 시에만, 사람이 한다. */
+/** A2-D6. A human unpins only after every contract test passes. */
 export const CODEX_PINNED_VERSION = "rust-v0.155.1";
 
 export const CODEX_CAPABILITIES: RuntimeCapabilities = {
@@ -2918,57 +2918,57 @@ export function probeCodexVersion(
   return {
     version: `codex ${found}`,
     state: drifted ? "degraded" : "online",
-    // 세션은 계속 뜨지만 허브가 위임 대상 후보에서 뺄 수 있게 플래그만 싣는다.
+    // The session still starts, but the flag is carried so the hub can drop it from the delegation candidates.
     capabilities: drifted ? { ...CODEX_CAPABILITIES, features: ["version_mismatch"] } : CODEX_CAPABILITIES,
   };
 }
 ```
 
-4. - [ ] 테스트를 돌린다: `pnpm --filter @omnis/local-agent test` → 4 passed
+4. - [ ] Run the tests: `pnpm --filter @omnis/local-agent test` → 4 passed
 
-5. - [ ] 커밋한다:
+5. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A19 add apps/local-agent/src/bridges/codex-probe.ts apps/local-agent/test/codex-probe.test.ts
-git -C omnis/.worktrees/US-A19 commit -m "US-A19: Codex 버전 핀(rust-v0.155.1)과 드리프트 강등
+git -C omnis/.worktrees/US-A19 commit -m "US-A19: Codex version pin (rust-v0.155.1) and drift downgrade
 
-- 핀 불일치는 기동 거부가 아니라 degraded + features=['version_mismatch']
+- A pin mismatch is not a refusal to start but degraded + features=['version_mismatch']
 
 Co-Authored-By: Claude Opus <noreply@anthropic.com>"
 ```
 
 ---
 
-## US-A19b — 미니 호스트 기동과 동시성 캡 (Task 16~18)
+## US-A19b — Mini host startup and concurrency cap (Task 16~18)
 
-> **목표**(A7 §7): 맥미니 호스트에서 `local-agent` 기동(Codex 브리지만 노출, Hermes는 Phase B) + host별 동시성 캡 4 적용(맥미니/맥북 각각)
-> **산출물**: `apps/local-agent/src/host-config.ts`(host=`mini`/`macbook` 분기), LaunchAgent plist(A6-D10 방식)
-> **검증 명령**: `pnpm --filter @omnis/local-agent test`
-> **티어**: Sonnet · **의존**: US-A17, US-A19
+> **Goal** (A7 §7): start `local-agent` on the Mac mini host (exposing only the Codex bridge; Hermes is Phase B) + apply the per-host concurrency cap of 4 (Mac mini and MacBook each)
+> **Deliverable**: `apps/local-agent/src/host-config.ts` (host=`mini`/`macbook` branching), LaunchAgent plist (the A6-D10 approach)
+> **Verification command**: `pnpm --filter @omnis/local-agent test`
+> **Tier**: Sonnet · **Depends on**: US-A17, US-A19
 
-### Task 16: 호스트 프로파일 (US-A19b, tier: Sonnet)
+### Task 16: Host profiles (US-A19b, tier: Sonnet)
 
 **Files:**
 - Create: `apps/local-agent/src/host-config.ts`
 - Test: `apps/local-agent/test/host-config.test.ts`
 
 **Interfaces:**
-- Consumes: Task 6의 `HOST_DEFAULTS`, `HostId`/`RuntimeKind`(@omnis/protocol)
+- Consumes: Task 6's `HOST_DEFAULTS`, `HostId`/`RuntimeKind` (@omnis/protocol)
 - Produces: `PHASE_A_RUNTIMES`, `HostProfile`, `HOST_PROFILES`, `hostProfile(host: HostId): HostProfile`, `phaseARuntimesFor(host: HostId): RuntimeKind[]`
 
-**읽을 것:** 계약 §8(호스트 설정), 마스터 §4.2, A6 §10.2. **만들지 말 것:** 호스트를 3개 이상으로 일반화하지 않는다 — `HostId`는 `mini`/`macbook` 둘뿐이고 세 번째가 생기면 그때 늘린다.
+**Read:** contract §8 (host config), master §4.2, A6 §10.2. **Do not build:** do not generalize to three or more hosts — `HostId` is only `mini`/`macbook`, and a third is added when one appears.
 
-1. - [ ] 실패 테스트를 쓴다: `apps/local-agent/test/host-config.test.ts`
+1. - [ ] Write the failing test: `apps/local-agent/test/host-config.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
 import { hostProfile, phaseARuntimesFor } from "../src/host-config.js";
 
-/** 검증 명령: `pnpm --filter @omnis/local-agent test`. 두 호스트를 한 번에 단언하므로 호스트 플래그가 없다. */
+/** Verification command: `pnpm --filter @omnis/local-agent test`. There is no host flag because both hosts are asserted at once. */
 const HOSTS = ["mini", "macbook"] as const;
 
 describe("host profile", () => {
-  it("caps active turns at 4 on both hosts (마스터 §9)", () => {
+  it("caps active turns at 4 on both hosts (master §9)", () => {
     expect(hostProfile("mini").maxActiveTurns).toBe(4);
     expect(hostProfile("macbook").maxActiveTurns).toBe(4);
   });
@@ -2996,16 +2996,16 @@ describe("host profile", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/local-agent test`
-   기대 실패: `Failed to resolve import "../src/host-config.js"`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/local-agent test`
+   Expected failure: `Failed to resolve import "../src/host-config.js"`
 
-3. - [ ] `apps/local-agent/src/host-config.ts`를 만든다:
+3. - [ ] Create `apps/local-agent/src/host-config.ts`:
 
 ```ts
 import type { HostId, RuntimeKind } from "@omnis/protocol";
 import { HOST_DEFAULTS } from "./config.js";
 
-/** Phase A에 어댑터가 존재하는 런타임. hermes(Phase B)와 omnis(어댑터 없음)는 빠진다. */
+/** The runtimes that have an adapter in Phase A. hermes (Phase B) and omnis (no adapter) are excluded. */
 export const PHASE_A_RUNTIMES: readonly RuntimeKind[] = ["claude_code", "codex", "claude_ds"];
 
 export interface HostProfile {
@@ -3033,27 +3033,27 @@ export const HOST_PROFILES: Record<HostId, HostProfile> = {
 
 export function hostProfile(host: HostId): HostProfile { return HOST_PROFILES[host]; }
 
-/** 이 호스트가 Phase A에 실제로 등록하는 런타임. */
+/** The runtimes this host actually registers in Phase A. */
 export function phaseARuntimesFor(host: HostId): RuntimeKind[] {
   return HOST_PROFILES[host].exposedRuntimes.filter((r) => PHASE_A_RUNTIMES.includes(r));
 }
 ```
 
-4. - [ ] 테스트를 돌린다: `pnpm --filter @omnis/local-agent test` → 5 passed
+4. - [ ] Run the tests: `pnpm --filter @omnis/local-agent test` → 5 passed
 
-5. - [ ] 커밋한다:
+5. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A19b add apps/local-agent/src/host-config.ts apps/local-agent/test/host-config.test.ts
-git -C omnis/.worktrees/US-A19b commit -m "US-A19b: 호스트 프로파일(mini/macbook) + Phase A 런타임 필터
+git -C omnis/.worktrees/US-A19b commit -m "US-A19b: host profiles (mini/macbook) + Phase A runtime filter
 
-- mini는 루프백 hub_url, macbook은 tailnet /api/bridge
-- 동시 활성 턴 캡 4, Phase A 노출은 codex(+맥북의 claude_code/claude_ds)
+- mini uses the loopback hub_url; macbook uses the tailnet /api/bridge
+- Active turn cap 4; Phase A exposes codex (+ claude_code/claude_ds on the MacBook)
 
 Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 ```
 
-### Task 17: 호스트당 활성 턴 4개 상한 (US-A19b, tier: Sonnet)
+### Task 17: A ceiling of 4 active turns per host (US-A19b, tier: Sonnet)
 
 **Files:**
 - Create: `apps/local-agent/src/turn-cap.ts`
@@ -3061,12 +3061,12 @@ Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 - Test: `apps/local-agent/test/turn-cap.test.ts`
 
 **Interfaces:**
-- Consumes: `BRIDGE_ERRORS`/`BridgeError`(@omnis/protocol), Task 16의 `hostProfile`
-- Produces: `TurnCap`(생성자 `{ max?, queueMax? }`, 메서드 `acquire`/`release`/`active`/`queued`), `DispatchDeps.turnCap?: TurnCap`
+- Consumes: `BRIDGE_ERRORS`/`BridgeError` (@omnis/protocol), Task 16's `hostProfile`
+- Produces: `TurnCap` (constructor `{ max?, queueMax? }`, methods `acquire`/`release`/`active`/`queued`), `DispatchDeps.turnCap?: TurnCap`
 
-**읽을 것:** A2 §7.2 "동시성". **만들지 말 것:** 프로세스 수를 세지 않는다 — 세는 단위는 턴이다. 런타임별 세분 상한도 만들지 않는다.
+**Read:** A2 §7.2 "concurrency". **Do not build:** do not count processes — the unit counted is the turn. Do not build per-runtime fine-grained ceilings either.
 
-1. - [ ] 실패 테스트를 쓴다: `apps/local-agent/test/turn-cap.test.ts`
+1. - [ ] Write the failing test: `apps/local-agent/test/turn-cap.test.ts`
 
 ```ts
 import { BridgeError } from "@omnis/protocol";
@@ -3108,15 +3108,15 @@ describe("TurnCap (A2 §7.2)", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/local-agent test`
-   기대 실패: `Failed to resolve import "../src/turn-cap.js"`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/local-agent test`
+   Expected failure: `Failed to resolve import "../src/turn-cap.js"`
 
-3. - [ ] `apps/local-agent/src/turn-cap.ts`를 만든다:
+3. - [ ] Create `apps/local-agent/src/turn-cap.ts`:
 
 ```ts
 import { BRIDGE_ERRORS, BridgeError } from "@omnis/protocol";
 
-/** A2 §7.2: 호스트당 활성 "턴" 4개. 프로세스 수가 아니다. 초과는 큐잉(최대 8), 넘치면 -32004. */
+/** A2 §7.2: 4 active "turns" per host. Not a process count. Overflow is queued (up to 8); beyond that -32004. */
 export class TurnCap {
   readonly #max: number;
   readonly #queueMax: number;
@@ -3137,7 +3137,7 @@ export class TurnCap {
     return "queued";
   }
 
-  /** 성공·실패·취소 모두에서 호출된다. 다음 대기 턴 id를 돌려준다. */
+  /** Called on success, failure, and cancellation alike. Returns the id of the next queued turn. */
   release(turnId: string): string | undefined {
     if (!this.#active.delete(turnId)) {
       this.#queue = this.#queue.filter((t) => t !== turnId);
@@ -3153,39 +3153,39 @@ export class TurnCap {
 }
 ```
 
-4. - [ ] `rpc-dispatch.ts`를 고쳐 `turn.start`/`turn.cancel`이 캡을 지나게 한다:
-   - `DispatchDeps`에 `turnCap?: TurnCap;`을 더한다.
-   - `case "turn.start"`의 `deps.beforeTurn?.(turnId);` 줄 앞에 `deps.turnCap?.acquire(turnId);`를 넣는다.
-   - `case "turn.cancel"`의 `deps.afterTurn?.(p.turn_id);` 줄 앞에 `deps.turnCap?.release(p.turn_id);`를 넣는다.
-   - `main.ts`의 `createDispatcher({...})` 호출에 `turnCap: new TurnCap({ max: hostProfile(config.host).maxActiveTurns })`를 더한다.
+4. - [ ] Modify `rpc-dispatch.ts` so `turn.start`/`turn.cancel` pass through the cap:
+   - Add `turnCap?: TurnCap;` to `DispatchDeps`.
+   - Insert `deps.turnCap?.acquire(turnId);` before the `deps.beforeTurn?.(turnId);` line in `case "turn.start"`.
+   - Insert `deps.turnCap?.release(p.turn_id);` before the `deps.afterTurn?.(p.turn_id);` line in `case "turn.cancel"`.
+   - Add `turnCap: new TurnCap({ max: hostProfile(config.host).maxActiveTurns })` to the `createDispatcher({...})` call in `main.ts`.
 
-5. - [ ] 테스트를 돌린다: `pnpm --filter @omnis/local-agent test` → 4 passed (turn-cap) + 기존 전부 green
+5. - [ ] Run the tests: `pnpm --filter @omnis/local-agent test` → 4 passed (turn-cap) + all existing tests green
 
-6. - [ ] 커밋한다:
+6. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A19b add apps/local-agent/src/turn-cap.ts apps/local-agent/src/rpc-dispatch.ts apps/local-agent/src/main.ts apps/local-agent/test/turn-cap.test.ts
-git -C omnis/.worktrees/US-A19b commit -m "US-A19b: 호스트당 활성 턴 4개 상한 + 큐 8
+git -C omnis/.worktrees/US-A19b commit -m "US-A19b: cap of 4 active turns per host + a queue of 8
 
-- 세는 단위는 프로세스가 아니라 턴(A2 §7.2)
-- 큐 초과는 -32004, release는 성공·실패·취소 모두에서 호출
+- The unit counted is the turn, not the process (A2 §7.2)
+- Queue overflow is -32004; release is called on success, failure, and cancellation alike
 
 Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 ```
 
-### Task 18: 미니 LaunchAgent plist와 설치 스크립트 (US-A19b, tier: Sonnet)
+### Task 18: Mini LaunchAgent plist and install script (US-A19b, tier: Sonnet)
 
 **Files:**
 - Create: `apps/local-agent/launchagent/ai.onwordlab.omnis-local-agent.mini.plist`, `apps/local-agent/launchagent/ai.onwordlab.omnis-local-agent.macbook.plist`, `scripts/install-local-agent.sh`
 - Test: `apps/local-agent/test/launchagent.test.ts`
 
 **Interfaces:**
-- Consumes: Task 6의 `normalizeHubUrl`, Task 16의 `hostProfile`/`phaseARuntimesFor`
-- Produces: 없음(자산 + 테스트)
+- Consumes: Task 6's `normalizeHubUrl`, Task 16's `hostProfile`/`phaseARuntimesFor`
+- Produces: none (assets + tests)
 
-**읽을 것:** A6 §10.1·§10.2(plist 두 개 + 설치 스크립트 3단계), A6-D10(root LaunchDaemon이 아니라 로그인 세션 LaunchAgent). **만들지 말 것:** LaunchDaemon 변형. healthchecks.io ping 로직(A6 §8 소유). plist 파서 라이브러리 — `ProgramArguments`의 `<string>`만 뽑으면 충분하다.
+**Read:** A6 §10.1·§10.2 (the two plists + the three install-script steps), A6-D10 (a login-session LaunchAgent, not a root LaunchDaemon). **Do not build:** a LaunchDaemon variant. The healthchecks.io ping logic (owned by A6 §8). A plist parser library — extracting just the `<string>` entries of `ProgramArguments` is enough.
 
-1. - [ ] 실패 테스트를 쓴다: `apps/local-agent/test/launchagent.test.ts`
+1. - [ ] Write the failing test: `apps/local-agent/test/launchagent.test.ts`
 
 ```ts
 import { readFileSync } from "node:fs";
@@ -3225,10 +3225,10 @@ describe("LaunchAgent plists (A6 §10)", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/local-agent test`
-   기대 실패: `ENOENT: no such file or directory, open '.../launchagent/ai.onwordlab.omnis-local-agent.mini.plist'`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/local-agent test`
+   Expected failure: `ENOENT: no such file or directory, open '.../launchagent/ai.onwordlab.omnis-local-agent.mini.plist'`
 
-3. - [ ] `apps/local-agent/launchagent/ai.onwordlab.omnis-local-agent.mini.plist`를 만든다:
+3. - [ ] Create `apps/local-agent/launchagent/ai.onwordlab.omnis-local-agent.mini.plist`:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -3257,7 +3257,7 @@ describe("LaunchAgent plists (A6 §10)", () => {
 </plist>
 ```
 
-4. - [ ] `apps/local-agent/launchagent/ai.onwordlab.omnis-local-agent.macbook.plist`를 만든다:
+4. - [ ] Create `apps/local-agent/launchagent/ai.onwordlab.omnis-local-agent.macbook.plist`:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -3286,11 +3286,11 @@ describe("LaunchAgent plists (A6 §10)", () => {
 </plist>
 ```
 
-5. - [ ] `scripts/install-local-agent.sh`를 만든다:
+5. - [ ] Create `scripts/install-local-agent.sh`:
 
 ```bash
 #!/usr/bin/env bash
-# A6 §10: plist 복사 → launchctl bootstrap → 기동 확인. 사용법: scripts/install-local-agent.sh mini|macbook
+# A6 §10: copy the plist → launchctl bootstrap → confirm startup. Usage: scripts/install-local-agent.sh mini|macbook
 set -euo pipefail
 
 HOST="${1:?usage: install-local-agent.sh <mini|macbook>}"
@@ -3311,42 +3311,42 @@ launchctl print "gui/$(id -u)/${LABEL}" | grep -E '^\s+state = ' || { echo "loca
 echo "installed ${LABEL} for host=${HOST}"
 ```
 
-6. - [ ] 실행 권한을 주고 테스트를 돌린다: `chmod +x scripts/install-local-agent.sh && pnpm --filter @omnis/local-agent test` → 3 passed (launchagent)
+6. - [ ] Make it executable and run the tests: `chmod +x scripts/install-local-agent.sh && pnpm --filter @omnis/local-agent test` → 3 passed (launchagent)
 
-7. - [ ] 커밋한다:
+7. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A19b add apps/local-agent/launchagent scripts/install-local-agent.sh apps/local-agent/test/launchagent.test.ts
-git -C omnis/.worktrees/US-A19b commit -m "US-A19b: 미니·맥북 LaunchAgent plist + 설치 스크립트
+git -C omnis/.worktrees/US-A19b commit -m "US-A19b: mini·MacBook LaunchAgent plists + install script
 
-- A6-D10: root LaunchDaemon이 아니라 로그인 세션 LaunchAgent
-- plist의 --hub가 host-config의 hub_url로 정규화되는지 테스트로 고정
+- A6-D10: a login-session LaunchAgent, not a root LaunchDaemon
+- Pin with a test that the plist's --hub normalizes to host-config's hub_url
 
 Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 ```
 
 ---
 
-## US-A20 — mock 런타임 계약 테스트 (Task 19~20)
+## US-A20 — Mock runtime contract tests (Task 19~20)
 
-> **목표**(A7 §7): 브리지 mock 런타임 테스트(실 CLI 없이 stream-json/JSON-RPC 목업)
-> **산출물**: `apps/local-agent/test/bridge-mock.test.ts`
-> **검증 명령**: `pnpm --filter @omnis/local-agent test`
-> **티어**: Sonnet · **의존**: US-A18, US-A19
+> **Goal** (A7 §7): bridge mock runtime tests (stream-json/JSON-RPC mockups with no real CLI)
+> **Deliverable**: `apps/local-agent/test/bridge-mock.test.ts`
+> **Verification command**: `pnpm --filter @omnis/local-agent test`
+> **Tier**: Sonnet · **Depends on**: US-A18, US-A19
 
-### Task 19: fixture와 mock 런타임 프로세스 (US-A20, tier: Sonnet)
+### Task 19: Fixtures and the mock runtime process (US-A20, tier: Sonnet)
 
 **Files:**
 - Create: `apps/local-agent/test/fixtures/claude_code/tool_call_turn.ndjson`, `apps/local-agent/test/fixtures/claude_code/unknown_item_turn.ndjson`, `apps/local-agent/test/fixtures/codex/tool_call_turn.ndjson`, `apps/local-agent/test/mock-runtime.mjs`, `apps/local-agent/test/mock-runtime.ts`
 - Test: `apps/local-agent/test/mock-runtime.test.ts`
 
 **Interfaces:**
-- Consumes: 없음
-- Produces: `mockSpawn(fixture: string): typeof spawn`(실제 자식 프로세스를 띄우는 spawn 대체), `FIXTURES`
+- Consumes: none
+- Produces: `mockSpawn(fixture: string): typeof spawn` (a spawn replacement that launches a real child process), `FIXTURES`
 
-**읽을 것:** A2-D14, §8.1(fixture 세트), §8.2(mock 런타임). **만들지 말 것:** CI에서 실 런타임을 호출하지 않는다 — `27` 실측 중 Codex 계정 한도로 턴이 끊겼다. 캡처 타이밍 재생(상대 시각 sleep)은 Phase A에 필요 없다.
+**Read:** A2-D14, §8.1 (the fixture set), §8.2 (the mock runtime). **Do not build:** do not call a real runtime in CI — during the `27` measurements a turn was cut off by the Codex account limit. Replaying capture timing (relative-time sleeps) is not needed in Phase A.
 
-1. - [ ] 실패 테스트를 쓴다: `apps/local-agent/test/mock-runtime.test.ts`
+1. - [ ] Write the failing test: `apps/local-agent/test/mock-runtime.test.ts`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -3373,10 +3373,10 @@ describe("mock runtime process", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/local-agent test`
-   기대 실패: `Failed to resolve import "./mock-runtime.js"`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/local-agent test`
+   Expected failure: `Failed to resolve import "./mock-runtime.js"`
 
-3. - [ ] `apps/local-agent/test/fixtures/claude_code/tool_call_turn.ndjson`을 만든다(한 줄 = 한 이벤트):
+3. - [ ] Create `apps/local-agent/test/fixtures/claude_code/tool_call_turn.ndjson` (one line = one event):
 
 ```
 {"type":"system","subtype":"init","session_id":"s-mock-1","capabilities":["interrupt_receipt_v1"],"tools":["Bash","Read"],"cwd":"/Users/u/dev/omnis"}
@@ -3389,7 +3389,7 @@ describe("mock runtime process", () => {
 {"type":"result","subtype":"success","total_cost_usd":0.0121,"duration_ms":4210,"num_turns":1}
 ```
 
-4. - [ ] `apps/local-agent/test/fixtures/claude_code/unknown_item_turn.ndjson`을 만든다:
+4. - [ ] Create `apps/local-agent/test/fixtures/claude_code/unknown_item_turn.ndjson`:
 
 ```
 {"type":"system","subtype":"init","session_id":"s-mock-2","capabilities":[],"tools":[]}
@@ -3399,7 +3399,7 @@ describe("mock runtime process", () => {
 {"type":"result","subtype":"success","total_cost_usd":0.0009,"duration_ms":800,"num_turns":1}
 ```
 
-5. - [ ] `apps/local-agent/test/fixtures/codex/tool_call_turn.ndjson`을 만든다:
+5. - [ ] Create `apps/local-agent/test/fixtures/codex/tool_call_turn.ndjson`:
 
 ```
 {"jsonrpc":"2.0","method":"thread.started","params":{"threadId":"th_mock_1"}}
@@ -3413,11 +3413,11 @@ describe("mock runtime process", () => {
 {"jsonrpc":"2.0","method":"turn.completed","params":{"durationMs":3300}}
 ```
 
-6. - [ ] `apps/local-agent/test/mock-runtime.mjs`를 만든다:
+6. - [ ] Create `apps/local-agent/test/mock-runtime.mjs`:
 
 ```js
 #!/usr/bin/env node
-// A2-D14: fixture NDJSON을 실제 stdio로 재생한다. 실 CLI는 CI에서 부르지 않는다.
+// A2-D14: replay the fixture NDJSON over real stdio. The real CLI is never invoked in CI.
 import { readFileSync } from "node:fs";
 
 const fixture = process.env.OMNIS_MOCK_FIXTURE;
@@ -3429,7 +3429,7 @@ for (const line of readFileSync(fixture, "utf8").split("\n")) {
 process.stdout.end();
 ```
 
-7. - [ ] `apps/local-agent/test/mock-runtime.ts`를 만든다:
+7. - [ ] Create `apps/local-agent/test/mock-runtime.ts`:
 
 ```ts
 import { type SpawnOptions, spawn } from "node:child_process";
@@ -3443,7 +3443,7 @@ export const FIXTURES = {
   codexToolCall: join(here, "fixtures", "codex", "tool_call_turn.ndjson"),
 } as const;
 
-/** RuntimeAdapter가 stdio를 읽는 코드 경로를 그대로 타게 한다(A2 §8.2). */
+/** Makes the exact code path the RuntimeAdapter uses to read stdio run for real (A2 §8.2). */
 export function mockSpawn(fixture: string): typeof spawn {
   return ((_cmd: string, _args: readonly string[], opts?: SpawnOptions) =>
     spawn(process.execPath, [join(here, "mock-runtime.mjs")], {
@@ -3453,33 +3453,33 @@ export function mockSpawn(fixture: string): typeof spawn {
 }
 ```
 
-8. - [ ] 테스트를 돌린다: `pnpm --filter @omnis/local-agent test` → 2 passed (mock-runtime)
+8. - [ ] Run the tests: `pnpm --filter @omnis/local-agent test` → 2 passed (mock-runtime)
 
-9. - [ ] 커밋한다:
+9. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A20 add apps/local-agent/test/fixtures apps/local-agent/test/mock-runtime.mjs apps/local-agent/test/mock-runtime.ts apps/local-agent/test/mock-runtime.test.ts
-git -C omnis/.worktrees/US-A20 commit -m "US-A20: mock 런타임 프로세스 + stream-json/app-server fixture
+git -C omnis/.worktrees/US-A20 commit -m "US-A20: mock runtime process + stream-json/app-server fixtures
 
-- A2-D14: 실 CLI를 CI에서 호출하지 않는다
-- 어댑터가 실제 stdio를 읽는 경로를 그대로 탄다
+- A2-D14: the real CLI is never invoked in CI
+- It runs the exact path the adapter uses to read real stdio
 
 Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 ```
 
-### Task 20: 브리지 계약 불변식 8개 (US-A20, tier: Sonnet)
+### Task 20: The eight bridge contract invariants (US-A20, tier: Sonnet)
 
 **Files:**
 - Create: `apps/local-agent/test/bridge-mock.test.ts`
-- Test: 같은 파일
+- Test: the same file
 
 **Interfaces:**
 - Consumes: Task 12 `ClaudeCodeAdapter`, Task 14 `CodexAdapter`/`mapAppServerEvent`, Task 9 `Outbox`, Task 10 `createDispatcher`/`EventSink`, Task 19 `mockSpawn`/`FIXTURES`
-- Produces: 없음(검증 전용)
+- Produces: none (verification only)
 
-**읽을 것:** A2 §8.2의 불변식 1~8. **만들지 말 것:** 실 Postgres 통합(그건 US-A21 이후 커널 쪽 스토리다). 타이밍 재생 기반 flaky 단언.
+**Read:** invariants 1~8 in A2 §8.2. **Do not build:** real Postgres integration (that is a kernel-side story after US-A21). Flaky assertions based on replay timing.
 
-1. - [ ] 계약 테스트를 쓴다: `apps/local-agent/test/bridge-mock.test.ts`
+1. - [ ] Write the contract test: `apps/local-agent/test/bridge-mock.test.ts`
 
 ```ts
 import { mkdtempSync } from "node:fs";
@@ -3606,52 +3606,52 @@ describe("bridge contract invariants (A2 §8.2)", () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/local-agent test`
-   기대 실패: 불변식 8이 먼저 깨진다 — `expected 'Listing src/.' to be 'Listing src/.'`가 아니라 델타 재조립이 `assistant` 본문과 어긋나면 `AssertionError: expected '' to be 'Listing src/.'`
+2. - [ ] Run it and confirm the failure: `pnpm --filter @omnis/local-agent test`
+   Expected failure: invariant 8 breaks first — if delta reassembly does not match the `assistant` body, `AssertionError: expected '' to be 'Listing src/.'` rather than `expected 'Listing src/.' to be 'Listing src/.'`
 
-3. - [ ] 불변식 위반이 나오면 **테스트가 아니라 파서를 고친다**. 빈번한 두 원인:
-   - `mapStreamJsonEvent`의 `content_block_delta` 분기가 `openText` 인덱스와 다른 `item_id`를 쓰고 있다 → 양쪽 다 `blk-${index}`를 쓰게 맞춘다.
-   - `createDurableDebouncer`가 `turn.completed` 앞에서 flush하지 않아 마지막 `completed`가 누락된다 → `push`의 기본 분기가 `flush()`를 먼저 부르는지 확인한다.
+3. - [ ] When an invariant is violated, **fix the parser, not the test**. Two frequent causes:
+   - The `content_block_delta` branch of `mapStreamJsonEvent` uses a different `item_id` than the `openText` index → make both use `blk-${index}`.
+   - `createDurableDebouncer` does not flush before `turn.completed`, so the last `completed` is dropped → check that the default branch of `push` calls `flush()` first.
 
-4. - [ ] 전체 검증을 돌린다: `pnpm --filter @omnis/local-agent test` → 9 passed, `pnpm lint` → exit 0, `pnpm typecheck` → exit 0
+4. - [ ] Run the full verification: `pnpm --filter @omnis/local-agent test` → 9 passed, `pnpm lint` → exit 0, `pnpm typecheck` → exit 0
 
-5. - [ ] 커밋한다:
+5. - [ ] Commit:
 
 ```bash
 git -C omnis/.worktrees/US-A20 add apps/local-agent/test/bridge-mock.test.ts
-git -C omnis/.worktrees/US-A20 commit -m "US-A20: 브리지 계약 불변식 8개 + Codex reasoning ephemeral 회귀 가드
+git -C omnis/.worktrees/US-A20 commit -m "US-A20: the eight bridge contract invariants + a Codex reasoning ephemeral regression guard
 
-- A2 §8.2 불변식 전량: item 짝, 델타 0 durable, write <= item x 2,
-  미지 이벤트 cold 전용, 승인 왕복, spawn 0회, outbox 멱등, 델타 재조립 일치
+- Every A2 §8.2 invariant: item pairing, 0 durable deltas, writes <= items x 2,
+  unknown events cold-only, approval round trip, 0 spawns, idempotent outbox, delta reassembly match
 
 Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 ```
 
 ---
 
-## 스토리 종료 체크리스트
+## Story exit checklist
 
-각 스토리는 ralph Step 7 리뷰어에게 넘기기 전에 아래를 스스로 통과해야 한다.
+Before handing each story to the ralph Step 7 reviewer, it must pass the following on its own.
 
-| 스토리 | 검증 명령 | 충족 조건 |
+| Story | Verification command | Pass condition |
 |---|---|---|
-| US-A16 | `pnpm --filter @omnis/protocol test` | bridge 4개 테스트 파일 green, `pnpm typecheck` exit 0 |
-| US-A17 | `pnpm --filter @omnis/local-agent test` | config 우선순위 8건 + 레지스트리 6건 + WS 5건 + outbox 3건 + 디스패처 6건 |
-| US-A18 | `pnpm --filter @omnis/local-agent test` | stream-json 8건 + claude-code 10건, durable에 델타 0건 |
-| US-A19 | `pnpm --filter @omnis/local-agent test` | app-server 3건 + codex 8건 + probe 4건 |
-| US-A19b | `pnpm --filter @omnis/local-agent test` | host-config 5건 + turn-cap 4건 + plist 3건 |
-| US-A20 | `pnpm --filter @omnis/local-agent test` | 불변식 8개 전부 green, 실 CLI 호출 0회 |
+| US-A16 | `pnpm --filter @omnis/protocol test` | the 4 bridge test files green, `pnpm typecheck` exit 0 |
+| US-A17 | `pnpm --filter @omnis/local-agent test` | 8 config precedence cases + 6 registry cases + 5 WS cases + 3 outbox cases + 6 dispatcher cases |
+| US-A18 | `pnpm --filter @omnis/local-agent test` | 8 stream-json cases + 10 claude-code cases, 0 deltas in durable |
+| US-A19 | `pnpm --filter @omnis/local-agent test` | 3 app-server cases + 8 codex cases + 4 probe cases |
+| US-A19b | `pnpm --filter @omnis/local-agent test` | 5 host-config cases + 4 turn-cap cases + 3 plist cases |
+| US-A20 | `pnpm --filter @omnis/local-agent test` | all 8 invariants green, 0 real CLI invocations |
 
-## 자기 점검 결과 (계획 작성자)
+## Self-check results (plan author)
 
-- 스토리 → 태스크 매핑: US-A16 → Task 1~4, US-A17 → Task 5~10, US-A18 → Task 11~12, US-A19 → Task 13~15, US-A19b → Task 16~18, US-A20 → Task 19~20. 빠진 스토리 없음.
-- 금지 패턴(`TBD`, `TODO`, `implement later`, `similar to Task N`, `handle edge cases`) 전수 grep — 해당 없음. 미검증 지점은 전부 A2의 스파이크 ID(S-A2-1~S-A2-6)로 이름이 붙어 있고, 그 자리마다 실제로 동작하는 보수값과 그 값을 고정하는 테스트가 함께 있다.
-- 소비 심볼은 전부 계약 문서(§3.1~3.5, §4, §8, §9)이거나 이 계획의 앞선 태스크가 만든 것이다. 유일한 외부 전제는 US-A11(`packages/protocol` 스캐폴드 + `src/adapter.ts` + `src/approval.ts`)이고, 이는 계약 §10의 의존 순서와 같다.
+- Story → task mapping: US-A16 → Task 1~4, US-A17 → Task 5~10, US-A18 → Task 11~12, US-A19 → Task 13~15, US-A19b → Task 16~18, US-A20 → Task 19~20. No story is missing.
+- Exhaustive grep for prohibited patterns (`TBD`, `TODO`, `implement later`, `similar to Task N`, `handle edge cases`) — none found. Every unverified point is named with its A2 spike id (S-A2-1~S-A2-6), and each one has a working conservative value alongside a test that pins it.
+- Every consumed symbol comes either from the contract document (§3.1~3.5, §4, §8, §9) or from an earlier task in this plan. The only external prerequisite is US-A11 (`packages/protocol` scaffold + `src/adapter.ts` + `src/approval.ts`), which matches the dependency order in contract §10.
 
-## 수정 이력 (2026-09-20, cross-plan review)
+## Revision history (2026-09-20, cross-plan review)
 
-- **M6 / 허브 `WS /bridge` 오너 명시** — Task 5와 Task 8의 `Interfaces`에 "Consumes (서버 카운터파트)" 줄을 추가했다. 서버 엔드포인트는 `ws://127.0.0.1:8787/bridge`(미니) / `wss://<mini>.ts.net/api/bridge`(맥북)이고 구현 오너는 `2026-09-20-phase-a-kernel-and-db.md`의 `hub-bridge-ws` 태스크(US-A10, T24 뒤)다. 이 계획은 dial 클라이언트만 만든다 — 상대가 없는 게 아니라 다른 계획이 소유한다는 점을 Task 8의 "만들지 말 것"에도 1줄로 못박았다.
-- **M1 / 버전 핀** — Tech Stack 줄과 Task 5의 `apps/local-agent/package.json`을 계약 §2의 FIXED 핀으로 맞췄다: `vitest 2.1.9`(← `^2.1.0`), `typescript 5.6.3`(← `^5.6.0`), 그리고 `zod ^3.24.1` · `pnpm 9.12.3` 표기. caret 금지 이유(워크스페이스에 러너 2벌)를 Task 5 스텝 3에 1줄로 남겼다.
-- **⑫ / `--permission-mode` 매핑** — Task 12의 `PERMISSION_MODE`를 CLI 실측 리터럴로 교체했다: `observe → "plan"`, `workspace → "manual"`, `trusted → "bypassPermissions"`. 존재하지 않는 값 `"default"`를 제거했다(출처: `tools/spikes/_probes/2026-09-20-cli-probes.md` §3, claude 2.1.274). 게이트 ⑫ 확정 전까지 pending임은 주석에 유지하고, 매핑과 "리터럴 6종 밖의 값이 없다"를 고정하는 테스트 1건을 추가했다.
-- **⑪ / `--bare` 인증 경로와 양쪽 호출 지원** — Task 12 "읽을 것" 아래에 프로브 실측을 기록했다: `--bare`는 Anthropic 인증을 `ANTHROPIC_API_KEY`/`apiKeyHelper`로 한정하고 OAuth·Keychain을 읽지 않으므로 위임 턴이 구독(T3)을 못 타고 API 과금이 된다(A2-D11 가정과 충돌). 위임 런 모드는 게이트 ⑪ / 마스터 §19 Q13이 결정한다. 그때까지 두 방식을 모두 지원하도록 `ClaudeArgsOpts.bare?: boolean` · `ClaudeAdapterConfig.bare?: boolean`를 추가하고 `buildClaudeArgs`의 분기를 `o.bare ?? o.origin !== "human"`으로 바꿨다(미지정 시 A2-D11 보수값 유지). `createClaudeDsAdapter`는 `bare: true` 고정, Task 6의 `ProcessRuntimeConfig`/`PROCESS_ONLY_FIELDS`/`parseRuntime`에 TOML `bare` 키를 뚫어 실제로 설정 가능하게 했다. 양방향 오버라이드를 고정하는 테스트 1건 추가 → Task 12 검증 명령 기대값 `8 passed` → `10 passed`, 스토리 종료 체크리스트의 US-A18 행도 `claude-code 10건`으로 갱신.
-- **커밋 트레일러 규칙** — Global Constraints의 커밋 줄을 kernel-and-db 계획과 같은 형식으로 교체했다(본문에 acceptance criteria, 계약 §9가 요구하는 `Co-Authored-By: Claude <tier>` / DeepSeek 변형, 불일치는 open question). 20개 태스크의 `git commit` 트레일러를 각 태스크 티어에 맞춰 `Co-Authored-By: Claude Opus <noreply@anthropic.com>`(Task 1~4·11~15) / `Co-Authored-By: Claude Sonnet <noreply@anthropic.com>`(Task 5~10·16~20)으로 바꿨다.
+- **M6 / naming the owner of the hub `WS /bridge`** — added "Consumes (server counterpart)" lines to the `Interfaces` of Task 5 and Task 8. The server endpoint is `ws://127.0.0.1:8787/bridge` (mini) / `wss://<mini>.ts.net/api/bridge` (MacBook), and the implementation owner is the `hub-bridge-ws` task (US-A10, after T24) in `2026-09-20-phase-a-kernel-and-db.md`. This plan builds only the dialing client — and pinned in one line under Task 8's "Do not build" that the counterpart is not missing but owned by another plan.
+- **M1 / version pins** — aligned the Tech Stack line and `apps/local-agent/package.json` in Task 5 with the FIXED pins from contract §2: `vitest 2.1.9` (← `^2.1.0`), `typescript 5.6.3` (← `^5.6.0`), and the `zod ^3.24.1` · `pnpm 9.12.3` notation. Left one line in Task 5 step 3 explaining why carets are banned (two runners in the workspace).
+- **⑫ / `--permission-mode` mapping** — replaced `PERMISSION_MODE` in Task 12 with the CLI-measured literals: `observe → "plan"`, `workspace → "manual"`, `trusted → "bypassPermissions"`. Removed the nonexistent value `"default"` (source: `tools/spikes/_probes/2026-09-20-cli-probes.md` §3, claude 2.1.274). Kept the comment noting it is pending until gate ⑫ is settled, and added one test pinning the mapping and that "no value outside the six literals exists".
+- **⑪ / the `--bare` auth path and supporting both call modes** — recorded the probe measurement below "Read" in Task 12: `--bare` limits Anthropic auth to `ANTHROPIC_API_KEY`/`apiKeyHelper` and does not read OAuth·Keychain, so a delegation turn cannot use the subscription (T3) and is billed via the API (conflicting with the A2-D11 assumption). The delegation run mode is decided by gate ⑪ / master §19 Q13. To support both modes until then, added `ClaudeArgsOpts.bare?: boolean` · `ClaudeAdapterConfig.bare?: boolean` and changed the branch in `buildClaudeArgs` to `o.bare ?? o.origin !== "human"` (keeping the A2-D11 conservative value when unset). `createClaudeDsAdapter` is pinned to `bare: true`, and the TOML `bare` key was threaded through `ProcessRuntimeConfig`/`PROCESS_ONLY_FIELDS`/`parseRuntime` in Task 6 so it is actually configurable. Added one test pinning the bidirectional override → Task 12 verification command expectation `8 passed` → `10 passed`, and updated the US-A18 row of the story exit checklist to `claude-code 10 cases`.
+- **Commit trailer rule** — replaced the commit line in Global Constraints with the same format as the kernel-and-db plan (acceptance criteria in the body, the `Co-Authored-By: Claude <tier>` / DeepSeek variants contract §9 requires, and the mismatch as an open question). Changed the `git commit` trailers of all 20 tasks to match each task tier: `Co-Authored-By: Claude Opus <noreply@anthropic.com>` (Task 1~4·11~15) / `Co-Authored-By: Claude Sonnet <noreply@anthropic.com>` (Task 5~10·16~20).
