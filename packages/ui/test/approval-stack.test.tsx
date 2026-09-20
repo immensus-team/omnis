@@ -112,6 +112,39 @@ describe("ApprovalStack (US-D03)", () => {
     expect(screen.getByText("Approve")).toBeInTheDocument();
   });
 
+  it("does not carry a picked approval across a thread switch", () => {
+    // This component is rendered as a stable child of the thread view (App.tsx), so switching
+    // threads re-renders it instead of remounting it and pickedId outlives the thread it was
+    // picked in. It used to be looked up in the unscoped queue, so the pick made in t2 stayed on
+    // screen after switching to a thread that has nothing pending of its own — another
+    // conversation's card, with its four buttons, under this thread's title.
+    const { container, rerender } = render(
+      <ApprovalStack approvals={ALL} openThreadId="t2" onDecide={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /approval c/ }));
+    // Before the switch the pick really is what is on screen, so the assertion below is about the
+    // switch and not about a click that never took.
+    expect(screen.getByText("Approve")).toBeInTheDocument();
+    rerender(<ApprovalStack approvals={ALL} openThreadId="t3" onDecide={vi.fn()} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("falls back to the newly opened thread's own primary after a switch", () => {
+    // The other half of the same guarantee: a stale pick must not survive into a thread that *does*
+    // have approvals — it has to yield to that thread's own card. Asserted through the decision
+    // callback, because that is the id the hub would act on.
+    const onDecide = vi.fn();
+    const { rerender } = render(
+      <ApprovalStack approvals={ALL} openThreadId="t2" onDecide={onDecide} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /approval c/ }));
+    rerender(<ApprovalStack approvals={ALL} openThreadId="t1" onDecide={onDecide} />);
+    expect(screen.getByText("1 more waiting")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /approval c/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Approve"));
+    expect(onDecide).toHaveBeenCalledWith("b", "accept", undefined);
+  });
+
   it("draws nothing at all when the queue is empty", () => {
     const { container } = render(
       <ApprovalStack approvals={[]} openThreadId={null} onDecide={vi.fn()} />,

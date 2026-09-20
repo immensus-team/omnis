@@ -76,11 +76,17 @@ export function ApprovalStack<T extends ApprovalStackItem>({
   // overrides it — one card is expanded at a time, whichever way it was chosen.
   const [pickedId, setPickedId] = useState<string | null>(null);
   const { primary, collapsed } = scopeApprovalStack(approvals, openThreadId);
-  const activeId = pickedId ?? primary?.id ?? null;
-  const active = approvals.find((a) => a.id === activeId) ?? null;
+  // The pick is resolved **inside the scope**, never against the raw queue. This component is a
+  // stable child of the thread view, so opening another thread re-renders it rather than remounting
+  // it and pickedId outlives the thread it was picked in; looking that id up in `approvals` would
+  // expand another conversation's card under this thread's title, which is the whole thing the
+  // scoping exists to prevent. A pick that is no longer in scope yields to the scope's own primary.
+  const inScope = primary ? [primary, ...collapsed] : collapsed;
+  const active = inScope.find((a) => a.id === pickedId) ?? primary;
   // Picking a collapsed row promotes it — so it leaves the collapsed list. Without this it would
-  // be on screen twice, once as the card and once as the row that opened it.
-  const rest = collapsed.filter((item) => item.id !== activeId);
+  // be on screen twice, once as the card and once as the row that opened it. Keyed off the
+  // resolved card rather than off pickedId, so the two cannot disagree about which one is on top.
+  const rest = collapsed.filter((item) => item.id !== active?.id);
   // An empty stack draws nothing at all: a landmark with nothing in it is a heading without a list
   // under it. This is the empty queue **and** the open thread that has no approval of its own —
   // both are "nothing of mine to decide here", and the pane simply does not raise the subject.
