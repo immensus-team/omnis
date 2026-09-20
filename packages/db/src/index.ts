@@ -1,7 +1,15 @@
 import { fileURLToPath } from "node:url";
-import { Pool, type PoolClient } from "pg";
+import pg from "pg";
+import type { Pool as PgPool, PoolClient } from "pg";
 
-export { Pool, type PoolClient } from "pg";
+// pg는 CJS이고 lib/index.js가 `module.exports = new PG(Client)`라 Node ESM의 정적 named export
+// 분석이 실패한다. `import { Pool } from "pg"`는 타입체크는 통과하지만 런타임에
+// "does not provide an export named 'Pool'"로 죽으므로(vitest는 Vite interop으로 가려준다),
+// default import로 받아 값과 타입을 각각 내보낸다.
+export const Pool: typeof pg.Pool = pg.Pool;
+export type Pool = PgPool;
+export type { PoolClient };
+export { MigrationError, migrate } from "./migrate.js";
 
 /** packages/db/migrations 절대경로. src 실행(vitest)과 dist 실행(hub) 양쪽에서 같은 곳을 가리킨다. */
 export const MIGRATIONS_DIR: string = fileURLToPath(new URL("../migrations", import.meta.url));
