@@ -1,5 +1,5 @@
 {
-  "scenario": "event_without_summary_yields_nothing",
+  "scenario": "event_without_summary_falls_back_to_description",
   "raw": {
     "kind": "calendar#event",
     "id": "evt_no_summary",
