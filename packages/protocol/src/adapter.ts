@@ -37,9 +37,10 @@ export type Sensitivity = z.infer<typeof Sensitivity>;
 export type HostId = z.infer<typeof HostId>;
 export type RuntimeKind = z.infer<typeof RuntimeKind>;
 
-declare const brand: unique symbol;
-export type SessionKey = string & { readonly [brand]: "SessionKey" };
-export type SessionId = string & { readonly [brand]: "SessionId" };
+// 브랜드 키는 `unique symbol`이 아니라 문자열 프로퍼티다: 심볼이면 bridge.ts처럼 다른 파일이
+// SessionKey를 쓰는 스키마를 export할 때 선언 emit이 TS4023으로 깨진다. 명목 타입 효과는 같다.
+export type SessionKey = string & { readonly __brand: "SessionKey" };
+export type SessionId = string & { readonly __brand: "SessionId" };
 
 export const SessionKey = z
   .string()
