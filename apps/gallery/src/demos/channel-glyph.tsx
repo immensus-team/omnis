@@ -23,7 +23,13 @@ export function ChannelGlyphDemo() {
       {CHANNELS.map((channel) => (
         <div
           key={channel}
-          style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, width: 72 }}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 6,
+            width: 72,
+          }}
         >
           <ChannelGlyph channel={channel} size={24} />
           <span style={{ fontSize: 11, color: "var(--text-tertiary)", textAlign: "center" }}>

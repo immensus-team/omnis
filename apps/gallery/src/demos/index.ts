@@ -1,14 +1,14 @@
 import type { ComponentType } from "react";
+import { ApprovalCardDemo } from "./approval-card.js";
 import { ButtonDemo } from "./button.js";
-import { GlassSurfaceDemo } from "./glass-surface.js";
 import { ChannelGlyphDemo } from "./channel-glyph.js";
-import { StatusBadgeDemo } from "./status-badge.js";
-import { ToolCallBadgeDemo } from "./tool-call-badge.js";
 import { ChannelRailDemo } from "./channel-rail.js";
 import { CommandPaletteDemo } from "./command-palette.js";
 import { DraftCardDemo } from "./draft-card.js";
-import { ApprovalCardDemo } from "./approval-card.js";
+import { GlassSurfaceDemo } from "./glass-surface.js";
 import { InboxRowDemo } from "./inbox-row.js";
+import { StatusBadgeDemo } from "./status-badge.js";
+import { ToolCallBadgeDemo } from "./tool-call-badge.js";
 
 /** id -> demo component, keyed to registry.ts's GALLERY_COMPONENTS ids.
  * Each demo is rendered twice by App.tsx (once per light/dark pane) — a demo component

@@ -1,12 +1,12 @@
-import { GALLERY_COMPONENTS } from "./registry.js";
 import { GALLERY_DEMOS } from "./demos/index.js";
+import { GALLERY_COMPONENTS } from "./registry.js";
 
 export function App() {
   return (
     <div className="gallery-layout">
       <nav className="gallery-nav">
         {GALLERY_COMPONENTS.map(({ id, label }) => (
-          <a href={"#" + id} key={id}>
+          <a href={`#${id}`} key={id}>
             {label}
           </a>
         ))}

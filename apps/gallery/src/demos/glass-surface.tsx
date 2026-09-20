@@ -8,7 +8,9 @@ const SLOTS: GlassSlot[] = ["sidebar", "toolbar", "sheet", "palette"];
  *  size and nothing to blur on its own, so each one sits on a saturated parent here.
  *  Neither surface takes a `style` prop (className only), hence the wrapper. */
 function OnAccent({ children }: { children: ReactNode }) {
-  return <div style={{ background: "var(--accent)", padding: 24, marginBottom: 8 }}>{children}</div>;
+  return (
+    <div style={{ background: "var(--accent)", padding: 24, marginBottom: 8 }}>{children}</div>
+  );
 }
 
 export function GlassSurfaceDemo() {

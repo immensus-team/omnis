@@ -1,4 +1,4 @@
-import { ApprovalCardView, type ApprovalCardInterrupt } from "@omnis/ui";
+import { type ApprovalCardInterrupt, ApprovalCardView } from "@omnis/ui";
 
 /** config 3종으로 버튼 조건부 렌더링을 전부 드러낸다:
  *  - send: 승인 + 수정 후 승인 + 무시 (3개)
