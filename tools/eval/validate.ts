@@ -201,6 +201,10 @@ const taskGates: Gate<z.infer<typeof TaskCase>>[] = [
 const routeNoteGates: Gate<z.infer<typeof RouteNoteCase>>[] = [
   (rows) => {
     const out: Issue[] = [];
+    const toThread = tally(rows, (d) => d.expected.kind === "thread");
+    const toPerson = rows.length - toThread;
+    if (toThread !== 41) out.push(issue(`expected.kind="thread" count ${toThread} != 41`));
+    if (toPerson !== 9) out.push(issue(`expected.kind="person" count ${toPerson} != 9`));
     for (const row of rows) {
       const { expected, candidates } = row.data;
       const found = candidates.some((c) => c.id === expected.id && c.kind === expected.kind);
@@ -221,6 +225,15 @@ const routeNoteGates: Gate<z.infer<typeof RouteNoteCase>>[] = [
 const followupGates: Gate<z.infer<typeof FollowupCase>>[] = [
   (rows) => {
     const out: Issue[] = [];
+    const firstTouch = tally(rows, (d) => d.first_contact);
+    if (firstTouch !== 5) out.push(issue(`first_contact:true count ${firstTouch} != 5`));
+    const coldOutreachCases = tally(
+      rows,
+      (d) => d.expected_channel === "linkedin" || d.expected_channel === "kakao",
+    );
+    if (coldOutreachCases !== 2) {
+      out.push(issue(`linkedin|kakao expected_channel count ${coldOutreachCases} != 2`));
+    }
     for (const row of rows) {
       const { expected_channel, last_message_from } = row.data;
       const coldOutreachRisk = expected_channel === "linkedin" || expected_channel === "kakao";
