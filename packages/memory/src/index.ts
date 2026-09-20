@@ -21,3 +21,13 @@ export {
   type SelfModelSnapshot,
 } from "./self-model.js";
 export { ensureSelfModelRepo, applySelfModelPatch, SelfModelPatchError } from "./self-model-git.js";
+export {
+  upsertEntity,
+  assertRelation,
+  invalidateEntity,
+  asOf,
+  type EntityInput,
+  type EntityRow,
+  type EntityType,
+  type RelationInput,
+} from "./entities.js";
