@@ -22,6 +22,7 @@ import {
 import type { Logger } from "./logger.js";
 import { assertPathAllowed } from "./paths.js";
 import type { SessionRecord, SessionRegistry } from "./session-registry.js";
+import type { TurnCap } from "./turn-cap.js";
 
 export interface EventSink {
   itemStarted(e: Record<string, unknown>): void;
@@ -57,6 +58,7 @@ export interface DispatchDeps {
   sinkFor?: (s: SessionRecord, turnId: string) => EventSink;
   beforeTurn?: (turnId: string) => void;
   afterTurn?: (turnId: string) => void;
+  turnCap?: TurnCap;
 }
 
 const PHASE_B_METHODS = new Set(["ingest.scan", "ingest.read"]);
@@ -134,6 +136,7 @@ export function createDispatcher(
             `turn already active: ${p.session_key}`,
           );
         const turnId = `t-${randomUUID().slice(0, 8)}`;
+        deps.turnCap?.acquire(turnId);
         deps.beforeTurn?.(turnId);
         const sink = deps.sinkFor?.(rec, turnId);
         if (sink === undefined)
@@ -151,6 +154,7 @@ export function createDispatcher(
           p.reason,
         );
         deps.registry.setState(p.session_key, "idle");
+        deps.turnCap?.release(p.turn_id);
         deps.afterTurn?.(p.turn_id);
         return { cancelled };
       }

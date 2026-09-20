@@ -3,12 +3,14 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import WebSocket from "ws";
 import { loadConfig } from "./config.js";
+import { hostProfile } from "./host-config.js";
 import { HubClient, type SocketLike } from "./hub-client.js";
 import { readKeychainSecret } from "./keychain.js";
 import { createLogger } from "./logger.js";
 import { Outbox } from "./outbox.js";
 import { createDispatcher } from "./rpc-dispatch.js";
 import { SessionRegistry } from "./session-registry.js";
+import { TurnCap } from "./turn-cap.js";
 
 export async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<void> {
   const logger = createLogger("@omnis/local-agent");
@@ -49,6 +51,7 @@ export async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<void
       runtimeIds: new Map(),
       logger,
       host: config.host,
+      turnCap: new TurnCap({ max: hostProfile(config.host).maxActiveTurns }),
     }),
     onOpen: async () => {
       await outbox.drain(async (e) => {
