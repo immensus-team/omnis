@@ -61,8 +61,8 @@ const FILES: IngestScanResult["files"] = [
 describe("createLocalMacbookProvider", () => {
   it("scans then reads each file and yields one doc per file", async () => {
     const { call, calls } = fakeBridge(FILES, {
-      "/Users/logan/notes/a.md": "본문 A",
-      "/Users/logan/notes/b.md": "본문 B",
+      "/Users/logan/notes/a.md": "body A",
+      "/Users/logan/notes/b.md": "body B",
     });
     const p = createLocalMacbookProvider({ roots: ["/Users/logan/notes"], call });
     expect(p.kind).toBe("file");
@@ -70,7 +70,7 @@ describe("createLocalMacbookProvider", () => {
 
     const docs = await collect(p.list({ pool: {} as never, logger, cursor: {} }));
     expect(docs.map((d) => d.source_ref)).toEqual(FILES.map((f) => f.path));
-    expect(docs[0]?.text).toBe("본문 A");
+    expect(docs[0]?.text).toBe("body A");
     expect(docs[0]?.validFrom).toBe("2026-09-19T00:00:00.000Z");
     expect(docs[0]?.meta?.host).toBe("macbook");
     expect(calls).toEqual(["ingest.scan", "ingest.read", "ingest.read"]);
@@ -95,7 +95,7 @@ describe("createLocalMacbookProvider", () => {
     expect(docs.map((d) => d.source_ref)).toEqual(["/Users/logan/notes/b.md"]);
   });
 
-  // A4 §10.1: 브리지가 오프라인이면 건너뛴다 — 실패로 카운트해 dead-letter를 부르지 않는다.
+  // A4 §10.1: when the bridge is offline we skip — counting it as a failure would trigger dead-letter.
   it("yields nothing and does not throw when the bridge is offline", async () => {
     const { call } = fakeBridge(FILES, {}, { offline: true });
     const p = createLocalMacbookProvider({ roots: ["/Users/logan/notes"], call });

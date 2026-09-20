@@ -6,7 +6,7 @@ describe("parseExtractOutput", () => {
     const out = parseExtractOutput({
       memories: [
         {
-          content: "마감은 9월 23일",
+          content: "the deadline is September 23",
           kind: "fact",
           confidence: 0.8,
           valid_from: "2026-09-20T00:00:00.000Z",
@@ -15,15 +15,15 @@ describe("parseExtractOutput", () => {
       entities: [
         {
           type: "project",
-          name: "다비치 PoC",
+          name: "Davichi PoC",
           attributes: { owner: "logan" },
           valid_from: "2026-09-20T00:00:00.000Z",
         },
       ],
       relations: [
         {
-          from: "다비치 PoC",
-          to: "온워드랩",
+          from: "Davichi PoC",
+          to: "Onward Lab",
           type: "owned_by",
           confidence: 0.6,
           valid_from: "2026-09-20T00:00:00.000Z",
@@ -47,7 +47,7 @@ describe("parseExtractOutput", () => {
 
   it("drops anything without a parseable valid_from (4-timestamp is mandatory)", () => {
     const out = parseExtractOutput({
-      memories: [{ content: "a", kind: "fact", confidence: 0.5, valid_from: "언젠가" }],
+      memories: [{ content: "a", kind: "fact", confidence: 0.5, valid_from: "someday" }],
       entities: [{ type: "org", name: "X" }],
     });
     expect(out.memories).toEqual([]);

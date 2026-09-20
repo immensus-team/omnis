@@ -3,11 +3,13 @@ import { type Server, createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { EMBED_DIMS } from "../../src/embed.js";
 
-/** 해시 bag-of-words 임베딩. 낱말을 공유하면 가까워지고, 전혀 안 겹치면 직교에 가깝다. */
+/** Hash bag-of-words embedding. Sharing words brings vectors closer; no overlap at all is close to orthogonal. */
 export function fakeVector(text: string): number[] {
   const v = new Array<number>(EMBED_DIMS).fill(0);
   for (const tok of text
     .toLowerCase()
+    // Frozen matcher: the Hangul range is the tokenizer's domain — Korean-language input must
+    // still tokenize into words here.
     .split(/[^a-z0-9가-힣]+/u)
     .filter((t) => t !== "")) {
     const h = createHash("sha256").update(tok).digest();
@@ -24,7 +26,7 @@ export interface FakeOllama {
   close(): Promise<void>;
 }
 
-/** 실패 모드: fail='all'이면 500, fail='none'이면 정상. */
+/** Failure mode: fail='all' means 500, fail='none' means normal. */
 export async function startFakeOllama(fail: "none" | "all" = "none"): Promise<FakeOllama> {
   const state = { calls: 0 };
   const server: Server = createServer((req, res) => {
