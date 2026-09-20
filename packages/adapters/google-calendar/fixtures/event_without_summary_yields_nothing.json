@@ -28,6 +28,26 @@
     ]
   },
   "expected": {
-    "items": []
+    "items": [
+      {
+        "threadExternalId": "evt_no_summary",
+        "externalId": "evt_no_summary",
+        "kind": "event",
+        "author": { "kind": "system", "id": "" },
+        "body": "다른 시스템이 밀어 넣은 busy 블록 — summary가 아예 없다.",
+        "attachments": [],
+        "sentAt": "2026-10-16T08:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_no_summary",
+        "threadMeta": {
+          "externalId": "evt_no_summary",
+          "kind": "calendar",
+          "title": null,
+          "participants": [{ "externalId": "dana@example.com", "displayName": "Dana Lee" }],
+          "lastItemAt": "2026-10-16T08:00:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
   }
 }

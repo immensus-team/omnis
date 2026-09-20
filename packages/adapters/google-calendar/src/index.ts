@@ -191,6 +191,7 @@ interface GCalEvent {
   id?: string;
   status?: string;
   summary?: string;
+  description?: string;
   start?: { dateTime?: string };
   end?: { dateTime?: string };
   attendees?: { email?: string; displayName?: string }[];
@@ -199,18 +200,20 @@ interface GCalEvent {
 export function normalize(raw: unknown): NormalizedItem[] {
   const e = raw as GCalEvent;
   if (!e.id || !e.start?.dateTime) return [];
-  // summary도 없으면 이 어댑터가 표현할 수 있는 내용이 없다: 제목 없는 이벤트(다른 시스템이 만든
-  // busy 블록, 캘린더가 자동 생성한 항목 등)가 여기 해당한다. body: "" + attachments: [] 아이템을
+  // summary와 description이 둘 다 없을 때만 표현할 내용이 없다. body: "" + attachments: [] 아이템을
   // 내보내는 대신 아이템을 만들지 않는다 — Slack(`if (!m.text && !m.files?.length) return [];`)과
   // Telegram 어댑터도 같은 이유로 같은 가드를 둔다.
-  if (!e.summary) return [];
+  // summary는 API에서 선택 필드다: 다른 시스템이 밀어 넣은 제목 없는 busy 블록은 summary가 아예
+  // 없지만 description에 실제 내용이 있다. 그런 이벤트를 드롭하면 데이터 손실이므로, 제목 대신
+  // description을 본문으로 삼아 살린다(threadMeta.title은 null로 남는다 — 이미 지원되는 상태).
+  if (!e.summary && !e.description) return [];
   return [
     {
       threadExternalId: e.id,
       externalId: e.id,
       kind: "event",
       author: { kind: "system", id: "" },
-      body: e.summary ?? "",
+      body: e.summary ?? e.description ?? "",
       attachments: [],
       sentAt: e.start.dateTime,
       status: "received",

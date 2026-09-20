@@ -82,9 +82,23 @@ describe("Google Calendar contract: NormalizedItem invariants", () => {
         expect(item.threadExternalId, `${fixture.scenario}: threadExternalId`).not.toBe("");
 
         // sentAt: 정렬·증분 수집의 기준 시각. 파싱 불가능한 문자열이면 안 된다.
-        expect(new Date(item.sentAt as string).toString(), `${fixture.scenario}: sentAt`).not.toBe(
-          "Invalid Date",
+        const sentAt = item.sentAt as string;
+        expect(new Date(sentAt).toString(), `${fixture.scenario}: sentAt`).not.toBe("Invalid Date");
+
+        // ISO 8601 왕복. outlook은 sentAt을 `.SSSZ`로 정규화해 내보내므로
+        // `new Date(sentAt).toISOString() === sentAt` 항등식이 성립하지만(outlook 테스트 참고), 이
+        // 어댑터는 API가 준 dateTime 문자열을 오프셋(`+09:00`)·플로팅 시각까지 그대로 보존한다 —
+        // 같은 instant를 다른 표기로 담으므로 항등식은 성립하지 않는다. 여기서 실제로 보장하는 건
+        // "ISO-8601 datetime 표기이고, 어떤 폴백을 타더라도 instant가 유실되지 않는다"이므로 그것을
+        // 고정한다(예: 폴백이 description 텍스트나 빈 문자열을 sentAt에 흘리면 여기서 걸린다).
+        // toISOString()은 Invalid Date에서 RangeError를 던지므로 파싱 실패도 여기서 함께 잡힌다.
+        expect(sentAt, `${fixture.scenario}: sentAt`).toMatch(
+          /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?$/,
         );
+        expect(
+          new Date(new Date(sentAt).toISOString()).getTime(),
+          `${fixture.scenario}: sentAt ISO roundtrip`,
+        ).toBe(new Date(sentAt).getTime());
 
         // author: 항상 존재하고 kind가 채워져야 한다(이 어댑터는 system 고정).
         expect(item.author, `${fixture.scenario}: author`).toBeDefined();
