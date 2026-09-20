@@ -1,82 +1,82 @@
-# A8 — README 청사진과 에셋
+# A8 — README Blueprint and Assets
 
-버전 1.0 (2026-09-20). 0.95→1.0: 전역 리뷰 2차 반영. 근거: `00-omnis-design.md` v0.95(D1, D6, D9, D14, §4, §8, §12, §16, §19 Q7/Q8/Q9), `99-review.md`(§3-3, §3-16, §4 Q9), `research/16-hot-repo-readme.md`, `research/02-block-buzz.md`, `research/01-kinso-and-competitors.md`.
+Version 1.0 (2026-09-20). 0.95→1.0: second pass of the global review incorporated. Sources: `00-omnis-design.md` v0.95 (D1, D6, D9, D14, §4, §8, §12, §16, §19 Q7/Q8/Q9), `99-review.md` (§3-3, §3-16, §4 Q9), `research/16-hot-repo-readme.md`, `research/02-block-buzz.md`, `research/01-kinso-and-competitors.md`.
 
-이 부록은 마스터 문서의 결정과 충돌하지 않는다. `00-omnis-design.md`가 이기며, 이 부록은 D14(레포·라이선스)와 §16(Phase 계획)를 README 실물로 구체화만 한다.
+This appendix does not conflict with the master document's decisions. `00-omnis-design.md` wins; this appendix only makes D14 (repo, license) and §16 (Phase plan) concrete as the actual README.
 
-## 확정하는 결정 (A8-D1 ~ A8-D14)
+## Decisions Locked In (A8-D1 – A8-D14)
 
-| # | 결정 | 근거 |
+| # | Decision | Basis |
 |---|---|---|
-| A8-D1 | README 섹션 순서 13개 고정: Hero → Demo(3종) → Badges → "Everything is an inbox" 3테제 → Feature grid → Architecture(mermaid) → 지원 채널·런타임 표 → Quickstart → 디자인 원칙 → 로드맵 → 보안·프라이버시 → 기여·라이선스 → Star history | hermes-agent/openclaw/swarms 공통 골격(hero-badge-install-feature-arch-community) 위에 goose식 절제와 hermes-agent식 플랫폼 나열을 얹음(`16`) |
-| A8-D2 | 히어로 태그라인 = `"Everything is an inbox."`(영문), 서브헤드는 별도 한 줄 | 3테제(§1)를 그대로 훅으로 승격. hermes-agent의 "hook 먼저, 설명은 그다음" 공식(`16`) |
-| A8-D3 | 데모 GIF 3종 확정: triage / draft-approval / delegation, 각 15초 | 6개 핫 레포 중 실제 동작 GIF를 쓴 곳이 0개였다는 공백을 역이용(`16` "Visual Asset Production Methods") — omnis는 이 공백을 차별화 지점으로 삼는다 |
-| A8-D4 | 배지 4종: License, CI, Platform(macOS/iPhone), Tailscale-only(정직 배지) | shields.io 표준은 6/6 공통(`16`); "Tailscale-only" 배지는 D12(hub 필요 채널)를 숨기지 않기 위한 omnis 고유 추가 |
-| A8-D5 | 아키텍처 다이어그램은 마스터 §4.2 배치 토폴로지를 README용으로 1장 축약(hub/client/agent 3블록) | hermes-agent·swarms·crewai 3/6이 아키텍처 다이어그램을 갖춤(`16` Variable Elements) |
-| A8-D6 | 채널·런타임 표는 §8 매트릭스를 Phase·리스크 열만 남겨 축약, 리스크 축소 없이 그대로 인용 | 정직한 정의(D12) 준수. kinso는 API-less 메커니즘을 아예 공개하지 않아 신뢰를 잃었다(`01`); omnis는 반대로 간다 |
-| A8-D7 | Quickstart 3단계(미니 세팅 → 맥 앱 → 첫 브리핑), 각 단계 3줄 이내 커맨드 | "인증 없이 50줄 안에 실행 가능"이 6/6 공통(`16`); omnis는 로그인이 필수라 절대 재현은 불가하지만 "3단계, 각 3줄" 원칙은 유지 |
-| A8-D8 | 디자인 원칙 절은 마스터 §12를 4줄로 요약(다크 우선, Liquid Glass는 표면에만, Pretendard+Inter, 모션 3단계) | goose의 "일부러 짧게"(`16`)를 디자인 절에 적용 — 길게 설명하지 않고 원칙만 나열 |
-| A8-D9 | 라이선스 **Apache-2.0으로 확정**(마스터 §19 Q9, `99-review.md` §4 항목 16). MIT/AGPL은 기각된 후보로 §1.12에 비교만 남긴다. Logan의 실행 항목은 런치 시점 `LICENSE` 파일 커밋뿐, 값 자체는 더 이상 열려 있지 않다 | Buzz(★33.7k)가 Apache-2.0으로 에이전트 개발자 채택 마찰을 최소화한 선례(`02`); MIT는 특허 조항 없음, AGPL은 개인 도구엔 과함(상세 비교는 본문 §1.12) |
-| A8-D10 | 에셋 툴체인: GUI 데모 3종 = QuickTime(⌘⇧5) → ffmpeg → WebP/MP4, CLI Quickstart 데모 1종 = VHS, 다이어그램 = Mermaid 인라인, 로고 = SVG 3안(텍스트 설명만, 실제 드로잉은 A8 밖) | `16`의 macOS 로컬 제작 도구 목록(Framer Motion/Final Cut/Mermaid/ffmpeg+gifsicle)을 GUI·CLI로 분리 적용 |
-| A8-D11 | 에셋 경로 고정: `assets/demo/*.webp`, `assets/arch/*.mmd`, `assets/brand/*.svg`, `assets/banner-{light,dark}.png` | `16`의 관찰(전 레포가 `assets/`, `images/` 하위에 CDN 상대경로 사용)을 그대로 채택 |
-| A8-D12 | 제작 순서 = Phase 연동: Phase A 종료 시 텍스트 README(배지·Quickstart·아키텍처만) 1차 커밋, Phase B에 데모 GIF 3종, Phase D 런치 직전에 배너·로고·Star history 최종본 | README 완성이 D14 폴백의 공개 전환 트리거이므로, 무거운 에셋(배너·로고)은 실제 public 전환 시점(Phase D)에 맞춰 마지막에 만든다 — 조기에 만들면 Phase A~C 사이 변경(D1~D16 재검토) 리스크로 재작업 |
-| A8-D13 | 레포 위생: `docs/spec/`(이 기획서 전체 사본), `CHANGELOG.md`(Keep a Changelog, Phase 단위 엔트리), `SECURITY.md`(GitHub Security Advisory 비공개 신고, 이메일 미게재), `CODE_OF_CONDUCT.md`(Contributor Covenant 2.1, public 전환 시점부터), 이슈 템플릿 3종(bug/feature/channel-adapter-request) | 6/6 레포가 Docs+Issues+License 조합을 갖춤(`16`); SECURITY.md는 개인 이메일 노출 대신 GitHub 내장 비공개 신고 경로로 default |
-| A8-D14 | 런치 체크리스트 12항목(본문 §4) | Phase D 종료 기준("레포 public", §16)의 실행 가능한 분해 |
+| A8-D1 | README section order fixed at 13: Hero → Demo (3 kinds) → Badges → "Everything is an inbox" 3 theses → Feature grid → Architecture (mermaid) → Supported channels & runtime table → Quickstart → Design principles → Roadmap → Security & privacy → Contributing & license → Star history | The common hermes-agent/openclaw/swarms skeleton (hero-badge-install-feature-arch-community) with goose-style restraint and hermes-agent-style platform enumeration layered on top (`16`) |
+| A8-D2 | Hero tagline = `"Everything is an inbox."` (English); the subhead is a separate single line | Promotes the 3 theses (§1) directly as the hook. hermes-agent's "hook first, explanation next" formula (`16`) |
+| A8-D3 | Three demo GIFs locked in: triage / draft-approval / delegation, 15 seconds each | Exploits the gap that 0 of the 6 hot repos used working GIFs (`16` "Visual Asset Production Methods") — omnis makes this gap its differentiator |
+| A8-D4 | Four badges: License, CI, Platform (macOS/iPhone), Tailscale-only (honesty badge) | shields.io is standard in 6/6 (`16`); the "Tailscale-only" badge is an omnis-specific addition so as not to hide D12 (hub-required channels) |
+| A8-D5 | The architecture diagram condenses the master §4.2 deployment topology into one README-sized chart (hub/client/agent, 3 blocks) | hermes-agent, swarms, and crewai — 3/6 include an architecture diagram (`16` Variable Elements) |
+| A8-D6 | The channel/runtime table condenses the §8 matrix to the Phase and Risk columns only, quoted verbatim with no softening of risk | Complies with the honest definition (D12). kinso lost trust by not disclosing its API-less mechanism at all (`01`); omnis goes the opposite way |
+| A8-D7 | Quickstart in 3 steps (mini setup → Mac app → first briefing), each step with commands in 3 lines or fewer | "Runnable in under 50 lines with no auth" is common in 6/6 (`16`); omnis requires login so exact reproduction is impossible, but the "3 steps, 3 lines each" principle is kept |
+| A8-D8 | The design principles section summarizes master §12 in 4 lines (dark-first, Liquid Glass only on surfaces, Pretendard+Inter, 3 motion tiers) | Applies goose's "deliberately short" (`16`) to the design section — no long explanation, just the principles listed |
+| A8-D9 | License **locked to Apache-2.0** (master §19 Q9, `99-review.md` §4 item 16). MIT/AGPL remain in §1.12 only as a comparison of rejected candidates. Logan's remaining action is solely committing the `LICENSE` file at launch; the value itself is no longer open | Buzz (★33.7k) set the precedent of using Apache-2.0 to minimize adoption friction for agent developers (`02`); MIT has no patent clause, and AGPL is overkill for a personal tool (detailed comparison in §1.12 below) |
+| A8-D10 | Asset toolchain: 3 GUI demos = QuickTime (⌘⇧5) → ffmpeg → WebP/MP4, 1 CLI Quickstart demo = VHS, diagrams = inline Mermaid, logo = 3 SVG options (text description only; the actual drawing is outside A8) | Applies `16`'s list of macOS local production tools (Framer Motion/Final Cut/Mermaid/ffmpeg+gifsicle) split into GUI and CLI |
+| A8-D11 | Fixed asset paths: `assets/demo/*.webp`, `assets/arch/*.mmd`, `assets/brand/*.svg`, `assets/banner-{light,dark}.png` | Adopts `16`'s observation as-is (every repo uses CDN-relative paths under `assets/`, `images/`) |
+| A8-D12 | Production order = tied to Phase: at the end of Phase A a text-only README (badges, Quickstart, architecture only) is committed first; the 3 demo GIFs in Phase B; banner, logo, and the final Star history just before launch in Phase D | Because README completion is the public-switch trigger for the D14 fallback, the heavy assets (banner, logo) are made last so they line up with the actual public switch (Phase D) — making them early risks rework from changes between Phases A and C (D1–D16 re-review) |
+| A8-D13 | Repo hygiene: `docs/spec/` (full copy of this planning document), `CHANGELOG.md` (Keep a Changelog, one entry per Phase), `SECURITY.md` (GitHub Security Advisory private reporting, no email published), `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1, effective from the public switch), 3 issue templates (bug/feature/channel-adapter-request) | 6/6 repos have the Docs+Issues+License combination (`16`); SECURITY.md defaults to GitHub's built-in private reporting path instead of exposing a personal email |
+| A8-D14 | Launch checklist with 12 items (§4 below) | An actionable decomposition of the Phase D exit criteria ("repo public", §16) |
 
 ---
 
-## 1. 레포 첫인상 구조
+## 1. Repo First-Impression Structure
 
-### 1.1 히어로
+### 1.1 Hero
 
-**태그라인 후보 5개(영문):**
+**Five tagline candidates (English):**
 
-1. `Everything is an inbox.` — 3테제 1번을 그대로 승격. **추천안.**
+1. `Everything is an inbox.` — a direct promotion of thesis 1. **Recommended.**
 2. `One queue. Every message, every agent, your call.`
 3. `Your context, always on. Your decisions, always yours.`
 4. `Not another inbox. The only inbox.`
 5. `Agents work first. You decide.`
 
-추천 이유: hermes-agent는 "hook 먼저, 차별화는 그다음"(`16`) 공식을 쓰고, goose는 짧을수록 자신감이 있다고 봤다(`16` "Sparse README as a feature"). `1`번은 이미 마스터 §1의 설계 원칙 자체라 카피를 새로 지어낼 필요가 없고, 가장 짧다.
+Why recommended: hermes-agent uses the "hook first, differentiation next" formula (`16`), and goose held that the shorter it is, the more confident it reads (`16` "Sparse README as a feature"). Candidate `1` is already the design principle of master §1 itself, so no new copy has to be invented, and it is the shortest.
 
-**한 줄 설명(서브헤드):** `omnis merges every message, every meeting, and every agent session — Claude Code, Codex, DeepSeek, Hermes — into one inbox that acts before you look, and never acts without you.`
+**One-line description (subhead):** `omnis merges every message, every meeting, and every agent session — Claude Code, Codex, DeepSeek, Hermes — into one inbox that acts before you look, and never acts without you.`
 
-### 1.2 데모 3종 (각 15초 스토리보드)
+### 1.2 The Three Demos (15-second storyboard each)
 
-리서치 16이 지적한 공백 — 6개 핫 레포 중 실제 동작 GIF/asciinema를 쓴 곳이 0곳(`16` "No asciinema / VHS / GIF recordings observed") — 을 omnis의 차별화 지점으로 쓴다. 파일: `assets/demo/triage.webp`, `assets/demo/draft.webp`, `assets/demo/delegate.webp`.
+The gap research 16 pointed out — 0 of the 6 hot repos used working GIFs/asciinema (`16` "No asciinema / VHS / GIF recordings observed") — is used as omnis's differentiator. Files: `assets/demo/triage.webp`, `assets/demo/draft.webp`, `assets/demo/delegate.webp`.
 
-| 시간 | triage.webp | draft.webp | delegate.webp |
+| Time | triage.webp | draft.webp | delegate.webp |
 |---|---|---|---|
-| 0–3s | 통합 인박스, Slack/Gmail/Kakao/Agent 항목이 실시간으로 쌓임 | 스레드 열림, 에이전트 draft 카드가 근거(참조 메모리 3건)와 함께 나타남 | Today 뷰, 대기 중 task 카드 하나 |
-| 3–8s | 필터 pill 클릭(Work→Agents→Needs approval), 목록 좁혀짐 | "Edit & send" 인라인 편집, 커서로 한 문장 수정 | ⌘K 팔레트 열고 "delegate to Codex · mini" 입력 |
-| 8–12s | `j/k`로 항목 이동, `e`/`r`/`a` 라벨링 적용 | 승인 버튼 클릭 | `pending_approvals` 카드 확인 후 승인 |
-| 12–15s | 아카이브 스와이프, unread 배지 0으로 수렴 | 전송 확인 토스트 + 감사 로그 항목 페이드인 | 새 Agent Session 스레드 생성, tool_call 배지가 진행 상태로 갱신 |
+| 0–3s | Unified inbox; Slack/Gmail/Kakao/Agent items pile up in real time | Thread opens; an agent draft card appears with its evidence (3 referenced memories) | Today view, one pending task card |
+| 3–8s | Filter pill clicks (Work→Agents→Needs approval), list narrows | "Edit & send" inline editing, cursor fixes one sentence | Open the ⌘K palette and type "delegate to Codex · mini" |
+| 8–12s | `j/k` moves between items, `e`/`r`/`a` labels applied | Click the approve button | Confirm the `pending_approvals` card, then approve |
+| 12–15s | Archive swipe, unread badge converges to 0 | Send confirmation toast + audit log entry fades in | A new Agent Session thread is created, tool_call badge updates to in-progress |
 
-세 GIF 모두 dark 테마, 실제 데이터가 아닌 시드 픽스처로 촬영(개인정보 노출 금지, §13 보안 원칙과 동일 기준 적용).
+All three GIFs use the dark theme and are shot with seed fixtures rather than real data (no exposure of personal data; the same standard as the §13 security principles applies).
 
-### 1.3 배지
+### 1.3 Badges
 
-`License: Apache-2.0` · `CI(GitHub Actions)` · `Platform(macOS · iPhone)` · `Tailscale-only`(KakaoTalk/LinkedIn은 허브 필요임을 배지 단계에서부터 숨기지 않음 — D12 정직한 정의를 README 최상단까지 끌어올림). shields.io 스타일(`16`). 마스터 §19 Q9가 Apache-2.0을 이미 확정했으므로(A8-D9) "TBD"나 "proposed" 표기는 쓰지 않는다 — Phase A 첫 커밋부터 `License: Apache-2.0`으로 표기하고, 런치 시점에 Logan이 `LICENSE` 파일 커밋으로 서명한다.
+`License: Apache-2.0` · `CI(GitHub Actions)` · `Platform(macOS · iPhone)` · `Tailscale-only` (does not hide from the badge stage onward that KakaoTalk/LinkedIn require the hub — pulls D12's honest definition all the way to the top of the README). shields.io style (`16`). Because master §19 Q9 already locked Apache-2.0 (A8-D9), no "TBD" or "proposed" marker is used — `License: Apache-2.0` is shown from the first Phase A commit, and at launch Logan signs it by committing the `LICENSE` file.
 
-### 1.4 "Everything is an inbox" — 3테제
+### 1.4 "Everything is an inbox" — the 3 Theses
 
-마스터 §1의 3테제를 원문 그대로, 영문 병기로 싣는다.
+Carries the 3 theses of master §1 verbatim, in English.
 
 1. **Everything is an inbox.** People's messages and agent turns share one queue.
 2. **Context is the product.** The inbox is the surface; the unified memory is the asset.
 3. **Agents act first, I decide.** Triage, drafts, todos are ready before you look. Nothing leaves without approval.
 
-### 1.5 기능 그리드 (3×3, §3·§11 기반)
+### 1.5 Feature Grid (3×3, based on §3/§11)
 
 | | | |
 |---|---|---|
-| Auto work/personal 필터 | 사람·토픽 자동 라벨 | 컨텍스트 기반 답장 초안 |
-| 아침 브리핑 / 밤 다이제스트 | 에이전트와 함께 쓰는 투두 | 기기 간 에이전트 위임 |
-| Network(개인 CRM) + 팔로업 | 노트 라우팅 | 통합 검색 |
+| Auto work/personal filter | Automatic people and topic labels | Context-based reply drafts |
+| Morning briefing / evening digest | Todos written together with agents | Cross-device agent delegation |
+| Network (personal CRM) + follow-ups | Note routing | Unified search |
 
-### 1.6 아키텍처 다이어그램
+### 1.6 Architecture Diagram
 
-마스터 §4.2 배치 토폴로지를 3블록으로 축약(전체 4층 다이어그램은 무겁다 — README용은 "어디서 뭐가 도는지"만):
+Condenses the master §4.2 deployment topology into 3 blocks (the full 4-layer diagram is too heavy — the README version shows only "what runs where"):
 
 ```mermaid
 flowchart LR
@@ -96,128 +96,128 @@ flowchart LR
   AGENTS <-->|session bus| MINI
 ```
 
-### 1.7 지원 채널·런타임 표 (정직한 리스크 표기)
+### 1.7 Supported Channels & Runtime Table (honest risk labeling)
 
-§8 매트릭스를 README 분량으로 축약. 채널 8개(마스터 §2, §3) 전부를 아래 표 행에 나열한다 — 표 첫 줄에 3개, 둘째 줄에 2개, 나머지 3개 채널로 합이 8. 리스크는 절대 완곡화하지 않는다 — kinso가 API-less 캡처 메커니즘을 비공개로 둬서 신뢰를 잃은 사례(`01`)의 정반대 방향.
+Condenses the §8 matrix to README length. All 8 channels (master §2, §3) are listed as rows in the table below — 3 in the first row, 2 in the second, and the remaining 3 channels, totaling 8. Risk is never softened — the exact opposite direction from the case where kinso lost trust by keeping its API-less capture mechanism closed (`01`).
 
-| 채널 | Phase | 리스크 |
+| Channel | Phase | Risk |
 |---|---|---|
-| Slack, Gmail, Google Calendar | A | 낮음(공식 API) |
-| Outlook, Telegram | B | 낮음(공식 API) |
-| WhatsApp | C | 중(Beeper Desktop API, whatsmeow 폴백) |
-| KakaoTalk | C | 중~높음(macOS Accessibility 자동화, read 2주 안정 후 send) |
-| LinkedIn | C | 중~높음(Playwright 상주 세션, 계정 정지 이력 있는 방식) |
-| Claude Code, Codex, DeepSeek | A | 낮음(네이티브 headless) |
-| Hermes | B(읽기 전용 세션) → C(위임 대상) | 낮음(선택적 어댑터, 기존 Hermes 구성에 의존하지 않고 HTTP `/v1` 표면만 사용) |
+| Slack, Gmail, Google Calendar | A | Low (official APIs) |
+| Outlook, Telegram | B | Low (official APIs) |
+| WhatsApp | C | Medium (Beeper Desktop API, whatsmeow fallback) |
+| KakaoTalk | C | Medium–high (macOS Accessibility automation, read stable for 2 weeks before send) |
+| LinkedIn | C | Medium–high (resident Playwright session, an approach with a history of account bans) |
+| Claude Code, Codex, DeepSeek | A | Low (native headless) |
+| Hermes | B (read-only session) → C (delegation target) | Low (optional adapter; uses only the HTTP `/v1` surface without depending on the existing Hermes setup) |
 
-각주: *"KakaoTalk과 LinkedIn은 GUI 세션이 살아 있는 맥 1대가 항상 필요합니다. 이것은 채널의 구조적 제약이지 omnis의 한계가 아닙니다."*(마스터 D12 원문 인용)
+Footnote: *"KakaoTalk and LinkedIn always require one Mac with a live GUI session. This is a structural constraint of the channels, not a limitation of omnis."* (quoted verbatim from master D12)
 
 ### 1.8 Quickstart
 
 ```bash
-# 1) 맥미니 허브 세팅 (1회)
+# 1) Mac mini hub setup (one time)
 git clone git@github.com:Onword-Lab/omnis.git && cd omnis
 pnpm install
-pnpm --filter @omnis/hub bootstrap   # Postgres+pgvector, Ollama pull, LaunchDaemon 설치
+pnpm --filter @omnis/hub bootstrap   # Postgres+pgvector, Ollama pull, LaunchDaemon install
 
-# 2) 맥 앱 (맥북)
-pnpm --filter @omnis/desktop tauri dev   # Tailscale로 미니에 연결, Gmail/Slack OAuth
+# 2) Mac app (MacBook)
+pnpm --filter @omnis/desktop tauri dev   # connect to the mini over Tailscale, Gmail/Slack OAuth
 
-# 3) 첫 브리핑
+# 3) First briefing
 pnpm --filter @omnis/hub briefing --now
 ```
 
-`bootstrap` / `briefing --now` 서브커맨드는 A7(개발 프로세스)에서 CLI 표면이 확정되기 전까지 **UNVERIFIED — spike**. 이름과 플래그는 스켈레톤이며 구현 시 A7 CLI 명세로 대체된다.
+The `bootstrap` / `briefing --now` subcommands are **UNVERIFIED — spike** until the CLI surface is locked in A7 (dev process). The names and flags are a skeleton and are replaced by the A7 CLI spec at implementation time.
 
-### 1.9 디자인 원칙
+### 1.9 Design Principles
 
-마스터 §12를 4줄로: 다크 우선, 근흑 캔버스 + 단일 액센트. Liquid Glass는 sidebar/toolbar/sheet/팔레트에만, 리스트와 본문은 불투명. Pretendard(한글) + Inter(라틴). 모션 100/160/400ms 3단계. goose식 절제(`16`)를 따라 이 절은 여기서 끝낸다 — 상세는 `docs/spec/A5-ui-ux.md` 링크로 위임.
+Master §12 in 4 lines: dark-first, near-black canvas + a single accent. Liquid Glass only on sidebar/toolbar/sheet/palette; lists and body text are opaque. Pretendard (Korean) + Inter (Latin). Motion in 3 tiers: 100/160/400ms. Following goose-style restraint (`16`), this section ends here — details are delegated to a link to `docs/spec/A5-ui-ux.md`.
 
-### 1.10 로드맵 (Phase A~D)
+### 1.10 Roadmap (Phases A–D)
 
-§16 표를 README용으로: **A** 커널+인박스 코어(Slack/Gmail/Calendar) → **B** 컨텍스트+에이전트+폰(메모리, 브리핑, PWA) → **C** 캡처 채널+투두+Network(Kakao/LinkedIn/WhatsApp) → **D** standalone+런치(허브 in-app, Tauri iOS, public).
+The §16 table, README-sized: **A** kernel + inbox core (Slack/Gmail/Calendar) → **B** context + agents + phone (memory, briefing, PWA) → **C** capture channels + todos + Network (Kakao/LinkedIn/WhatsApp) → **D** standalone + launch (hub in-app, Tauri iOS, public).
 
-Phase D 한 줄은 정직하게 쓴다: *"Phase D에서 허브 기능은 맥북 앱 안에서 돈다. 다만 KakaoTalk·LinkedIn 캡처는 GUI 세션이 살아 있는 맥이 항상 필요하므로, 맥미니가 이 두 채널만을 위한 캡처 사이드카로 계속 켜져 있다(마스터 §19 Q8)."* — "완전한 standalone"으로 과장하지 않고, D12/D14 폴백 조건과 §1.7의 Tailscale-only 배지가 왜 Phase D 이후에도 KakaoTalk·LinkedIn 사용자에게 남는지 여기서 먼저 밝힌다.
+The Phase D line is written honestly: *"In Phase D the hub functionality runs inside the MacBook app. However, KakaoTalk and LinkedIn capture always require a Mac with a live GUI session, so the Mac mini stays on as a capture sidecar for these two channels alone (master §19 Q8)."* — Rather than overstating this as "fully standalone," it states up front why the D12/D14 fallback conditions and the §1.7 Tailscale-only badge remain for KakaoTalk and LinkedIn users even after Phase D.
 
-### 1.11 보안·프라이버시
+### 1.11 Security & Privacy
 
-§13 요약 4줄: 인박스 텍스트는 항상 data 태그로 분리(지시로 해석 안 함), 비가역 tool(send/delete/delegate)은 승인 없이 자율 루프에 없음, append-only 감사 로그 + 전역 kill switch, 비밀은 Keychain+sops/age(레포에 평문 없음).
+§13 in 4 lines: inbox text is always isolated with a data tag (never interpreted as instructions); irreversible tools (send/delete/delegate) never enter the autonomous loop without approval; append-only audit log + a global kill switch; secrets live in Keychain + sops/age (no plaintext in the repo).
 
-### 1.12 기여·라이선스
+### 1.12 Contributing & License
 
-**라이선스: Apache-2.0으로 확정.** 마스터 §19 Q9가 이미 결정했고 `99-review.md` §4 항목 16이 이를 재확인했다 — README에는 후보 목록이 아니라 확정값만 싣는다. MIT/AGPL을 검토했던 근거는 기록으로만 아래에 남긴다(A8-D9):
+**License: locked to Apache-2.0.** Master §19 Q9 already decided this, and `99-review.md` §4 item 16 reconfirmed it — the README carries the locked value, not a candidate list. The reasoning behind reviewing MIT/AGPL is kept below as a record only (A8-D9):
 
-| 검토했던 후보 | 장점 | 단점 | 비고 |
+| Candidate reviewed | Pros | Cons | Notes |
 |---|---|---|---|
-| **Apache-2.0**(확정) | 특허 조항 있음, 엔터프라이즈/에이전트 개발자 채택 마찰 최소, Buzz 선례(`02`) | MIT보다 약간 긺 | omnis도 에이전트 런타임 다수를 통합하므로 특허 조항이 어댑터 기여자 보호에 유리 |
-| MIT | 가장 단순, 가장 관대 | 특허 조항 없음 | 소규모 유틸이면 충분하지만 omnis는 채널 어댑터가 늘어날수록 특허 노출면이 커짐 — 기각 |
-| AGPL | 파생 SaaS의 소스 공개 강제 | 개인 도구를 SaaS화할 계획이 마스터에 없음(v2도 "같은 프로파일의 파운더", §2) — 강한 카피레프트가 채택률만 깎음. 마스터 D6도 Honcho(AGPL)를 의존성으로도 배제 | 기각 |
+| **Apache-2.0** (locked) | Has a patent clause; minimizes adoption friction for enterprise and agent developers; Buzz precedent (`02`) | Slightly longer than MIT | omnis also integrates many agent runtimes, so the patent clause helps protect adapter contributors |
+| MIT | Simplest, most permissive | No patent clause | Sufficient for a small utility, but omnis's patent exposure surface grows with each channel adapter — rejected |
+| AGPL | Forces source disclosure of derivative SaaS | The master has no plan to turn a personal tool into SaaS (v2 is also "founders with the same profile," §2) — strong copyleft only erodes adoption. Master D6 also rules out Honcho (AGPL) even as a dependency | Rejected |
 
-Logan에게 남은 절차는 값을 고르는 것이 아니라 런치 시점에 `LICENSE` 파일을 커밋하는 실행뿐이다(A8-D9). Contributing 절은 crewai식 "역할극" 톤 대신 hermes-agent식 담백한 톤 채택(§16 Tone 비교, "Technical, matter-of-fact") — omnis는 개인 생산성 도구라 크루/역할극 메타포가 안 맞는다.
+The only step left for Logan is not choosing a value but the action of committing the `LICENSE` file at launch (A8-D9). The Contributing section adopts hermes-agent's plain tone rather than crewai's "role-play" tone (§16 tone comparison, "Technical, matter-of-fact") — omnis is a personal productivity tool, so crew/role-play metaphors do not fit.
 
-### 1.13 Star history
+### 1.13 Star History
 
-`https://api.star-history.com/svg?repos=Onword-Lab/omnis&type=Date` 차트를 README 최하단에. Public 전환 후(Phase D)부터만 의미가 있으므로 Phase A~C 커밋에는 넣지 않는다(A8-D12).
+The `https://api.star-history.com/svg?repos=Onword-Lab/omnis&type=Date` chart goes at the very bottom of the README. It is meaningful only after the public switch (Phase D), so it is not included in Phase A–C commits (A8-D12).
 
 ---
 
-## 2. 에셋 제작 계획
+## 2. Asset Production Plan
 
-| 에셋 | 툴 | 경로 | Phase |
+| Asset | Tool | Path | Phase |
 |---|---|---|---|
-| 데모 GIF 3종 | QuickTime(⌘⇧5) 녹화 → `ffmpeg -c:v libvpx-vp9` WebP 변환(`16` 커맨드 그대로) | `assets/demo/*.webp` | B |
-| Quickstart 터미널 데모 | VHS(charmbracelet, `.tape` 스크립트로 재현 가능한 녹화) | `assets/demo/quickstart.gif` | A |
-| 아키텍처 다이어그램 | Mermaid, README 인라인(외부 렌더 서버 불필요) | 인라인 + `assets/arch/hub-topology.mmd` 백업 | A |
-| SVG 로고 3안(텍스트 설명, 드로잉은 디자이너 별도 작업) | ① 겹치는 원 3개가 하나로 수렴하는 마크(인박스 통합 은유) ② 소문자 `o` 안에 점 하나(단일 큐 은유, goose의 절제된 워드마크 참고) ③ 대괄호 `[ ]` 사이 점선이 실선으로 바뀌는 마크(승인 게이트 은유) — 최종 선택은 디자이너 브리프에서 | `assets/brand/logo-v1-{a,b,c}.svg` | D |
-| 배너(light/dark) | Figma export 또는 스크린샷 합성 | `assets/banner-{light,dark}.png` | D |
+| 3 demo GIFs | QuickTime (⌘⇧5) recording → `ffmpeg -c:v libvpx-vp9` WebP conversion (commands verbatim from `16`) | `assets/demo/*.webp` | B |
+| Quickstart terminal demo | VHS (charmbracelet, reproducible recording via a `.tape` script) | `assets/demo/quickstart.gif` | A |
+| Architecture diagram | Mermaid, inline in the README (no external render server needed) | inline + `assets/arch/hub-topology.mmd` backup | A |
+| 3 SVG logo options (text description; drawing is separate designer work) | ① a mark of three overlapping circles converging into one (the unified-inbox metaphor) ② a single dot inside a lowercase `o` (the single-queue metaphor, referencing goose's restrained wordmark) ③ a mark where the dotted line between brackets `[ ]` becomes solid (the approval-gate metaphor) — final selection in the designer brief | `assets/brand/logo-v1-{a,b,c}.svg` | D |
+| Banner (light/dark) | Figma export or screenshot compositing | `assets/banner-{light,dark}.png` | D |
 
-제작 순서: A(Quickstart GIF+다이어그램, 텍스트 위주 1차 README) → B(데모 3종) → D(로고 확정, 배너, Star history 활성화). Phase C는 신규 에셋 없음(채널 표 갱신만).
+Production order: A (Quickstart GIF + diagram, first text-heavy README) → B (the 3 demos) → D (final logo, banner, Star history activation). Phase C has no new assets (only a channel table refresh).
 
-## 3. 레포 위생
+## 3. Repo Hygiene
 
-- `docs/spec/` — 이 기획서(00 + A1~A8) 전체 사본. public 전환 시에도 그대로 유지(전략 문서를 숨기지 않는다 — hermes-agent/goose 모두 ARCHITECTURE.md급 문서를 공개, `16`/`02`).
-- `CHANGELOG.md` — Keep a Changelog 포맷, Phase 종료 시점마다 엔트리 1개(스토리 단위 원자 커밋과는 별도 레이어).
-- `SECURITY.md` — GitHub Security Advisory의 비공개 취약점 신고 기능으로 연결. 개인 이메일은 게재하지 않는다(1인 프로젝트라 대체 채널 없음, 노출 리스크만 있고 이득 없음).
-- `CODE_OF_CONDUCT.md` — Contributor Covenant 2.1. Phase D public 전환 시점부터 적용.
-- 이슈 템플릿 3종: `bug_report.yml`, `feature_request.yml`, `channel_adapter_request.yml`(Adapter 인터페이스 §8 링크 포함 — "새 채널 = 새 어댑터" 확장 패턴을 외부 기여로 유도, Buzz의 kind 확장 철학과 유사(`02`)).
+- `docs/spec/` — a full copy of this planning document (00 + A1–A8). Kept as-is after the public switch (we do not hide strategy documents — both hermes-agent and goose publish ARCHITECTURE.md-grade documents, `16`/`02`).
+- `CHANGELOG.md` — Keep a Changelog format, one entry per Phase exit (a separate layer from the story-level atomic commits).
+- `SECURITY.md` — points to GitHub Security Advisory's private vulnerability reporting. No personal email is published (it is a one-person project with no alternative channel, so exposure carries only risk and no benefit).
+- `CODE_OF_CONDUCT.md` — Contributor Covenant 2.1. Applies from the Phase D public switch.
+- 3 issue templates: `bug_report.yml`, `feature_request.yml`, `channel_adapter_request.yml` (includes a link to the Adapter interface §8 — steers the "new channel = new adapter" extension pattern toward external contributions, similar to Buzz's kind-extension philosophy (`02`)).
 
-## 4. 런치 체크리스트 (Phase D 종료 기준의 분해)
+## 4. Launch Checklist (decomposition of the Phase D exit criteria)
 
-1. README 13섹션 전부 채움, 링크 깨짐 없음
-2. 데모 GIF 3종 최종본 교체(시드 픽스처 확인, 개인정보 없음)
-3. 아키텍처 다이어그램 §4.2 최신 배치와 일치
-4. 채널·런타임 표가 실제 Phase 진행 상태와 일치(문서 드리프트 없음)
-5. Quickstart 3단계를 새 계정으로 실제 재현 테스트
-6. 라이선스 파일(`LICENSE`) + 배지 Apache-2.0으로 확정
-7. `CODE_OF_CONDUCT.md`, `SECURITY.md`, 이슈 템플릿 3종 존재
-8. `CHANGELOG.md`에 Phase A~D 엔트리 소급 작성
-9. 비밀·크리덴셜 grep 스캔(`git log`까지 포함) 0건
-10. Star history 배지 활성화
-11. 레포 visibility private → public 전환(D14)
-12. 전환 직후 첫 이슈로 "Help wanted: KakaoTalk parser, LinkedIn scraper" 등록(`16` CONTRIBUTING 아이디어)
+1. All 13 README sections filled in, no broken links
+2. The 3 demo GIFs replaced with final versions (seed fixtures verified, no personal data)
+3. Architecture diagram matches the latest §4.2 deployment
+4. Channel/runtime table matches the actual Phase progress (no documentation drift)
+5. The 3 Quickstart steps actually reproduction-tested with a fresh account
+6. License file (`LICENSE`) + badge locked to Apache-2.0
+7. `CODE_OF_CONDUCT.md`, `SECURITY.md`, and the 3 issue templates present
+8. Phase A–D entries written retroactively in `CHANGELOG.md`
+9. Secret/credential grep scan (including `git log`) returns 0 hits
+10. Star history badge activated
+11. Repo visibility private → public switch (D14)
+12. Register "Help wanted: KakaoTalk parser, LinkedIn scraper" as the first issue right after the switch (`16` CONTRIBUTING idea)
 
 ---
 
-## 리뷰 노트 (2026-09-20)
+## Review Notes (2026-09-20)
 
-인라인으로 고친 것(경미): (1) A8-D1과 런치 체크리스트 1번의 섹션 수가 "12개/12섹션"으로 적혀 있었으나, 나열된 항목과 본문 소제목(1.1~1.13)을 세어보면 실제로는 13개 — 둘 다 13으로 수정. (2) §1.12와 A8-D9 근거 열의 "§20-D9"는 존재하지 않는 참조(마스터 §20은 부록 목록일 뿐 D9 하위 항목이 없음) — A8 자신의 §1.12/A8-D9를 가리키도록 수정.
+Fixed inline (minor): (1) The section count in A8-D1 and launch checklist item 1 read "12 items / 12 sections," but counting the listed items and the body subheadings (1.1–1.13) shows there are actually 13 — both were corrected to 13. (2) The "§20-D9" reference in §1.12 and in the A8-D9 basis column is a nonexistent reference (master §20 is only an appendix list and has no D9 sub-item) — corrected to point at A8's own §1.12/A8-D9.
 
-아래는 고치지 않고 남겨둔 것(경미~중대, Logan 판단 필요):
+The following were left unfixed (minor to major; Logan's judgment needed):
 
-1. **[중대] A8-D10·§2의 "VHS(charmbracelet)" 출처 불명.** `research/16-hot-repo-readme.md`는 VHS를 "6개 레포 중 아무도 안 쓴 도구"로만 언급하고(Visual Asset Production Methods 절), 실제 macOS 로컬 제작 도구 목록(Framer Motion/Final Cut/Mermaid/ffmpeg+gifsicle, 같은 파일 "Tools for macOS" 절)에는 VHS가 없다. A8-D10의 근거 열은 이 도구 목록을 "그대로 적용"했다고 말하지만 VHS는 그 목록에 없는 항목이라, `16`에서 나온 것처럼 읽힌다. VHS 자체는 실존하는 도구(charmbracelet)라 구현이 막히진 않지만, 근거 인용이 부정확하다 — 다른 리서치 파일에도 VHS 언급이 전혀 없음(grep 확인).
-2. **[경미] Star history 뱃지 URL(`https://api.star-history.com/svg?repos=...&type=Date`, §1.13)이 리서치에 없음.** `research/16`은 "Star History 뱃지가 있으면 좋다"는 권고와 dify README 링크만 인용하고, 실제 API 엔드포인트/쿼리 파라미터는 어디에도 없다(grep 결과 0건). 서비스 자체는 실존하고 URL 포맷도 맞지만, "리서치 파일에서 추적 가능"하지는 않다.
-3. **[경미] 레포 위생 표준(§3, A8-D13)의 구체적 버전·방식 — `Contributor Covenant 2.1`, `Keep a Changelog` 포맷, `GitHub Security Advisory` 비공개 신고, 이슈 템플릿 파일명(`bug_report.yml` 등) — 이 리서치 폴더 어디에도 없음(grep 결과 0건).** 널리 쓰이는 표준 관행이라 틀린 내용은 아니지만, 이 부록의 다른 모든 결정처럼 "근거: `NN`" 인용이 붙어있지 않다. 리서치 기반 정확성이 이 기획서의 원칙이라면 일관성이 깨진다 — Logan 판단하에 "업계 표준, 리서치 무관" 정도로 명시하거나 그냥 두면 된다.
-4. **[경미, 모호성] §1.10 로드맵 요약의 "B 컨텍스트+에이전트+폰"에서 "에이전트"가 Phase A에 이미 들어가는 에이전트 브리지(Claude Code·Codex, §16 Phase A 종료 기준)와 헷갈릴 수 있다.** 마스터 §16을 보면 에이전트 브리지 자체는 Phase A에 붙고, Phase B에서 추가되는 건 "컨텍스트 기반 초안"(에이전트 능력의 심화)이다. README를 그대로 구현하는 코딩 에이전트가 이 한 줄만 보고 "에이전트 연동이 Phase B부터 시작"이라고 오해할 여지가 있다 — §16 원문 표를 참조하라는 문구를 추가하면 해소된다.
+1. **[Major] The source of "VHS (charmbracelet)" in A8-D10/§2 is unknown.** `research/16-hot-repo-readme.md` mentions VHS only as "a tool nobody among the 6 repos used" (Visual Asset Production Methods section), and VHS is absent from the actual list of macOS local production tools (Framer Motion/Final Cut/Mermaid/ffmpeg+gifsicle, same file, "Tools for macOS" section). A8-D10's basis column says this tool list was "applied as-is," but VHS is not on that list, so it reads as if it came from `16`. VHS itself is a real tool (charmbracelet), so implementation is not blocked, but the citation of its basis is inaccurate — no other research file mentions VHS at all (verified by grep).
+2. **[Minor] The Star history badge URL (`https://api.star-history.com/svg?repos=...&type=Date`, §1.13) is not in the research.** `research/16` cites only the recommendation that "a Star History badge would be nice" and a link to the dify README; the actual API endpoint and query parameters appear nowhere (grep result: 0 hits). The service itself exists and the URL format is correct, but it is not "traceable to a research file."
+3. **[Minor] The specific versions and mechanisms of the repo hygiene standards (§3, A8-D13) — `Contributor Covenant 2.1`, the `Keep a Changelog` format, `GitHub Security Advisory` private reporting, issue template filenames (`bug_report.yml`, etc.) — appear nowhere in this research folder (grep result: 0 hits).** They are widely used standard practices, so the content is not wrong, but unlike every other decision in this appendix they carry no "basis: `NN`" citation. If research-grounded accuracy is a principle of this planning document, this is an inconsistency — at Logan's discretion, either note them as "industry standard, independent of the research" or leave them as-is.
+4. **[Minor, ambiguity] In the §1.10 roadmap summary, "B context + agents + phone," the word "agents" can be confused with the agent bridge that already lands in Phase A (Claude Code/Codex, §16 Phase A exit criteria).** Looking at master §16, the agent bridge itself attaches in Phase A, and what Phase B adds is "context-based drafts" (a deepening of agent capability). A coding agent implementing the README literally could read this one line and mistake it for "agent integration starts in Phase B" — adding a pointer to the §16 source table would resolve it.
 
-(v0.9에 있던 5번 — "Tailscale-only" 배지가 Phase D standalone 이후에도 정확한지 불명확하다는 항목 — 은 v0.95에서 해소되어 제거. §1.10에 Phase D 정직한 문장을 추가해, Phase D 이후에도 "Tailscale-only"가 전체 제품이 아니라 KakaoTalk·LinkedIn 사용자에게만 조건부로 남는다는 것을 §1.7·§1.10 양쪽에서 명시했다 — 아래 수정 이력 참고.)
+(Item 5 from v0.9 — the note that it was unclear whether the "Tailscale-only" badge stays accurate after the Phase D standalone — was resolved in v0.95 and removed. The Phase D honesty sentence added to §1.10 makes clear in both §1.7 and §1.10 that even after Phase D, "Tailscale-only" remains conditional on KakaoTalk/LinkedIn users rather than applying to the whole product — see the revision history below.)
 
-블로커는 없음: 위 항목들은 모두 마스터 D1~D16 결정과 직접 충돌하지 않고, Phase A~C 구현을 막지 않는다.
+No blockers: none of the items above directly conflicts with master decisions D1–D16, and none blocks Phase A–C implementation.
 
-## 수정 이력 (v0.95, 2026-09-20)
+## Revision History (v0.95, 2026-09-20)
 
-1. 패키지 이름을 `@omnis/app` → `@omnis/desktop`으로 정정(§1.8 Quickstart 2단계 커맨드) — A7의 `@omnis/desktop`과 표기 통일(`99-review.md` §1.2 "표기 3건").
-2. 라이선스를 "기본값, Logan 최종 확정 대기" 톤에서 "Apache-2.0으로 확정"으로 재서술(A8-D9, §1.3 배지, §1.12) — 마스터 §19 Q9와 `99-review.md` §4 항목 16이 이미 값을 정했으므로 배지에서 "TBD/proposed" 표기를 제거하고, MIT/AGPL은 기각된 후보로만 남김. Logan에게 남은 절차는 런치 시점 `LICENSE` 파일 커밋뿐이라고 명시.
-3. 채널·런타임 표(§1.7)의 Hermes 행을 "C 이후 선택"에서 "B(읽기 전용 세션) → C(위임 대상)"으로 정정 — 마스터 §3, §19 Q7과 일치. 채널이 8개(§1.7 도입부에 합계 8 명시)임을 재확인.
-4. 허브 포트: A8 전체를 grep한 결과 포트를 언급하는 곳이 원래 없었음 — 8642/8787 오기가 없어 변경할 곳이 없다(확인만, 변경 없음).
-5. Phase D 정직한 문장을 §1.10 로드맵에 추가 — "Phase D에도 맥미니가 KakaoTalk·LinkedIn 캡처 사이드카로 남는다"(마스터 §19 Q8)를 명시하고, 이로써 v0.9 리뷰 노트 5번("Tailscale-only" 배지가 Phase D 이후에도 정확한지 모호했던 항목)을 해소.
-6. 버전 표기를 0.9 → 0.95로, 근거 인용에 `99-review.md`와 마스터 §19를 추가.
+1. Corrected the package name from `@omnis/app` to `@omnis/desktop` (§1.8 Quickstart step 2 command) — unified the notation with A7's `@omnis/desktop` (`99-review.md` §1.2 "3 notation items").
+2. Rewrote the license from a "default value, pending Logan's final decision" tone to "locked to Apache-2.0" (A8-D9, §1.3 badge, §1.12) — since master §19 Q9 and `99-review.md` §4 item 16 already fixed the value, the "TBD/proposed" marker was removed from the badge, and MIT/AGPL remain only as rejected candidates. Stated that the only step left for Logan is committing the `LICENSE` file at launch.
+3. Corrected the Hermes row in the channel/runtime table (§1.7) from "optional after C" to "B (read-only session) → C (delegation target)" — matching master §3 and §19 Q7. Reconfirmed that there are 8 channels (the §1.7 intro states the total of 8).
+4. Hub port: grepping all of A8 showed there was originally no place mentioning a port — there is no 8642/8787 typo to change (verification only, no changes).
+5. Added the Phase D honesty sentence to the §1.10 roadmap — stating that "even in Phase D the Mac mini remains as a capture sidecar for KakaoTalk and LinkedIn" (master §19 Q8), thereby resolving v0.9 review note item 5 (the item where it was ambiguous whether the "Tailscale-only" badge stays accurate after Phase D).
+6. Bumped the version notation from 0.9 to 0.95, and added `99-review.md` and master §19 to the source citations.

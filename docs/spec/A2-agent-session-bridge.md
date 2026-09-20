@@ -1,65 +1,65 @@
-# A2 — 에이전트 세션 브리지 프로토콜
+# A2 — Agent Session Bridge Protocol
 
-버전 1.0 · 2026-09-20 · 작성 Fable
-근거: `research/09-agents-as-inbox.md`(런타임 표면·Hermes 세션 헤더 분리·ACP/A2A 기각), `research/27-gap-event-volume-and-sync-budget.md`(이벤트 실측·3티어 분리), `research/22-gap-read-the-prior-art-source.md`(HumanInterrupt/HumanResponse·tool 격리), `research/02-block-buzz.md`(agent-as-member, JSON in/out CLI 규약), `research/24-gap-ralph-loop-dev-pipeline.md`(claude-ds 호출 규약), `research/00-SYNTHESIS.md` §2.3(버전 협상 모델), 마스터 설계 `00-omnis-design.md` D5/D7/D10/D15/D16 · §6 · §9 · §11 · §19 Q7/Q10.
+Version 1.0 · 2026-09-20 · Author Fable
+Basis: `research/09-agents-as-inbox.md` (runtime surface, Hermes session header split, ACP/A2A rejection), `research/27-gap-event-volume-and-sync-budget.md` (event measurements, 3-tier split), `research/22-gap-read-the-prior-art-source.md` (HumanInterrupt/HumanResponse, tool isolation), `research/02-block-buzz.md` (agent-as-member, JSON in/out CLI contract), `research/24-gap-ralph-loop-dev-pipeline.md` (claude-ds invocation contract), `research/00-SYNTHESIS.md` §2.3 (version negotiation model), and the master design `00-omnis-design.md` D5/D7/D10/D15/D16 · §6 · §9 · §11 · §19 Q7/Q10.
 
-이 부록은 마스터 §9를 구현 가능한 수준으로 확장한다. 마스터와 충돌하면 마스터가 이긴다.
+This appendix extends master §9 to an implementable level. Where it conflicts with the master, the master wins.
 
 ---
 
-## 0. 이 부록이 확정하는 결정
+## 0. Decisions This Appendix Settles
 
-| # | 결정 | 근거 | 폴백/변경 조건 |
+| # | Decision | Basis | Fallback / change condition |
 |---|---|---|---|
-| A2-D1 | **`session_key`(안정 스코프) ≠ `session_id`(런타임이 회전시키는 트랜스크립트 ID).** key 포맷은 `agent:{runtime}:{host}:{purpose}`, 최대 256자, 제어문자 금지 | Hermes `X-Hermes-Session-Key`/`X-Hermes-Session-Id` 분리(`09`, 이 스윕에서 가장 강하게 검증된 단일 발견) | 없음 |
-| A2-D2 | **전송은 브리지→허브 단방향 dial의 WebSocket 1개, JSON-RPC 2.0 양방향.** 허브는 브리지에 접속하지 않는다 | 맥북·아이폰은 NAT 뒤에 있고 Tailscale 주소만 안정적. 허브를 listen-only로 두면 방화벽 규칙이 한 방향뿐 | 브리지가 항상 켜진 호스트(미니)에만 있으면 허브→브리지 dial도 가능하지만 코드 두 벌이 되므로 안 한다 |
-| A2-D3 | **버전 협상은 MCP 2026-07-28 모델.** `initialize` 핸드셰이크 없음. 모든 요청의 `params._meta["ai.omnis/protocolVersion"]`에 버전을 싣고, 능력은 `bridge/discover` RPC로 조회 | `00-SYNTHESIS` §2.3(MCP 현행 2026-07-28, per-request `_meta` + mandatory discover) | 없음 |
-| A2-D4 | **이벤트 3티어.** `turn.item.delta`는 저장하지 않는다(ephemeral). durable은 `turn.item.started`에 row 생성 → 500ms 디바운스 또는 `turn.item.completed`에만 UPDATE. raw NDJSON 전량은 허브 로컬 cold 로그 | `27` 실측: 한 턴 39이벤트/63KB 중 92%가 프로세스 기동당 1회 나가는 `system/init`, 실콘텐츠 ~4.8KB. 토큰 델타 커밋은 G5(2초)를 깎는다 | 디바운스 간격은 Phase A 실측 후 조정. 500ms는 초기값 |
-| A2-D5 | **Claude Code 어댑터는 턴당 서브프로세스.** 상주 프로세스로 두지 않는다. `claude -p --output-format stream-json --verbose --resume <session_id>` | `09` VERIFIED. `-p`는 비대화형 1회 실행이 기본 계약이고, 상주화하려면 Agent SDK로 갈아타야 하는데 D3(하네스는 AI SDK만)과 충돌 | 턴당 `system/init` 28KB 오버헤드가 문제가 되면 Claude Agent SDK `unstable_v2_resumeSession`으로 교체(`09`) |
-| A2-D6 | **Codex 어댑터는 상주 `app-server` 자식 프로세스 1개.** 버전은 `rust-v0.155.1`에 핀, 기능은 `capabilities` 배열로 feature detection | `09`/`27`: app-server는 장수명 양방향 JSON-RPC이고 0.156.0-alpha가 하루 4~5회 잘린다 | 핀 해제는 계약 테스트 전량 통과 시에만 |
-| A2-D7 | **`codex mcp-server`는 존재하지 않는다.** 위임 경로에서 완전히 뺀다 | `09` Verification 행 10: `codex-rs/cli/src/mcp_cmd.rs`에 `List/Get/Add/Remove/Login/Logout`뿐 | 없음 |
-| A2-D8 | **claude-ds는 Claude Code 어댑터의 설정 변형.** 별도 어댑터 클래스를 만들지 않는다. 바이너리 이름·모델 alias·API 키 출처만 다르다 | `09`("claude-ds is free: same wrapper works unmodified"), `24`(claude-ds 호출 규약) | claude-ds 엔드포인트가 stream-json 계약을 깨면 그때 분기 |
-| A2-D9 | **Hermes 어댑터는 두 호스트 모두에 있고 Phase가 나뉜다: Phase B = 읽기 전용 세션(`origin:'human'`만, 위임 대상에서 제외), Phase C = 위임 대상 편입.** 표면은 `/v1` + `X-Hermes-Session-Key`/`X-Hermes-Session-Id`, 능력은 `GET /v1/capabilities` | 마스터 §19 Q7(Phase B 읽기 전용 세션, Phase C 위임 대상), `09` VERIFIED(세션 헤더 분리·capabilities 자기기술) | Phase C 승격 조건은 S-A2-5(Hermes command approval의 실제 표면) 통과. 실패하면 Hermes는 읽기 전용에 머문다 |
-| A2-D10 | **런타임의 승인 요청은 omnis `pending_approvals`로 승격된다.** 브리지가 자체 판단으로 accept하지 않는다 | `22`(HumanInterrupt/HumanResponse), 마스터 D10/D15 | 없음 |
-| A2-D11 | **delegated 런은 `--bare`가 기본이다.** 대상 레포의 `.claude/settings.json` hooks와 `.mcp.json`을 로드하지 않는다. Settings에 "owned-repo allowlist는 `--bare` 없이 실행" 옵션을 두되 **기본 off**이고, 켤지 여부의 결정은 Phase A의 위임 품질 실측 뒤로 미룬다(hook/MCP 없이도 위임이 충분히 도는지를 먼저 본다) | `09` VERIFIED: `--bare` 없으면 `-p` 런도 프로젝트 hook/MCP를 신뢰 프롬프트 없이 로드한다 → 인박스 텍스트가 유도한 위임이 레포의 hook을 실행시키는 경로가 열린다. allowlist 옵션은 마스터 §11의 "완전 자율 실행은 런타임·레포별 허용 규칙을 Logan이 열 때만"과 같은 모양이다(§19 Q10) | 켜더라도 allowlist에 든 레포 경로에만 적용되고, 인박스에서 출발한 위임(`source_item_id` 있음)은 allowlist와 무관하게 항상 `--bare` |
-| A2-D12 | **브리지는 `allowed_roots` 밖 경로에서 런타임을 기동하지 않는다.** 허브가 보낸 `cwd`는 브리지가 재검증한다 | 마스터 D10(구조로 강제), `15`(Claude Code 샌드박스 전략) | 없음 |
-| A2-D13 | **`read_session`은 durable 요약 + 마지막 N턴만 반환한다.** raw 델타·reasoning 원문은 절대 반환하지 않는다 | 마스터 §9, `27`(reasoning ephemeral 결정), 프라이버시 | 디버깅용 전체 트랜스크립트는 허브 로컬 온디맨드 API로만 |
-| A2-D15 | **설정 우선순위는 CLI 인자 > 환경변수 > `~/.omnis/local-agent.toml` > 내장 기본값.** `[[runtime]]` 블록만은 TOML 전용이다 | A6 §10.1의 LaunchAgent plist가 `--hub <url>`을 `ProgramArguments`로 넘기는데 A2 §2.1은 TOML로 같은 값을 정한다 — 둘 중 어느 쪽이 이기는지가 어디에도 없었다(99-review-v2 §2-3) | 없음 |
-| A2-D16 | **런타임이 다른 런타임에 직접 명령하는 경로는 없다.** 한 런타임이 다른 런타임의 일을 원하면 `propose_delegation` → 승인 → 대상 브리지만 쓴다 | 마스터 §9(의도된 축소): 승인 없는 에이전트 간 명령은 인젝션이 한 세션에서 다른 세션으로 번지는 통로가 된다 | 런타임·레포별 허용 규칙(마스터 §19 Q10)을 Logan이 열면 승인 단계만 생략되고, 경로 자체는 그대로 대상 브리지를 지난다 |
-| A2-D14 | **mock 런타임 + NDJSON fixture 재생이 어댑터 계약 테스트의 기본 형태.** 실런타임을 CI에서 호출하지 않는다 | `27`: 실측 중 Codex 계정 사용량 한도로 턴이 끊겼다. 과금·rate limit이 있는 것을 CI에 넣지 않는다 | 주 1회 nightly에서만 실런타임 스모크 1턴 |
+| A2-D1 | **`session_key` (stable scope) ≠ `session_id` (the transcript ID the runtime rotates).** Key format is `agent:{runtime}:{host}:{purpose}`, max 256 characters, control characters forbidden | Hermes's separation of `X-Hermes-Session-Key` and `X-Hermes-Session-Id` (`09`, the single most strongly verified finding in this sweep) | None |
+| A2-D2 | **Transport is a single WebSocket dialed one-way bridge→hub, carrying bidirectional JSON-RPC 2.0.** The hub never connects to the bridge | The MacBook and iPhone sit behind NAT, and only their Tailscale addresses are stable. Keeping the hub listen-only means firewall rules in one direction only | If the bridge existed only on the always-on host (the mini), a hub→bridge dial would also work, but that means two code paths, so we don't |
+| A2-D3 | **Version negotiation follows the MCP 2026-07-28 model.** No `initialize` handshake. Every request carries the version in `params._meta["ai.omnis/protocolVersion"]`, and capabilities are queried via the `bridge/discover` RPC | `00-SYNTHESIS` §2.3 (MCP current 2026-07-28, per-request `_meta` + mandatory discover) | None |
+| A2-D4 | **Three event tiers.** `turn.item.delta` is not stored (ephemeral). Durable work creates a row on `turn.item.started` → UPDATE only on a 500 ms debounce or on `turn.item.completed`. The full raw NDJSON goes to the hub's local cold log | `27` measurements: of 39 events / 63 KB in one turn, 92% is `system/init`, emitted once per process start; real content is ~4.8 KB. Committing token deltas would eat into G5 (2 seconds) | The debounce interval is tuned after Phase A measurements. 500 ms is the initial value |
+| A2-D5 | **The Claude Code adapter is a subprocess per turn.** It is not kept as a resident process. `claude -p --output-format stream-json --verbose --resume <session_id>` | `09` VERIFIED. `-p` is by default a non-interactive one-shot run, and making it resident would require switching to the Agent SDK, which conflicts with D3 (the harness uses only the AI SDK) | If the per-turn `system/init` 28 KB overhead becomes a problem, switch to the Claude Agent SDK's `unstable_v2_resumeSession` (`09`) |
+| A2-D6 | **The Codex adapter is one resident `app-server` child process.** The version is pinned to `rust-v0.155.1`, and features are detected via the `capabilities` array | `09`/`27`: app-server is a long-lived bidirectional JSON-RPC channel, and 0.156.0-alpha gets cut 4–5 times a day | The pin is lifted only when the full contract test suite passes |
+| A2-D7 | **`codex mcp-server` does not exist.** It is removed from the delegation path entirely | `09` Verification row 10: `codex-rs/cli/src/mcp_cmd.rs` contains only `List/Get/Add/Remove/Login/Logout` | None |
+| A2-D8 | **claude-ds is a configuration variant of the Claude Code adapter.** No separate adapter class is created. Only the binary name, model alias, and API key source differ | `09` ("claude-ds is free: same wrapper works unmodified"), `24` (claude-ds invocation contract) | If the claude-ds endpoint breaks the stream-json contract, branch then |
+| A2-D9 | **The Hermes adapter exists on both hosts and is split by phase: Phase B = read-only sessions (`origin:'human'` only, excluded from delegation targets), Phase C = included as a delegation target.** The surface is `/v1` + `X-Hermes-Session-Key`/`X-Hermes-Session-Id`, and capabilities come from `GET /v1/capabilities` | master §19 Q7 (Phase B read-only sessions, Phase C delegation targets), `09` VERIFIED (session header split, capabilities self-description) | Promotion to Phase C requires passing S-A2-5 (the actual surface of Hermes command approval). If it fails, Hermes stays read-only |
+| A2-D10 | **A runtime's approval request is promoted into omnis `pending_approvals`.** The bridge never accepts on its own judgment | `22` (HumanInterrupt/HumanResponse), master D10/D15 | None |
+| A2-D11 | **`--bare` is the default for delegated runs.** The target repo's `.claude/settings.json` hooks and `.mcp.json` are not loaded. Settings exposes an "run owned-repo allowlist without `--bare`" option, but it is **off by default**, and the decision whether to enable it is deferred until after Phase A measures delegation quality (first see whether delegation runs well enough without hooks/MCP) | `09` VERIFIED: without `--bare`, even a `-p` run loads project hooks/MCP without a trust prompt → this opens a path where an inbox-text-induced delegation executes the repo's hooks. The allowlist option has the same shape as master §11's "fully autonomous execution only when Logan opens per-runtime, per-repo allow rules" (§19 Q10) | Even when enabled, it applies only to repo paths in the allowlist, and any delegation originating from the inbox (with a `source_item_id`) is always `--bare` regardless of the allowlist |
+| A2-D12 | **The bridge does not start a runtime for a path outside `allowed_roots`.** The bridge re-verifies any `cwd` the hub sends | master D10 (enforced by structure), `15` (Claude Code sandbox strategy) | None |
+| A2-D13 | **`read_session` returns only the durable summary plus the last N turns.** It never returns raw deltas or raw reasoning text | master §9, `27` (the reasoning-is-ephemeral decision), privacy | Full transcripts for debugging are available only through a hub-local on-demand API |
+| A2-D15 | **Configuration precedence is CLI arguments > environment variables > `~/.omnis/local-agent.toml` > built-in defaults.** Only `[[runtime]]` blocks are TOML-exclusive | A6 §10.1's LaunchAgent plist passes `--hub <url>` via `ProgramArguments`, while A2 §2.1 sets the same value through TOML — nowhere did it say which one wins (99-review-v2 §2-3) | None |
+| A2-D16 | **There is no path for one runtime to command another directly.** If a runtime wants another runtime to do work, it uses only `propose_delegation` → approval → the target bridge | master §9 (deliberate reduction): agent-to-agent commands without approval become a channel for injection to spread from one session to another | When Logan opens per-runtime, per-repo allow rules (master §19 Q10), only the approval step is skipped; the path itself still goes through the target bridge |
+| A2-D14 | **A mock runtime replaying NDJSON fixtures is the default form of adapter contract testing.** Real runtimes are not invoked in CI | `27`: during measurement, a turn was cut off by the Codex account usage limit. Anything with billing or rate limits does not go into CI | A one-turn real-runtime smoke test runs once a week in nightly only |
 
 ---
 
-## 1. 개념 모델
+## 1. Conceptual Model
 
-### 1.1 4개 객체
+### 1.1 The Four Objects
 
 ```ts
 // packages/bridge-protocol/src/types.ts
 export type RuntimeKind = 'claude_code' | 'codex' | 'claude_ds' | 'hermes' | 'omnis';
 export type HostId = 'mini' | 'macbook';
 
-/** 호스트에 설치된 런타임 1종. 브리지가 기동 시 등록한다. */
+/** One runtime kind installed on a host. The bridge registers it at startup. */
 export interface AgentRuntime {
-  id: string;                 // uuid, 허브가 발급
+  id: string;                 // uuid, issued by the hub
   runtime: RuntimeKind;
   host: HostId;
   version: string;            // 'claude 2.1.231' | 'codex rust-v0.155.1'
   capabilities: RuntimeCapabilities;
-  transport: 'process' | 'http';  // hermes만 'http'
-  binary_path: string | null;     // transport='http'면 null (§2.1)
-  allowed_roots: string[];        // A2-D12. transport='http'면 [] — 강제할 수 없다
-  base_url: string | null;        // transport='http'일 때만 (§2.1)
+  transport: 'process' | 'http';  // only hermes is 'http'
+  binary_path: string | null;     // null when transport='http' (§2.1)
+  allowed_roots: string[];        // A2-D12. [] when transport='http' — cannot be enforced
+  base_url: string | null;        // only when transport='http' (§2.1)
   state: 'online' | 'degraded' | 'offline';
   last_health_at: string;     // ISO8601
 }
 
-/** 하나의 대화. omnis threads 테이블의 kind='agent_session' row와 1:1. */
+/** A single conversation. 1:1 with a kind='agent_session' row in the omnis threads table. */
 export interface AgentSession {
   id: string;                 // uuid = threads.id
   runtime_id: string;
-  session_key: string;        // A2-D1, 안정
-  session_id: string | null;  // 런타임이 준 것, 회전 가능
+  session_key: string;        // A2-D1, stable
+  session_id: string | null;  // as given by the runtime, may rotate
   cwd: string;
   purpose: string;            // 'inbox:draft' | 'proj:omnis' | 'delegate:<task_id>'
   origin: 'human' | 'delegation' | 'job';
@@ -70,81 +70,81 @@ export interface AgentSession {
 }
 ```
 
-**`session_key`** 는 "누가·어디서·무엇을 위해"를 고정한다. 포맷은 `agent:{runtime}:{host}:{purpose}`, 예: `agent:codex:mini:proj-omnis`, `agent:claude_code:macbook:inbox-draft`. `purpose`의 네임스페이스 구분자 `:`(예 `proj:omnis`)는 `session_key`에 넣을 때 `-`로 치환한다 — `session_key` 자체가 `:`를 세그먼트 구분자로 쓰므로 그대로 넣으면 파싱이 모호해진다. 256자 상한과 제어문자 금지는 Hermes의 규칙을 그대로 따른다(`09`). 이 키가 메모리 스코프(A3의 `memories.scope`)와 `read_session`의 조회 키다.
+**`session_key`** pins down "who, where, and for what". Its format is `agent:{runtime}:{host}:{purpose}`, e.g. `agent:codex:mini:proj-omnis`, `agent:claude_code:macbook:inbox-draft`. The namespace separator `:` in `purpose` (e.g. `proj:omnis`) is replaced with `-` when placed into `session_key` — because `session_key` itself uses `:` as its segment separator, inserting it verbatim would make parsing ambiguous. The 256-character cap and the ban on control characters follow Hermes's rules verbatim (`09`). This key is the memory scope (A3's `memories.scope`) and the lookup key for `read_session`.
 
-**`session_id`** 는 런타임이 준 트랜스크립트 ID다. Claude Code는 `system/init` 이벤트나 `--output-format json`의 `session_id` 필드에서 얻고(`09`), Codex는 `thread.started`의 `threadId`에서 얻는다(`09`,`27`). 런타임이 세션을 새로 만들면(예: `--resume` 실패, app-server 재시작) 이 값은 바뀌지만 `session_key`와 thread는 유지된다. **이 분리가 이 부록 전체의 뼈대다.** 스레드 연속성과 메모리 스코프가 런타임의 재시작에 묶이지 않는다.
+**`session_id`** is the transcript ID the runtime provides. For Claude Code it comes from the `system/init` event or the `session_id` field of `--output-format json` (`09`), and for Codex from `threadId` in `thread.started` (`09`,`27`). When the runtime starts a new session (e.g. a failed `--resume`, an app-server restart), this value changes while `session_key` and the thread persist. **This separation is the backbone of this entire appendix.** Thread continuity and memory scope are not tied to runtime restarts.
 
-**`purpose`** 는 자유 문자열이 아니라 3개 네임스페이스만 허용한다: `inbox:<loop>`(분류·초안 등 omnis 루프), `proj:<slug>`(Logan이 직접 여는 개발 세션), `delegate:<task_id>`(위임 실행). 네임스페이스가 permission profile을 고르는 1차 입력이다(§7.1).
+**`purpose`** is not a free-form string; only three namespaces are allowed: `inbox:<loop>` (omnis loops such as triage and drafting), `proj:<slug>` (development sessions Logan opens directly), and `delegate:<task_id>` (delegation execution). The namespace is the primary input for choosing the permission profile (§7.1).
 
-**`'omnis'` kind는 브리지가 다루지 않는다.** `agent_runtimes`에 **row 1개**로 고정 존재하며(마스터 §6: "`omnis` 런타임은 1 row, 브리지 어댑터 없음"), 이것은 omnis 자체의 내장 L3 루프(마스터 §11의 분류·초안·투두·다이제스트·Network·노트 라우팅·자동 보관·Ingestion)가 만든 세션과 Item의 소속을 표시하기 위한 것이다. 성질:
+**The `'omnis'` kind is not handled by the bridge.** It exists as **exactly one row** in `agent_runtimes` (master §6: "the `omnis` runtime is 1 row, with no bridge adapter"), and this is to mark the ownership of sessions and Items created by omnis's own built-in L3 loops (master §11's triage, drafting, todos, digest, Network, note routing, auto-archiving, and Ingestion). Properties:
 
-- 브리지가 `runtime.registered`로 등록하지 **않는다**. 허브가 부팅 시 자기 자신으로 upsert한다. `host`는 허브가 도는 호스트(미니).
-- `RuntimeAdapter` 구현체가 **없다**(§4의 4종이 전부다). `probe`/`startTurn`/`cancel`/`close`가 호출되는 경로 자체가 없다 — 루프는 허브 안에서 직접 돈다.
-- 이 런타임의 세션은 `purpose`가 항상 `inbox:*`이고 `origin`은 `job`이다. 따라서 §7.1에 따라 profile은 `observe` 고정이고, 파일 쓰기·네트워크·위임 실행 경로가 구조적으로 닫힌다.
-- `session_key`는 같은 포맷을 쓴다: `agent:omnis:mini:inbox-triage` 등.
+- The bridge does **not** register it via `runtime.registered`. The hub upserts it as itself at boot. `host` is the host the hub runs on (mini).
+- There is **no** `RuntimeAdapter` implementation (the four in §4 are all of them). There is no code path that calls `probe`/`startTurn`/`cancel`/`close` — the loops run directly inside the hub.
+- Sessions of this runtime always have `purpose` of `inbox:*` and `origin` of `job`. So per §7.1 the profile is fixed to `observe`, and the file-write, network, and delegation-execution paths are structurally closed.
+- `session_key` uses the same format: `agent:omnis:mini:inbox-triage`, etc.
 
-구현자에게: `RuntimeKind` 유니온에 `'omnis'`는 남기되 어댑터 팩토리의 `switch`에서는 `throw new Error('omnis runtime has no adapter')`로 명시 차단한다. 조용히 무시하면 나중에 위임 대상 후보 목록에 섞여 들어간다.
+A note for implementers: keep `'omnis'` in the `RuntimeKind` union but explicitly block it in the adapter factory's `switch` with `throw new Error('omnis runtime has no adapter')`. Silently ignoring it means it later gets mixed into the delegation candidate list.
 
-### 1.2 capabilities 자기기술
+### 1.2 Capability Self-Description
 
-런타임 능력을 버전 문자열로 추론하지 않는다. Claude Code가 `system/init.capabilities` 배열을 두는 이유와 같다(`09` VERIFIED, v2.1.205+).
+Runtime capabilities are not inferred from a version string. This is the same reason Claude Code carries a `system/init.capabilities` array (`09` VERIFIED, v2.1.205+).
 
 ```ts
 export interface RuntimeCapabilities {
-  resume: boolean;              // 과거 세션 재개 가능
-  cross_project_resume: boolean;// CWD 밖 세션 ID로 재개 (claude >= 2.1.223, `09`)
-  stream_deltas: boolean;       // 토큰 단위 델타 제공
-  reasoning_stream: boolean;    // reasoning 델타 제공 (codex)
-  tool_calls: boolean;          // tool 호출을 구조화 이벤트로 제공
+  resume: boolean;              // can resume past sessions
+  cross_project_resume: boolean;// resume by session ID outside the CWD (claude >= 2.1.223, `09`)
+  stream_deltas: boolean;       // provides token-level deltas
+  reasoning_stream: boolean;    // provides reasoning deltas (codex)
+  tool_calls: boolean;          // provides tool calls as structured events
   approvals: 'native' | 'hook' | 'none';
-  cancel: boolean;              // 진행 중 턴 취소
-  models: string[];             // 선택 가능한 모델 alias
-  features: string[];           // 런타임 원본 capability 문자열 그대로 통과
+  cancel: boolean;              // cancel an in-flight turn
+  models: string[];             // selectable model aliases
+  features: string[];           // passes through the runtime's original capability strings verbatim
 }
 ```
 
-`features`는 런타임이 준 배열을 손대지 않고 그대로 싣는다(Claude Code의 `interrupt_receipt_v1` 등). 어댑터는 자기가 이해하는 것만 위쪽 boolean으로 승격하고 나머지는 통과시킨다 — 새 기능이 나와도 브리지 배포 없이 허브가 로그로 발견할 수 있다.
+`features` carries the array the runtime gave verbatim, untouched (Claude Code's `interrupt_receipt_v1`, etc.). The adapter promotes only what it understands into the boolean fields above and passes the rest through — so when a new feature appears, the hub can discover it from logs without a bridge deployment.
 
-### 1.3 세션 상태 기계 (herdr 모델 → `agent_sessions.state`)
+### 1.3 Session State Machine (herdr model → `agent_sessions.state`)
 
-세션 상태는 herdr의 pane 모델(`idle / working / blocked / done`, `research/30-herdr-and-oss-ui-borrow.md` §1 — "에이전트가 멈춰서 답을 기다리면 herdr가 그렇게 말한다")을 그대로 쓴다. 저장 값은 A3 §4 `agent_sessions_state_ck`의 6종이고, 매핑은 이것뿐이다:
+Session states use herdr's pane model verbatim (`idle / working / blocked / done`, `research/30-herdr-and-oss-ui-borrow.md` §1 — "when an agent stalls waiting for an answer, herdr says so"). The stored values are the six in A3 §4 `agent_sessions_state_ck`, and this is the only mapping:
 
-| herdr | `agent_sessions.state` | 전이 시점 |
+| herdr | `agent_sessions.state` | Transition point |
 |---|---|---|
-| — | `starting` | row가 처음 만들어진 직후(허브의 `session.create`, 또는 브리지의 `session.registered`가 모르는 키를 들고 왔을 때) |
-| idle | `idle` | `session.create`/`session.resume` 응답 뒤 |
-| working | `running` | `turn.started`, 그리고 `turn.item.started` 하나라도 도착하면 |
-| blocked | `waiting_approval` | `approval.requested` 접수 ~ 사람의 결정까지 |
-| (재계산) | — | 결정 직후. 상태를 고정하지 않고 다시 고른다: 남은 `pending` 승인이 있으면 `waiting_approval`, 턴이 아직 열려 있으면 `running`, 아니면 마지막 `turn.completed`의 종착점(`idle`/`failed`) |
-| done | `idle` | `turn.completed`(status=ok)이고 그 세션 스레드에 `pending` 승인이 없을 때 |
+| — | `starting` | immediately after the row is first created (the hub's `session.create`, or when the bridge's `session.registered` arrives with an unknown key) |
+| idle | `idle` | after the `session.create`/`session.resume` response |
+| working | `running` | `turn.started`, and as soon as even one `turn.item.started` arrives |
+| blocked | `waiting_approval` | from receipt of `approval.requested` until a human decides |
+| (recompute) | — | immediately after a decision. The state is not pinned; it is re-chosen: if any `pending` approval remains, `waiting_approval`; if the turn is still open, `running`; otherwise the terminus of the last `turn.completed` (`idle`/`failed`) |
+| done | `idle` | when `turn.completed` (status=ok) and the session thread has no `pending` approval |
 | — | `failed` | `turn.completed`(status≠ok) |
 | — | `ended` | `session.close` |
 
-**`done`이 `idle`로 접히는 것은 의도다.** CHECK의 `ended`는 세션 종료 자리라 재사용하면 "턴이 끝난 열린 세션"과 "닫힌 세션"이 구분되지 않는다. UI가 "이 턴은 끝났다"를 아는 근거는 세션 상태가 아니라 스레드의 마지막 item(`kind='system'`의 턴 완료 한 줄)이다.
+**Folding `done` into `idle` is intentional.** The CHECK's `ended` is the slot for session termination; reusing it would make "an open session whose turn finished" indistinguishable from "a closed session". The UI's evidence that "this turn is over" is not the session state but the thread's last item (a single turn-completion line with `kind='system'`).
 
-**blocked는 done보다 세다.** `turn.completed`가 와도 그 세션 스레드에 `pending` 승인이 남아 있으면 `waiting_approval`에 머문다 — 승인 왕복 중에 런타임이 턴을 닫는 순서(승인 요청 → 턴 종료 → 결정)에서 세션이 잠깐 "할 일 없음"으로 보이면 안 된다. 판정 근거는 `pending_approvals.thread_id` 하나이고, 그래서 브리지가 올린 승인은 접수 시점에 세션 스레드에 걸린다.
+**blocked is stronger than done.** Even when `turn.completed` arrives, if a `pending` approval remains on that session thread, the session stays in `waiting_approval` — in the ordering where a runtime closes the turn during an approval round trip (approval request → turn end → decision), the session must not briefly appear as "nothing to do". The sole determining signal is `pending_approvals.thread_id`, which is why an approval the bridge raises is attached to the session thread at the moment of receipt.
 
-**결정이 나면 `running`으로 되돌리지 않는다.** 승인을 기다리던 호출이 풀리는 시점에 상태를 `running`으로 고정하면 위 순서(승인 요청 → 턴 종료 → 결정)에서 턴은 이미 끝났는데 세션 배지만 영원히 "작업 중"으로 남는다. 결정 직후에는 위 표의 (재계산) 행대로 blocked → working → 마지막 턴의 종착점 순으로 다시 고른다.
+**Once a decision is made, the state is not put back to `running`.** If the state were pinned to `running` at the moment a call waiting on approval is released, then in the ordering above (approval request → turn end → decision) the turn has already finished while the session badge would remain "working" forever. Immediately after a decision, the state is re-chosen as in the (recompute) row above: blocked → working → the terminus of the last turn.
 
-이 값들은 Zero publication(0008)에 이미 들어 있는 `agent_sessions.state`로 그대로 복제된다 — 데스크톱은 별도 조회 없이 세션 배지를 그린다.
+These values are replicated verbatim into the `agent_sessions.state` already present in Zero publication (0008) — the desktop draws session badges without a separate query.
 
 ---
 
-## 2. 브리지 데몬 `local-agent`
+## 2. The Bridge Daemon `local-agent`
 
-### 2.1 배치
+### 2.1 Placement
 
-`apps/local-agent`, Node 22 단일 프로세스. 맥북은 LaunchAgent(로그인 세션), 미니는 LaunchDaemon으로 뜬다(마스터 D11 — 코드 실행 런타임은 GUI가 필요 없다). **브리지는 두 호스트 모두에서 돈다**: 맥북(Claude Code, Codex, claude-ds, Hermes)과 미니(Codex, Hermes). 미니는 허브를 겸하지만 브리지는 별도 프로세스로 둔다 — 허브가 런타임을 직접 spawn하면 A2-D12의 경로 재검증이 허브 안으로 들어와 권한 경계가 흐려진다.
+`apps/local-agent`, a single Node 22 process. On the MacBook it runs as a LaunchAgent (login session); on the mini it runs as a LaunchDaemon (master D11 — code-execution runtimes don't need a GUI). **The bridge runs on both hosts**: the MacBook (Claude Code, Codex, claude-ds, Hermes) and the mini (Codex, Hermes). The mini also hosts the hub, but the bridge stays a separate process — if the hub spawned runtimes directly, A2-D12's path re-verification would move inside the hub and the privilege boundary would blur.
 
-Keychain 아이템 이름은 A1의 명명 규칙 `omnis.<channel>.<kind>.<external_id>`를 런타임에도 그대로 적용한다(`<external_id>` 자리에 호스트). **브리지 토큰의 정본 리터럴은 `omnis.bridge.token.<host>`** — 실제 값은 `omnis.bridge.token.macbook`과 `omnis.bridge.token.mini` 둘뿐이고, 본문에서 이 이름이 나오는 곳은 아래 두 TOML 예시가 전부다. A6 §9가 쓰던 `omnis.<host>.session_bus_token`은 이 리터럴로 통일한다(99-review-v2 §4-4).
+Keychain item names apply A1's naming convention `omnis.<channel>.<kind>.<external_id>` to runtimes as well (with the host in place of `<external_id>`). **The canonical literal for the bridge token is `omnis.bridge.token.<host>`** — there are only two actual values, `omnis.bridge.token.macbook` and `omnis.bridge.token.mini`, and the only places this name appears in the body are the two TOML examples below. A6 §9's `omnis.<host>.session_bus_token` is unified into this literal (99-review-v2 §4-4).
 
-**설정 우선순위**(A2-D15): CLI 인자 > 환경변수 > `~/.omnis/local-agent.toml` > 내장 기본값. A6 §10.1의 LaunchAgent/LaunchDaemon plist가 `ProgramArguments`로 넘기는 `--hub <url>`은 TOML의 `hub_url`을 덮어쓰고, `--host`·`--token-keychain-item`도 같은 방식으로 대응 키를 덮어쓴다. 환경변수는 `OMNIS_` 접두 + 대문자 스네이크(`OMNIS_HUB_URL`, `OMNIS_HOST`)로 TOML보다 세고 CLI보다 약하다 — plist를 다시 쓰지 않고 한 번 시험해 볼 때 쓰는 자리다. **`[[runtime]]` 블록은 TOML에만 있다**: CLI나 환경변수로 런타임을 추가·수정하지 않는다. `allowed_roots`가 명령줄에서 바뀔 수 있으면 A2-D12의 경로 상한이 의미를 잃는다. 기동 로그에 실효값과 그 출처(`cli`|`env`|`toml`|`default`)를 키마다 한 줄씩 찍는다.
+**Configuration precedence** (A2-D15): CLI arguments > environment variables > `~/.omnis/local-agent.toml` > built-in defaults. The `--hub <url>` that A6 §10.1's LaunchAgent/LaunchDaemon plist passes via `ProgramArguments` overrides TOML's `hub_url`, and `--host` and `--token-keychain-item` similarly override their corresponding keys. Environment variables use the `OMNIS_` prefix in upper snake case (`OMNIS_HUB_URL`, `OMNIS_HOST`) and are stronger than TOML but weaker than the CLI — the slot for a one-off trial without rewriting the plist. **`[[runtime]]` blocks exist only in TOML**: runtimes are not added or modified via CLI or environment variables. If `allowed_roots` could be changed from the command line, A2-D12's path cap would lose its meaning. The startup log prints the effective value and its source (`cli`|`env`|`toml`|`default`) for each key, one line per key.
 
-맥북 설정 `~/.omnis/local-agent.toml`:
+MacBook configuration `~/.omnis/local-agent.toml`:
 
 ```toml
 host = "macbook"
-hub_url = "wss://omnis-hub.your-tailnet.ts.net/bridge"   # 허브 자체는 127.0.0.1:8787에 bind
+hub_url = "wss://omnis-hub.your-tailnet.ts.net/bridge"   # the hub itself binds to 127.0.0.1:8787
 token_keychain_item = "omnis.bridge.token.macbook"     # security find-generic-password
 
 [[runtime]]
@@ -172,11 +172,11 @@ token_keychain_item = "omnis.hermes.api_key.macbook"
 session_header_mode = "hermes_v1"
 ```
 
-미니 설정 `~/.omnis/local-agent.toml`:
+Mini configuration `~/.omnis/local-agent.toml`:
 
 ```toml
 host = "mini"
-hub_url = "ws://127.0.0.1:8787/bridge"                 # 같은 기기, 루프백
+hub_url = "ws://127.0.0.1:8787/bridge"                 # same machine, loopback
 token_keychain_item = "omnis.bridge.token.mini"
 
 [[runtime]]
@@ -192,40 +192,40 @@ token_keychain_item = "omnis.hermes.api_key.mini"
 session_header_mode = "hermes_v1"
 ```
 
-**`[[runtime]]` 필드는 런타임 종류에 따라 갈린다.** `binary`·`allowed_roots`·`pinned_version`·`default_model`은 브리지가 자식 프로세스를 spawn하는 런타임(`claude_code`, `codex`, `claude_ds`)에만 있다. `hermes`는 프로세스를 띄우지 않고 이미 떠 있는 HTTP 서버에 붙는 클라이언트라 이 넷이 전부 의미가 없다 — 설정 검증이 HTTP 런타임에 이 필드가 오면 기동을 거부한다. 대신:
+**`[[runtime]]` fields differ by runtime kind.** `binary`, `allowed_roots`, `pinned_version`, and `default_model` exist only for runtimes the bridge spawns as child processes (`claude_code`, `codex`, `claude_ds`). `hermes` is a client that attaches to an already-running HTTP server without spawning a process, so all four are meaningless — configuration validation refuses to start if these fields are present on an HTTP runtime. Instead:
 
-| 필드 | 의미 | 기본값 |
+| Field | Meaning | Default |
 |---|---|---|
-| `base_url` | Hermes `api_server` 주소. `API_SERVER_PORT` 기본이 8642다(`09` VERIFIED) | `http://127.0.0.1:8642` |
-| `token_keychain_item` | bearer 토큰(`API_SERVER_KEY`)의 Keychain 아이템(`09` VERIFIED) | 필수, 기본값 없음 |
-| `session_header_mode` | 세션 헤더 규약. `hermes_v1` = `X-Hermes-Session-Key`(안정) + `X-Hermes-Session-Id`(회전)(`09` VERIFIED) | `hermes_v1` |
+| `base_url` | Hermes `api_server` address. `API_SERVER_PORT` defaults to 8642 (`09` VERIFIED) | `http://127.0.0.1:8642` |
+| `token_keychain_item` | Keychain item for the bearer token (`API_SERVER_KEY`) (`09` VERIFIED) | Required, no default |
+| `session_header_mode` | Session header convention. `hermes_v1` = `X-Hermes-Session-Key` (stable) + `X-Hermes-Session-Id` (rotating) (`09` VERIFIED) | `hermes_v1` |
 
-능력은 설정에 적지 않고 기동 시 `GET /v1/capabilities`로 조회한다(`09` VERIFIED: `"session_key_header": "X-Hermes-Session-Key"` 등을 자기기술로 돌려준다). 응답의 `session_key_header`가 `session_header_mode`가 가정한 값과 다르면 런타임을 `degraded`로 등록하고 세션을 열지 않는다. 경로 상한(A2-D12)은 HTTP 런타임에 적용할 수 없다 — Hermes 프로세스의 작업 디렉터리는 브리지가 정하지 않는다. 그래서 Hermes 세션은 §7.1의 `observe`/`workspace` 판정을 브리지가 강제하지 못하고, Phase B에서 `origin:'human'` 읽기 전용으로만 쓴다(A2-D9).
+Capabilities are not written into configuration; they are queried at startup via `GET /v1/capabilities` (`09` VERIFIED: it self-describes things like `"session_key_header": "X-Hermes-Session-Key"`). If the response's `session_key_header` differs from what `session_header_mode` assumes, the runtime is registered as `degraded` and no sessions are opened. The path cap (A2-D12) cannot be applied to HTTP runtimes — the bridge does not control the Hermes process's working directory. So for Hermes sessions the bridge cannot enforce §7.1's `observe`/`workspace` determination, and in Phase B they are used only as `origin:'human'` read-only (A2-D9).
 
-`allowed_roots`에 `$HOME` 자체나 `/`를 쓰는 것은 기동 시 거부한다(설정 검증에서 fail-fast).
+Using `$HOME` itself or `/` in `allowed_roots` is rejected at startup (fail-fast in configuration validation).
 
-### 2.2 접속·인증·재연결
+### 2.2 Connection, Authentication, Reconnection
 
-1. 브리지가 Keychain에서 토큰을 읽어 `Authorization: Bearer <token>`으로 `wss://.../bridge`에 dial한다. Tailscale ACL이 이미 tailnet 밖 접근을 막지만(마스터 §13), 토큰은 "어느 기기인가"를 증명하는 2차 요소로 남긴다. 토큰은 기기별로 다르고 허브 DB에 `sha256` 해시로만 저장한다.
-2. 허브는 Tailscale Serve가 주입한 identity 헤더를 **먼저 제거하고 재주입**해 스푸핑을 막는다(`15`의 Tailscale 패턴 차용).
-3. 접속 직후 브리지가 `bridge/discover`를 호출한다(§3.2). 허브가 자기 프로토콜 버전과 지원 메서드를 답한다.
-4. 이어서 런타임 목록을 `session.registered`가 아니라 `runtime.registered` 알림으로 보낸다(런타임 1개당 1건).
-5. 끊기면 지수 백오프로 재연결한다: 1s → 2s → 4s → … → 30s 상한, ±20% jitter. 재연결 후 브리지는 `runtime.registered`를 다시 보내고, 살아 있는 세션 목록을 `session.registered`로 재신고한다. 허브는 이를 멱등으로 처리한다(`session_key` 기준 upsert).
-6. 30초마다 `health` 알림. 허브가 90초 동안 못 받으면 해당 브리지의 런타임을 `offline`로 내리고, 인박스에 시스템 Item("macbook 브리지 연결 끊김")을 하나 만든다(마스터 §15).
+1. The bridge reads the token from Keychain and dials `wss://.../bridge` with `Authorization: Bearer <token>`. Tailscale ACLs already block access from outside the tailnet (master §13), but the token remains as a second factor proving "which device this is". Tokens differ per device and are stored in the hub DB only as `sha256` hashes.
+2. The hub **strips and then re-injects** the identity headers Tailscale Serve injects, preventing spoofing (borrowing the Tailscale pattern from `15`).
+3. Immediately after connecting, the bridge calls `bridge/discover` (§3.2). The hub answers with its own protocol version and supported methods.
+4. It then sends the runtime list as `runtime.registered` notifications, not `session.registered` (one per runtime).
+5. On disconnect it reconnects with exponential backoff: 1s → 2s → 4s → … → 30s cap, ±20% jitter. After reconnecting, the bridge re-sends `runtime.registered` and re-declares the list of live sessions via `session.registered`. The hub handles this idempotently (upsert keyed by `session_key`).
+6. A `health` notification every 30 seconds. If the hub does not receive one for 90 seconds, it marks that bridge's runtimes `offline` and creates one system Item in the inbox ("macbook bridge disconnected") (master §15).
 
-**끊긴 동안의 턴.** WS가 끊겨도 진행 중인 런타임 프로세스는 죽이지 않는다. 브리지는 durable 이벤트(`turn.item.started/completed`, `turn.completed`, `approval.requested`)를 디스크 큐(`~/.omnis/outbox.ndjson`, 최대 50MB, 넘치면 오래된 것부터 버리되 `approval.requested`는 절대 안 버림)에 쌓고 재연결 시 순서대로 flush한다. ephemeral 델타는 큐에 넣지 않고 버린다(A2-D4).
+**Turns while disconnected.** A dropped WS does not kill an in-flight runtime process. The bridge queues durable events (`turn.item.started/completed`, `turn.completed`, `approval.requested`) to a disk queue (`~/.omnis/outbox.ndjson`, max 50 MB; on overflow, drop oldest first — but `approval.requested` is never dropped) and flushes it in order on reconnect. Ephemeral deltas are not queued; they are discarded (A2-D4).
 
-### 2.3 세션 목록
+### 2.3 Session List
 
-브리지는 자기가 만든 세션만 관리한다. Logan이 터미널에서 직접 연 Claude Code 세션을 스캔해서 붙이지 않는다 — 그 세션의 CWD·권한·의도를 브리지가 알 수 없고, 마스터 D10의 "구조로 강제"와 맞지 않는다. (원한다면 Phase C에서 `~/.claude/projects/**/*.jsonl` 읽기 전용 import를 별도 기능으로 검토. 지금은 비목표.)
+The bridge manages only sessions it created. It does not scan and attach Claude Code sessions Logan opened directly in a terminal — the bridge cannot know such a session's CWD, permissions, or intent, and it does not fit master D10's "enforced by structure". (If desired, Phase C can consider a read-only import of `~/.claude/projects/**/*.jsonl` as a separate feature. For now it is a non-goal.)
 
 ---
 
-## 3. 와이어 프로토콜
+## 3. Wire Protocol
 
-### 3.1 공통 형태
+### 3.1 Common Shape
 
-JSON-RPC 2.0, WebSocket 텍스트 프레임 1개 = 메시지 1개. 요청은 `id`를 갖고, 알림은 갖지 않는다. 모든 요청의 `params._meta`에 다음을 싣는다(A2-D3):
+JSON-RPC 2.0, one WebSocket text frame = one message. Requests carry an `id`; notifications do not. Every request carries the following in `params._meta` (A2-D3):
 
 ```json
 {
@@ -244,71 +244,71 @@ JSON-RPC 2.0, WebSocket 텍스트 프레임 1개 = 메시지 1개. 요청은 `id
 }
 ```
 
-버전 불일치는 연결을 끊지 않는다. 수신 측이 지원하지 못하는 버전이면 그 요청만 `-32010 VERSION_UNSUPPORTED`로 거절하고 `data.supported: ["2026-09-20"]`를 돌려준다. 이렇게 두면 브리지와 허브를 따로 배포할 수 있다.
+A version mismatch does not drop the connection. If the receiver does not support the version, it rejects only that request with `-32010 VERSION_UNSUPPORTED` and returns `data.supported: ["2026-09-20"]`. This lets the bridge and hub be deployed independently.
 
-### 3.2 hub → bridge (요청)
+### 3.2 hub → bridge (requests)
 
-| method | params | result | 비고 |
+| method | params | result | Notes |
 |---|---|---|---|
-| `bridge/discover` | — | `{ protocolVersions: string[], methods: string[], runtimes: AgentRuntime[] }` | 양방향. 브리지도 허브에 같은 메서드를 호출한다 |
-| `session.create` | `{ session_key, runtime, cwd, purpose, origin, permission_profile, model? }` | `{ session_id: null, thread_id }` | 런타임 프로세스는 첫 턴에 뜬다. 여기선 슬롯만 |
-| `session.resume` | `{ session_key }` | `{ session_id, restored: boolean }` | `restored:false`면 런타임이 과거 세션을 못 찾아 새로 시작했다는 뜻 |
-| `turn.start` | `{ session_key, input: { text, attachments? }, model?, timeout_ms? }` | `{ turn_id }` | 이미 실행 중이면 `-32004` |
-| `turn.cancel` | `{ session_key, turn_id, reason }` | `{ cancelled: boolean }` | `capabilities.cancel=false`면 `-32003` |
-| `session.read_summary` | `{ session_key, last_n_turns? }` | `SessionSummary` (§6) | 다른 세션 이해용 |
-| `delegate.run` | `DelegationBrief` (§5.2) | `{ session_key, turn_id }` | 승인된 위임만 |
-| `session.close` | `{ session_key, reason }` | `{ closed: true }` | 런타임 프로세스 종료 |
-| `ingest.scan` | `{ roots: string[], since?: string }` | `{ files: { path, size, mtime, sha256 }[], truncated: boolean }` | 세션과 무관. 맥북 로컬 파일 ingestion(마스터 §10) |
-| `ingest.read` | `{ path, max_bytes? }` | `{ path, mtime, bytes, content_b64, truncated: boolean }` | 파일 1개. 기본 상한 1MB |
+| `bridge/discover` | — | `{ protocolVersions: string[], methods: string[], runtimes: AgentRuntime[] }` | Bidirectional. The bridge also calls the same method on the hub |
+| `session.create` | `{ session_key, runtime, cwd, purpose, origin, permission_profile, model? }` | `{ session_id: null, thread_id }` | The runtime process starts on the first turn. Here it is only a slot |
+| `session.resume` | `{ session_key }` | `{ session_id, restored: boolean }` | `restored:false` means the runtime could not find the past session and started fresh |
+| `turn.start` | `{ session_key, input: { text, attachments? }, model?, timeout_ms? }` | `{ turn_id }` | `-32004` if already running |
+| `turn.cancel` | `{ session_key, turn_id, reason }` | `{ cancelled: boolean }` | `-32003` if `capabilities.cancel=false` |
+| `session.read_summary` | `{ session_key, last_n_turns? }` | `SessionSummary` (§6) | For understanding other sessions |
+| `delegate.run` | `DelegationBrief` (§5.2) | `{ session_key, turn_id }` | Approved delegations only |
+| `session.close` | `{ session_key, reason }` | `{ closed: true }` | Terminates the runtime process |
+| `ingest.scan` | `{ roots: string[], since?: string }` | `{ files: { path, size, mtime, sha256 }[], truncated: boolean }` | Independent of sessions. MacBook local file ingestion (master §10) |
+| `ingest.read` | `{ path, max_bytes? }` | `{ path, mtime, bytes, content_b64, truncated: boolean }` | One file. Default cap 1 MB |
 
-**ingestion RPC의 상한.** 마스터 §10은 "맥미니의 파일은 허브가 직접, 맥북의 파일은 맥북 `local-agent`가 읽어 허브로 보낸다"로 정했다 — `ingest.scan`/`ingest.read`가 그 경로이고, 런타임을 기동하지 않는 순수 읽기라 세션·턴·동시성 상한(§7.2)과 무관하다. 브리지가 강제하는 것: (a) `roots`와 `path`는 A4 §10.1의 로컬 폴더 allowlist와 이 호스트의 `allowed_roots`의 **교집합** 안이어야 하고, `realpath` 해석 뒤 다시 검사한다 — 밖이면 `-32005`이고 파일 목록도 돌려주지 않는다; (b) allowlist 안이라도 `.env*`·`*.pem`·`*.key`·`id_rsa*`·`.git/` 이하·그 밖의 dotfile은 **항상** 거부한다. A4 §10.2의 프라이버시 제외 규칙이 허브에서 한 번 더 걸리지만, 비밀 파일은 허브에 도달하기 전에 막는다; (c) `ingest.read`는 파일당 기본 1MB에서 자르고 `truncated:true`를 세운다. 전량이 필요하면 위임 브리프의 `inputs`(§5.2)로 경로를 넘겨 대상 런타임이 직접 읽게 한다.
+**Caps on the ingestion RPCs.** Master §10 settled that "files on the Mac mini are read by the hub directly, and files on the MacBook are read by the MacBook's `local-agent` and sent to the hub" — `ingest.scan`/`ingest.read` are that path, and because they are pure reads that start no runtime, they are unrelated to the session, turn, and concurrency caps (§7.2). What the bridge enforces: (a) `roots` and `path` must lie within the **intersection** of A4 §10.1's local folder allowlist and this host's `allowed_roots`, re-checked after `realpath` resolution — outside means `-32005`, and no file listing is returned either; (b) even inside the allowlist, `.env*`, `*.pem`, `*.key`, `id_rsa*`, anything under `.git/`, and other dotfiles are **always** rejected. A4 §10.2's privacy exclusion rules catch this once more at the hub, but secret files are blocked before they ever reach the hub; (c) `ingest.read` truncates at a default 1 MB per file and sets `truncated:true`. If the full content is needed, pass the path through the delegation brief's `inputs` (§5.2) and let the target runtime read it directly.
 
-### 3.3 bridge → hub (알림, 일부 요청)
+### 3.3 bridge → hub (notifications, some requests)
 
-| method | 종류 | payload 요지 | 티어 |
+| method | Type | Payload summary | Tier |
 |---|---|---|---|
-| `runtime.registered` | 알림 | `AgentRuntime` | durable |
-| `session.registered` | 알림 | `{ session_key, session_id, runtime_id, state }` | durable |
-| `turn.started` | 알림 | `{ session_key, turn_id, at }` | durable |
-| `turn.item.started` | 알림 | `{ session_key, turn_id, item_id, kind, label, meta }` | durable (row 생성) |
-| `turn.item.delta` | 알림 | `{ session_key, turn_id, item_id, seq, text }` | **ephemeral (저장 안 함)** |
-| `turn.item.completed` | 알림 | `{ session_key, turn_id, item_id, body, status, meta }` | durable (row 확정) |
-| `turn.completed` | 알림 | `{ session_key, turn_id, status, usage, error? }` | durable |
-| `approval.requested` | **요청** | `{ session_key, turn_id, interrupt: HumanInterrupt }` | durable |
-| `health` | 알림 | `{ host, runtimes: [{id, state, load}], at }` | durable(요약만) |
+| `runtime.registered` | notification | `AgentRuntime` | durable |
+| `session.registered` | notification | `{ session_key, session_id, runtime_id, state }` | durable |
+| `turn.started` | notification | `{ session_key, turn_id, at }` | durable |
+| `turn.item.started` | notification | `{ session_key, turn_id, item_id, kind, label, meta }` | durable (row created) |
+| `turn.item.delta` | notification | `{ session_key, turn_id, item_id, seq, text }` | **ephemeral (not stored)** |
+| `turn.item.completed` | notification | `{ session_key, turn_id, item_id, body, status, meta }` | durable (row finalized) |
+| `turn.completed` | notification | `{ session_key, turn_id, status, usage, error? }` | durable |
+| `approval.requested` | **request** | `{ session_key, turn_id, interrupt: HumanInterrupt }` | durable |
+| `health` | notification | `{ host, runtimes: [{id, state, load}], at }` | durable (summary only) |
 
-`approval.requested`만 요청이다 — 브리지가 허브의 응답(`HumanResponse`)을 기다려야 런타임에 답을 돌려줄 수 있기 때문이다. 나머지는 전부 알림이라 ack가 없고, 순서는 WS가 보장한다.
+Only `approval.requested` is a request — the bridge must await the hub's response (`HumanResponse`) before it can return an answer to the runtime. Everything else is a notification with no ack, and ordering is guaranteed by the WS.
 
-**`kind`는 두 개뿐이다**: `agent_turn`(모델이 사람에게 한 말), `tool_call`(도구 실행). 마스터 §6의 `items.kind`와 같은 enum을 쓴다. reasoning은 item이 아니다 — 델타로만 흐르고 사라진다(A2-D4, A2-D13).
+**There are only two `kind` values**: `agent_turn` (what the model said to a human) and `tool_call` (a tool execution). It uses the same enum as master §6's `items.kind`. Reasoning is not an item — it flows only as deltas and disappears (A2-D4, A2-D13).
 
-**author 매핑.** A3의 `items.author`는 nullable 3컬럼(`person_id` | `agent_session_id` | system 플래그)이고 셋 중 하나만 채워진다(마스터 §6). 브리지 이벤트에서 만들어지는 Item은 전부 **`agent_session_id`를 채운다** — 그 턴을 만든 `AgentSession`의 id(= `threads.id`)다. `person_id`와 system 플래그는 비운다. 예외 둘: 위임 결과를 원 스레드에 붙이는 요약 Item(§5.3)과 브리지 연결 끊김 시스템 Item(§2.2)은 에이전트 세션의 산출이 아니라 허브의 산출이므로 system 플래그를 쓴다. 브리지가 `author`를 직접 쓰지 않는다 — 허브가 `session_key` → `AgentSession.id` 조회로 채운다.
+**Author mapping.** A3's `items.author` is three nullable columns (`person_id` | `agent_session_id` | system flag), of which exactly one is filled (master §6). Every Item created from a bridge event **fills `agent_session_id`** — the id of the `AgentSession` that produced that turn (= `threads.id`). `person_id` and the system flag are left empty. Two exceptions: the summary Item that attaches a delegation result to the originating thread (§5.3) and the bridge-disconnect system Item (§2.2) are outputs of the hub, not of an agent session, so they use the system flag. The bridge does not write `author` itself — the hub fills it by looking up `session_key` → `AgentSession.id`.
 
-### 3.4 에러 코드
+### 3.4 Error Codes
 
-JSON-RPC 표준(-32700 parse, -32600 invalid request, -32601 method not found, -32602 invalid params, -32603 internal) 위에 omnis 범위:
+On top of the JSON-RPC standard (-32700 parse, -32600 invalid request, -32601 method not found, -32602 invalid params, -32603 internal), the omnis range:
 
-| 코드 | 이름 | 의미 | 호출자 조치 |
+| Code | Name | Meaning | Caller action |
 |---|---|---|---|
-| -32001 | `SESSION_NOT_FOUND` | `session_key` 미등록 | `session.create` 후 재시도 |
-| -32002 | `RUNTIME_UNAVAILABLE` | 바이너리 없음/기동 실패 | 인박스에 시스템 Item, 재시도 안 함 |
-| -32003 | `CAPABILITY_UNSUPPORTED` | 이 런타임이 못 하는 요청 | 기능 강등 |
-| -32004 | `TURN_ALREADY_ACTIVE` | 턴 진행 중 | 큐잉 또는 `turn.cancel` 후 재시도 |
-| -32005 | `PATH_NOT_ALLOWED` | `cwd`가 `allowed_roots` 밖 | 감사 로그 기록, 사용자에게 노출 |
-| -32006 | `APPROVAL_REQUIRED` | 승인 없이 위임 시도 | 버그. 감사 로그 + 알림 |
-| -32007 | `TURN_TIMEOUT` | `timeout_ms` 초과 | §5.4 |
-| -32008 | `TURN_CANCELLED` | 사용자/킬스위치 취소 | 정상 종료 처리 |
-| -32009 | `RUNTIME_RATE_LIMITED` | 런타임 계정 한도 | 백오프, 다른 런타임으로 제안 |
-| -32010 | `VERSION_UNSUPPORTED` | 프로토콜 버전 불일치 | `data.supported` 보고 강등 |
-| -32011 | `AUTH_FAILED` | 토큰 무효 | 재연결 중단, 알림 |
-| -32012 | `BUDGET_EXCEEDED` | 월 상한 도달(마스터 §14) | T1 강등 또는 중단 |
+| -32001 | `SESSION_NOT_FOUND` | `session_key` not registered | Retry after `session.create` |
+| -32002 | `RUNTIME_UNAVAILABLE` | Missing binary / failed to start | System Item in the inbox, no retry |
+| -32003 | `CAPABILITY_UNSUPPORTED` | Request this runtime cannot do | Degrade the feature |
+| -32004 | `TURN_ALREADY_ACTIVE` | A turn is in progress | Queue, or retry after `turn.cancel` |
+| -32005 | `PATH_NOT_ALLOWED` | `cwd` outside `allowed_roots` | Write an audit log entry, expose to the user |
+| -32006 | `APPROVAL_REQUIRED` | Delegation attempted without approval | Bug. Audit log + alert |
+| -32007 | `TURN_TIMEOUT` | `timeout_ms` exceeded | §5.4 |
+| -32008 | `TURN_CANCELLED` | Cancelled by user / kill switch | Treat as a normal termination |
+| -32009 | `RUNTIME_RATE_LIMITED` | Runtime account limit | Back off, suggest another runtime |
+| -32010 | `VERSION_UNSUPPORTED` | Protocol version mismatch | Degrade using `data.supported` |
+| -32011 | `AUTH_FAILED` | Invalid token | Stop reconnecting, alert |
+| -32012 | `BUDGET_EXCEEDED` | Monthly cap reached (master §14) | Degrade to T1 or stop |
 
-`-32009`는 실제로 발생한다 — `27`의 실측 중 Codex가 계정 사용량 한도로 턴을 끊었다. 브리지는 이 에러를 `turn.completed{status:'failed', error:{code:-32009}}`로도 한 번 더 보내 스레드에 흔적을 남긴다.
+`-32009` really happens — during `27`'s measurements, Codex cut a turn off due to the account usage limit. The bridge also sends this error once more as `turn.completed{status:'failed', error:{code:-32009}}` to leave a trace on the thread.
 
 ---
 
-## 4. 런타임 어댑터
+## 4. Runtime Adapters
 
-어댑터 인터페이스는 하나다:
+There is one adapter interface:
 
 ```ts
 export interface RuntimeAdapter {
@@ -328,11 +328,11 @@ export interface EventSink {
 }
 ```
 
-`sink.raw`는 모든 원본 줄을 받아 `~/.omnis/cold/<session_key>/<turn_id>.ndjson`에 append한다. 이것이 cold 티어이고 허브로 복제하지 않는다(A2-D4).
+`sink.raw` receives every raw line and appends it to `~/.omnis/cold/<session_key>/<turn_id>.ndjson`. This is the cold tier, and it is not replicated to the hub (A2-D4).
 
 ### 4.1 Claude Code
 
-기동(A2-D5):
+Startup (A2-D5):
 
 ```bash
 claude -p \
@@ -344,153 +344,153 @@ claude -p \
   "$PROMPT"
 ```
 
-`--include-partial-messages`가 없으면 토큰 델타가 안 온다(`09`). `--verbose`는 `stream-json`에서 전체 이벤트를 받기 위한 필수 플래그다(`09`). `--resume`은 세션 ID 또는 `.jsonl` 경로를 받고, CWD 밖 세션 ID 재개는 v2.1.223+에서만 된다(`09` Verification 행 4) — 그래서 브리지는 기동 시 버전을 파싱해 `cross_project_resume` capability를 세운다.
+Without `--include-partial-messages`, token deltas do not arrive (`09`). `--verbose` is a required flag to receive all events from `stream-json` (`09`). `--resume` accepts a session ID or a `.jsonl` path, and resuming by session ID outside the CWD works only in v2.1.223+ (`09` Verification row 4) — so the bridge parses the version at startup and sets the `cross_project_resume` capability.
 
-이벤트 → Item 매핑:
+Event → Item mapping:
 
-| stream-json 이벤트 | 브리지 출력 | 티어 |
+| stream-json event | Bridge output | Tier |
 |---|---|---|
-| `system` / `init` | `session.registered{session_id, capabilities}` | durable(작게) + cold |
+| `system` / `init` | `session.registered{session_id, capabilities}` | durable (small) + cold |
 | `stream_event` / `content_block_start` (text) | `turn.item.started{kind:'agent_turn'}` | durable |
 | `stream_event` / `content_block_delta` | `turn.item.delta` | **ephemeral** |
-| `stream_event` / `content_block_stop` | (무시, `assistant`가 확정판) | cold |
+| `stream_event` / `content_block_stop` | (ignored; `assistant` is the authoritative version) | cold |
 | `assistant` (text block) | `turn.item.completed{kind:'agent_turn', body}` | durable |
 | `assistant` (tool_use block) | `turn.item.started{kind:'tool_call', label, meta:{tool, input}}` | durable |
-| `user` (tool_result block) | `turn.item.completed{kind:'tool_call', status, body:요약}` | durable |
+| `user` (tool_result block) | `turn.item.completed{kind:'tool_call', status, body:summary}` | durable |
 | `result` | `turn.completed{status, usage:{cost_usd, duration_ms, num_turns}}` | durable |
-| `rate_limit_event` | `health{..., limited:true}` (+ 필요시 `-32009`) | durable(요약) |
-| 그 외 `system` | (없음) | cold |
+| `rate_limit_event` | `health{..., limited:true}` (+ `-32009` if needed) | durable (summary) |
+| any other `system` | (none) | cold |
 
-`system/init`이 한 턴 바이트의 대부분을 차지한다(실측 28,340B, `27`). 브리지는 이것을 그대로 durable에 넣지 않고 `session_id`와 `capabilities`만 뽑아 쓰고 나머지는 cold로 보낸다.
+`system/init` accounts for most of a turn's bytes (measured 28,340 B, `27`). The bridge does not put it into durable as-is; it extracts only `session_id` and `capabilities` and sends the rest to cold.
 
-**tool_result 본문 축약 규칙**: 8KB 초과 시 앞 2KB + `… (N bytes truncated)` + 뒤 1KB로 자르고, 전문은 cold 티어의 `turn_id`로 찾을 수 있게 `meta.cold_ref`를 붙인다.
+**tool_result body truncation rule**: above 8 KB, truncate to the first 2 KB + `… (N bytes truncated)` + the last 1 KB, and attach `meta.cold_ref` so the full text can be found via the cold tier's `turn_id`.
 
-**hooks 활용**: `approvals: 'hook'`. `PreToolUse` hook이 도구 이름·인자를 브리지의 유닉스 소켓으로 보내고 브리지가 `approval.requested`로 승격한다(`09`: Agent SDK가 `PreToolUse`/`PostToolUse`/`Stop` 등을 노출). 단 A2-D11에 따라 delegated 런은 `--bare`라 프로젝트 hook이 로드되지 않으므로, 브리지가 `--settings`로 자기 hook 설정 파일 경로를 명시 주입한다. *`-p` + `--bare` 조합에서 `--settings`로 hook을 주입하는 정확한 플래그 표면은 리서치에 없음 — **UNVERIFIED — spike S-A2-1**.*
+**Using hooks**: `approvals: 'hook'`. The `PreToolUse` hook sends the tool name and arguments to the bridge's Unix socket, and the bridge promotes it to `approval.requested` (`09`: the Agent SDK exposes `PreToolUse`/`PostToolUse`/`Stop`, etc.). However, per A2-D11 a delegated run is `--bare`, so project hooks are not loaded; the bridge therefore explicitly injects its own hook settings file path via `--settings`. *The exact flag surface for injecting hooks via `--settings` in the `-p` + `--bare` combination is not in the research — **UNVERIFIED — spike S-A2-1**.*
 
-**권한 모드 정책**: 리서치가 확인한 값은 `bypassPermissions`(claude-ds 실사용 규약, `24`)와 `--permission-mode` 플래그의 존재(`09`)뿐이다. omnis 정책은 §7.1의 profile로 정의하고, profile → 실제 플래그 값 매핑은 스파이크에서 확정한다(**UNVERIFIED — spike S-A2-2**). 어떤 경우에도 `origin != 'human'`인 세션에 `bypassPermissions`를 주지 않는다.
+**Permission mode policy**: The only values the research confirmed are `bypassPermissions` (claude-ds's real-world convention, `24`) and the existence of the `--permission-mode` flag (`09`). omnis policy is defined by §7.1's profiles, and the profile → actual flag value mapping is settled in a spike (**UNVERIFIED — spike S-A2-2**). Under no circumstances is `bypassPermissions` given to a session with `origin != 'human'`.
 
 ### 4.2 Codex
 
-상주 `app-server` 자식 1개를 stdio로 붙든다(A2-D6). 스레드/턴/아이템 3원 구조를 그대로 받는다(`09`,`27`).
+One resident `app-server` child is held over stdio (A2-D6). Its thread/turn/item three-part structure is taken as-is (`09`,`27`).
 
-| app-server 이벤트 | 브리지 출력 | 티어 |
+| app-server event | Bridge output | Tier |
 |---|---|---|
 | `thread.started` | `session.registered{session_id: threadId}` | durable |
 | `turn.started` | `turn.started` | durable |
 | `item/started` (`agentMessage`) | `turn.item.started{kind:'agent_turn'}` | durable |
 | `item/agentMessage/delta` | `turn.item.delta` | ephemeral |
-| `item/plan/delta`, `item/reasoning/textDelta`, `item/reasoning/summaryTextDelta`, `item/reasoning/summaryPartAdded` | `turn.item.delta{channel:'reasoning'}` | **ephemeral 전용, durable 승격 금지** |
+| `item/plan/delta`, `item/reasoning/textDelta`, `item/reasoning/summaryTextDelta`, `item/reasoning/summaryPartAdded` | `turn.item.delta{channel:'reasoning'}` | **ephemeral only, promotion to durable forbidden** |
 | `item/started` (`commandExecution`/`fileChange`/`mcpToolCall`/`dynamicToolCall`/`collabToolCall`/`webSearch`/`imageView`) | `turn.item.started{kind:'tool_call', label}` | durable |
 | `item/commandExecution/outputDelta` | `turn.item.delta` | ephemeral |
 | `item/completed` | `turn.item.completed` | durable |
 | `turn.completed` / `turn.failed` | `turn.completed{status}` | durable |
-| 서버발 승인 요청 | `approval.requested` | durable |
+| server-originated approval request | `approval.requested` | durable |
 
-item 타입은 11종 이상이고 델타 타입은 6종 이상이다(`27` VERIFIED). 어댑터는 **알려진 타입만 매핑하고 모르는 `item/started`는 `kind:'tool_call', label: item.type`으로 일반화**한다 — 0.156 알파가 새 타입을 추가해도 스레드가 깨지지 않는다.
+There are 11+ item types and 6+ delta types (`27` VERIFIED). The adapter **maps only known types and generalizes unknown `item/started` events as `kind:'tool_call', label: item.type`** — so the thread does not break when a 0.156 alpha adds new types.
 
-승인 매핑(`09` VERIFIED: command 결정 `accept|acceptForSession|decline|cancel|acceptWithExecpolicyAmendment`, file-change 결정 `accept|acceptForSession|decline|cancel`):
+Approval mapping (`09` VERIFIED: command decisions `accept|acceptForSession|decline|cancel|acceptWithExecpolicyAmendment`, file-change decisions `accept|acceptForSession|decline|cancel`):
 
-| Codex 결정 | `HumanInterruptConfig` | `HumanResponse` |
+| Codex decision | `HumanInterruptConfig` | `HumanResponse` |
 |---|---|---|
 | `accept` | `allow_accept` | `{type:'accept'}` |
-| `acceptForSession` | `allow_accept` + omnis "이 세션 자율 허용" 토글 | `{type:'accept'}` + `session_rules` 기록 |
+| `acceptForSession` | `allow_accept` + omnis "allow autonomy for this session" toggle | `{type:'accept'}` + record `session_rules` |
 | `decline` | `allow_ignore` | `{type:'ignore'}` |
-| `cancel` | — | `turn.cancel` 경로로 분리 |
+| `cancel` | — | Routed separately through `turn.cancel` |
 | `acceptWithExecpolicyAmendment` | `allow_edit` | `{type:'edit', args:{...}}` |
 
-`acceptWithExecpolicyAmendment`의 amendment payload 스키마는 리서치에 없다 — **UNVERIFIED — spike S-A2-3**. 그때까지 이 결정은 UI에 노출하지 않고 `decline`으로 강등한다.
+The amendment payload schema for `acceptWithExecpolicyAmendment` is not in the research — **UNVERIFIED — spike S-A2-3**. Until then this decision is not exposed in the UI and is demoted to `decline`.
 
-**버전 드리프트 대응**: 기동 시 `codex --version`이 핀과 다르면 `degraded`로 등록하고 `capabilities.features`에 `version_mismatch`를 넣는다. 세션은 계속 뜨지만 위임 대상 후보에서 제외한다.
+**Handling version drift**: If `codex --version` at startup differs from the pin, register as `degraded` and add `version_mismatch` to `capabilities.features`. Sessions still start, but it is excluded from delegation target candidates.
 
 ### 4.3 claude-ds
 
-Claude Code 어댑터와 같은 클래스, 설정만 다르다(A2-D8).
+The same class as the Claude Code adapter, differing only in configuration (A2-D8).
 
-| 항목 | claude_code | claude_ds |
+| Item | claude_code | claude_ds |
 |---|---|---|
-| 바이너리 | `claude` | `claude-ds` |
-| 모델 | `sonnet`/`haiku`/`opus` | `deepseek-flash`(기본), `DS_MODEL=deepseek-v4-pro`로 Pro † |
-| 키 | 구독 OAuth(마스터 D9 T3) | Keychain `deepseek-api`. 브리지는 값을 읽어 자식 env로만 넘기고 로그·이벤트·에러 메시지에 절대 싣지 않는다 |
-| 기본 플래그 | profile별 | `--strict-mcp-config` 고정(`24`) |
-| 비용 집계 | `result.cost_usd`를 **무시**한다(Claude 단가로 계산되어 틀림) | 토큰 수만 취해 DeepSeek 단가로 재계산 |
-| 사용처 | 사람 세션, 위임 | 격리된 잘 정의된 위임(마스터 D13) |
+| Binary | `claude` | `claude-ds` |
+| Model | `sonnet`/`haiku`/`opus` | `deepseek-flash` (default), Pro via `DS_MODEL=deepseek-v4-pro` † |
+| Key | Subscription OAuth (master D9 T3) | Keychain `deepseek-api`. The bridge reads the value and passes it only via the child's env; it never appears in logs, events, or error messages |
+| Default flags | Per profile | Fixed `--strict-mcp-config` (`24`) |
+| Cost accounting | **Ignore** `result.cost_usd` (computed at Claude rates, so wrong) | Take only token counts and recompute at DeepSeek rates |
+| Usage | Human sessions, delegation | Isolated, well-defined delegations (master D13) |
 
-† `DS_MODEL=deepseek-v4-pro`와 `deepseek-flash` 기본값은 **리서치 출처가 아니라 Logan의 로컬 `~/.claude/CLAUDE.md` 운용 관행**이다(`research/` 전체에 `DS_MODEL`·`deepseek-v4-pro` 문자열이 없다 — grep 확인). `24`가 뒷받침하는 것은 `claude-ds -p … --permission-mode bypassPermissions --strict-mcp-config` 호출 규약과 "Claude 단가로 찍히는 `total_cost_usd`를 믿지 말 것"까지다. 모델 alias 이름과 전환 방식은 **UNVERIFIED — 아래 spike S-A2-4가 같이 확인한다**(계약 테스트 fixture를 캡처할 때 `DS_MODEL` 두 값으로 각각 1턴씩 돌려 alias 유효성과 토큰 회계를 함께 본다).
+† `DS_MODEL=deepseek-v4-pro` and the `deepseek-flash` default are **not a research source but Logan's local `~/.claude/CLAUDE.md` operating practice** (the strings `DS_MODEL` and `deepseek-v4-pro` appear nowhere in `research/` — confirmed by grep). What `24` backs is the `claude-ds -p … --permission-mode bypassPermissions --strict-mcp-config` invocation contract and the advice not to trust `total_cost_usd`, which is printed at Claude rates. The model alias names and the switching mechanism are **UNVERIFIED — spike S-A2-4 below checks them as well** (when capturing contract-test fixtures, run one turn with each of the two `DS_MODEL` values to check both alias validity and token accounting).
 
-claude-ds의 Anthropic 호환 엔드포인트가 stream-json 계약을 그대로 지키는지는 1차 소스로 확인되지 않았다(`09` open question). Phase A 계약 테스트에서 fixture를 실제로 캡처해 확인한다 — **UNVERIFIED — spike S-A2-4**.
+Whether claude-ds's Anthropic-compatible endpoint honors the stream-json contract exactly is not confirmed by a primary source (`09` open question). Phase A contract tests will confirm it by actually capturing fixtures — **UNVERIFIED — spike S-A2-4**.
 
-### 4.4 Hermes (Phase B 읽기 전용 → Phase C 위임)
+### 4.4 Hermes (Phase B read-only → Phase C delegation)
 
-HTTP + SSE다. 프로세스를 띄우지 않고 `http://127.0.0.1:8642`에 붙는다(`09` VERIFIED, `API_SERVER_PORT`, bearer `API_SERVER_KEY`). 허브 자체는 `127.0.0.1:8787`에 bind하므로 미니에서 둘이 같이 떠도 포트가 겹치지 않는다. 두 호스트(미니·맥북) 각각의 Hermes가 그 호스트의 브리지를 통해 별개 `AgentRuntime`으로 등록된다.
+It is HTTP + SSE. It attaches to `http://127.0.0.1:8642` without spawning a process (`09` VERIFIED, `API_SERVER_PORT`, bearer `API_SERVER_KEY`). The hub itself binds to `127.0.0.1:8787`, so the two can run together on the mini without port conflicts. Each host's Hermes (mini and MacBook) registers as a separate `AgentRuntime` through that host's bridge.
 
-Phase 구분(A2-D9, 마스터 §19 Q7):
+Phase split (A2-D9, master §19 Q7):
 
 | | Phase B | Phase C |
 |---|---|---|
-| 허용 `origin` | `human`만 | `human` + `delegation` |
-| 위임 대상 | 제외 | 포함(S-A2-5 통과 시) |
-| 승인 경로 | 해당 없음(읽기 전용 세션이라 승인 요청이 발생할 여지를 만들지 않는다) | `approval.requested`로 승격, Hermes 네이티브 승인 표면에 매핑 |
+| Allowed `origin` | `human` only | `human` + `delegation` |
+| Delegation target | Excluded | Included (once S-A2-5 passes) |
+| Approval path | Not applicable (read-only sessions leave no room for an approval request to arise) | Promoted to `approval.requested` and mapped onto Hermes's native approval surface |
 
-- 능력: `GET /v1/capabilities` → `session_key_header: "X-Hermes-Session-Key"` 등(`09` VERIFIED).
-- 세션: omnis `session_key`를 `X-Hermes-Session-Key`에 그대로 넣는다. Hermes가 돌려주는 `X-Hermes-Session-Id`를 `session_id`에 기록한다. **이 매핑이 1:1이라 어댑터가 제일 얇다.**
-- 턴: `/v1/responses`에 `conversation`(= `session_key`) 또는 `previous_response_id`로 체인(`09` VERIFIED).
-- 스트림: SSE, 10초 무음마다 `: keepalive` 주석(`09` VERIFIED). 어댑터는 keepalive를 이벤트로 올리지 않고 health 타이머만 갱신한다.
-- 승인: Hermes는 자체 command approval이 있다고 문서화되어 있으나 이번 스윕에서 독립 검증되지 않았다(`09`). Phase C 진입 시 확인 — **UNVERIFIED — spike S-A2-5**. 그때까지 Hermes 세션은 `origin:'human'`만 허용하고 위임 대상에서 제외한다.
+- Capabilities: `GET /v1/capabilities` → `session_key_header: "X-Hermes-Session-Key"`, etc. (`09` VERIFIED).
+- Sessions: the omnis `session_key` goes into `X-Hermes-Session-Key` verbatim. The `X-Hermes-Session-Id` Hermes returns is recorded as `session_id`. **Because this mapping is 1:1, this is the thinnest adapter.**
+- Turns: chained through `conversation` (= `session_key`) or `previous_response_id` on `/v1/responses` (`09` VERIFIED).
+- Stream: SSE, with a `: keepalive` comment every 10 seconds of silence (`09` VERIFIED). The adapter does not raise keepalives as events; it only refreshes the health timer.
+- Approvals: Hermes is documented as having its own command approval, but it was not independently verified in this sweep (`09`). To be confirmed on entering Phase C — **UNVERIFIED — spike S-A2-5**. Until then Hermes sessions allow only `origin:'human'` and are excluded from delegation targets.
 
 ---
 
-## 5. 위임 흐름
+## 5. Delegation Flow
 
-### 5.1 경로
+### 5.1 Path
 
 ```mermaid
 sequenceDiagram
-  participant L as omnis 위임 루프 (T2)
+  participant L as omnis delegation loop (T2)
   participant H as hub
   participant U as Logan
-  participant B as local-agent (대상 호스트)
-  participant R as 런타임
+  participant B as local-agent (target host)
+  participant R as runtime
   L->>H: propose_delegation(brief)
-  H->>H: pending_approvals(action='delegate') 생성
-  H-->>U: 승인 카드 (전문 노출)
+  H->>H: create pending_approvals(action='delegate')
+  H-->>U: approval card (full text exposed)
   U->>H: HumanResponse{type:'accept'|'edit'|'ignore'}
   H->>B: delegate.run(brief)
   B->>R: session.create + turn.start
-  R-->>B: item/turn 이벤트
+  R-->>B: item/turn events
   B-->>H: turn.item.* / turn.completed
-  H-->>U: 진행 스레드(agent_session)
-  H->>H: 결과를 원 스레드에 Item(kind='system')으로 첨부
+  H-->>U: progress thread (agent_session)
+  H->>H: attach result to originating thread as Item(kind='system')
 ```
 
-**위임은 자동 제안 + 승인 실행이다**(마스터 §11, §19 Q10). 트리거는 자동이다 — 에이전트가 Task를 만들 때 위임 가능 여부와 대상(런타임·호스트)을 스스로 판단해 `propose_delegation`을 부르고, Logan의 승인 한 번으로 실행된다. 사람이 "이걸 위임해"라고 먼저 말해야 시작되는 구조가 아니다. 자동으로 열리지 않는 것은 **실행**뿐이다.
+**Delegation is automatic proposal + approved execution** (master §11, §19 Q10). The trigger is automatic — when an agent creates a Task, it judges for itself whether delegation is possible and what the target is (runtime, host), calls `propose_delegation`, and one approval from Logan executes it. It is not a structure that requires a human to first say "delegate this". The only thing that does not open automatically is **execution**.
 
-**런타임끼리 직접 명령하는 경로는 없다**(A2-D16, 마스터 §9) — Codex 세션이 Claude Code에 일을 시키고 싶어도 `propose_delegation`으로 Task와 위임 제안을 만들어 위 그림의 같은 승인 게이트를 지나야 하고, 실행은 언제나 대상 호스트의 브리지다. 브리지가 `approval_id` 없는 `delegate.run`을 `-32006`으로 거절하므로 이 축소는 와이어에서도 강제된다.
+**There is no path for runtimes to command each other directly** (A2-D16, master §9) — even if a Codex session wants Claude Code to do work, it must create a Task and a delegation proposal via `propose_delegation` and pass through the same approval gate shown above, and execution is always the target host's bridge. Because the bridge rejects a `delegate.run` without an `approval_id` with `-32006`, this reduction is enforced on the wire as well.
 
-`propose_delegation`은 저장만 한다. `delegate.run`은 승인 핸들러만 호출할 수 있고 에이전트 tool palette에 아예 없다(마스터 §11, `22`의 구조적 강제). 브리지도 이중으로 막는다: `delegate.run` params에 허브가 서명한 `approval_id`가 없으면 `-32006`. 완전 자율 실행(승인 없이 바로 run)은 런타임·레포별 허용 규칙을 Logan이 Settings에서 열 때만 켜지고 기본은 off다(마스터 §19 Q10, A2-D11의 allowlist와 같은 스위치).
+`propose_delegation` only persists. `delegate.run` can be called only by the approval handler and is not in the agent tool palette at all (master §11, `22`'s structural enforcement). The bridge blocks it twice over: if the `delegate.run` params lack an `approval_id` signed by the hub, `-32006`. Fully autonomous execution (running immediately without approval) is enabled only when Logan opens per-runtime, per-repo allow rules in Settings and is off by default (master §19 Q10, the same switch as A2-D11's allowlist).
 
-**이름 매핑**(A7·A4와의 표기 통일): 승인 핸들러가 노출하는 **tool 이름은 `send` / `delete` / `delegate` / `calendar_write` 4개**다(마스터 §11). 브리지 **와이어 RPC 이름은 `delegate.run`을 유지한다** — JSON-RPC 메서드는 `<namespace>.<verb>` 규약을 쓰고 있어서(`turn.start`, `session.close`) 여기만 다르게 둘 이유가 없다. 즉 승인 핸들러의 `delegate` tool이 브리지의 `delegate.run` RPC를 1:1로 호출한다. `calendar_write`는 허브 안에서 끝나므로 대응하는 브리지 RPC가 없다.
+**Name mapping** (notation unified with A7 and A4): the approval handler exposes **four tool names: `send` / `delete` / `delegate` / `calendar_write`** (master §11). The bridge **keeps the wire RPC name `delegate.run`** — JSON-RPC methods follow the `<namespace>.<verb>` convention (`turn.start`, `session.close`), so there is no reason to make this one different. That is, the approval handler's `delegate` tool calls the bridge's `delegate.run` RPC 1:1. `calendar_write` finishes inside the hub, so it has no corresponding bridge RPC.
 
-### 5.2 브리프 포맷
+### 5.2 Brief Format
 
-위임이 실패하는 이유는 대부분 브리프가 모호해서다. 5필드 고정, 전부 필수:
+Delegations mostly fail because the brief is vague. Five fixed fields, all required:
 
 ```ts
 export interface DelegationBrief {
-  approval_id: string;          // 승인 증거
+  approval_id: string;          // approval evidence
   target: { runtime: RuntimeKind; host: HostId; cwd: string };
-  goal: string;                 // 1~3문장. 무엇이 끝나면 done인지
-  inputs: string[];             // 절대 경로 파일/디렉터리. 없으면 [] 명시
-  verify: string;               // 단일 셸 명령. exit 0 = 성공
+  goal: string;                 // 1–3 sentences. What must be finished for this to be done
+  inputs: string[];             // Absolute-path files/directories. Explicit [] if none
+  verify: string;               // A single shell command. exit 0 = success
   output: 'diff' | 'file' | 'report';
-  output_path?: string;         // output='file'일 때 필수
-  timeout_ms: number;           // 기본 900000 (15분)
-  source_item_id?: string;      // 이 위임을 촉발한 인박스 Item
+  output_path?: string;         // Required when output='file'
+  timeout_ms: number;           // Default 900000 (15 minutes)
+  source_item_id?: string;      // The inbox Item that triggered this delegation
 }
 ```
 
-`verify`가 없는 위임은 만들지 않는다 — 검증 명령이 없으면 결과를 사람이 다시 읽어야 하고, 그건 위임이 아니라 일을 늘리는 것이다. `24`의 DeepSeek 위임 규약("files + acceptance criteria + verify command")과 같은 형태다.
+No delegation is created without `verify` — without a verification command, a human has to read the result again, which is not delegation but added work. It is the same shape as `24`'s DeepSeek delegation contract ("files + acceptance criteria + verify command").
 
-프롬프트로 조립되는 형태(런타임 공통):
+The form it is assembled into as a prompt (common to all runtimes):
 
 ```
 [omnis delegation · approval {approval_id}]
@@ -501,31 +501,31 @@ OUTPUT: {output}{output_path ? ` at ${output_path}` : ''}
 Do not send messages, do not modify files outside {cwd}.
 ```
 
-### 5.3 결과 첨부
+### 5.3 Result Attachment
 
-`turn.completed`가 오면 허브가:
-1. 위임 스레드의 마지막 `agent_turn` 본문 + `verify` 재실행 결과(브리지가 별도 `tool_call` Item으로 남김)를 묶어 요약 Item을 만든다.
-2. `source_item_id`가 있으면 원 스레드에 `kind:'system'` Item으로 첨부하고 `tasks.delegated_session_id`를 채운다.
-3. `output='diff'`면 diff 전문은 cold 티어에 두고 스레드에는 파일별 `+/-` 요약만 넣는다.
+When `turn.completed` arrives, the hub:
+1. Combines the delegation thread's last `agent_turn` body with the result of re-running `verify` (which the bridge leaves as a separate `tool_call` Item) into a summary Item.
+2. If `source_item_id` exists, attaches it to the originating thread as a `kind:'system'` Item and fills `tasks.delegated_session_id`.
+3. If `output='diff'`, the full diff stays in the cold tier and only a per-file `+/-` summary goes into the thread.
 
-### 5.4 실패·타임아웃·취소
+### 5.4 Failure, Timeout, Cancellation
 
-| 상황 | 브리지 | 허브 |
+| Situation | Bridge | Hub |
 |---|---|---|
-| `verify` exit != 0 | `turn.completed{status:'failed'}` + verify 출력 tail 4KB | 스레드에 실패 Item, 자동 재시도 **안 함** |
-| `timeout_ms` 초과 | SIGTERM → 5초 후 SIGKILL, `-32007` | 부분 산출물 링크 + 재시도 승인 카드 |
-| 런타임 rate limit | `-32009` | 같은 브리프를 다른 런타임으로 재승인 제안(1회) |
-| 브리지 연결 끊김 | 프로세스 유지, outbox 큐잉 | 스레드 `state:'running'` 유지, 90초 후 "연결 끊김" 배지 |
-| kill switch | 전 세션 `turn.cancel` | 신규 `delegate.run` 전면 거부 |
-| 사용자 취소 | `turn.cancel` → `capabilities.cancel=false`면 SIGTERM | `-32008`은 실패가 아니라 정상 종료로 표시 |
+| `verify` exit != 0 | `turn.completed{status:'failed'}` + verify output tail 4 KB | Failure Item on the thread, **no** automatic retry |
+| `timeout_ms` exceeded | SIGTERM → SIGKILL after 5 seconds, `-32007` | Link to partial artifacts + a retry approval card |
+| Runtime rate limit | `-32009` | Propose re-approving the same brief on another runtime (once) |
+| Bridge disconnected | Keep the process, queue to outbox | Keep the thread `state:'running'`, "disconnected" badge after 90 seconds |
+| kill switch | `turn.cancel` on every session | Reject all new `delegate.run` outright |
+| User cancellation | `turn.cancel` → SIGTERM if `capabilities.cancel=false` | `-32008` is shown as a normal termination, not a failure |
 
-재시도는 언제나 사람이 누른다. 자동 재시도는 넣지 않는다 — 실패한 위임을 자동으로 다시 돌리는 것은 비용과 부작용이 둘 다 곱해진다.
+Retries are always pressed by a human. There is no automatic retry — automatically re-running a failed delegation multiplies both cost and side effects.
 
 ---
 
-## 6. 상호 이해 — `read_session`
+## 6. Mutual Understanding — `read_session`
 
-에이전트가 다른 세션을 이해하는 유일한 경로다. raw 트랜스크립트는 주지 않는다(A2-D13).
+This is the only path by which an agent understands another session. Raw transcripts are not provided (A2-D13).
 
 ```ts
 export interface SessionSummary {
@@ -537,30 +537,30 @@ export interface SessionSummary {
   opened_at: string;
   last_turn_at: string | null;
   turn_count: number;
-  summary: string;              // durable 요약, 400자 이내
-  open_questions: string[];     // 이 세션이 막혀 있는 지점
+  summary: string;              // durable summary, within 400 characters
+  open_questions: string[];     // where this session is stuck
   artifacts: { path: string; action: 'created'|'modified'|'read' }[];
   recent_turns: {
     turn_id: string;
     at: string;
     role: 'user' | 'agent';
-    text: string;               // 1,000자 초과 시 잘림
+    text: string;               // truncated above 1,000 characters
     tool_calls: { label: string; status: 'ok' | 'failed' }[];
-  }[];                          // 기본 N=3, 최대 10
+  }[];                          // default N=3, max 10
 }
 ```
 
-**요약 생성 주기**: `turn.completed` 후 30초 디바운스로 1회. 같은 세션에서 연속 턴이 돌면 마지막 것만 생성된다. 모델은 T1(DeepSeek Flash), 입력은 durable Item만(델타·reasoning 제외). 5턴마다 한 번은 전체 durable을 다시 읽어 요약을 재작성한다(요약의 요약이 누적 드리프트하는 것을 막는다).
+**Summary generation cadence**: once per 30-second debounce after `turn.completed`. If consecutive turns run in the same session, only the last one generates. The model is T1 (DeepSeek Flash), and the input is durable Items only (deltas and reasoning excluded). Every fifth turn, the entire durable set is re-read and the summary rewritten (preventing summary-of-summary accumulated drift).
 
-**`artifacts`** 는 `tool_call` Item의 meta에서 기계적으로 추출한다(파일 경로가 드러나는 도구만). 모델이 만들지 않는다 — 이 필드가 위임 판단의 핵심 입력이라 hallucination을 허용할 수 없다.
+**`artifacts`** is extracted mechanically from `tool_call` Items' meta (only tools that reveal file paths). The model does not produce it — this field is a core input to delegation decisions, so hallucination cannot be allowed.
 
-**호출 권한**: `read_session`은 read-only tool이라 위임·초안 루프 palette에 들어간다(마스터 §11). 스코프 경계는 마스터 §9가 **의도된 축소**로 못박은 것을 그대로 따른다: omnis 자체 루프(L3)는 모든 세션 요약을 읽을 수 있지만, 개발 세션(Claude Code, Codex 등)은 `purpose`가 `inbox:*`인 세션과 인박스 스레드 원문을 직접 읽지 못한다. 인박스 내용이 개발 세션으로 새는 경로를 막기 위한 것이고, 필요한 내용은 승인된 위임 브리프(§5.2의 `inputs`·`goal`)에 첨부되어 전달된다. 브리프의 "서로 전부 이해"는 이 경계 안에서 구현한다.
+**Call permissions**: `read_session` is a read-only tool, so it enters the delegation and drafting loops' palettes (master §11). The scope boundary follows verbatim what master §9 nails down as a **deliberate reduction**: omnis's own loops (L3) can read every session summary, but development sessions (Claude Code, Codex, etc.) cannot directly read sessions whose `purpose` is `inbox:*` or the raw text of inbox threads. This is to block the path by which inbox content leaks into development sessions; needed content is delivered attached to an approved delegation brief (§5.2's `inputs` and `goal`). The brief's "everyone understands each other" is implemented within this boundary.
 
-즉 방향이 비대칭이다. `runtime = 'omnis'`인 호출자(=L3 루프)는 전 세션 요약을 읽고, 그 외 런타임의 세션은 `inbox:*`를 조회하면 `-32001 SESSION_NOT_FOUND`를 받는다 — 존재를 알려주지 않기 위해 권한 에러가 아니라 미존재로 답한다.
+The direction is therefore asymmetric. A caller with `runtime = 'omnis'` (= an L3 loop) reads every session summary, while a session of any other runtime that queries `inbox:*` receives `-32001 SESSION_NOT_FOUND` — answering with non-existence rather than a permission error, so as not to reveal that it exists.
 
 ---
 
-## 7. 보안
+## 7. Security
 
 ### 7.1 permission profile
 
@@ -568,42 +568,42 @@ export interface SessionSummary {
 export type PermissionProfile = 'observe' | 'workspace' | 'trusted';
 ```
 
-| profile | 파일 쓰기 | 네트워크 | 승인 | 허용 origin |
+| profile | File writes | Network | Approvals | Allowed origin |
 |---|---|---|---|---|
-| `observe` | 없음(읽기만) | 없음 | 해당 없음 | `inbox:*` 루프 |
-| `workspace` | `cwd` 하위만 | 런타임 기본 | 그 외 모든 도구는 `approval.requested` | `delegation`, `job` |
-| `trusted` | `allowed_roots` 내 | 허용 | 런타임 네이티브 | `human`만 |
+| `observe` | None (read only) | None | Not applicable | `inbox:*` loops |
+| `workspace` | Only under `cwd` | Runtime default | Every other tool triggers `approval.requested` | `delegation`, `job` |
+| `trusted` | Within `allowed_roots` | Allowed | Runtime native | `human` only |
 
-`bypassPermissions`는 `trusted` + `origin:'human'`에서만 나올 수 있다. 인박스에서 출발한 어떤 경로도 `trusted`에 도달하지 못한다 — profile은 `origin`과 `purpose`에서 결정되고 프롬프트로 바뀌지 않는다.
+`bypassPermissions` can arise only from `trusted` + `origin:'human'`. No path originating from the inbox can reach `trusted` — the profile is determined from `origin` and `purpose` and does not change via prompts.
 
-### 7.2 상한
+### 7.2 Caps
 
-- **디렉터리**: `cwd`는 `allowed_roots` 중 하나의 하위여야 한다. 심볼릭 링크는 `realpath` 후 재검사. 위반 시 `-32005` + 감사 로그.
-- **네트워크**: `observe`는 런타임을 네트워크 없이 띄운다(Claude Code 샌드박스 전략 차용, `15`). `workspace`/`trusted`는 제한하지 않는다 — macOS에서 프로세스별 네트워크 차단을 신뢰성 있게 거는 방법이 리서치에 없다(**UNVERIFIED — spike S-A2-6**).
-- **비밀**: 브리지는 Keychain에서 읽은 값을 자식 env로만 전달하고, `sink.raw`에 쓰기 전에 알려진 비밀 값을 `***`로 치환한다.
-- **동시성**: **호스트당 활성 턴 4개 상한**(마스터 §9). 세는 단위는 프로세스가 아니라 턴이다 — 런타임마다 프로세스 셈법이 달라서 프로세스 기준으로는 같은 상한이 전혀 다른 부하를 뜻하게 된다. Claude Code·claude-ds는 턴당 서브프로세스가 뜨고 죽으므로(A2-D5) 프로세스 수 = 활성 턴 수지만, Codex는 상주 `app-server` 자식 1개가 여러 thread/턴을 동시에 처리하므로(A2-D6) 프로세스 수는 항상 1이고 캡이 무의미해진다. Hermes는 아예 브리지가 프로세스를 띄우지 않는다(§4.4). 브리지는 `turn.started`에서 카운터를 올리고 `turn.completed`(성공·실패·취소 모두)에서 내린다. 초과 요청은 큐잉(최대 8, 넘치면 `-32004`).
+- **Directories**: `cwd` must be under one of `allowed_roots`. Symlinks are re-checked after `realpath`. Violation means `-32005` + audit log.
+- **Network**: `observe` starts the runtime without network (borrowing the Claude Code sandbox strategy, `15`). `workspace`/`trusted` are not restricted — the research has no reliable way to block network per process on macOS (**UNVERIFIED — spike S-A2-6**).
+- **Secrets**: the bridge passes values read from Keychain only via the child's env, and replaces known secret values with `***` before writing to `sink.raw`.
+- **Concurrency**: **a cap of 4 active turns per host** (master §9). The unit counted is the turn, not the process — because each runtime counts processes differently, a process-based cap would mean completely different loads for the same number. Claude Code and claude-ds spawn and kill a subprocess per turn (A2-D5), so process count = active turn count, but Codex has one resident `app-server` child handling multiple threads/turns at once (A2-D6), so process count is always 1 and the cap becomes meaningless. With Hermes the bridge spawns no process at all (§4.4). The bridge increments the counter on `turn.started` and decrements it on `turn.completed` (success, failure, and cancellation alike). Excess requests are queued (max 8; overflow yields `-32004`).
 
-### 7.3 감사 로그 항목
+### 7.3 Audit Log Entries
 
-`audit_log`에 남기는 브리지 관련 행(마스터 §6):
+Bridge-related rows written to `audit_log` (master §6):
 
 | action | actor | target | before/after |
 |---|---|---|---|
-| `bridge.connect` / `bridge.disconnect` | system | host | token 해시 앞 8자, 이유 |
-| `session.create` | agent 또는 me | session_key | cwd, profile, origin |
-| `turn.start` | agent 또는 me | session_key/turn_id | 프롬프트 전문(위임은 브리프 전체) |
-| `approval.decided` | me | approval_id | interrupt 전문 → HumanResponse 전문 |
-| `delegate.run` | me | session_key | 브리프 전체 + approval_id |
-| `path.denied` | system | 시도 경로 | allowed_roots |
-| `killswitch.engaged` | me | — | 취소된 turn_id 목록 |
+| `bridge.connect` / `bridge.disconnect` | system | host | first 8 characters of the token hash, reason |
+| `session.create` | agent or me | session_key | cwd, profile, origin |
+| `turn.start` | agent or me | session_key/turn_id | Full prompt text (the entire brief for delegations) |
+| `approval.decided` | me | approval_id | Full interrupt text → full HumanResponse text |
+| `delegate.run` | me | session_key | Full brief + approval_id |
+| `path.denied` | system | attempted path | allowed_roots |
+| `killswitch.engaged` | me | — | List of cancelled turn_ids |
 
-append-only. 승인 결정 행은 "무엇을 보고 승인했는가"를 복원할 수 있어야 하므로 interrupt 전문을 잘라내지 않는다.
+append-only. Approval-decision rows must be able to reconstruct "what was approved, given what was shown", so the full interrupt text is not truncated.
 
 ---
 
-## 8. 계약 테스트와 mock 런타임
+## 8. Contract Tests and the Mock Runtime
 
-### 8.1 fixture 캡처
+### 8.1 Fixture Capture
 
 ```bash
 # Claude Code
@@ -611,85 +611,85 @@ claude -p "List files in src/ then summarize" \
   --output-format stream-json --verbose --include-partial-messages \
   > fixtures/claude_code/tool_call_turn.ndjson
 
-# Codex (app-server를 직접 붙잡기 전 단계의 스모크)
+# Codex (a smoke test before attaching directly to app-server)
 codex exec --json --sandbox read-only --skip-git-repo-check "…" \
   > fixtures/codex/tool_call_turn.ndjson
 ```
 
-fixture는 커밋한다. 비밀·경로는 캡처 직후 `scripts/scrub-fixture.ts`로 치환한다(홈 경로 → `/Users/u`, 토큰 → `***`).
+Fixtures are committed. Secrets and paths are substituted immediately after capture by `scripts/scrub-fixture.ts` (home paths → `/Users/u`, tokens → `***`).
 
-필수 fixture 세트(런타임별):
+Required fixture set (per runtime):
 
-| 이름 | 내용 |
+| Name | Content |
 |---|---|
-| `text_only_turn` | 텍스트만, 델타 다수 |
-| `tool_call_turn` | tool 호출 1회 + 결과 |
-| `tool_error_turn` | tool 실패 |
-| `approval_turn` | 승인 요청 발생 |
-| `rate_limited_turn` | rate limit로 중단 (`27`에서 실제로 잡힌 케이스) |
-| `cancelled_turn` | 중간 취소 |
-| `unknown_item_turn` | 미지의 item 타입(전방 호환 확인) |
+| `text_only_turn` | Text only, many deltas |
+| `tool_call_turn` | One tool call + result |
+| `tool_error_turn` | Tool failure |
+| `approval_turn` | An approval request occurs |
+| `rate_limited_turn` | Aborted by rate limit (a case actually caught in `27`) |
+| `cancelled_turn` | Cancelled mid-turn |
+| `unknown_item_turn` | Unknown item type (forward-compatibility check) |
 
-### 8.2 mock 런타임
+### 8.2 Mock Runtime
 
-`packages/bridge-protocol/test/mock-runtime.ts`. fixture NDJSON을 실제 타이밍(캡처된 상대 시각)으로 재생하는 프로세스다. `RuntimeAdapter`가 stdio를 읽는 코드 경로를 그대로 타므로 파서 버그가 잡힌다.
+`packages/bridge-protocol/test/mock-runtime.ts`. A process that replays fixture NDJSON at real timing (the captured relative timestamps). It goes through the exact code path where `RuntimeAdapter` reads stdio, so parser bugs are caught.
 
-계약 테스트가 검증하는 불변식(런타임 4종 × fixture 7종):
+Invariants the contract tests verify (4 runtimes × 7 fixtures):
 
-1. 모든 `turn.item.started`는 같은 `item_id`의 `turn.item.completed`로 닫힌다(취소·실패 제외, 그때는 `turn.completed`가 닫는다).
-2. `turn.item.delta`는 **하나도** durable 저장소에 도달하지 않는다(spy가 DB write를 카운트).
-3. durable write 횟수 ≤ item 수 × 2. 델타당 write가 있으면 실패한다(A2-D4 회귀 방지).
-4. 미지의 이벤트 타입이 와도 파서가 죽지 않고 cold에만 남는다.
-5. `approval.requested`는 항상 `HumanResponse`를 받고 나서야 런타임에 답이 간다.
-6. `-32005`가 나는 `cwd`로는 프로세스가 **spawn되지 않는다**(spawn spy 0회).
-7. 재연결 시 outbox flush 후 durable Item에 중복이 없다(`item_id` 기준 멱등).
-8. 델타 → item body 재조립 결과가 `item.completed.body`와 일치한다(어댑터 파서 정합성).
+1. Every `turn.item.started` is closed by a `turn.item.completed` with the same `item_id` (excluding cancellation and failure, where `turn.completed` closes it).
+2. **Not a single** `turn.item.delta` reaches durable storage (a spy counts DB writes).
+3. durable write count ≤ item count × 2. If there is a write per delta, the test fails (A2-D4 regression guard).
+4. An unknown event type does not kill the parser and lands only in cold.
+5. `approval.requested` always receives a `HumanResponse` before an answer goes back to the runtime.
+6. No process is **spawned** for a `cwd` that yields `-32005` (spawn spy count 0).
+7. After an outbox flush on reconnect, durable Items contain no duplicates (idempotent by `item_id`).
+8. Reassembling deltas into an item body matches `item.completed.body` (adapter parser consistency).
 
-커널 통합 테스트(실 Postgres)는 mock 런타임 2개를 서로 다른 host로 등록해 위임 왕복 1회를 돈다: `propose_delegation → 승인 → delegate.run → turn.completed → 원 스레드 첨부`. 이것이 Phase A의 브리지 종료 기준이다.
+The kernel integration test (real Postgres) registers two mock runtimes on different hosts and runs one delegation round trip: `propose_delegation → approval → delegate.run → turn.completed → attach to originating thread`. This is Phase A's bridge exit criterion.
 
-### 8.3 스파이크 목록 (이 부록이 추가한 것)
+### 8.3 Spike List (added by this appendix)
 
-| ID | 내용 | 차단하는 것 |
+| ID | Content | What it blocks |
 |---|---|---|
-| S-A2-1 | `-p --bare`에서 hook 설정을 명시 주입하는 플래그 표면 확인 | 위임 런의 승인 게이트 |
-| S-A2-2 | `--permission-mode` 허용 값 전수와 profile 매핑 확정 | §7.1 전체 |
-| S-A2-3 | Codex `acceptWithExecpolicyAmendment`의 amendment payload 스키마 | 승인 UI의 edit 경로 |
-| S-A2-4 | claude-ds가 stream-json 계약·토큰 회계를 그대로 지키는지 + `DS_MODEL` alias(`deepseek-flash`/`deepseek-v4-pro`) 유효성 확인(현재 근거는 Logan 로컬 CLAUDE.md 관행뿐) | A2-D8, 비용 집계, §4.3 모델 행 |
-| S-A2-5 | Hermes command approval의 실제 표면 | Phase C Hermes 위임 |
-| S-A2-6 | macOS에서 자식 프로세스 네트워크 차단 수단 | `observe` profile의 네트워크 상한 |
+| S-A2-1 | Confirm the flag surface for explicitly injecting hook configuration under `-p --bare` | The approval gate for delegated runs |
+| S-A2-2 | Enumerate all allowed `--permission-mode` values and settle the profile mapping | All of §7.1 |
+| S-A2-3 | The amendment payload schema for Codex's `acceptWithExecpolicyAmendment` | The approval UI's edit path |
+| S-A2-4 | Whether claude-ds honors the stream-json contract and token accounting exactly, plus validation of the `DS_MODEL` aliases (`deepseek-flash`/`deepseek-v4-pro`) (currently backed only by Logan's local CLAUDE.md practice) | A2-D8, cost accounting, the model row in §4.3 |
+| S-A2-5 | The actual surface of Hermes command approval | Phase C Hermes delegation |
+| S-A2-6 | A means of blocking network for child processes on macOS | The `observe` profile's network cap |
 
-S-A2-1·S-A2-2는 Phase 0에, 나머지는 해당 Phase 진입 시 돌린다.
+S-A2-1 and S-A2-2 run in Phase 0; the rest run on entering their respective phases.
 
 ---
 
-## 수정 이력
+## Revision History
 
 ### v0.95 (2026-09-20, pass 1)
 
-99-review(§2·§3·§4)와 마스터 v0.95에 맞춰 고친 것. 이전 "리뷰 노트 (2026-09-20)" 4건은 전부 본문에 반영되어 삭제했다.
+Changes made to match 99-review (§2, §3, §4) and master v0.95. All four items from the previous "Review Notes (2026-09-20)" were incorporated into the body and deleted.
 
-- §2.1 — 미니용 `local-agent.toml` 예시(`host = "mini"`, Codex+Hermes) 추가. 브리지가 두 호스트 모두에서 돈다는 것을 본문에 명시.
-- §2.1 — Hermes `[[runtime]]` 스키마 정의: `base_url`(기본 `http://127.0.0.1:8642`), `token_keychain_item`, `session_header_mode`, 능력은 `GET /v1/capabilities` 조회(`09`). `binary`/`allowed_roots`/`pinned_version`/`default_model`은 HTTP 런타임에 무의미하며 설정 검증이 거부한다고 명시.
-- §2.1 — Keychain 아이템 이름을 A1 규칙 `omnis.<channel>.<kind>.<external_id>`에 정렬(`omnis-bridge-token` → `omnis.bridge.token.<host>`). 허브 bind 주소 `127.0.0.1:8787`을 주석으로 표기.
-- §1.1 — `'omnis'` RuntimeKind 정의 추가: `agent_runtimes` 1 row, 브리지가 등록하지 않음, `RuntimeAdapter` 없음, 세션 purpose는 `inbox:*`·origin `job`·profile `observe` 고정. 어댑터 팩토리에서 명시 throw.
-- §7.2 — 동시성 상한을 "동시 런타임 프로세스 4개" → **"호스트당 활성 턴 4개"**(마스터 §9)로 교체. Codex 상주 app-server와 Claude Code 턴당 프로세스의 셈법 차이를 근거로 기재.
-- §4.3 — `DS_MODEL=deepseek-v4-pro`·`deepseek-flash`의 출처를 Logan 로컬 `~/.claude/CLAUDE.md` 운용 관행으로 각주 표기하고 **UNVERIFIED — spike S-A2-4**로 마킹. `24`가 실제로 뒷받침하는 범위(호출 플래그, 비용 표시 무시)를 분리.
-- §8.3 — S-A2-4 스파이크 범위에 `DS_MODEL` alias 검증 추가.
-- A2-D9 / §4.4 — Hermes를 "Phase C 이후 선택, 영구 보류 가능"에서 **Phase B 읽기 전용 세션(`origin:'human'`, 위임 제외) → Phase C 위임 대상**으로 재작성(마스터 §19 Q7). Phase 비교표와 8642/8787 포트 분리, 두 호스트 각각 별개 런타임 등록을 명시.
-- A2-D11 — `--bare`를 delegated 런의 **기본**으로 재작성하고 Settings 옵션 "owned-repo allowlist는 `--bare` 없이 실행"(기본 off, 결정은 Phase A 품질 실측 뒤로 유보)을 결정 행에 편입. 인박스 발 위임은 allowlist와 무관하게 항상 `--bare`.
-- §5.1 — 위임 트리거가 **자동 제안 + 승인 실행**임을 명시(마스터 §11, §19 Q10). 자동으로 열리지 않는 것은 실행뿐이라는 점과 완전 자율의 조건(런타임·레포별 허용 규칙) 기재.
-- §5.1 — tool/RPC 이름 매핑 한 줄 추가: 승인 핸들러 tool은 `send`/`delete`/`delegate`/`calendar_write`, 브리지 와이어 RPC는 `delegate.run` 유지, `calendar_write`는 대응 RPC 없음.
-- §6 — `read_session` 스코프에 마스터 §9의 문장(L3 루프는 전 세션 요약 가능, 개발 세션은 `inbox:*` 세션·인박스 스레드 원문 불가, 필요한 내용은 승인된 위임 브리프로 전달)을 그대로 편입하고, 비인가 조회를 `-32001`로 답한다는 규칙 추가.
-- §1.1 — `AgentRuntime`에 `transport`(`process`|`http`)·`base_url` 추가, `binary_path`/`allowed_roots`를 HTTP 런타임에서 null/빈 배열로 정의.
-- §3.3 — Item author 매핑 추가: 브리지 발 Item은 A3의 3컬럼 author 중 `agent_session_id`를 채운다. 허브 발 시스템 Item(위임 결과 첨부·연결 끊김)만 system 플래그.
-- 헤더 — 버전 0.9 → 0.95, 근거에 `24`와 마스터 §6/§9/§11/§19 추가.
+- §2.1 — Added a `local-agent.toml` example for the mini (`host = "mini"`, Codex+Hermes). Stated in the body that the bridge runs on both hosts.
+- §2.1 — Defined the Hermes `[[runtime]]` schema: `base_url` (default `http://127.0.0.1:8642`), `token_keychain_item`, `session_header_mode`, and capabilities queried via `GET /v1/capabilities` (`09`). Stated that `binary`/`allowed_roots`/`pinned_version`/`default_model` are meaningless for HTTP runtimes and are rejected by configuration validation.
+- §2.1 — Aligned Keychain item names with A1's convention `omnis.<channel>.<kind>.<external_id>` (`omnis-bridge-token` → `omnis.bridge.token.<host>`). Noted the hub bind address `127.0.0.1:8787` in a comment.
+- §1.1 — Added the definition of the `'omnis'` RuntimeKind: 1 row in `agent_runtimes`, not registered by the bridge, no `RuntimeAdapter`, session purpose fixed to `inbox:*`, origin `job`, profile `observe`. Explicit throw in the adapter factory.
+- §7.2 — Replaced the concurrency cap "4 concurrent runtime processes" with **"4 active turns per host"** (master §9). Recorded the rationale in the difference between the counting for Codex's resident app-server and Claude Code's per-turn processes.
+- §4.3 — Footnote the origin of `DS_MODEL=deepseek-v4-pro` and `deepseek-flash` as Logan's local `~/.claude/CLAUDE.md` operating practice, marked **UNVERIFIED — spike S-A2-4**. Separated out what `24` actually backs (invocation flags, ignoring reported cost).
+- §8.3 — Added `DS_MODEL` alias validation to the scope of spike S-A2-4.
+- A2-D9 / §4.4 — Rewrote Hermes from "optional after Phase C, may be deferred indefinitely" to **Phase B read-only sessions (`origin:'human'`, excluded from delegation) → Phase C delegation target** (master §19 Q7). Stated the phase comparison table, the 8642/8787 port separation, and separate runtime registration for each of the two hosts.
+- A2-D11 — Rewrote `--bare` as the **default** for delegated runs and folded the Settings option "run owned-repo allowlist without `--bare`" (off by default; the decision deferred until after Phase A quality measurements) into the decision row. Inbox-originated delegations are always `--bare` regardless of the allowlist.
+- §5.1 — Stated that the delegation trigger is **automatic proposal + approved execution** (master §11, §19 Q10). Noted that only execution does not open automatically, and the condition for full autonomy (per-runtime, per-repo allow rules).
+- §5.1 — Added a line on tool/RPC name mapping: the approval handler's tools are `send`/`delete`/`delegate`/`calendar_write`, the bridge wire RPC keeps `delegate.run`, and `calendar_write` has no corresponding RPC.
+- §6 — Incorporated master §9's sentences verbatim into the `read_session` scope (L3 loops can read all session summaries; development sessions cannot read `inbox:*` sessions or the raw text of inbox threads; needed content is passed via an approved delegation brief) and added the rule that unauthorized queries are answered with `-32001`.
+- §1.1 — Added `transport` (`process`|`http`) and `base_url` to `AgentRuntime`, and defined `binary_path`/`allowed_roots` as null/empty array for HTTP runtimes.
+- §3.3 — Added the Item author mapping: bridge-originated Items fill `agent_session_id` among A3's three author columns. Only hub-originated system Items (delegation result attachment, disconnection) use the system flag.
+- Header — version 0.9 → 0.95; added `24` and master §6/§9/§11/§19 to the basis.
 
 ### v1.0 (2026-09-20, pass 2)
 
-99-review-v2(§2-3, §4-4)와 마스터 v1.0 §9·§10에 맞춘 것.
+Changes made to match 99-review-v2 (§2-3, §4-4) and master v1.0 §9 and §10.
 
-- A2-D15 신설 / §2.1 — 설정 우선순위 규칙 확정: CLI 인자 > 환경변수(`OMNIS_*`) > `~/.omnis/local-agent.toml` > 내장 기본값. A6 §10.1 plist의 `--hub <url>`이 TOML `hub_url`을 덮어쓴다. `[[runtime]]` 블록은 TOML 전용(명령줄로 `allowed_roots`를 바꿀 수 있으면 A2-D12가 무의미해진다). 기동 로그에 키별 실효값+출처 기재(99-review-v2 §2-3).
-- §2.1 — 브리지 토큰 Keychain 정본 리터럴을 `omnis.bridge.token.<host>`로 한 곳에서 명시(A6 §9의 `omnis.<host>.session_bus_token`을 이 이름으로 통일, 99-review-v2 §4-4).
-- A2-D16 신설 / §5.1 — 마스터 §9의 에이전트↔에이전트 축소 편입: 런타임이 다른 런타임에 직접 명령하지 않고 `propose_delegation` → 승인 → 대상 브리지만 지난다. `approval_id` 없는 `delegate.run`은 `-32006`이라 와이어에서도 강제된다는 문장 추가.
-- §3.2 — 마스터 §10의 맥북 로컬 파일 ingestion 경로를 RPC로 구현: `ingest.scan`·`ingest.read` 2행 추가(세션 무관, 동시성 상한 밖). 보안 상한 명시 — A4 §10.1 allowlist ∩ `allowed_roots` 교집합 + `realpath` 재검사(밖이면 `-32005`), `.env*`·`*.pem`·`*.key`·`id_rsa*`·`.git/`·dotfile 항상 거부, `ingest.read` 파일당 1MB 상한.
-- 헤더 — 버전 0.95 → 1.0.
+- A2-D15 added / §2.1 — Settled the configuration precedence rule: CLI arguments > environment variables (`OMNIS_*`) > `~/.omnis/local-agent.toml` > built-in defaults. A6 §10.1's plist `--hub <url>` overrides TOML's `hub_url`. `[[runtime]]` blocks are TOML-exclusive (if `allowed_roots` could be changed from the command line, A2-D12 would be meaningless). The startup log records the effective value and source per key (99-review-v2 §2-3).
+- §2.1 — Specified the canonical bridge-token Keychain literal `omnis.bridge.token.<host>` in one place (unifying A6 §9's `omnis.<host>.session_bus_token` under this name, 99-review-v2 §4-4).
+- A2-D16 added / §5.1 — Incorporated master §9's agent↔agent reduction: a runtime does not command another runtime directly but goes only through `propose_delegation` → approval → the target bridge. Added the sentence that a `delegate.run` without an `approval_id` is `-32006`, so it is enforced on the wire too.
+- §3.2 — Implemented master §10's MacBook local file ingestion path as RPCs: added two rows, `ingest.scan` and `ingest.read` (independent of sessions, outside the concurrency cap). Stated the security caps — A4 §10.1 allowlist ∩ `allowed_roots` intersection + `realpath` re-check (`-32005` if outside), always reject `.env*`, `*.pem`, `*.key`, `id_rsa*`, `.git/`, and dotfiles, and a 1 MB per-file cap on `ingest.read`.
+- Header — version 0.95 → 1.0.
