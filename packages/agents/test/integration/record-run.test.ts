@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { AgentsNotConfiguredError, configureAgents, recordRun } from "../src/index.js";
+import { AgentsNotConfiguredError, configureAgents, recordRun } from "../../src/index.js";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL ?? "postgres://logan@127.0.0.1:5432/omnis_test",
@@ -65,7 +65,7 @@ describe("recordRun", () => {
   });
 
   it("throws AgentsNotConfiguredError before configureAgents", async () => {
-    const { getAgentsPool, resetAgentsPoolForTest } = await import("../src/pool.js");
+    const { getAgentsPool, resetAgentsPoolForTest } = await import("../../src/pool.js");
     resetAgentsPoolForTest();
     expect(() => getAgentsPool()).toThrow(AgentsNotConfiguredError);
     configureAgents({ pool });
@@ -74,7 +74,7 @@ describe("recordRun", () => {
 
 describe("finishRun", () => {
   it("patches only the given columns and stamps finished_at", async () => {
-    const { finishRun } = await import("../src/index.js");
+    const { finishRun } = await import("../../src/index.js");
     const id = await recordRun({
       loop: "classify", trigger_kind: "event", model_tier: "T1",
       provider: "openrouter", model: "deepseek-v4.1-flash", outcome: "running",
@@ -93,7 +93,7 @@ describe("finishRun", () => {
   });
 
   it("keeps the parsed-failure raw output for schema violations (A4 §1.6)", async () => {
-    const { finishRun } = await import("../src/index.js");
+    const { finishRun } = await import("../../src/index.js");
     const id = await recordRun({
       loop: "classify", trigger_kind: "event", model_tier: "T1",
       provider: "openrouter", model: "deepseek-v4.1-flash", outcome: "running",
@@ -105,7 +105,7 @@ describe("finishRun", () => {
   });
 
   it("throws when the id does not exist", async () => {
-    const { finishRun } = await import("../src/index.js");
+    const { finishRun } = await import("../../src/index.js");
     await expect(finishRun("00000000-0000-0000-0000-000000000000", { outcome: "ok" }))
       .rejects.toThrow(/agent_runs row not found/);
   });

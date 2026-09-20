@@ -42,7 +42,7 @@ sensitivity는 normal/personal/finance/legal/health 중 하나다. 애매하면 
 function sanitize(raw: string, nonce: string): string {
   return raw
     .normalize("NFKC")
-    .replace(/[​-‏﻿]/g, "")
+    .replace(/[\u200B-\u200F\uFEFF]/g, "")
     .replaceAll(`d_${nonce}`, "⟦redacted-tag⟧")
     .replaceAll("</data", "⟦redacted-tag⟧")
     .replaceAll("[system]", "⟦redacted-tag⟧")

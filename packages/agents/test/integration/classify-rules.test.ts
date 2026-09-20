@@ -1,8 +1,8 @@
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { applyRules, WORK_DOMAINS } from "../src/classify/rules.js";
-import type { ClassifyCtx } from "../src/classify/rules.js";
-import type { ItemRow } from "../src/types.js";
+import { applyRules, WORK_DOMAINS } from "../../src/classify/rules.js";
+import type { ClassifyCtx } from "../../src/classify/rules.js";
+import type { ItemRow } from "../../src/types.js";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL ?? "postgres://logan@127.0.0.1:5432/omnis_test",

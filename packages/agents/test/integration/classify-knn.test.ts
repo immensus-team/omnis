@@ -1,7 +1,7 @@
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { knnVote, KNN_MARGIN_MIN, KNN_SIM_MIN } from "../src/classify/knn.js";
-import type { ItemRow } from "../src/types.js";
+import { knnVote, KNN_MARGIN_MIN, KNN_SIM_MIN } from "../../src/classify/knn.js";
+import type { ItemRow } from "../../src/types.js";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL ?? "postgres://logan@127.0.0.1:5432/omnis_test",
