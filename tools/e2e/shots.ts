@@ -38,19 +38,30 @@ async function densify(pool: Pool): Promise<void> {
       pool,
       "SELECT id, title FROM threads WHERE kind <> 'agent_session' ORDER BY created_at",
     );
+    // One sentence per thread, and never the same sentence twice. The old fixture rotated three
+    // strings through `i % 3`, so any screenshot that caught more than three approvals printed one
+    // of them again — three identical rows under a count look like a rendering bug, not a queue.
+    // The per-thread fallback is what makes uniqueness structural rather than a longer list to
+    // outrun.
     const asks = [
       "Share the latest Brightstone purchase agreement?",
       "Put the Friday 14:00 design review on the calendar?",
       "Answer the invoice reissue request with 'I will check and get back to you'?",
+      "Send the countersigned NDA back to Northwind legal?",
+      "Confirm the offsite venue for the 12th?",
+      "Reply to the recruiting thread with two interview slots?",
     ];
     for (const [i, t] of threads.entries()) {
-      const description = asks[i % asks.length] ?? asks[0] ?? "";
+      const description = asks[i] ?? `Reply on ${t.title ?? "this thread"}?`;
       await kernel.approvals.propose({
         action: "send",
         args: { channel: "slack", body: description },
         description,
         config: { allow_accept: true, allow_edit: true, allow_respond: true, allow_ignore: true },
-        risk: "normal",
+        // The stack expands the open thread's **riskiest** approval and collapses the rest, so the
+        // fixture has to contain a risk spread: with every row on 'normal' the screenshot cannot
+        // show what the ranking does (and would rank by recency alone).
+        risk: i === 0 ? "high" : "normal",
         thread_id: t.id,
       });
     }
@@ -204,6 +215,25 @@ async function main(): Promise<void> {
     await page.waitForTimeout(1400);
     await page.screenshot({ path: join(OUT, "row-hover-card.png") });
 
+    // 5) The detail pane (US-D03) — the thread header (title, subline, segments, icon actions), the
+    //    key-value table and the approval stack. It has to be a thread that carries a pending
+    //    approval: the stack expands the open thread's riskiest one and collapses the rest, and a
+    //    thread with no approval of its own would only show the collapsed side of that rule.
+    await row.click();
+    // click() leaves the pointer on the row, which re-opens step 4's hover card 400ms later — over
+    // the very header this shot exists to show. Park the pointer off the list and wait for the card
+    // to leave the DOM rather than sleeping past it.
+    await page.mouse.move(2, 2);
+    await page.locator(".row-hover-card").waitFor({ state: "hidden", timeout: 5000 });
+    // The key-value table is behind the More icon by design (the pane's body is the conversation),
+    // so the screenshot opens it: otherwise the one component this story adds to the pane is the
+    // one thing the pane's own evidence cannot show.
+    await page.getByRole("button", { name: "More details" }).click();
+    await page.waitForTimeout(600);
+    await page
+      .locator('[data-testid="detail-pane"]')
+      .screenshot({ path: join(OUT, "detail-pane.png") });
+
     // The layout has to hold at the narrowest reachable width (src-tauri/tauri.conf.json minWidth
     // 1024). Page-level horizontal scroll alone is not evidence: two grid items inside a row can
     // share the same track and overlap while scrollWidth stays 0 (that is exactly how round three of
@@ -212,7 +242,13 @@ async function main(): Promise<void> {
     // (page scroll off <body> + an element-rect scan, tools/e2e/overflow.ts), and whether
     // .inbox-row__chips and .inbox-row__side bounding boxes overlap in any rendered row — the
     // overlap is the one inside a clipped box that neither scroll reading can see.
-    for (const width of [1024, 1280, 1440]) {
+    // 390 and 768 are below the desktop window's own 1024 floor, but they are not hypothetical: the
+    // web shell reaches them, SKILLS.md #11 names them, and shots-responsive.ts sweeps them — with
+    // one gap this loop closes. That sweep never opens a thread, so it never renders the detail pane,
+    // and below the 900px shell breakpoint the pane stops being a column and becomes a floating
+    // sheet over the list. The sheet is a third of the widths' worth of surface that nothing measured
+    // until this story put the approval stack, the segmented control and the key-value table in it.
+    for (const width of [390, 768, 1024, 1280, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
       await page.waitForTimeout(400);
       const overflow = await page.evaluate(measureOverflow);

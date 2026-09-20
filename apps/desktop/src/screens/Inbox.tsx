@@ -493,13 +493,17 @@ export function Inbox({
   }, [filtered, grouped]);
 
   // The needs-approval tab's count. It only means anything if it is the same number whether or
-  // not the tab is selected, so it is counted **before** the pill filter (labelFiltered). At zero
-  // it is not drawn: an empty queue is said by an empty list, not by a badge.
+  // not the tab is selected, so it is counted **before** the pill filter — from `channelFiltered`,
+  // the last stage upstream of it. (It read `labelFiltered`, which looks pre-pill and is not: that
+  // stage returns `pillFiltered` untouched when no label is chosen, so the count was taken after
+  // the pill after all. The badge then vanished on every tab whose own rows carry no approval —
+  // the agents view advertised no queue while both waiting threads sat one tab away.) At zero it
+  // is not drawn: an empty queue is said by an empty list, not by a badge.
   const pendingCount = useMemo(
     () =>
-      applyArchiveView(labelFiltered, view, pendingArchive).filter((r) => r.hasPendingApproval)
+      applyArchiveView(channelFiltered, view, pendingArchive).filter((r) => r.hasPendingApproval)
         .length,
-    [labelFiltered, view, pendingArchive],
+    [channelFiltered, view, pendingArchive],
   );
 
   return (

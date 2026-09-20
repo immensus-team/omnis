@@ -248,6 +248,18 @@ describe("Inbox group headers (US-D02)", () => {
     expect(rowNames()).toEqual(["Waiting thread", "Waiting thread 2"]);
   });
 
+  // How much is waiting on a decision is a fact about the queue, not about the tab you happen to
+  // be reading it from. Counting it downstream of the pill filter made it a fact about the tab:
+  // the badge read 0 on every tab whose own rows carry no approval, so the agents view showed no
+  // badge at all while both waiting threads sat one tab away.
+  it("keeps the pending count on the pill whichever tab is selected", () => {
+    renderInbox();
+    expect(filterTab("needs-approval")).toHaveTextContent("2");
+
+    filterBy("agents");
+    expect(filterTab("needs-approval")).toHaveTextContent("2");
+  });
+
   // On the needs-approval tab every row is pending, so a dot on each of them distinguishes
   // nothing. On any other tab it still means "this one is waiting on your decision", so it stays.
   it("hides the row's pending-approval dot on needs-approval and shows it elsewhere", () => {

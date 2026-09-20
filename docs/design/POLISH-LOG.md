@@ -359,3 +359,78 @@ in full rather than line by line.
 branch. `pnpm tsx tools/e2e/shots-responsive.ts` reports `overflow 0px` at 390/768/1024/1440 in both
 passes, a filter row of 36–40px (never above the 40px cap) and a 57px rail pinned to the bottom edge
 at 390 and 768.
+
+## US-D03 — the detail pane, the one hairline table, and the person card (2026-09-21)
+
+Baseline: the right-hand card in `reference/ref-dashboard-detail-card.webp`. New evidence:
+`screens/detail-pane.png`; the four screens it re-shoots now carry eight distinct approval strings
+where the fixture used to repeat one sentence three times.
+
+### What changed
+
+1. **`KeyValueTable` (`packages/ui`) is where hairlines are allowed.** 13px, label grey on the left,
+   value right-aligned, one `1px` rule above every row but the first, and `data-numeric` switching the
+   value to tabular figures for the times and counts. Both callers are fact sheets rather than prose:
+   the thread's own meta and the hover card.
+2. **The detail header takes the reference's card header** — title, one grey subline under it, the
+   segmented control, three right-aligned icon actions. The subline is a tested pure function
+   (`threadSubline`) joining `channel · people · last activity`, people capped at three plus `+N`.
+   Archive is a real state change; Labels and More are disclosures, not icon-shaped decoration — an
+   icon that does nothing when pressed is worse than no icon. `apps/desktop` has no radix dependency,
+   so both are inline panels, which also keeps them out of the floating layer.
+3. **`PersonCard`** is the shared identity block: avatar or initials with the pastel fallback, a badge
+   row, then the same table (channels, last contact, relationship state, plus the caller's own rows).
+   The hover card *is* that card for rows with a person behind them. An agent-session row has nobody
+   behind it — its avatar slot holds the runtime logo — so it keeps the plain title + table form and
+   omits the channel line rather than inventing a person to fill it.
+4. **The approval stack** scopes to the open thread: that thread's riskiest, then newest, approval is
+   the expanded and elevated card, its in-scope siblings lead the collapsed one-line rows, and the
+   rest follow under a count header. Picking a collapsed row promotes it — and it leaves the list it
+   came from, which was the first version's bug: it rendered in both places at once.
+5. **Part of the bug was the fixture.** `densify()` rotated three sentences through `i % 3`, so any
+   screenshot catching more than three approvals printed one of them twice, and three identical rows
+   under a count read as a rendering fault rather than a queue. It now uses one sentence per thread
+   with a per-thread fallback, which makes uniqueness structural instead of a longer list to outrun,
+   and it spreads risk so the ranking has something to rank.
+
+### Found by actually using the screen
+
+- **The pill count was reading the wrong stage of the pipeline.** `pendingCount` said it counted
+  "before the pill filter (labelFiltered)" and did not: `labelFiltered` returns `pillFiltered`
+  untouched when no label is chosen, so the count was taken after the pill after all. The badge read
+  0 on every tab whose own rows carry no approval — the agents view advertised an empty queue while
+  eight approvals waited one tab away. It counts from `channelFiltered` now (the last stage genuinely
+  upstream of the pill), with a test that holds the number steady across tabs. Nothing had noticed
+  because the earlier rounds' fixtures had no pending approvals at all: the badge never drew, so it
+  could not draw wrongly.
+- The first `detail-pane.png` had the hover card sitting over the header the shot exists to show:
+  Playwright's `click()` leaves the pointer on the row, which re-opens the card 400ms later. The
+  pointer now parks off the list, and the script waits for the card to leave the DOM instead of
+  sleeping past it.
+- The pane's own table was behind the More icon, so the one component this story adds to the pane was
+  the one thing its evidence could not show. The screenshot opens it.
+- The stack looked mis-scoped and was not. Assuming one approval per thread is what made the expanded
+  card look like the wrong one: the fixture puts two on `#omnis-launch` (the seed proposes one too),
+  and the expanded card is the newest in scope with its sibling leading the collapsed rows. The
+  `needs-approval 7` badge against eight approvals is the same fact twice — seven threads, eight
+  approvals — not a disagreement.
+
+### Deliberately not done this round
+
+- Absolute dates in the meta table. `Created: now` is honest (the fixture thread really is created
+  during the run), and `packages/ui` has exactly one time formatter on purpose; a second convention
+  costs more than one fixture row is worth.
+- `DraftCard`'s hardcoded Korean copy, which is visible in the pane shot. It is not this story's file
+  and the branch's i18n sweep owns it — `ko.ts`/`en.ts` already carry `common.draftCard` for it.
+- Reporting the pane's overflow at 390/768 from `shots-responsive.ts`: that sweep never opens a
+  thread, so it never renders the pane, and below the 900px breakpoint the pane is a floating sheet
+  over the list. The two widths went into `shots.ts`'s own probe loop instead, which has a thread
+  open — the sheet is a third of the widths' surface that nothing had measured.
+
+### Evidence
+
+`pnpm lint` (692 files, no fixes applied) and `pnpm typecheck` (`tsc --build --force`) exit 0.
+`@omnis/ui` 22 files / 194 passed. `@omnis/desktop` 68 passed across 10 files, with
+`test/integration/zero-client.test.ts` still failing to collect on an unresolved `@omnis/db` — the
+same pre-existing suite the round above recorded. `pnpm tsx tools/e2e/shots.ts` reports `overflow 0px`
+and zero chip/side-slot overlaps across all 12 rows at each of 390/768/1024/1280/1440.
