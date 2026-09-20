@@ -15,6 +15,7 @@
     { "path": "./apps/local-agent" },
     { "path": "./packages/ui" },
     { "path": "./apps/desktop" },
+    { "path": "./apps/gallery" },
     { "path": "./tools/auth-kit" }
   ]
 }

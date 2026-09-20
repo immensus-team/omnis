@@ -1,0 +1,100 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  background: var(--bg-base);
+}
+.gallery-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  height: 100%;
+}
+.gallery-nav {
+  overflow-y: auto;
+  border-right: var(--hairline);
+  padding: 16px 8px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+.gallery-nav a {
+  display: block;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 13px;
+}
+.gallery-nav a:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+.gallery-main {
+  overflow-y: auto;
+  padding: 24px;
+}
+.gallery-section {
+  margin-bottom: 48px;
+  scroll-margin-top: 16px;
+}
+.gallery-section h2 {
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+.gallery-panes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 12px;
+}
+.gallery-pane {
+  border: var(--hairline);
+  border-radius: var(--radius-lg, 16px);
+  padding: 16px;
+  background: var(--bg-elevated);
+}
+.gallery-pane h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin: 0 0 12px 0;
+}
+.gallery-variant {
+  margin-bottom: 16px;
+}
+.gallery-variant-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-bottom: 6px;
+}
+
+/* Dark preview pane: packages/ui/src/tokens.css only overrides these vars under
+   `:root[data-theme="dark"]`, which matches <html>, never a nested div — so a
+   `data-theme="dark"` attribute on a pane div alone would do nothing. Re-declaring the
+   same override values here, scoped to `[data-theme="dark"]` (any element, not just
+   :root), makes the pane itself an override root without touching packages/ui.
+   Keep this list in sync with packages/ui/src/tokens.css's `:root[data-theme="dark"]`
+   block if that ever changes — copy its values verbatim, do not invent new ones. */
+.gallery-pane[data-theme="dark"] {
+  --bg-base: var(--gray-950);
+  --bg-elevated: var(--gray-850);
+  --bg-overlay: color-mix(in oklch, var(--gray-900) 72%, transparent);
+  --border-hairline: oklch(1 0 0 / 0.08);
+  --border-hairline-strong: oklch(1 0 0 / 0.14);
+  --text-primary: var(--gray-100);
+  --text-secondary: var(--gray-500);
+  --text-tertiary: oklch(0.55 0.006 260 / 0.7);
+  --accent: var(--accent-500);
+  --accent-fg: oklch(0.14 0 0);
+  --shadow-row-selected: 0 4px 16px oklch(0 0 0 / 0.35), 0 1px 2px oklch(0 0 0 / 0.4);
+  --bg-canvas: var(--gray-950);
+  --canvas-grid: none;
+  --canvas-grid-size: auto;
+  background: var(--bg-base);
+  color: var(--text-primary);
+}

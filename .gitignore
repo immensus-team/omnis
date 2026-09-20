@@ -17,12 +17,14 @@ tools/spikes/**/out/
 tools/spikes/**/node_modules
 tools/e2e/.env
 tools/e2e/test-results
-# OMC 오케스트레이션 상태·태스크 파일 — 리포 내용이 아니다(워크트리마다 churn).
+# OMC orchestration state and task files — not repo content (churn per worktree).
 .omc/
 .omnis-task.md
-# tools/e2e 런타임 산출물(로그·zero replica·Playwright 아티팩트). evidence/와 REPORT.md는 커밋한다.
+# tools/e2e runtime artifacts (logs, zero replica, Playwright artifacts). evidence/ and REPORT.md are committed.
 tools/e2e/.logs/
 tools/e2e/.tmp/
 tools/e2e/.playwright/
 ops/mini/env.sh
 tools/auth-kit/accounts.local.json
+# Visual regression test scratch output (screenshots/report) — not committed; baseline/ is committed separately.
+tools/visual/.current/
