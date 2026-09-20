@@ -31,3 +31,13 @@ export {
   type EntityType,
   type RelationInput,
 } from "./entities.js";
+export {
+  chunkDocument,
+  chunkCode,
+  chunkCalendarEvent,
+  CHUNK_MIN_TOKENS,
+  CHUNK_MAX_TOKENS,
+  CHUNK_OVERLAP_TOKENS,
+  type Chunk,
+  type CalendarChunkInput,
+} from "./ingest/chunk.js";
