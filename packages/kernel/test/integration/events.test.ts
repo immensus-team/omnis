@@ -1,7 +1,7 @@
-import type { Pool } from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPool, one, query } from "@omnis/db";
 import { type Events, createEvents, createLogger } from "@omnis/kernel";
+import type { Pool } from "pg";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 let pool: Pool;
 let events: Events & { close(): Promise<void> };
@@ -36,10 +36,10 @@ describe("events — ephemeral tier", () => {
     const got: Array<Record<string, unknown>> = [];
     const off = events.subscribe("turn.item.delta", (p) => got.push(p));
 
-    const before = await one<{ n: string }>(pool, `SELECT count(*)::text AS n FROM events`);
+    const before = await one<{ n: string }>(pool, "SELECT count(*)::text AS n FROM events");
     await events.emit("ephemeral", "turn.item.delta", { id: "t-1", text: "hel" });
     await events.emit("ephemeral", "turn.item.delta", { id: "t-1", text: "lo" });
-    const after = await one<{ n: string }>(pool, `SELECT count(*)::text AS n FROM events`);
+    const after = await one<{ n: string }>(pool, "SELECT count(*)::text AS n FROM events");
 
     expect(got).toEqual([
       { id: "t-1", text: "hel" },
@@ -87,7 +87,12 @@ describe("events — cold tier", () => {
       target_table: "accounts",
       reason: "rate limited",
     });
-    const row = await one<{ kind: string; actor: string; target_table: string; payload: Record<string, unknown> }>(
+    const row = await one<{
+      kind: string;
+      actor: string;
+      target_table: string;
+      payload: Record<string, unknown>;
+    }>(
       pool,
       `SELECT kind, actor, target_table, payload FROM events WHERE kind = 'adapter.error' ORDER BY seq DESC LIMIT 1`,
     );
@@ -102,7 +107,9 @@ describe("events — cold tier", () => {
 
 describe("events — subscribe", () => {
   it("rejects an unknown NOTIFY-looking channel", () => {
-    expect(() => events.subscribe("omnis_bogus", () => undefined)).toThrow(/unknown omnis_ channel/);
+    expect(() => events.subscribe("omnis_bogus", () => undefined)).toThrow(
+      /unknown omnis_ channel/,
+    );
   });
 
   it("keeps other subscribers alive when one throws", async () => {

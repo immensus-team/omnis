@@ -1,7 +1,7 @@
+import { createPool, one, query } from "@omnis/db";
 import { Client } from "pg";
 import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createPool, one, query } from "@omnis/db";
 
 let pool: Pool;
 let listener: Client;
@@ -12,9 +12,19 @@ beforeAll(async () => {
   listener = new Client({ connectionString: process.env.DATABASE_URL });
   await listener.connect();
   listener.on("notification", (msg) => {
-    seen.push({ channel: msg.channel, payload: JSON.parse(msg.payload ?? "{}") as Record<string, unknown> });
+    seen.push({
+      channel: msg.channel,
+      payload: JSON.parse(msg.payload ?? "{}") as Record<string, unknown>,
+    });
   });
-  for (const ch of ["omnis_item", "omnis_thread", "omnis_approval", "omnis_task", "omnis_session", "omnis_job"]) {
+  for (const ch of [
+    "omnis_item",
+    "omnis_thread",
+    "omnis_approval",
+    "omnis_task",
+    "omnis_session",
+    "omnis_job",
+  ]) {
     await listener.query(`LISTEN ${ch}`);
   }
 });
@@ -90,7 +100,10 @@ describe("0007_notify", () => {
   });
 
   it("notifies omnis_session with the runtime name and omnis_job with the job name", async () => {
-    const runtime = await one<{ id: string }>(pool, `SELECT id FROM agent_runtimes WHERE runtime='omnis'`);
+    const runtime = await one<{ id: string }>(
+      pool,
+      `SELECT id FROM agent_runtimes WHERE runtime='omnis'`,
+    );
     const acc = await one<{ id: string }>(
       pool,
       `INSERT INTO accounts (channel, external_id, display) VALUES ('agent','notify','a') RETURNING id`,

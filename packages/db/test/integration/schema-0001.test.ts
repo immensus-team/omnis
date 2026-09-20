@@ -1,6 +1,6 @@
+import { createPool, query } from "@omnis/db";
 import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createPool, query } from "@omnis/db";
 
 let pool: Pool;
 beforeAll(() => {
