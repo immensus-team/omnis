@@ -25,3 +25,25 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 if (typeof Element.prototype.scrollIntoView === "undefined") {
   Element.prototype.scrollIntoView = () => {};
 }
+
+// deviation: Node 22 defines a global `localStorage` getter that returns undefined unless
+// `--localstorage-file` is passed, and vitest's jsdom populateGlobal never installs jsdom's
+// own Storage over it — so `localStorage` is undefined for both the bare global and
+// `window.localStorage` (verified by probe). US-D01's model picker (lib/ask-model.ts) reads
+// and writes it inside try/catch, so the missing Storage is silent: the picker still changes
+// label, it just never persists, and no test could see that.
+// Minimal in-memory Storage, ponytail: no quota/eviction semantics, add them if a test ever
+// asserts on either. The store lives for the whole file (one module graph per file), which is
+// why tests that touch it clear it in beforeEach.
+if (typeof globalThis.localStorage === "undefined") {
+  const store = new Map<string, string>();
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, String(value)),
+      removeItem: (key: string) => void store.delete(key),
+      clear: () => store.clear(),
+    },
+  });
+}

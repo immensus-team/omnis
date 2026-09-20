@@ -39,11 +39,11 @@ describe("App shell (US-A25 '빈 셸' + A26~A31 화면 라우팅)", () => {
     expect(screen.getByRole("radiogroup", { name: "Inbox 필터" })).toBeInTheDocument();
   });
 
-  it("opens the command palette on ⌘K (A5 §2.3)", () => {
+  it("opens the ask panel on ⌘K (US-D01: 모달 팔레트가 아니라 인라인 ask 바의 AI 패널)", () => {
     render(<App />);
-    expect(screen.queryByPlaceholderText("검색 또는 명령…")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "AI 패널" })).not.toBeInTheDocument();
     fireEvent.keyDown(window, { key: "k", metaKey: true });
-    expect(screen.getByPlaceholderText("검색 또는 명령…")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "AI 패널" })).toBeInTheDocument();
   });
 });
 

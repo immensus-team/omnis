@@ -4,8 +4,21 @@
 import "./setup";
 
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CommandPalette, type PaletteAction, groupBy } from "../src/components/command-palette";
+import {
+  ASK_MODEL_STORAGE_KEY,
+  type AskModelId,
+  DEFAULT_ASK_MODEL,
+  askModelLabel,
+  writeAskModel,
+} from "../src/lib/ask-model";
+
+/** US-D01부터 패널의 기본 탭은 "제안"이다 — 명령 목록은 "명령" 탭 뒤에 있다. */
+const openCommandsTab = () => fireEvent.click(screen.getByRole("button", { name: "명령" }));
+
+/** 리터럴로 두되 AskModelId로 좁혀 오타가 컴파일에서 걸리게 한다. */
+const FLASH_ID: AskModelId = "deepseek-v4.1-flash";
 
 describe("groupBy", () => {
   it("groups items by the given key function", () => {
@@ -48,6 +61,17 @@ describe('CommandPalette mode="inline" (U1 kinso ask/search 필 바)', () => {
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 
+  it("mounts the AI 패널 dialog only while open (US-D01)", () => {
+    const onOpenChange = vi.fn();
+    const { rerender } = render(
+      <CommandPalette mode="inline" open={false} onOpenChange={onOpenChange} actions={[]} />,
+    );
+    expect(screen.queryByRole("dialog", { name: "AI 패널" })).not.toBeInTheDocument();
+
+    rerender(<CommandPalette mode="inline" open onOpenChange={onOpenChange} actions={[]} />);
+    expect(screen.getByRole("dialog", { name: "AI 패널" })).toBeInTheDocument();
+  });
+
   it("typing into the pill opens the palette (onOpenChange(true))", () => {
     const onOpenChange = vi.fn();
     render(<CommandPalette mode="inline" open={false} onOpenChange={onOpenChange} actions={[]} />);
@@ -70,6 +94,7 @@ describe('CommandPalette mode="inline" (U1 kinso ask/search 필 바)', () => {
       { id: "go-inbox", name: "Go to Inbox", group: "이동", perform },
     ];
     render(<CommandPalette mode="inline" open onOpenChange={vi.fn()} actions={actions} />);
+    openCommandsTab();
     expect(screen.getByRole("listbox")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Go to Inbox"));
     expect(perform).toHaveBeenCalledOnce();
@@ -99,6 +124,7 @@ describe('CommandPalette mode="inline" 닫기 경로 (U1 회귀)', () => {
       { id: "go-inbox", name: "Go to Inbox", group: "이동", perform: vi.fn() },
     ];
     render(<CommandPalette mode="inline" open onOpenChange={onOpenChange} actions={actions} />);
+    openCommandsTab();
     fireEvent.pointerDown(screen.getByText("Go to Inbox"));
     expect(onOpenChange).not.toHaveBeenCalled();
   });
@@ -108,5 +134,28 @@ describe('CommandPalette mode="inline" 닫기 경로 (U1 회귀)', () => {
     render(<CommandPalette mode="inline" open={false} onOpenChange={onOpenChange} actions={[]} />);
     fireEvent.pointerDown(document.body);
     expect(onOpenChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('CommandPalette mode="inline" 모델 선택기 영속성 (US-D01)', () => {
+  // test/setup.ts의 메모리 Storage는 파일 단위로 살아남는다 — 테스트 사이에 비운다.
+  beforeEach(() => localStorage.clear());
+
+  it("pick swaps the toggle label and writes the id to localStorage", () => {
+    render(<CommandPalette mode="inline" open onOpenChange={vi.fn()} actions={[]} />);
+
+    const toggle = screen.getByRole("button", { name: askModelLabel(DEFAULT_ASK_MODEL) });
+    fireEvent.click(toggle);
+    fireEvent.click(screen.getByRole("button", { name: askModelLabel(FLASH_ID) }));
+
+    expect(toggle).toHaveTextContent(askModelLabel(FLASH_ID));
+    expect(localStorage.getItem(ASK_MODEL_STORAGE_KEY)).toBe(FLASH_ID);
+  });
+
+  it("starts on the stored model", () => {
+    writeAskModel(FLASH_ID);
+    render(<CommandPalette mode="inline" open onOpenChange={vi.fn()} actions={[]} />);
+
+    expect(screen.getByRole("button", { name: askModelLabel(FLASH_ID) })).toBeInTheDocument();
   });
 });
