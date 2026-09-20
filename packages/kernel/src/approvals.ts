@@ -55,6 +55,14 @@ export interface Approvals {
     thread_id?: string;
     limit?: number;
   }): Promise<PendingApproval[]>;
+  /** decided(accept|edit) → executing. 0행이면 ApprovalStateError. runEgress만 부른다. */
+  beginExecution(id: string): Promise<PendingApproval>;
+  /** executing → executed */
+  completeExecution(id: string): Promise<void>;
+  /** executing → failed */
+  failExecution(id: string, reason: string): Promise<void>;
+  /** pending & expires_at <= now → expired(+decision='ignore'). 바뀌었으면 true. */
+  expire(id: string): Promise<boolean>;
 }
 
 export interface ApprovalsDeps {
@@ -180,6 +188,78 @@ export function createApprovals(deps: ApprovalsDeps): Approvals {
           LIMIT $${params.length}`,
         params,
       );
+    },
+
+    async beginExecution(id) {
+      // decision이 accept|edit일 때만 실행할 수 있다. ignore/respond는 채널로 나가지 않는다.
+      const rows = await query<PendingApproval>(
+        pool,
+        `UPDATE pending_approvals
+            SET state = 'executing'
+          WHERE id = $1 AND state = 'decided' AND decision IN ('accept','edit')
+          RETURNING id, action, args, description, config, state, decision, decided_args,
+                    requested_by, thread_id, item_id, task_id, risk, expires_at,
+                    created_at, decided_at, executed_at, fail_reason`,
+        [id],
+      );
+      const row = rows[0];
+      if (row === undefined) {
+        throw new ApprovalStateError(
+          `approval ${id} is not executable (needs state=decided, decision∈accept|edit)`,
+        );
+      }
+      logger.info("approval execution claimed", { id, action: row.action });
+      return row;
+    },
+
+    async completeExecution(id) {
+      const rows = await query<{ id: string }>(
+        pool,
+        `UPDATE pending_approvals SET state = 'executed', executed_at = now()
+          WHERE id = $1 AND state = 'executing' RETURNING id`,
+        [id],
+      );
+      if (rows[0] === undefined) {
+        throw new ApprovalStateError(`approval ${id} is not executing`);
+      }
+    },
+
+    async failExecution(id, reason) {
+      const rows = await query<{ id: string }>(
+        pool,
+        `UPDATE pending_approvals SET state = 'failed', fail_reason = $2
+          WHERE id = $1 AND state = 'executing' RETURNING id`,
+        [id, reason.slice(0, 2000)],
+      );
+      if (rows[0] === undefined) {
+        throw new ApprovalStateError(`approval ${id} is not executing`);
+      }
+      logger.info("approval execution failed", { id, reason });
+    },
+
+    async expire(id) {
+      // approvals_decided_ck는 state<>'pending'인 row에 non-NULL decision을 요구한다.
+      // 아무도 고르지 않고 시간이 지난 것 = 'ignore'.
+      const rows = await query<{ id: string }>(
+        pool,
+        `UPDATE pending_approvals
+            SET state = 'expired', decision = 'ignore', decided_at = now()
+          WHERE id = $1 AND state = 'pending' AND expires_at IS NOT NULL AND expires_at <= now()
+          RETURNING id`,
+        [id],
+      );
+      const hit = rows[0] !== undefined;
+      if (hit) {
+        await deps.audit?.record({
+          actor: "system",
+          action: "approval.expired",
+          target_table: "pending_approvals",
+          target_id: id,
+          after: { state: "expired", decision: "ignore" },
+          approval_id: id,
+        });
+      }
+      return hit;
     },
   };
 }
