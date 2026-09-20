@@ -351,7 +351,7 @@ Later: 메시지 본문 컬럼 암호화(SQLCipher 급), 프롬프트 인젝션 
 | Q10 | 위임을 에이전트가 자동 실행까지 하는가 | **자동 제안 + 승인 실행. 완전 자율은 런타임·레포별 허용 규칙을 열 때만** (브리프의 "먼저 일을 시키기도"를 한 번의 승인으로 구현) | 안전 경계 |
 | Q11 | 비용 상한에 걸리면 VIP 초안도 멈추는가 | **아니다. 10% 예비비로 VIP·민감 초안은 계속(§14)** | 비용 |
 | Q12 | 터미널에서 직접 연 Claude Code·Codex 세션도 인박스에 보이게 하는가 | **Phase C에 읽기 전용 import 후보로 두고 지금은 안 한다** | Phase C 범위 |
-| Q13 | 위임된 Claude Code 실행의 인증·격리 모드 | **게이트 ⑪ 결과(2026-09-20, FAIL)로 확정:** `--bare`는 hooks와 `--permission-mode`를 모두 무시하고 API 키 인증만 받는다. non-bare는 `--settings`로 주입한 omnis hook이 발동하지만 프로젝트 자체 hook과 격리되지 않는다. 따라서 ① Claude Code 위임은 non-bare + 구독 인증 + omnis hooks + 새 worktree로 돌리되 **Logan 소유 레포 allowlist에서만**(프로젝트 hook을 신뢰할 수 있는 곳), 비가역 tool은 `--disallowedTools`로 차단 ② claude-ds는 `--bare`(API 키)로 돌리고 승인 표면이 없으므로 observe 프로파일(읽기 전용) 기본 ③ 헤드리스 승인 경로는 Claude Code의 `--permission-prompt-tool`(브리지가 MCP로 제공)을 Wave 1 스파이크 S-A2-1b로 검증. Logan이 뒤집을 수 있음 | A2-D11, D9 비용 |
+| Q13 | 위임된 Claude Code 실행의 인증·격리 모드와 헤드리스 승인 표면 | **게이트 ⑪(FAIL)·⑪b(PASS, 2026-09-20)로 확정.** `--bare`는 hooks와 `--permission-mode`를 무시하고 API 키 인증만 받지만, `--mcp-config`로 등록하고 `--permission-prompt-tool`로 지정한 MCP tool은 `--bare`에서도 호출되고 deny가 지켜진다(응답 지연 3~4ms). 따라서 ① 헤드리스 승인 표면 = 브리지가 서빙하는 permission-prompt MCP tool → `pending_approvals`로 승격(hook 기반 승격은 폐기) ② Claude Code 위임 = non-bare + 구독 인증 + 새 worktree + Logan 소유 레포 allowlist(프로젝트 hook은 격리되지 않으나 차단 권한이 없음) + `--disallowedTools`로 비가역 tool 차단 ③ claude-ds 위임 = `--bare`(API 키) + 같은 permission-prompt tool. observe 전용 제한은 해제하고 workspace 프로파일까지 허용. Logan이 뒤집을 수 있음 | A2-D11, A2 §4.1, D9 비용 |
 
 ## 20. 부록
 
