@@ -82,7 +82,7 @@ function AddFilterPopover({
           sideOffset={6}
         >
           <Command label={`${fieldLabel} 필터`}>
-            <Command.Input placeholder="Filter…" autoFocus />
+            <Command.Input placeholder={`${fieldLabel} 검색`} autoFocus />
             <Command.List>
               <Command.Empty>결과가 없어요</Command.Empty>
               {options.map((option) => (

@@ -62,6 +62,7 @@ async function densify(pool: Pool): Promise<void> {
     pool,
     "SELECT id FROM accounts WHERE channel = 'slack' LIMIT 1",
   );
+  // 상태당 2건 이상 — 그룹 카운트가 전부 1이면 "밀도 시스템"이 아니라 헤더 네 줄만 보인다.
   const extra: [string, string, string, string][] = [
     [
       "running",
@@ -69,8 +70,12 @@ async function densify(pool: Pool): Promise<void> {
       "answers:draft",
       "받은 메일 3건 초안을 쓰는 중입니다 (2/3)",
     ],
+    ["running", "계약서 diff 요약", "contract:diff", "특약 2개 변경점을 비교하는 중입니다"],
+    ["waiting_approval", "청구서 재발행 회신", "billing:reissue", "회신 문구 승인을 기다립니다"],
     ["idle", "주간 리포트 수집", "report:weekly", "다음 실행까지 대기 중입니다"],
+    ["idle", "캘린더 충돌 감시", "calendar:watch", "다음 점검까지 대기 중입니다"],
     ["ended", "라벨 규칙 정리", "labels:tidy", "중복 라벨 4개를 병합하고 끝냈습니다"],
+    ["ended", "스팸 필터 학습", "spam:train", "오탐 6건을 반영하고 끝냈습니다"],
   ];
   for (const [state, title, key, summary] of extra) {
     const thread = await one<{ id: string }>(
@@ -155,8 +160,9 @@ async function main(): Promise<void> {
     await page.waitForSelector(".inbox-row", { timeout: 60_000 });
     await page.waitForTimeout(2500);
 
-    // 1) needs-approval — 대기 그룹 헤더 + 승인 대기 행들 + 필터 칩 바
-    await page.getByRole("radio", { name: "needs-approval" }).click();
+    // 1) needs-approval — 탭 pill 안의 대기 건수 + 승인 대기 행들 + 필터 칩 바.
+    //    이름이 정확히 "needs-approval"이 아니다: 탭이 카운트를 달고 있어 "needs-approval 6"이다.
+    await page.getByRole("radio", { name: /^needs-approval/ }).click();
     await page.waitForTimeout(800);
     await page.screenshot({ path: join(OUT, "approvals-density.png") });
 

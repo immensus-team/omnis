@@ -229,6 +229,17 @@ describe("Inbox 그룹 헤더 (US-D02)", () => {
     expect(rowNames()).toEqual(["대기 건", "대기 건 2"]);
   });
 
+  // needs-approval 탭에서는 모든 행이 승인 대기라 행마다 붙는 점이 아무것도 구분하지 못한다.
+  // 다른 탭에서는 "이 행만 내 결정을 기다린다"는 뜻이 살아 있으므로 그대로 둔다.
+  it("needs-approval에서는 행의 승인 대기 점을 숨기고, 다른 탭에서는 보여준다", () => {
+    const { container } = renderInbox();
+    filterBy("all");
+    expect(container.querySelectorAll(".inbox-row__approval-dot").length).toBeGreaterThan(0);
+
+    filterBy("needs-approval");
+    expect(container.querySelectorAll(".inbox-row__approval-dot")).toHaveLength(0);
+  });
+
   // 나머지 필터와 Archived는 평평해야 한다 — 그룹핑이 그쪽으로 새면 회귀다.
   it("all/work/personal과 보관됨 뷰에는 그룹 헤더가 없다", () => {
     const { container } = renderInbox();

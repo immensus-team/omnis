@@ -64,7 +64,9 @@ describe("FilterChipBar (US-D02)", () => {
     fireEvent.click(screen.getByRole("button", { name: "+ Label" }));
 
     const popover = screen.getByRole("dialog");
-    expect(within(popover).getByPlaceholderText("Filter…")).toBeInTheDocument();
+    // placeholder는 필드명을 물려받는다 — 하드코딩된 영어 "Filter…"는 한국어 UI 한가운데
+    // 혼자 영어로 남는다(실사용 화면에서 그대로 보였다).
+    expect(within(popover).getByPlaceholderText("Label 검색")).toBeInTheDocument();
     expect(within(popover).getByText("Integrations")).toBeInTheDocument();
     expect(within(popover).getByText("Billing")).toBeInTheDocument();
 

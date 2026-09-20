@@ -517,7 +517,10 @@ export function Inbox({
               unread={item.row.unread}
               unreadCount={item.row.unreadCount}
               selected={item.row.id === selectedId}
-              hasPendingApproval={item.row.hasPendingApproval}
+              // needs-approval 탭에서는 모든 행이 승인 대기다 — 탭이 이미 말한 걸 행마다
+              // 점으로 되풀이하면 점이 아무것도 구분하지 못한다(그룹 헤더 아래 상태 배지를
+              // 뺀 것과 같은 규칙: 위가 말한 상태를 아래가 반복하지 않는다).
+              hasPendingApproval={filter !== "needs-approval" && item.row.hasPendingApproval}
               labels={item.row.labels}
               archived={view === "archived"}
               onArchive={(id) => toggleArchive(id, view !== "archived")}
