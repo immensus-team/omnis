@@ -8,11 +8,15 @@ import { Clock } from "lucide-react";
 import { describe, expect, it } from "vitest";
 import { AgentStatusPill, ApprovalStatusPill, StatusPill } from "../src/components/status-pill";
 
-describe("ApprovalStatusPill (approval 4상태)", () => {
+describe("ApprovalStatusPill (approval 라이프사이클 표시 상태)", () => {
+  // failed/responded가 따로 있는 게 이 테이블의 요점이다: 내가 승인한 건의 실행 실패와
+  // 역제안을 "거절됨"에 접으면 사용자가 하지 않은 행동을 했다고 말하게 된다.
   it.each([
     ["pending", "대기", "warning"],
     ["approved", "승인됨", "success"],
     ["rejected", "거절됨", "danger"],
+    ["responded", "역제안", "info"],
+    ["failed", "실패", "danger"],
     ["expired", "만료", "neutral"],
   ] as const)("%s → %s / tone %s", (state, label, tone) => {
     render(<ApprovalStatusPill state={state} />);
@@ -37,20 +41,12 @@ describe("AgentStatusPill (agent session 5상태)", () => {
   });
 });
 
-describe("count prop", () => {
-  // 0은 "없음"이 아니라 실제 카운트다 — `count !== undefined` 분기가 0에서 살아있는지 고정한다.
-  it.each([
-    [6, "6"],
-    [0, "0"],
-    [undefined, null],
-  ] as const)("count=%s", (count, text) => {
-    const { container } = render(<ApprovalStatusPill state="pending" count={count} />);
-    const el = container.querySelector(".status-pill__count");
-    if (text === null) {
-      expect(el).toBeNull();
-    } else {
-      expect(el).toHaveTextContent(text);
-    }
+describe("카운트는 pill이 그리지 않는다", () => {
+  // 레퍼런스에서 숫자는 pill 밖 별도 회색 칩이다(GroupHeader.__count). pill 안에 숫자를 다시
+  // 넣으면 헤더가 필터 칩 줄과 같은 크기의 칩 하나로 뭉개진다 — 그 회귀를 여기서 막는다.
+  it("pill 안에는 숫자 슬롯이 없다", () => {
+    const { container } = render(<ApprovalStatusPill state="pending" />);
+    expect(container.querySelector(".status-pill__count")).toBeNull();
   });
 });
 

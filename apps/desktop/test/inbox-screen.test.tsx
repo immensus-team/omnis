@@ -36,9 +36,8 @@ describe("filterInboxItems (A5 §2.1 필터 pill 5개, 서로 배타)", () => {
     expect(filterInboxItems(items, filter).map((i) => i.id)).toEqual(expectedIds);
   });
 
-  // US-D02 의도된 변경: needs-approval은 "지금 대기 중"이 아니라 "승인 활동이 있는" 스레드다.
-  // 대기만 있던 스레드(id 2)는 예전과 똑같이 뜨고, 결정된 건이 새로 들어온다.
-  it("needs-approval은 결정·만료된 승인도 포함한다", () => {
+  // needs-approval은 내 액션 큐다 — 결정·만료된 건까지 남기면 탭이 영원히 비워지지 않는다.
+  it("needs-approval은 결정·만료된 승인을 빼고 대기 중인 것만 남긴다", () => {
     const rows: InboxQueryItem[] = [
       {
         id: "p",
@@ -69,7 +68,7 @@ describe("filterInboxItems (A5 §2.1 필터 pill 5개, 서로 배타)", () => {
         authorKind: "person",
       },
     ];
-    expect(filterInboxItems(rows, "needs-approval").map((i) => i.id)).toEqual(["p", "a", "e"]);
+    expect(filterInboxItems(rows, "needs-approval").map((i) => i.id)).toEqual(["p"]);
   });
 });
 
@@ -202,19 +201,21 @@ describe("sortInboxRows (U2: blocked agent session·승인 대기 행이 최상�
   });
 });
 
-describe("approvalPillState (US-D02: DB 승인 상태 + 판정 → 표시 4상태)", () => {
+describe("approvalPillState (US-D02: DB 승인 상태 + 판정 → 표시 상태)", () => {
   it.each([
     ["pending", null, "pending"],
     ["expired", null, "expired"],
-    // failed는 표시상 "거절됨"에 모은다 — DB에 rejected state가 없다.
-    ["failed", null, "rejected"],
+    // 내가 승인해 준 건의 실행이 실패한 것. 이걸 "거절됨"으로 접으면 하지 않은 행동을 했다고
+    // 말하는 셈이라 별도 상태다(DB에 rejected state는 없다 — 거절은 decision='ignore'다).
+    ["failed", "accept", "failed"],
+    ["failed", null, "failed"],
     ["executed", "accept", "approved"],
     ["executed", "edit", "approved"],
     ["decided", "accept", "approved"],
     ["executing", "accept", "approved"],
-    // ignore/respond는 승인도 거절도 아닌 "안 하기로 한" 결정이다 — 거절 버킷으로.
+    // respond는 역제안이다 — 거절이 아니라 별도 선택지(config.allow_respond).
+    ["decided", "respond", "responded"],
     ["decided", "ignore", "rejected"],
-    ["decided", "respond", "rejected"],
     ["decided", null, "rejected"],
     ["executed", null, "rejected"],
   ] as const)("state=%s decision=%s → %s", (state, decision, expected) => {
@@ -222,11 +223,14 @@ describe("approvalPillState (US-D02: DB 승인 상태 + 판정 → 표시 4상�
   });
 });
 
-describe("groupByApprovalState (US-D02: 그룹 순서 = 대기 → 승인됨 → 거절됨 → 만료)", () => {
+describe("groupByApprovalState (US-D02: 대기 → 승인됨 → 역제안 → 거절됨 → 실패 → 만료)", () => {
   const rows = [
     { id: "e", approvalState: "expired" as const },
     { id: "p", approvalState: "pending" as const },
     { id: "n", approvalState: null },
+    { id: "f", approvalState: "failed" as const },
+    { id: "r", approvalState: "responded" as const },
+    { id: "x", approvalState: "rejected" as const },
     { id: "a", approvalState: "approved" as const },
   ];
 
@@ -234,6 +238,9 @@ describe("groupByApprovalState (US-D02: 그룹 순서 = 대기 → 승인됨 →
     expect(groupByApprovalState(rows).map((g) => [g.state, g.rows.map((r) => r.id)])).toEqual([
       ["pending", ["p"]],
       ["approved", ["a"]],
+      ["responded", ["r"]],
+      ["rejected", ["x"]],
+      ["failed", ["f"]],
       ["expired", ["e"]],
     ]);
   });

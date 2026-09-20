@@ -117,7 +117,7 @@ const renderInbox = (props: ComponentProps<typeof Inbox> = {}) =>
 const rowNames = (): string[] =>
   [...document.querySelectorAll(".inbox-row__name")].map((el) => el.textContent ?? "");
 
-const addTrigger = () => screen.getByRole("button", { name: "+ Label" });
+const addTrigger = () => screen.getByRole("button", { name: "+ 라벨" });
 const optionIn = (label: string) => within(screen.getByRole("dialog")).getByText(label);
 
 describe("Inbox 라벨 필터 칩 (US-D02)", () => {
@@ -134,19 +134,21 @@ describe("Inbox 라벨 필터 칩 (US-D02)", () => {
     fireEvent.click(optionIn("Billing"));
     expect(rowNames()).toEqual(["통합 건", "청구 건", "둘 다 건"]);
 
-    fireEvent.click(screen.getByRole("button", { name: "Label 필터 제거" }));
+    fireEvent.click(screen.getByRole("button", { name: "라벨 필터 제거" }));
     expect(rowNames()).toEqual(["라벨 없음", "통합 건", "청구 건", "둘 다 건"]);
   });
 
+  // 칩 문구는 이 화면의 나머지(보관됨/대기/확인 필요)와 같은 언어여야 한다 — 레퍼런스의
+  // 영어 필터 DSL("Label is any of 2 labels")을 그대로 옮기면 한 칩 안에 두 언어가 섞인다.
   it("칩 문구는 고른 라벨 수를 센다", () => {
     renderInbox();
     fireEvent.click(addTrigger());
     expect(document.querySelector(".filter-chip")).toBeNull();
 
     fireEvent.click(optionIn("Integrations"));
-    expect(screen.getByText("Label is any of 1개 라벨")).toBeInTheDocument();
+    expect(screen.getByText("라벨은 1개 중 하나")).toBeInTheDocument();
     fireEvent.click(optionIn("Billing"));
-    expect(screen.getByText("Label is any of 2개 라벨")).toBeInTheDocument();
+    expect(screen.getByText("라벨은 2개 중 하나")).toBeInTheDocument();
   });
 
   it("워크스페이스에 라벨이 하나도 없으면 빈 바를 그리지 않는다", () => {
@@ -168,8 +170,8 @@ describe("Inbox 채널 필터 칩 (US-D02)", () => {
     const onChannelFilterChange = vi.fn();
     renderInbox({ channelFilter: "gmail", onChannelFilterChange });
 
-    expect(screen.getByText("Channel is Gmail")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Channel 필터 제거" }));
+    expect(screen.getByText("채널은 Gmail")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "채널 필터 제거" }));
     expect(onChannelFilterChange).toHaveBeenCalledWith(null);
   });
 

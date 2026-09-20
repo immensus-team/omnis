@@ -43,6 +43,8 @@ export interface InboxRowProps {
   /** null이 아니면 agent_session 행 — 우측 슬롯이 채널 아이콘 대신 상태 배지를 보여준다. */
   agentState: AgentSessionKinsoState | null;
   unread: boolean;
+  /** 안읽음 개수(threads.unread_count). 행은 점 하나로만 줄여 보여주므로 호버 카드가 수를 말한다. */
+  unreadCount?: number;
   selected: boolean;
   hasPendingApproval: boolean;
   labels: LabelChip[];
@@ -190,18 +192,27 @@ export function InboxRow(props: InboxRowProps) {
           sideOffset={8}
         >
           <p className="row-hover-card__title">{props.name}</p>
-          {/* ponytail: 아직 "참여자 목록" 데이터 모델이 없다 — 여기서 말하는 참여자는 행이 아는
-              단 하나의 이름(props.name)이고, 그래서 제목과 같은 값이 한 번 더 나온다. 스레드가
-              진짜 참여자 배열을 갖게 되면 이 한 줄만 갈아 끼우면 된다. */}
+          {/* 카드가 말하는 건 "행이 잘라 낸 것"뿐이다 — 행이 이미 그대로 보여 주는 값을 한 번 더
+              쓰지 않는다. 요약은 행에서 한 줄 ellipsis라(.inbox-row__summary) 여기서만 전문이
+              보이고, 라벨 줄은 칩 2개 + "+N"으로 잘렸을 때만 나온다. */}
+          {summaryText && <p className="row-hover-card__summary">{summaryText}</p>}
           <dl className="row-hover-card__meta">
-            <div>
-              <dt>참여자</dt>
-              <dd>{props.name}</dd>
-            </div>
-            {props.labels.length > 0 && (
+            {more > 0 && (
               <div>
                 <dt>라벨</dt>
                 <dd>{props.labels.map((l) => l.name).join(", ")}</dd>
+              </div>
+            )}
+            {props.agentState === null && (
+              <div>
+                <dt>채널</dt>
+                <dd>{CHANNEL_LABEL[props.channel]}</dd>
+              </div>
+            )}
+            {props.unreadCount !== undefined && props.unreadCount > 0 && (
+              <div>
+                <dt>안읽음</dt>
+                <dd>{props.unreadCount}개</dd>
               </div>
             )}
             <div>

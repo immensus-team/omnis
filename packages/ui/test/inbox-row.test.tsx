@@ -190,15 +190,15 @@ describe("InboxRow 호버 카드 (US-D02)", () => {
   // (command-palette.test.tsx의 닫힘 스프링 테스트와 같은 패턴).
   afterEach(() => vi.useRealTimers());
 
-  function hoverRow(labels = baseProps.labels) {
+  function hoverRow(over: Partial<typeof baseProps> & Record<string, unknown> = {}) {
     vi.useFakeTimers();
-    render(<InboxRow {...baseProps} labels={labels} />);
+    render(<InboxRow {...baseProps} {...over} />);
     // Radix HoverCard 1.1.23의 트리거는 pointer 이벤트만 듣는다 — mouseEnter로는 열리지 않는다.
-    fireEvent.pointerEnter(screen.getByRole("option"));
+    fireEvent.pointerEnter(screen.getAllByRole("option")[0] as HTMLElement);
     return () => document.querySelector(".row-hover-card") as HTMLElement | null;
   }
 
-  it("호버 전에는 없고, 400ms가 지나야 참여자·라벨·마지막 활동 카드가 뜬다", () => {
+  it("호버 전에는 없고, 400ms가 지나야 카드가 뜬다", () => {
     const card = hoverRow();
 
     // 리스트를 훑고 지나갈 때 카드가 줄줄이 번쩍이지 않는다.
@@ -209,21 +209,58 @@ describe("InboxRow 호버 카드 (US-D02)", () => {
     expect(card()).toBeNull();
 
     act(() => vi.advanceTimersByTime(1));
+    expect(card()).not.toBeNull();
+  });
+
+  // 카드의 존재 이유: 행이 한 줄 ellipsis로 잘라 낸 요약의 전문.
+  it("행이 자른 요약 전문과, 행에 없는 채널·안읽음 수를 보여준다", () => {
+    const long =
+      "브라이트스톤 리얼티 매매계약서 최신본을 공유해 달라는 요청입니다. 지난주 검토본 이후 " +
+      "특약 두 줄이 바뀌었고 금요일까지 회신이 필요하다고 합니다.";
+    const card = hoverRow({ summary: long, unreadCount: 3 });
+    act(() => vi.advanceTimersByTime(400));
     const meta = within(card() as HTMLElement);
-    // 제목 + 참여자 행. 지금은 둘 다 행이 아는 같은 이름 하나다(컴포넌트의 ponytail 주석 참고).
-    expect(meta.getAllByText("Sora Kim")).toHaveLength(2);
-    expect(meta.getByText("참여자")).toBeInTheDocument();
-    expect(meta.getByText("work, davich")).toBeInTheDocument(); // 라벨은 쉼표로 이어 붙인다
+
+    expect(meta.getByText(long)).toBeInTheDocument();
+    expect(meta.getByText("채널")).toBeInTheDocument();
+    expect(meta.getByText("Slack")).toBeInTheDocument();
+    expect(meta.getByText("안읽음")).toBeInTheDocument();
+    expect(meta.getByText("3개")).toBeInTheDocument();
     expect(meta.getByText("마지막 활동")).toBeInTheDocument();
     expect(meta.getByText("3m")).toBeInTheDocument();
   });
 
-  it("라벨이 없는 행은 카드에서 라벨 행을 통째로 뺀다", () => {
-    const card = hoverRow([]);
-
+  // 카드는 행을 되풀이하지 않는다. 제목(=이름)은 한 번뿐이고, 행이 이미 칩으로 다 보여 준
+  // 라벨은 카드에 다시 나오지 않는다.
+  it("행이 다 보여 준 것은 반복하지 않는다", () => {
+    const card = hoverRow({ unreadCount: 0 });
     act(() => vi.advanceTimersByTime(400));
     const meta = within(card() as HTMLElement);
+
+    expect(meta.getAllByText("Sora Kim")).toHaveLength(1);
     expect(meta.queryByText("라벨")).not.toBeInTheDocument();
-    expect(meta.getByText("마지막 활동")).toBeInTheDocument();
+    expect(meta.queryByText("안읽음")).not.toBeInTheDocument();
+  });
+
+  // 칩 2개 + "+N"으로 잘렸을 때만 전체 라벨 목록이 값을 더한다.
+  it("칩에서 잘린 라벨이 있으면 전체 목록을 보여준다", () => {
+    const card = hoverRow({
+      labels: [
+        { kind: "scope" as const, name: "work", color: null },
+        { kind: "topic" as const, name: "davich", color: null },
+        { kind: "topic" as const, name: "계약", color: null },
+      ],
+    });
+    act(() => vi.advanceTimersByTime(400));
+    const meta = within(card() as HTMLElement);
+    expect(meta.getByText("라벨")).toBeInTheDocument();
+    expect(meta.getByText("work, davich, 계약")).toBeInTheDocument();
+  });
+
+  // agent_session 행은 우측 슬롯이 채널 아이콘 대신 상태 배지라 "채널"이 의미가 없다.
+  it("agent 세션 행에는 채널 줄이 없다", () => {
+    const card = hoverRow({ agentState: "working" as const });
+    act(() => vi.advanceTimersByTime(400));
+    expect(within(card() as HTMLElement).queryByText("채널")).not.toBeInTheDocument();
   });
 });

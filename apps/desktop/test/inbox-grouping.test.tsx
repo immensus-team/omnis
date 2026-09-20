@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-// US-D02: Needs-approval 뷰는 승인 라이프사이클(pending/approved/rejected/expired)별로,
-// Agents 뷰는 세션 상태(blocked → working → idle → done → failed)별로 그룹 헤더를 단다.
+// US-D02: Needs-approval 뷰는 "지금 내 결정을 기다리는" 건만 담는 액션 큐고(그래서 그룹은
+// 대기 하나다), Agents 뷰는 세션 상태(blocked → working → idle → done → failed)별로 묶인다.
+// 라이프사이클 정렬 자체는 groupByApprovalState 순수 함수로 따로 고정한다.
 // archive-inbox.test.tsx의 테이블 태깅 목을 그대로 쓴다 — Inbox는 쿼리마다 다른 행이 필요하다.
 import "./setup";
 
@@ -12,7 +13,8 @@ const THREADS = {
   pending: "11111111-1111-1111-1111-111111111111",
   approved: "22222222-2222-2222-2222-222222222222",
   expired: "33333333-3333-3333-3333-333333333333",
-  rejected: "44444444-4444-4444-4444-444444444444",
+  failed: "44444444-4444-4444-4444-444444444444",
+  pending2: "88888888-8888-8888-8888-888888888888",
   blocked: "55555555-5555-5555-5555-555555555555",
   working: "66666666-6666-6666-6666-666666666666",
   agentEmail: "77777777-7777-7777-7777-777777777777",
@@ -64,16 +66,18 @@ const store: Record<string, unknown[]> = {
     item(THREADS.pending, "대기 건"),
     item(THREADS.approved, "승인 건"),
     item(THREADS.expired, "만료 건"),
-    item(THREADS.rejected, "거절 건"),
+    item(THREADS.failed, "실패 건"),
+    item(THREADS.pending2, "대기 건 2"),
     agentItem(THREADS.blocked, "막힌 세션"),
     agentItem(THREADS.working, "도는 세션"),
     // agent가 보낸 행이지만 agent_session은 아니다 — 묶을 세션 상태가 없다(ungrouped 버킷).
     item(THREADS.agentEmail, "에이전트 메일", { author_agent_id: "agent-1" }),
   ],
   accounts: [{ id: "acct-1", channel: "gmail" }],
-  // A3 라이프사이클: 대기 / 실행 완료(accept) / 만료 / 실행 실패(→표시상 거절).
+  // A3 라이프사이클: 대기 2건 / 실행 완료(accept) / 만료 / 실행 실패.
   pending_approvals: [
     { id: "ap-1", thread_id: THREADS.pending, state: "pending", decision: null, created_at: 1 },
+    { id: "ap-5", thread_id: THREADS.pending2, state: "pending", decision: null, created_at: 5 },
     {
       id: "ap-2",
       thread_id: THREADS.approved,
@@ -82,7 +86,7 @@ const store: Record<string, unknown[]> = {
       created_at: 2,
     },
     { id: "ap-3", thread_id: THREADS.expired, state: "expired", decision: null, created_at: 3 },
-    { id: "ap-4", thread_id: THREADS.rejected, state: "failed", decision: null, created_at: 4 },
+    { id: "ap-4", thread_id: THREADS.failed, state: "failed", decision: null, created_at: 4 },
   ],
   labels: [],
   thread_labels: [],
@@ -148,40 +152,33 @@ const renderInbox = () =>
     </VirtuosoMockContext.Provider>,
   );
 
-/** 헤더 pill의 라벨만 뽑는다. StatusPill은 [점][라벨][카운트] 순으로 그려서 textContent가
- * "대기4"가 된다 — 카운트를 붙여 놓고 순서를 단언하면 테스트가 문자열 파싱이 된다. */
-const pillLabel = (pill: Element): string =>
-  [...pill.childNodes]
-    .filter((n) => n.nodeType === Node.TEXT_NODE)
-    .map((n) => n.textContent ?? "")
-    .join("");
-
 /** 그룹 헤더가 DOM에 놓인 순서 = 화면에 보이는 순서. */
 const headerLabels = (container: HTMLElement): string[] =>
-  [...container.querySelectorAll(".group-header .status-pill")].map(pillLabel);
+  [...container.querySelectorAll(".group-header .status-pill")].map((el) => el.textContent ?? "");
 
+/** 카운트는 pill 밖 별도 칩이다(레퍼런스 문법). */
 const headerCounts = (container: HTMLElement): string[] =>
-  [...container.querySelectorAll(".group-header .status-pill__count")].map(
-    (el) => el.textContent ?? "",
-  );
+  [...container.querySelectorAll(".group-header__count")].map((el) => el.textContent ?? "");
 
 const filterBy = (name: string) => fireEvent.click(screen.getByRole("radio", { name }));
 
 describe("Inbox 그룹 헤더 (US-D02)", () => {
-  it("needs-approval 뷰를 대기 → 승인됨 → 거절됨 → 만료 순서로 묶는다", () => {
+  it("needs-approval 뷰는 대기 중인 건만, 대기 헤더 하나로 묶는다", () => {
     const { container } = renderInbox();
     filterBy("needs-approval");
 
-    expect(headerLabels(container)).toEqual(["대기", "승인됨", "거절됨", "만료"]);
-    expect(headerCounts(container)).toEqual(["1", "1", "1", "1"]);
+    expect(headerLabels(container)).toEqual(["대기"]);
+    expect(headerCounts(container)).toEqual(["2"]);
   });
 
-  // 이 슬라이스의 의도된 동작 변경: 예전엔 지금 대기 중인 건만 이 탭에 떴다. 이제 결정·만료된
-  // 건도 남는다 — 그래야 상태별 그룹이 여러 개 뜬다. 대기만 있던 스레드는 예전과 똑같이 뜬다.
-  it("needs-approval 뷰는 결정·만료된 건도 함께 보여준다", () => {
+  // 이 탭은 액션 큐다 — 결정·만료된 건이 남으면 탭이 영원히 비워지지 않는다.
+  it("결정·만료·실패한 건은 needs-approval 뷰에 남지 않는다", () => {
     renderInbox();
     filterBy("needs-approval");
-    expect(screen.getAllByRole("option")).toHaveLength(4);
+    const names = screen
+      .getAllByRole("option")
+      .map((r) => r.querySelector(".inbox-row__name")?.textContent ?? "");
+    expect(names).toEqual(["대기 건", "대기 건 2"]);
   });
 
   it("agents 뷰는 확인 필요(blocked)를 작업 중(working)보다 위에 둔다", () => {
@@ -215,7 +212,7 @@ describe("Inbox 그룹 헤더 (US-D02)", () => {
     }
 
     filterBy("needs-approval");
-    expect(container.querySelectorAll(".group-header")).toHaveLength(4);
+    expect(container.querySelectorAll(".group-header")).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "보관됨" }));
     expect(container.querySelectorAll(".group-header")).toHaveLength(0);
   });

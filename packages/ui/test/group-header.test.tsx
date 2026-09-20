@@ -9,20 +9,38 @@ import { GroupHeader } from "../src/components/group-header";
 import { AgentStatusPill, ApprovalStatusPill } from "../src/components/status-pill";
 
 describe("GroupHeader (US-D02: 리스트 상태별 그룹 헤더)", () => {
-  it("넘긴 pill과 카운트를 그대로 그린다", () => {
+  it("pill은 라벨만, 카운트는 pill 밖 별도 칩이다", () => {
     const { container } = render(
-      <GroupHeader pill={<ApprovalStatusPill state="pending" count={4} />} />,
+      <GroupHeader pill={<ApprovalStatusPill state="pending" />} count={4} />,
     );
     const pill = container.querySelector(".group-header .status-pill");
-    // textContent는 "대기4"다(라벨 + 카운트) — 라벨이 통째로 사라지지 않았는지만 본다.
     expect(pill).toHaveTextContent("대기");
-    expect(container.querySelector(".status-pill__count")).toHaveTextContent("4");
+    // 숫자가 pill 안으로 되돌아오면 헤더가 필터 칩과 같은 덩어리로 읽힌다.
+    expect(pill).not.toHaveTextContent("4");
+    expect(container.querySelector(".group-header__count")).toHaveTextContent("4");
+  });
+
+  // 0은 "없음"이 아니라 실제 카운트다 — undefined일 때만 칩을 생략한다.
+  it.each([
+    [0, "0"],
+    [undefined, null],
+  ] as const)("count=%s", (count, text) => {
+    const { container } = render(
+      <GroupHeader pill={<ApprovalStatusPill state="pending" />} count={count} />,
+    );
+    const el = container.querySelector(".group-header__count");
+    if (text === null) expect(el).toBeNull();
+    else expect(el).toHaveTextContent(text);
+  });
+
+  // listbox 안에 행과 섞여 들어가므로 헤더는 옵션으로 세어지면 안 된다.
+  it("헤더 래퍼는 role=presentation이다", () => {
+    const { container } = render(<GroupHeader pill={<ApprovalStatusPill state="pending" />} />);
+    expect(container.querySelector(".group-header")).toHaveAttribute("role", "presentation");
   });
 
   it("agent pill도 같은 자리에 온다", () => {
-    const { container } = render(
-      <GroupHeader pill={<AgentStatusPill state="blocked" count={2} />} />,
-    );
+    const { container } = render(<GroupHeader pill={<AgentStatusPill state="blocked" />} />);
     expect(container.querySelector(".group-header .status-pill")).toHaveAttribute(
       "data-tone",
       "danger",

@@ -58,12 +58,11 @@ export function filterInboxItems<T extends InboxQueryItem>(items: T[], filter: I
       return items.filter((i) => i.scope === "personal");
     case "agents":
       return items.filter((i) => i.authorKind === "agent");
-    // US-D02 편차: 예전엔 i.hasPendingApproval(지금 대기 중인 건만)이었다. 이제 승인 "활동이
-    // 있는" 스레드 전체다 — 레퍼런스의 상태 라이프사이클 그룹과 맞추려면 결정·만료된 건도
-    // 같은 뷰에 남아 있어야 한다(그래야 그룹 헤더가 여러 개 뜬다). 회귀는 없다: 대기만 있던
-    // 스레드는 이전과 똑같이 뜬다.
+    // 이 탭은 아카이브가 아니라 내 액션 큐다 — 지금 내 결정을 기다리는 건만 남는다. 결정·만료된
+    // 건까지 남기면 탭이 영원히 비워지지 않는다(라이프사이클은 그 자체로 뷰가 필요한 얘기고,
+    // 아직 그런 뷰가 없다).
     case "needs-approval":
-      return items.filter((i) => i.approvalState !== null);
+      return items.filter((i) => i.hasPendingApproval);
   }
 }
 
@@ -113,19 +112,21 @@ export function threadSummary(row: {
 }
 
 /** A3 approvals_state_ck(pending/decided/executing/executed/failed/expired) + decision
- * (accept/edit/respond/ignore) → StatusPill의 4-상태 표시 매핑. DB에 "rejected" state는 없다 —
- * ignore/respond로 결정됐거나 실행이 failed로 끝난 건 표시상 "거절됨" 버킷에 모은다(ponytail:
- * 별도 실패 표시가 필요해지면 여기 매핑만 넓힌다). */
+ * (accept/edit/respond/ignore) → StatusPill 표시 상태. DB에 "rejected" state는 없다: 거절은
+ * decision='ignore'다. 실행 실패(state='failed')와 역제안(decision='respond')을 거절로 접지
+ * 않는 이유는 그게 사실이 아니라서다 — 내가 승인한 건이 실행 중 실패한 걸 "거절됨"이라고
+ * 쓰면 하지 않은 행동을 했다고 말하는 셈이다. */
 export function approvalPillState(row: {
   state: string;
   decision?: string | null;
 }): ApprovalPillState {
   if (row.state === "pending") return "pending";
   if (row.state === "expired") return "expired";
-  if (row.state === "failed") return "rejected";
+  if (row.state === "failed") return "failed";
   // decided / executing / executed
   if (row.decision === "accept" || row.decision === "edit") return "approved";
-  return "rejected"; // ignore / respond / unknown decision
+  if (row.decision === "respond") return "responded";
+  return "rejected"; // ignore / unknown decision
 }
 
 export interface ArchivableRow {
@@ -166,7 +167,14 @@ export function sortInboxRows<T extends SortableInboxRow>(rows: T[]): T[] {
 
 /** 그룹 헤더 순서는 "내가 지금 해야 하는 것" 우선(pending → approved → rejected → expired).
  *  빈 그룹은 헤더도 만들지 않는다 — 데이터 없는 섹션은 소음이다. */
-const APPROVAL_GROUP_ORDER: ApprovalPillState[] = ["pending", "approved", "rejected", "expired"];
+const APPROVAL_GROUP_ORDER: ApprovalPillState[] = [
+  "pending",
+  "approved",
+  "responded",
+  "rejected",
+  "failed",
+  "expired",
+];
 
 export function groupByApprovalState<T extends { approvalState: ApprovalPillState | null }>(
   rows: T[],
@@ -215,12 +223,15 @@ interface ThreadRow extends InboxQueryItem, ArchivableRow, SortableInboxRow {
   channel: UiChannel;
   timestamp: string;
   unread: boolean;
+  unreadCount: number;
   labels: LabelChip[];
   avatar: RowAvatar;
 }
 
 /** Virtuoso는 평평한 배열만 받는다 — 그룹 헤더와 행을 한 스트림으로 접은 것. */
-type FlatItem = { kind: "header"; key: string; pill: ReactNode } | { kind: "row"; row: ThreadRow };
+type FlatItem =
+  | { kind: "header"; key: string; count: number; pill: ReactNode }
+  | { kind: "row"; row: ThreadRow };
 
 export function Inbox({
   onOpen,
@@ -265,10 +276,14 @@ export function Inbox({
       .limit(200),
   );
   const [accounts] = useQuery(zero.query.accounts);
-  // US-D02: 예전엔 .where("state","=","pending")이라 지금 대기 중인 건만 알고 있었다.
-  // 그룹 헤더가 pending/approved/rejected/expired를 나눠 그리려면 라이프사이클 전체가 필요해
-  // 필터를 뗀다(승인은 스레드당 소수라 상한을 새로 걸지 않는다 — 원래도 없었다).
-  const [pendingApprovals] = useQuery(zero.query.pending_approvals);
+  // 이름 그대로 "대기 중"만 받는다. 라이프사이클 전체를 복제하면 클라이언트 쪽 승인 테이블이
+  // 상한 없이 자라는데, 인박스가 실제로 묻는 건 "지금 내 결정을 기다리는 게 뭐냐" 하나다.
+  const [pendingApprovals] = useQuery(
+    zero.query.pending_approvals
+      .where("state", "=", "pending")
+      .orderBy("created_at", "desc")
+      .limit(200),
+  );
   const [labels] = useQuery(zero.query.labels);
   const [threadLabels] = useQuery(zero.query.thread_labels);
   const [agentSessions] = useQuery(zero.query.agent_sessions);
@@ -278,20 +293,12 @@ export function Inbox({
     () => new Map(accounts.map((a) => [a.id, a.channel as UiChannel])),
     [accounts],
   );
-  // US-D02: 스레드당 "가장 볼 만한" 승인 한 건. 대기 중인 게 있으면 그게 우선(사용자가 지금
-  // 행동해야 하는 것)이고, 없으면 가장 최근에 만들어진 건이다. hasPendingApproval도 여기서
-  // 파생된다 — 대기가 최우선이라 "대기 건이 하나라도 있으면 pending"이라는 예전 Set 의미와 같다.
+  // 스레드당 승인 한 건(가장 최근 것). 쿼리가 created_at desc라 첫 등장이 곧 최신이다.
   const approvalByThread = useMemo(() => {
-    const rank = (state: string) => (state === "pending" ? 1 : 0);
     const best = new Map<string, (typeof pendingApprovals)[number]>();
     for (const approval of pendingApprovals) {
       if (!approval.thread_id) continue;
-      const prev = best.get(approval.thread_id);
-      const wins =
-        !prev ||
-        rank(approval.state) > rank(prev.state) ||
-        (rank(approval.state) === rank(prev.state) && approval.created_at > prev.created_at);
-      if (wins) best.set(approval.thread_id, approval);
+      if (!best.has(approval.thread_id)) best.set(approval.thread_id, approval);
     }
     return best;
   }, [pendingApprovals]);
@@ -365,6 +372,7 @@ export function Inbox({
         channel: channelByAccount.get(item.account_id) ?? "system",
         timestamp: formatRelativeTime(item.sent_at),
         unread: (item.thread?.unread_count ?? 0) > 0,
+        unreadCount: item.thread?.unread_count ?? 0,
         labels: chipsByThread.get(item.thread_id) ?? [],
         avatar:
           runtime !== undefined ? { kind: "runtime", runtime } : { kind: "initials", name: title },
@@ -444,21 +452,21 @@ export function Inbox({
   if (channelFilter && onChannelFilterChange) {
     chips.push({
       id: "channel",
-      fieldLabel: "Channel",
-      text: `Channel is ${CHANNEL_LABEL[channelFilter]}`,
+      fieldLabel: "채널",
+      text: `채널은 ${CHANNEL_LABEL[channelFilter]}`,
       onRemove: () => onChannelFilterChange(null),
     });
   }
   if (selectedLabelIds.size > 0) {
     chips.push({
       id: "labels",
-      fieldLabel: "Label",
-      text: `Label is any of ${selectedLabelIds.size}개 라벨`,
+      fieldLabel: "라벨",
+      text: `라벨은 ${selectedLabelIds.size}개 중 하나`,
       onRemove: () => setSelectedLabelIds(new Set()),
     });
   }
   const addOptions = {
-    fieldLabel: "Label",
+    fieldLabel: "라벨",
     options: labels.map((l) => ({ id: l.id, label: l.name })),
     selectedIds: [...selectedLabelIds],
     onToggle: (id: string) =>
@@ -481,7 +489,8 @@ export function Inbox({
         {
           kind: "header" as const,
           key: `approval-${g.state}`,
-          pill: <ApprovalStatusPill state={g.state} count={g.rows.length} />,
+          count: g.rows.length,
+          pill: <ApprovalStatusPill state={g.state} />,
         },
         ...g.rows.map((row) => ({ kind: "row" as const, row })),
       ]);
@@ -493,7 +502,8 @@ export function Inbox({
         {
           kind: "header" as const,
           key: `agent-${g.state}`,
-          pill: <AgentStatusPill state={g.state} count={g.rows.length} />,
+          count: g.rows.length,
+          pill: <AgentStatusPill state={g.state} />,
         },
         ...g.rows.map((row) => ({ kind: "row" as const, row })),
       ]),
@@ -539,7 +549,7 @@ export function Inbox({
         data={listItems}
         itemContent={(_, item) =>
           item.kind === "header" ? (
-            <GroupHeader pill={item.pill} />
+            <GroupHeader pill={item.pill} count={item.count} />
           ) : (
             <InboxRow
               id={item.row.id}
@@ -551,6 +561,7 @@ export function Inbox({
               agentState={item.row.agentState}
               timestamp={item.row.timestamp}
               unread={item.row.unread}
+              unreadCount={item.row.unreadCount}
               selected={item.row.id === selectedId}
               hasPendingApproval={item.row.hasPendingApproval}
               labels={item.row.labels}

@@ -868,8 +868,12 @@ body {
 
 /* US-D02: 밀도 높은 리스트의 그룹 헤더/필터용 tinted pill — ref-issue-tracker-density.webp 실측
    (높이 28px, radius 12px, 라벨 13px/590, leading 8px 도트, trailing 카운트는 회색).
-   위 .status-badge와 달리 완전 캡슐(999px)이 아니라 모서리를 남긴다: 같은 스크린샷에서 필터 칩은
-   캡슐, 상태 pill은 라운드 렉트다 — 두 문법을 섞지 않는다. flat, 테두리·그림자 없음(레퍼런스 그대로).
+   레퍼런스 실물은 상태 pill 쪽이 완전 캡슐이고 필터 칩이 테두리 있는 라운드 렉트다(이 자리에
+   있던 예전 주석은 둘을 반대로 적어 놨었다 — 픽셀은 멀쩡했지만 다음 사람이 따라 읽을 기록이라
+   고친다). 여기서 12px 라운드를 쓰는 건 레퍼런스가 아니라 브리프의 실측 지정(28px/12px/13px)을
+   따른 것이고, .status-badge(999px 캡슐)와 굳이 같은 모양을 쓰지 않으려는 이유도 겸한다.
+   카운트는 pill 밖 별도 회색 칩(.group-header__count)이다 — 레퍼런스도 숫자를 pill에서 뺀다.
+   flat, 테두리·그림자 없음(레퍼런스 그대로).
    톤 배경·라벨 둘 다 color-mix가 아니라 상대 색상 문법(oklch(from … L c h))으로 만든다.
    color-mix(in oklch, 톤, --bg-elevated)는 색상각까지 보간해서 hue를 돌려버린다: --bg-elevated가
    h260이라 warn(h80)은 정확히 180° 반대 → 청록, danger(h25)·success(h150)은 각각 자홍·파랑으로
@@ -944,7 +948,23 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px 6px;
+  /* 위 20px / 아래 6px. 필터 칩 줄과 붙어 있으면 헤더가 "네 번째 필터 칩"으로 읽힌다 —
+     위쪽 여백이 행 간격(12px)보다 커야 앞 묶음이 끝났다는 신호가 된다. */
+  padding: 20px 16px 6px;
+}
+
+/* 레퍼런스의 "In review [6] +" 중 [6] — pill 밖 중립 회색 칩이다. 톤 컬러는 pill이 다 쓰고
+   숫자는 밀도만 담당한다. */
+.group-header__count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  text-align: center;
 }
 
 /* 호버 채움은 --state-hover로 통일 — 인박스의 다른 인터랙티브 요소 4곳과 같은 토큰이다.
@@ -967,14 +987,19 @@ body {
     var(--ease-spring);
 }
 
-.group-header__add:hover {
+.group-header__add:hover,
+.group-header__add:focus-visible {
   background: var(--state-hover);
   color: var(--text-primary);
 }
+.group-header__add:active {
+  transform: scale(0.94);
+}
 
 /* US-D02: 필터 칩 바 — 리스트 헤더 바로 아래, 행들 위에 얹힌다. 칩은 캡슐(999px)이 아니라
-   모서리를 남긴 8px 라운드다(ref-issue-tracker-density.webp: 필터 칩 = 라운드 렉트,
-   상태 pill = 캡슐 — 두 문법을 섞지 않는다). 채움은 강조색 8% 틴트 하나로 끝낸다. */
+   모서리를 남긴 8px 라운드에 테두리가 있는 렉트다(ref-issue-tracker-density.webp 실물 그대로).
+   상태 pill(틴트만, 테두리 없음)과 모양·채움을 둘 다 다르게 둬서 두 문법이 안 섞이게 한다.
+   채움은 강조색 8% 틴트 하나로 끝낸다. */
 .filter-chip-bar {
   display: flex;
   flex-wrap: wrap;
@@ -1005,9 +1030,13 @@ body {
   transition: background var(--dur-base) var(--ease-spring), color var(--dur-base)
     var(--ease-spring);
 }
-.filter-chip button:hover {
+.filter-chip button:hover,
+.filter-chip button:focus-visible {
   background: var(--state-hover);
   color: var(--text-primary);
+}
+.filter-chip button:active {
+  transform: scale(0.9);
 }
 .filter-chip-bar__add {
   border: var(--hairline);
@@ -1021,9 +1050,13 @@ body {
   transition: background var(--dur-base) var(--ease-spring), color var(--dur-base)
     var(--ease-spring);
 }
-.filter-chip-bar__add:hover {
+.filter-chip-bar__add:hover,
+.filter-chip-bar__add:focus-visible {
   background: var(--state-hover);
   color: var(--text-primary);
+}
+.filter-chip-bar__add:active {
+  transform: scale(0.97);
 }
 /* 칩 편집 팝오버 = 떠 있는 패널 → glass-surface(유리). 폭만 잡아 준다. */
 .filter-chip-popover {
@@ -1102,9 +1135,22 @@ body {
 }
 
 .row-hover-card__title {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   font-size: 13px;
   font-weight: 600;
+}
+/* 행에서 한 줄 ellipsis로 잘린 요약의 전문 — 이 카드의 본문이다. 5줄에서 끊는 건 카드가
+   상세 패널로 자라지 않게 하려는 것(레퍼런스 카드도 3줄짜리 제목에서 멈춘다). */
+.row-hover-card__summary {
+  margin: 0 0 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  line-clamp: 5;
+  overflow: hidden;
 }
 .row-hover-card__meta {
   display: grid;
