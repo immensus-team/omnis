@@ -39,10 +39,11 @@ async function check(name: string, fn: () => Promise<string | undefined>): Promi
   }
 }
 
-/** run.ts zeroes `.tmp/assertions.json` before the run and phase-a.spec.ts writes its own list over
- *  the top in its afterAll. Appending rather than writing is what keeps the two from clobbering each
- *  other — with `workers: 1` the files run one after another, so this read-modify-write is the whole
- *  synchronisation it needs. */
+/** run.ts zeroes `.tmp/assertions.json` before the run, and both specs append to it: this one and
+ *  phase-a.spec.ts each read the file, add their own list and write it back. Appending rather than
+ *  writing is what keeps the two from clobbering each other — with `workers: 1` the files run one
+ *  after another, so this read-modify-write is the whole synchronisation it needs. (This spec runs
+ *  first; if phase-a were ever changed back to a plain write it would take these rows with it.) */
 test.afterAll(() => {
   const file = join(E2E_DIR, ".tmp", "assertions.json");
   let existing: Assertion[] = [];

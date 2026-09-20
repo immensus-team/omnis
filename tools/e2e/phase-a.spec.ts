@@ -48,9 +48,22 @@ async function hubApprovals(state: string): Promise<{ id: string; state: string 
   return ((await res.json()) as { approvals: { id: string; state: string }[] }).approvals;
 }
 
+/** run.ts zeroes `.tmp/assertions.json` before the run, and both specs then contribute to it: this
+ *  one and aurora.spec.ts each read the file, add their own list and write it back. `workers: 1`
+ *  makes the files run one after another in testMatch order, so this read-modify-write is the whole
+ *  synchronisation it needs — but it has to be a read-modify-write on *both* sides. aurora.spec.ts
+ *  runs first (alphabetical), so a plain write here dropped its 15 US-D06 assertions on the floor:
+ *  the report carried this file's 15 rows and none of the aurora evidence. */
 test.afterAll(() => {
+  const file = join(E2E_DIR, ".tmp", "assertions.json");
+  let existing: Assertion[] = [];
+  try {
+    existing = JSON.parse(readFileSync(file, "utf8")) as Assertion[];
+  } catch {
+    // No file yet (this spec ran first) — there is nothing to append to.
+  }
   mkdirSync(join(E2E_DIR, ".tmp"), { recursive: true });
-  writeFileSync(join(E2E_DIR, ".tmp", "assertions.json"), JSON.stringify(results, null, 2));
+  writeFileSync(file, JSON.stringify([...existing, ...results], null, 2));
 });
 
 test("Phase A seeded smoke", async ({ page }) => {
