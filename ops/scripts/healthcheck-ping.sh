@@ -9,6 +9,7 @@ NTFY_URL="${OMNIS_NTFY_URL:-http://127.0.0.1:2586}"
 DATABASE_URL="${DATABASE_URL:-postgres://vigor@127.0.0.1:5432/omnis}"
 
 # slug|check_cmd|tier(critical|warning) — A6 §8 표 그대로. check_cmd는 성공하면 exit 0.
+# check_cmd 자체가 '|'(파이프)를 품으므로 `IFS='|' read`로 자르면 안 된다 — 양 끝에서 깎는다(parse_job).
 JOBS=(
   "omnis-hub|curl -fsS -m 5 http://127.0.0.1:8787/health|critical"
   "omnis-postgres|psql \"\$DATABASE_URL\" -Atc 'select 1' | grep -q 1|critical"
@@ -26,6 +27,13 @@ JOBS=(
   "omnis-backup-restic|true|critical"
   "omnis-tailscale-serve|bash \"\$(dirname \"\$0\")/../mini/tailscale-serve.sh\" --check|critical"
 )
+
+# slug는 첫 필드, tier는 마지막 필드, 나머지 전부가 cmd다(cmd 안의 파이프를 보존한다).
+parse_job() {
+  job_slug="${1%%|*}"
+  job_tier="${1##*|}"
+  job_cmd="${1#*|}"; job_cmd="${job_cmd%|*}"
+}
 
 post_ntfy() {
   local topic="$1" title="$2" msg="$3"
@@ -63,12 +71,13 @@ run_check() {
   post_ntfy "omnis-$tier" "$slug failed" "check failed: $cmd"
   post_system_item "$slug 실패" "healthcheck '$slug' 실패 ($tier)"
   echo "FAIL: $slug" >&2
+  return 1
 }
 
 do_check() {
   local missing=0
   for job in "${JOBS[@]}"; do
-    IFS='|' read -r slug _cmd _tier <<< "$job"
+    parse_job "$job"; local slug="$job_slug"
     kc "omnis.healthchecks.$slug" >/dev/null 2>&1 || { echo "no healthchecks uuid for $slug (will run check but skip ping)"; missing=$((missing+1)); }
   done
   echo "ok: ${#JOBS[@]} jobs configured, $missing missing a healthchecks.io uuid"
@@ -77,15 +86,23 @@ do_check() {
 do_run() {
   local failures=0
   for job in "${JOBS[@]}"; do
-    IFS='|' read -r slug cmd tier <<< "$job"
-    run_check "$slug" "$cmd" "$tier" || failures=$((failures+1))
+    parse_job "$job"
+    run_check "$job_slug" "$job_cmd" "$job_tier" || failures=$((failures+1))
   done
   echo "ran ${#JOBS[@]} checks, $failures failed"
   [ "$failures" -eq 0 ]
 }
 
+do_list() {
+  for job in "${JOBS[@]}"; do
+    parse_job "$job"
+    printf '%s\t%s\n' "$job_slug" "$job_tier"
+  done
+}
+
 case "${1:---check}" in
   --check) do_check ;;
   --run) do_run ;;
-  *) echo "usage: healthcheck-ping.sh [--check|--run]" >&2; exit 64 ;;
+  --list) do_list ;;
+  *) echo "usage: healthcheck-ping.sh [--check|--run|--list]" >&2; exit 64 ;;
 esac
