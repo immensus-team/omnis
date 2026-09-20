@@ -1,6 +1,6 @@
 {
   "scenario": "conversation_reply_in_sent_items_folder",
-  "note": "Our own reply, synced out of Sent Items. The adapter reads no folder fields, so it is reported as a received item like any other (Gmail/Outlook 둘 다 동일).",
+  "note": "Our own reply, synced out of Sent Items. The adapter reads no folder fields, so it is reported as a received item like any other (same for both Gmail and Outlook).",
   "raw": {
     "id": "AAMkAGI1msg014",
     "conversationId": "AAQkAGI1conv010",

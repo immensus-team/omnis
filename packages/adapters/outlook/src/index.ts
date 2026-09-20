@@ -60,11 +60,12 @@ function addr(a?: GraphAddress): { externalId: string; displayName: string } | n
   return { externalId: email, displayName: a?.emailAddress?.name || email };
 }
 
-/** receivedDateTime이 깨진 메시지(스팸, 게이트웨이 경유, 또는 직렬화 과정에서 빈 문자열이 된 경우)는
- *  toISOString()이 RangeError를 던진다 — normalize()는 backfill()/subscribe() 루프 안에서 메시지마다
- *  불리므로 그 메시지 하나가 스트림 전체를 죽인다. Graph가 함께 주는 sentDateTime으로, 그것도 못 쓰면
- *  now()로 물러난다(Gmail의 internalDate 폴백과 같은 원칙). 살아남은 Date는 밀리초가 없을 수 있으므로
- *  (`...20Z`) `.SSSZ` 형태로 왕복 정규화한다 — NormalizedItem 계약이 기대하는 포맷이다. */
+/** A message with a broken receivedDateTime (spam, gateway relays, or an empty string left over from
+ *  serialization) makes toISOString() throw a RangeError — normalize() runs per message inside the
+ *  backfill()/subscribe() loop, so that one message kills the whole stream. Fall back to the
+ *  sentDateTime Graph sends alongside it, and to now() if that is unusable too (same principle as
+ *  Gmail's internalDate fallback). A surviving Date may carry no milliseconds (`...20Z`), so round-trip
+ *  it into the `.SSSZ` form the NormalizedItem contract expects. */
 function parseSentAt(receivedDateTime?: string, sentDateTime?: string): string {
   const parsed = [receivedDateTime, sentDateTime]
     .map((s) => (s ? new Date(s) : null))

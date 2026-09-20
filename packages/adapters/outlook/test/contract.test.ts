@@ -38,22 +38,23 @@ describe("Outlook contract: fixture replay", () => {
   }
 });
 
-// payload별 기대값(위 블록)과 별개로, 어떤 payload에서 나왔든 item이 갖춰야 할 성질을 본다.
-// payload가 늘어날 때 "정규화는 됐지만 쓸 수 없는 item"(스레드에 못 붙거나, 시각이 깨졌거나,
-// 본문도 첨부도 없는 item)이 조용히 섞여 들어오는 걸 막는 그물 — fixtures 는 계속 늘어난다.
+// Separate from the per-payload expectations above, this checks the properties every item must have
+// no matter which payload produced it — a net against "normalized but unusable" items (one that will
+// not attach to a thread, has a broken timestamp, or has neither body nor attachments) quietly
+// slipping in as fixtures keep growing.
 describe("Outlook contract: invariants on every normalized item", () => {
   for (const { file, fixture } of itemFixtures) {
     it(`${fixture.scenario} (${file})`, () => {
       const items = normalize(fixture.raw);
 
-      // 실패한 item의 externalId를 모아서 보여준다 — 어느 메시지가 계약을 깼는지 바로 보이도록.
+      // Collect the externalIds of the failing items so it is obvious which message broke the contract.
       const bad = (predicate: (item: (typeof items)[number]) => boolean) =>
         items.filter(predicate).map((item) => item.externalId);
 
       expect(bad((item) => !isNonEmptyString(item.externalId))).toEqual([]);
       expect(bad((item) => !isNonEmptyString(item.threadExternalId))).toEqual([]);
       expect(bad((item) => !isParsableDate(item.sentAt))).toEqual([]);
-      // 어댑터는 항상 `.SSSZ`로 왕복시켜 내보낸다(src의 parseSentAt) — 폴백이 그 포맷을 깨면 여기서 걸린다.
+      // The adapter always round-trips to `.SSSZ` on the way out (parseSentAt in src) — a fallback that breaks that format gets caught here.
       expect(bad((item) => new Date(item.sentAt).toISOString() !== item.sentAt)).toEqual([]);
       expect(bad((item) => !item.author || !isNonEmptyString(item.author.kind))).toEqual([]);
       expect(
