@@ -47,6 +47,31 @@ export interface BuildAdaptersDeps {
   factories: AdapterFactories;
   logger: Logger;
   recordAdapterHealth?: HealthReporter;
+  /** Ceiling for a single `connect()`. See connectWithTimeout. */
+  connectTimeoutMs?: number;
+}
+
+// ponytail: one flat ceiling for every channel. gmail/outlook connect() reads the Keychain (a
+// `security` subprocess that blocks while the keychain is locked) and then refreshes a token over
+// the network; 15s is far beyond a healthy connect and far below a LaunchDaemon's tolerance.
+const DEFAULT_CONNECT_TIMEOUT_MS = 15_000;
+
+/** A connect() can hang instead of rejecting, and buildAdapters runs before listen() — an
+ *  unanswered one would keep /health from ever coming up (no listener, no signal handlers). Expiry
+ *  behaves exactly like a rejection, so the caller keeps one failure path rather than two. */
+async function connectWithTimeout(adapter: Adapter, auth: AuthRef, ms: number): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    await Promise.race([
+      adapter.connect(auth),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`connect timed out after ${ms}ms`)), ms);
+      }),
+    ]);
+  } finally {
+    // Without this the timer keeps the event loop alive for the full 15s after a fast connect.
+    clearTimeout(timer);
+  }
 }
 
 /** The registry's input: every account row plus its Keychain item name (A3-D4 — never the value).
@@ -81,6 +106,7 @@ async function reportHealth(
 
 export async function buildAdapters(deps: BuildAdaptersDeps): Promise<BoundAdapter[]> {
   const { accounts, factories, logger } = deps;
+  const connectTimeoutMs = deps.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
   const out: BoundAdapter[] = [];
   for (const a of accounts) {
     if (a.state !== "active") {
@@ -110,7 +136,7 @@ export async function buildAdapters(deps: BuildAdaptersDeps): Promise<BoundAdapt
     };
     try {
       const adapter = make();
-      await adapter.connect(auth);
+      await connectWithTimeout(adapter, auth, connectTimeoutMs);
       out.push({ accountId: a.id, channel: a.channel as Channel, adapter });
     } catch (e) {
       // If one account's expired token blocked hub startup, every other channel would die with it.

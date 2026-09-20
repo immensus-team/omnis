@@ -64,6 +64,17 @@ const accounts: AccountRow[] = [
   { id: "a4", channel: "outlook", external_id: "me@corp.example", state: "active", auth_ref: null },
 ];
 
+/** The same account once its secret exists — the row the connect-failure paths exercise. */
+const outlookAccount: AccountRow = {
+  id: "a4",
+  channel: "outlook",
+  external_id: "me@corp.example",
+  state: "active",
+  auth_ref: "omnis.outlook.me@corp.example",
+};
+
+const never = (): Promise<void> => new Promise<void>(() => {});
+
 describe("buildAdapters", () => {
   it("returns one binding per active account that has a factory and a secret", async () => {
     const gmail = fakeAdapter();
@@ -125,15 +136,8 @@ describe("buildAdapters", () => {
           }),
         }),
     };
-    const other: AccountRow = {
-      id: "a4",
-      channel: "outlook",
-      external_id: "me@corp.example",
-      state: "active",
-      auth_ref: "omnis.outlook.me@corp.example",
-    };
     const built = await buildAdapters({
-      accounts: [...accounts, other],
+      accounts: [...accounts, outlookAccount],
       factories,
       logger,
       recordAdapterHealth,
@@ -142,6 +146,64 @@ describe("buildAdapters", () => {
     expect(recordAdapterHealth).toHaveBeenCalledWith(
       expect.objectContaining({ accountId: "a4", channel: "outlook", status: "down" }),
     );
+  });
+
+  // A connect() can hang rather than reject: a Keychain read blocking on a locked keychain, an OAuth
+  // endpoint that accepts the socket and never answers. buildAdapters runs before listen(), so an
+  // unanswered connect() keeps /health from ever coming up.
+  it("times out a connect() that never resolves and still builds the other accounts", async () => {
+    vi.useFakeTimers();
+    try {
+      const recordAdapterHealth = vi.fn(async () => {});
+      const factories: AdapterFactories = {
+        gmail: () => fakeAdapter(),
+        outlook: () => fakeAdapter({ connect: vi.fn(never) }),
+      };
+      const pending = buildAdapters({
+        accounts: [...accounts, outlookAccount],
+        factories,
+        logger,
+        recordAdapterHealth,
+        connectTimeoutMs: 1_000,
+      });
+      await vi.advanceTimersByTimeAsync(1_000);
+      const built = await pending;
+      expect(built.map((b) => b.accountId)).toEqual(["a1"]);
+      expect(recordAdapterHealth).toHaveBeenCalledWith({
+        accountId: "a4",
+        channel: "outlook",
+        status: "down",
+        error: "connect timed out after 1000ms",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("defaults the connect timeout to 15s when the dep is omitted", async () => {
+    vi.useFakeTimers();
+    try {
+      const recordAdapterHealth = vi.fn(async () => {});
+      let settled = false;
+      const pending = buildAdapters({
+        accounts: [outlookAccount],
+        factories: { outlook: () => fakeAdapter({ connect: vi.fn(never) }) },
+        logger,
+        recordAdapterHealth,
+      }).then((b) => {
+        settled = true;
+        return b;
+      });
+      await vi.advanceTimersByTimeAsync(14_999);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(pending).resolves.toEqual([]);
+      expect(recordAdapterHealth).toHaveBeenCalledWith(
+        expect.objectContaining({ error: "connect timed out after 15000ms" }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   // Reporting health is best effort: a failing report (ntfy down, DB blip) must not take the hub down.
