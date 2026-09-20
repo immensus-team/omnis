@@ -1,4 +1,10 @@
-// Phase A 종단 스모크의 UI 단. 스택은 tools/e2e/run.ts가 이미 띄워 놓았다.
+// The UI half of the Phase A end-to-end smoke. tools/e2e/run.ts has already brought the stack up.
+//
+// NOTE ON KOREAN STRINGS BELOW (glossed exception): Playwright locators here match text the app
+// actually renders, and the desktop UI is still Korean because packages/ui/src/i18n/ko.ts is the
+// active locale. Each such locator is marked `// ui-copy: still Korean in packages/ui`. They must
+// move together with the UI-shard translation, never before it, or this smoke breaks silently.
+// Everything else in this file — check names, notes, seed-derived text — is English.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Page, expect, test } from "@playwright/test";
@@ -42,7 +48,7 @@ function shot(page: Page, file: string): Promise<Buffer> {
   return page.screenshot({ path: join(EVIDENCE, file), fullPage: false });
 }
 
-/** 허브 HTTP는 데스크톱과 같은 127.0.0.1 경계다 — 승인 상태 확인은 여기로 한다(계약 §5). */
+/** Hub HTTP sits on the same 127.0.0.1 boundary as the desktop app — approval state is read here (contract §5). */
 async function hubApprovals(state: string): Promise<{ id: string; state: string }[]> {
   const res = await fetch(`http://127.0.0.1:8787/approvals?state=${state}`);
   return ((await res.json()) as { approvals: { id: string; state: string }[] }).approvals;
@@ -59,7 +65,7 @@ test("Phase A seeded smoke", async ({ page }) => {
   await expect(rows.first()).toBeVisible({ timeout: 30_000 });
 
   await check(
-    "A1 Inbox lists one row per seeded thread (U2: 행이 item이 아니라 thread 단위)",
+    "A1 Inbox lists one row per seeded thread (U2: rows are per thread, not per item)",
     async () => {
       const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
       let expectedThreads: number;
@@ -72,15 +78,17 @@ test("Phase A seeded smoke", async ({ page }) => {
       } finally {
         await pool.end();
       }
-      // Zero의 초기 싱크는 점진적이다 — 시드가 만든 스레드 수가 다 찰 때까지 기다린다.
+      // Zero's initial sync is incremental — wait until the seeded thread count is fully replicated.
       await expect.poll(() => rows.count(), { timeout: 30_000 }).toBe(expectedThreads);
       return `${expectedThreads} thread rows (item count was ${SEED.itemCount})`;
     },
   );
 
-  // 접근성 이름만 보면 빈 div도 통과한다(실제로 그랬다 — 앞 커밋의 fix(desktop) 참고).
-  // U2부터 채널 아이콘은 모노그램 텍스트가 아니라 실제 react-icons/si SVG다 — "보이는 무언가가
-  // 있다"는 주장은 이제 svg 자식 노드 존재 + non-zero bounding box로 확인한다.
+  // Checking the accessible name alone lets an empty div pass (that actually happened — see the
+  // fix(desktop) commit). Since U2 the channel icons are real react-icons/si SVGs rather than
+  // monogram text, so "there is something visible" is now confirmed by an svg child node plus a
+  // non-zero bounding box.
+  // ui-copy: still Korean in packages/ui (channel icon aria-labels).
   const CHANNEL_LABELS = ["Slack 메시지", "Gmail 메시지", "Google Calendar 메시지"];
   await check("A2 Inbox rows show a visible channel icon for all three channels", async () => {
     for (const label of CHANNEL_LABELS) {
@@ -99,8 +107,8 @@ test("Phase A seeded smoke", async ({ page }) => {
     return CHANNEL_LABELS.join(" / ");
   });
 
-  // 시드 행의 제목은 스레드 제목이다 — Phase A는 author_person_id를 안 채우고 Slack에는
-  // subject가 없어서, 이 검증이 없으면 모든 행이 "(제목 없음)"이어도 A1이 통과한다.
+  // A seeded row's title is the thread title — Phase A leaves author_person_id unfilled and Slack
+  // has no subject, so without this check A1 would still pass when every row reads "(no title)".
   await check("A2b Inbox rows show the seeded thread titles", async () => {
     for (const title of ["#omnis-launch", "omnis launch sync"]) {
       await expect(page.getByText(title, { exact: true }).first()).toBeVisible({ timeout: 15_000 });
@@ -109,13 +117,16 @@ test("Phase A seeded smoke", async ({ page }) => {
   });
 
   await check("A3 Inbox rows carry label chips", async () => {
+    // ui-copy: still Korean in packages/ui (label chip aria-labels).
     await expect(page.getByLabel("scope 라벨: work").first()).toBeVisible();
     await expect(page.getByLabel("topic 라벨: launch").first()).toBeVisible();
   });
 
-  // U1/U2 셸 크롬: kinso 레퍼런스의 두 고정 요소(왼쪽 채널 레일, 상단 ask/search 필바)가
-  // 실제로 떠 있는지 본다 — 01-inbox.png가 "kinso처럼 보인다"는 주장의 절반이 이 둘이다.
+  // U1/U2 shell chrome: confirm the two fixed elements of the kinso reference (the left channel
+  // rail and the top ask/search bar) are really rendered — they are half of what the
+  // "looks like kinso" claim in 01-inbox.png rests on.
   await check("A2c kinso shell: channel rail tiles + ask/search bar", async () => {
+    // ui-copy: still Korean in packages/ui (channel rail nav aria-label).
     const rail = page.getByRole("navigation", { name: "채널" });
     await expect(rail).toBeVisible();
     for (const tile of ["Inbox", "Slack", "Gmail", "Google Calendar", "Agent"]) {
@@ -125,14 +136,15 @@ test("Phase A seeded smoke", async ({ page }) => {
     return "rail: Inbox/Slack/Gmail/Google Calendar/Agent + ask bar";
   });
 
-  // 행 해부(U2): 아바타 · 이름 · 상대시간 · AI 한 줄 요약이 한 행 안에 다 있는지.
-  // A1/A2/A2b는 각각 개수·아이콘·제목만 보므로, 요약 줄이 통째로 빠져도 전부 통과한다.
+  // Row anatomy (U2): whether avatar, name, relative time and the AI one-line summary are all
+  // present in a single row. A1/A2/A2b only check count, icons and title respectively, so they
+  // would all still pass with the summary line missing entirely.
   await check("A2d a conversation row has avatar + name + relative time + summary", async () => {
     const row = rows.first();
     await expect(row.locator(".inbox-row__avatar")).toHaveCount(1);
     await expect(row.locator(".inbox-row__name")).not.toBeEmpty();
     const time = (await row.locator(".inbox-row__timestamp").textContent()) ?? "";
-    // formatRelativeTime의 출력 문법: now / 3m / 2w / 4 Aug (절대 ISO 타임스탬프가 아니다).
+    // The output grammar of formatRelativeTime: now / 3m / 2w / 4 Aug (never an absolute ISO timestamp).
     if (!/^(now|\d+[mhdw]|\d{1,2} [A-Za-z]{3}( \d{4})?)$/.test(time.trim())) {
       throw new Error(`timestamp "${time}" is not a kinso relative time`);
     }
@@ -142,9 +154,10 @@ test("Phase A seeded smoke", async ({ page }) => {
   });
   await shot(page, "01-inbox.png");
 
-  // U2부터 행이 item이 아니라 thread 단위라 "work와 personal의 개수가 다르다"는 더 이상
-  // 보장되지 않는다(시드는 work 스레드 1개 · personal 스레드 1개다) — 개수 대신 신원을 본다:
-  // 두 필터의 행 집합은 겹치지 않고, 둘 다 all의 진부분집합이다.
+  // Since U2 rows are per thread rather than per item, "work and personal have different counts"
+  // is no longer guaranteed (the seed has one work thread and one personal thread) — so check
+  // identity instead of counts: the two filters' row sets do not overlap and both are proper
+  // subsets of all.
   await check("A4 work/personal filter pills change the list", async () => {
     const names = async (): Promise<string[]> =>
       (await rows.locator(".inbox-row__name").allTextContents()).map((n) => n.trim()).sort();
@@ -163,16 +176,18 @@ test("Phase A seeded smoke", async ({ page }) => {
     return `all=${all.length} work=[${work.join(", ")}] personal=[${personal.join(", ")}]`;
   });
 
-  // 레일 타일도 필터다(U1: 레일 선택 AND pill 필터) — 클릭 한 번이 실제로 목록을 좁히는지.
+  // The rail tiles are filters too (U1: rail selection AND pill filter) — check that one click actually narrows the list.
   await check("A4b channel rail tile filters the list, Inbox tile restores it", async () => {
     const all = await rows.count();
     await page
+      // ui-copy: still Korean in packages/ui (channel rail nav aria-label).
       .getByRole("navigation", { name: "채널" })
       .getByRole("button", { name: "Gmail" })
       .click();
     await expect.poll(() => rows.count()).toBeLessThan(all);
     const gmail = await rows.count();
     await page
+      // ui-copy: still Korean in packages/ui (channel rail nav aria-label).
       .getByRole("navigation", { name: "채널" })
       .getByRole("button", { name: "Inbox" })
       .click();
@@ -184,7 +199,9 @@ test("Phase A seeded smoke", async ({ page }) => {
   await page.getByRole("radio", { name: "all", exact: true }).click();
 
   await check("A5 Thread screen renders seeded items with status badges", async () => {
-    // 초안 행은 sent_at=now()라 목록 맨 위에 있다 — Virtuoso 스크롤 없이 바로 누를 수 있다.
+    // The draft row has sent_at=now(), so it sits at the top of the list — clickable without
+    // scrolling Virtuoso.
+    // ui-copy: "초안:" prefix is still Korean in packages/ui (i18n draftPrefix).
     await rows.filter({ hasText: "초안:" }).first().click();
     const detail = page.getByTestId("detail-pane");
     await expect(detail.locator(".status-badge").first()).toBeVisible({ timeout: 20_000 });
@@ -196,7 +213,7 @@ test("Phase A seeded smoke", async ({ page }) => {
   await shot(page, "03-thread.png");
 
   await check("A6 Agent Session screen shows turns and a ToolCallBadge", async () => {
-    await rows.filter({ hasText: "✓ 턴 완료" }).first().click();
+    await rows.filter({ hasText: "✓ Turn completed" }).first().click();
     const detail = page.getByTestId("detail-pane");
     await expect(detail.locator(".tool-call-badge").first()).toBeVisible({ timeout: 20_000 });
     await expect(detail.locator(".agent-session-screen__turn").first()).toBeVisible();
@@ -206,18 +223,19 @@ test("Phase A seeded smoke", async ({ page }) => {
 
   await check("A7 Approval card shows the pending approval", async () => {
     await expect(page.locator(".approval-card").first()).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText("#omnis-launch에 답장을 보낼까요?")).toBeVisible();
+    await expect(page.getByText("Reply to #omnis-launch?")).toBeVisible();
     const pending = await hubApprovals("pending");
     expect(pending.map((a) => a.id)).toContain(SEED.approvalId);
   });
-  // 04와 같은 전체 화면을 또 찍으면 바이트까지 같은 PNG가 나온다(승인 카드가 두 프레임에
-  // 모두 떠 있다) — 카드 자체만 찍어 서로 다른 정보를 남긴다.
+  // Taking the same full screen as 04 again would produce a byte-identical PNG (the approval card
+  // shows in both frames) — shoot just the card so the two images carry different information.
   await page
     .locator(".approval-card")
     .first()
     .screenshot({ path: join(EVIDENCE, "05-approval-card.png") });
 
   await check("A8 Approve → hub moves the approval to decided", async () => {
+    // ui-copy: the approve button label is still Korean in packages/ui.
     await page.getByRole("button", { name: "승인", exact: true }).first().click();
     await expect
       .poll(async () => (await hubApprovals("decided")).map((a) => a.id), { timeout: 20_000 })
@@ -227,56 +245,64 @@ test("Phase A seeded smoke", async ({ page }) => {
 
   await check("A9 ⌘K opens the command palette", async () => {
     await page.keyboard.press("Meta+k");
+    // ui-copy: the palette placeholder is still Korean in packages/ui.
     await expect(page.getByPlaceholder("검색 또는 명령…")).toBeVisible();
   });
   await shot(page, "06-command-palette.png");
   await page.keyboard.press("Escape");
 
-  // US-A36: 보관은 승인 게이트를 타지 않는 로컬 상태 전이다 — UI에서 사라지는 것과 허브가
-  // 실제로 threads.archived_at + audit_log를 쓴 것을 둘 다 본다(UI만 보면 낙관적 갱신에 속는다).
-  await check("A-archive 행 보관 → 목록에서 사라지고, 되살리면 돌아온다", async () => {
-    await page.getByRole("radio", { name: "all", exact: true }).click();
-    const before = await rows.count();
-    const target = rows.first();
-    const name = ((await target.locator(".inbox-row__name").textContent()) ?? "").trim();
-    await target.hover();
-    await target.getByRole("button", { name: "보관", exact: true }).click();
-    await expect.poll(() => rows.count(), { timeout: 20_000 }).toBe(before - 1);
+  // US-A36: archiving is a local state transition that does not go through an approval gate —
+  // check both that it disappears from the UI and that the hub really wrote threads.archived_at +
+  // audit_log (watching the UI alone would be fooled by an optimistic update).
+  await check(
+    "A-archive archive a row → it leaves the list and returns when restored",
+    async () => {
+      await page.getByRole("radio", { name: "all", exact: true }).click();
+      const before = await rows.count();
+      const target = rows.first();
+      const name = ((await target.locator(".inbox-row__name").textContent()) ?? "").trim();
+      await target.hover();
+      // ui-copy: the archive button label is still Korean in packages/ui.
+      await target.getByRole("button", { name: "보관", exact: true }).click();
+      await expect.poll(() => rows.count(), { timeout: 20_000 }).toBe(before - 1);
 
-    const archivedPill = page.getByRole("button", { name: "보관됨", exact: true });
-    await archivedPill.click();
-    const archivedRow = rows.filter({ hasText: name }).first();
-    await expect(archivedRow).toBeVisible({ timeout: 20_000 });
-    await shot(page, "08-archived.png");
+      // ui-copy: the archived pill label is still Korean in packages/ui.
+      const archivedPill = page.getByRole("button", { name: "보관됨", exact: true });
+      await archivedPill.click();
+      const archivedRow = rows.filter({ hasText: name }).first();
+      await expect(archivedRow).toBeVisible({ timeout: 20_000 });
+      await shot(page, "08-archived.png");
 
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
-    try {
-      const { count } = await one<{ count: string }>(
-        pool,
-        "SELECT count(*) AS count FROM threads WHERE archived_at IS NOT NULL",
-      );
-      expect(Number(count)).toBeGreaterThanOrEqual(1);
-      await archivedRow.hover();
-      await archivedRow.getByRole("button", { name: "되살리기", exact: true }).click();
-      await archivedPill.click(); // Inbox 뷰로 복귀
-      await expect.poll(() => rows.count(), { timeout: 20_000 }).toBe(before);
-      const { actions } = await one<{ actions: string }>(
-        pool,
-        "SELECT string_agg(DISTINCT action, ',' ORDER BY action) AS actions FROM audit_log WHERE action LIKE 'thread.%archived'",
-      );
-      expect(actions).toBe("thread.archived,thread.unarchived");
-    } finally {
-      await pool.end();
-    }
-    return `"${name}" archived → restored (${before} rows), audit_log 2종 기록`;
-  });
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+      try {
+        const { count } = await one<{ count: string }>(
+          pool,
+          "SELECT count(*) AS count FROM threads WHERE archived_at IS NOT NULL",
+        );
+        expect(Number(count)).toBeGreaterThanOrEqual(1);
+        await archivedRow.hover();
+        // ui-copy: the restore button label is still Korean in packages/ui.
+        await archivedRow.getByRole("button", { name: "되살리기", exact: true }).click();
+        await archivedPill.click(); // back to the Inbox view
+        await expect.poll(() => rows.count(), { timeout: 20_000 }).toBe(before);
+        const { actions } = await one<{ actions: string }>(
+          pool,
+          "SELECT string_agg(DISTINCT action, ',' ORDER BY action) AS actions FROM audit_log WHERE action LIKE 'thread.%archived'",
+        );
+        expect(actions).toBe("thread.archived,thread.unarchived");
+      } finally {
+        await pool.end();
+      }
+      return `"${name}" archived → restored (${before} rows), 2 audit_log actions recorded`;
+    },
+  );
 
   await check("G5 a new item reaches the UI in ≤2s", async () => {
     await page.getByRole("radio", { name: "all", exact: true }).click();
     const marker = `G5 latency probe ${Date.now()}`;
     const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
     try {
-      await ingestOneMore(pool, marker); // 허브가 쓰는 것과 같은 커널 IngestSink
+      await ingestOneMore(pool, marker); // the same kernel IngestSink the hub uses
     } finally {
       await pool.end();
     }
@@ -284,7 +310,7 @@ test("Phase A seeded smoke", async ({ page }) => {
     await expect(page.getByText(marker)).toBeVisible({ timeout: 20_000 });
     const ms = Date.now() - ingestedAt;
     expect(ms).toBeLessThanOrEqual(2000);
-    return `${ms}ms ingest → 화면 (목표 ≤2000ms)`;
+    return `${ms}ms ingest → screen (target ≤2000ms)`;
   });
   await shot(page, "07-g5-live-item.png");
 

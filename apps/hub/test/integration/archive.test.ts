@@ -1,4 +1,4 @@
-// US-A36: POST /api/threads/:id/archive|unarchive — 행 + audit_log + durable 이벤트 + 어댑터 write-back.
+// US-A36: POST /api/threads/:id/archive|unarchive — row + audit_log + durable event + adapter write-back.
 import type { AddressInfo } from "node:net";
 import { createPool, one, query } from "@omnis/db";
 import { type Kernel, createKernel, createLogger } from "@omnis/kernel";
@@ -33,7 +33,7 @@ const fakeGmail = {
     archived.push(thread);
   },
 } as unknown as Adapter;
-// Slack은 A1 §2.1대로 archive=false다 — capability가 없으면 write-back을 건너뛴다.
+// Slack is archive=false per A1 §2.1 — without the capability, write-back is skipped.
 const fakeSlack = {
   id: "fake-slack",
   channel: "slack",
@@ -122,7 +122,7 @@ describe("POST /threads/:id/archive", () => {
         [id],
       );
       expect(Number(audit.n)).toBe(1);
-      // NOTIFY는 LISTEN 커넥션을 한 번 도니까 잠깐 기다린다.
+      // NOTIFY goes around the LISTEN connection once, so wait briefly.
       await expect.poll(() => seen.some((p) => p.id === id), { timeout: 5_000 }).toBe(true);
     } finally {
       unsubscribe();
@@ -162,7 +162,7 @@ describe("POST /threads/:id/archive", () => {
   });
 });
 
-describe("archive write-back (마스터 §7: 승인 게이트 대상이 아니다)", () => {
+describe("archive write-back (master §7: not subject to an approval gate)", () => {
   it("calls adapter.archive() when the channel declares the capability", async () => {
     const id = await makeThread("gmail", "G-archive-1");
     archived.length = 0;

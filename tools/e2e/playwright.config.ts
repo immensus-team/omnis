@@ -1,6 +1,6 @@
 import { defineConfig } from "@playwright/test";
 
-// 스택(DB·zero-cache·허브·Vite)은 tools/e2e/run.ts가 띄운다 — 여기서는 webServer를 쓰지 않는다.
+// tools/e2e/run.ts brings up the stack (DB, zero-cache, hub, Vite) — no webServer here.
 export default defineConfig({
   testDir: ".",
   testMatch: /phase-a\.spec\.ts/,

@@ -1,9 +1,10 @@
-// US-A36: 사람이 직접 누르는 스레드 보관/되살리기.
-// 마스터 §7의 승인 게이트는 send/delete/delegate/calendar_write 넷뿐이다 — 보관은 egress가 아니므로
-// pending_approvals를 만들지 않는다(A4-D3, A4 §9와 같은 근거: 되돌릴 수 있는 상태 전이다).
-// L8 자동 보관(A4 §9)은 `items.status='archived'`를 쓰지만 그건 "어떤 메일을 인박스에서 치울까"의
-// item 단위 판정이고, 여기서 사람이 치우는 단위는 스레드다(A5 §3.8의 `threads.archived_at`).
-// 둘은 같은 스레드에 공존할 수 있고 Inbox는 둘 다를 숨긴다.
+// US-A36: user-driven thread archive/unarchive.
+// The approval gates in master §7 are only send/delete/delegate/calendar_write — archiving is not
+// egress, so it creates no pending_approvals (same rationale as A4-D3 and A4 §9: a reversible
+// state transition).
+// L8 auto-archive (A4 §9) uses `items.status='archived'`, but that is a per-item decision about
+// "which mail do we clear out of the inbox"; the unit a human clears here is the thread
+// (`threads.archived_at` in A5 §3.8). Both can coexist on the same thread and Inbox hides either.
 import { query } from "@omnis/db";
 import type { Kernel, Logger } from "@omnis/kernel";
 import type { Adapter } from "@omnis/protocol";
@@ -13,8 +14,9 @@ export interface ArchiveDeps {
   pool: Pool;
   kernel: Kernel;
   logger: Logger;
-  /** 채널 → 어댑터. 허브는 아직 어댑터 레지스트리를 부팅하지 않아 main.ts는 이걸 넘기지 않는다
-   *  (Phase A는 시드/브리지로만 쓴다) — 레지스트리가 생기면 여기에 꽂으면 write-back이 켜진다. */
+  /** Channel → adapter. The hub does not boot an adapter registry yet, so main.ts passes nothing
+   *  here (Phase A uses seeding and the bridge only) — once the registry exists, plugging it in
+   *  here turns write-back on. */
   adapters?: ReadonlyMap<string, Adapter>;
 }
 
@@ -34,14 +36,15 @@ interface Row {
   after_at: Date | null;
 }
 
-/** 스레드 하나를 보관하거나 되살린다. 스레드가 없으면 null(라우트가 404로 옮긴다). */
+/** Archive or unarchive one thread. Returns null when the thread is missing (the route maps 404). */
 export async function setThreadArchived(
   deps: ArchiveDeps,
   threadId: string,
   archived: boolean,
 ): Promise<ArchiveResult | null> {
   const { pool, kernel, logger } = deps;
-  // COALESCE라 두 번 보관해도 archived_at(= 7일 undo 창의 기준)이 밀리지 않는다 — 멱등.
+  // COALESCE keeps archived_at (the anchor for the 7-day undo window) from drifting on a second
+  // archive — idempotent.
   const rows = await query<Row>(
     pool,
     `WITH before AS (SELECT id, archived_at FROM threads WHERE id = $1)
@@ -70,9 +73,10 @@ export async function setThreadArchived(
   return { id: threadId, archived_at: after, writeBack: await writeBack(deps, row, archived) };
 }
 
-/** 채널 쪽에도 보관을 반영한다. 실패해도 로컬 보관은 되돌리지 않는다(사람이 방금 누른 결과다) —
- *  대신 스레드에 system item을 남겨 조용히 사라지지 않게 한다(A5 §3.2의 오류 노출 원칙).
- *  Adapter에는 unarchive가 없으므로(protocol §Adapter) 되살리기는 로컬 전용이다. */
+/** Mirror the archive to the channel side. A failure does not roll back the local archive (the
+ *  human just pressed the button) — instead we leave a system item on the thread so it does not
+ *  vanish silently (the surface-errors principle in A5 §3.2).
+ *  Adapters have no unarchive (protocol §Adapter), so unarchiving is local-only. */
 async function writeBack(deps: ArchiveDeps, row: Row, archived: boolean): Promise<WriteBack> {
   if (!archived) return "skipped";
   const adapter = deps.adapters?.get(row.channel);
@@ -89,7 +93,7 @@ async function writeBack(deps: ArchiveDeps, row: Row, archived: boolean): Promis
        SELECT id, $1, 'system', 'received', $2, now() FROM threads WHERE account_id = $1 AND external_id = $3`,
       [
         row.account_id,
-        `${row.channel} 보관 반영 실패 — omnis에서만 보관됨: ${reason}`,
+        `${row.channel} archive write-back failed — archived in omnis only: ${reason}`,
         row.external_id,
       ],
     );
