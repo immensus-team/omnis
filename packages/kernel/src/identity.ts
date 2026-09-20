@@ -1,8 +1,9 @@
 // A3 §10 (A3-D13): handle_norm만으로 매칭한다. 표시 이름은 절대 키가 아니다.
 import { createHash } from "node:crypto";
-import { one, query } from "@omnis/db";
+import { one, query, tx } from "@omnis/db";
 import type { PoolClient } from "@omnis/db";
 import type { Channel } from "@omnis/protocol";
+import type { Pool } from "pg";
 
 const UNIT_SEPARATOR = ""; // A3 §10이 고정한 구분자(0x1f)
 
@@ -172,4 +173,144 @@ export async function resolvePerson(
     return { person_id: await followMerges(c, winner.person_id), created: false };
   }
   return { person_id: person.id, created: true };
+}
+
+async function recordIdentityAudit(
+  c: PoolClient,
+  e: { actor: string; action: string; target_id: string; before: unknown; after: unknown },
+): Promise<void> {
+  await query(
+    c,
+    `INSERT INTO audit_log (actor, action, target_table, target_id, before, after)
+       VALUES ($1, $2, 'persons', $3, $4::jsonb, $5::jsonb)`,
+    [e.actor, e.action, e.target_id, JSON.stringify(e.before), JSON.stringify(e.after)],
+  );
+}
+
+/** A3 §10 병합 (a)~(e). $from은 지우지 않는다 — tombstone으로 남겨 되돌릴 수 있게 한다. */
+export async function mergePersons(
+  pool: Pool,
+  from: string,
+  to: string,
+  actor: string,
+): Promise<void> {
+  if (from === to) throw new Error("cannot merge a person into itself");
+  await tx(pool, async (c) => {
+    const survivor = await followMerges(c, to);
+    if (survivor === from) {
+      throw new Error("cannot merge a person into itself (chain resolves back)");
+    }
+
+    await query(c, "UPDATE identities SET person_id = $2 WHERE person_id = $1", [from, survivor]);
+    await query(c, "UPDATE items SET author_person_id = $2 WHERE author_person_id = $1", [
+      from,
+      survivor,
+    ]);
+    // 체인을 평탄화한다 — 해석 1단계의 깊이 상한이 실제로 충분해지는 이유다.
+    await query(c, "UPDATE persons SET merged_into = $2 WHERE id = $1 OR merged_into = $1", [
+      from,
+      survivor,
+    ]);
+    await query(
+      c,
+      `INSERT INTO person_merges (kind, from_person_id, to_person_id, reason)
+         VALUES ('merge', $1, $2, $3)`,
+      [from, survivor, `merged by ${actor}`],
+    );
+    await recordIdentityAudit(c, {
+      actor,
+      action: "person.merged",
+      target_id: survivor,
+      before: { from },
+      after: { to: survivor },
+    });
+  });
+}
+
+/**
+ * A3 §10 분리. items 재배정은 "그 채널의 thread" 기준이다.
+ * ponytail: items에는 handle이 없어서 "이 item이 어느 identity에서 왔는지"를 사후에 복원할 수
+ * 없다. 그래서 원 person이 그 채널에 identity를 하나도 안 남기면 전부 옮기고, 하나라도 남으면
+ * A3가 지시한 대로 NULL + threads.meta.reassign_needed로 사람에게 넘긴다. items에 identity_id
+ * 컬럼이 생기면 이 분기는 사라진다.
+ */
+export async function splitIdentity(
+  pool: Pool,
+  identityId: string,
+  toPersonId: string | null,
+  actor: string,
+): Promise<void> {
+  await tx(pool, async (c) => {
+    const idn = await one<{
+      person_id: string;
+      channel: Channel;
+      display: string | null;
+      handle: string;
+    }>(c, "SELECT person_id, channel, display, handle FROM identities WHERE id = $1", [identityId]);
+    const from = idn.person_id;
+    const target =
+      toPersonId ??
+      (
+        await one<{ id: string }>(
+          c,
+          "INSERT INTO persons (display_name) VALUES ($1) RETURNING id",
+          [idn.display ?? idn.handle],
+        )
+      ).id;
+    if (target === from) throw new Error("split target equals the current person");
+
+    await query(c, "UPDATE identities SET person_id = $2 WHERE id = $1", [identityId, target]);
+
+    const remaining = await query<{ id: string }>(
+      c,
+      "SELECT id FROM identities WHERE person_id = $1 AND channel = $2",
+      [from, idn.channel],
+    );
+    const threads = await query<{ thread_id: string }>(
+      c,
+      `SELECT DISTINCT i.thread_id FROM items i
+         JOIN accounts a ON a.id = i.account_id
+        WHERE a.channel = $2 AND i.author_person_id = $1`,
+      [from, idn.channel],
+    );
+    const threadIds = threads.map((t) => t.thread_id);
+
+    if (threadIds.length > 0) {
+      if (remaining.length === 0) {
+        await query(
+          c,
+          `UPDATE items SET author_person_id = $3
+            WHERE author_person_id = $1 AND thread_id = ANY($2::uuid[])`,
+          [from, threadIds, target],
+        );
+      } else {
+        await query(
+          c,
+          `UPDATE items SET author_person_id = NULL
+            WHERE author_person_id = $1 AND thread_id = ANY($2::uuid[])`,
+          [from, threadIds],
+        );
+        await query(
+          c,
+          `UPDATE threads SET meta = meta || '{"reassign_needed":true}'::jsonb
+            WHERE id = ANY($1::uuid[])`,
+          [threadIds],
+        );
+      }
+    }
+
+    await query(
+      c,
+      `INSERT INTO person_merges (kind, from_person_id, to_person_id, identity_ids, reason)
+         VALUES ('split', $1, $2, $3::uuid[], $4)`,
+      [from, target, [identityId], `split by ${actor}`],
+    );
+    await recordIdentityAudit(c, {
+      actor,
+      action: "person.split",
+      target_id: target,
+      before: { from, identityId },
+      after: { to: target, auto_reassigned: remaining.length === 0 },
+    });
+  });
 }
