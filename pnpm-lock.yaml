@@ -249,6 +249,28 @@ importers:
         specifier: 8.11.10
         version: 8.11.10
 
+  packages/memory:
+    dependencies:
+      '@omnis/db':
+        specifier: workspace:*
+        version: link:../db
+      '@omnis/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      ai:
+        specifier: 7.0.107
+        version: 7.0.107(zod@3.25.76)
+      pg:
+        specifier: 8.13.1
+        version: 8.13.1
+    devDependencies:
+      '@types/pg':
+        specifier: 8.11.10
+        version: 8.11.10
+      vitest:
+        specifier: 2.1.9
+        version: 2.1.9(@types/node@22.7.5)(jsdom@25.0.1)
+
   packages/protocol:
     dependencies:
       zod:
