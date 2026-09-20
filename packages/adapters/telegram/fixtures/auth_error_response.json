@@ -1,0 +1,5 @@
+{
+  "scenario": "auth_error_response",
+  "raw": { "code": 401, "message": "AUTH_KEY_UNREGISTERED" },
+  "expected": { "errorKind": "auth_revoked" }
+}

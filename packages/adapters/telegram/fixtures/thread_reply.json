@@ -1,0 +1,33 @@
+{
+  "scenario": "thread_reply",
+  "raw": {
+    "id": 502,
+    "chat": { "id": 2002, "type": "group", "title": "omnis launch" },
+    "sender": { "id": 43, "firstName": "Logan" },
+    "text": "10am works",
+    "date": 1700003600
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "2002",
+        "externalId": "502",
+        "kind": "message",
+        "author": { "kind": "person", "id": "43" },
+        "body": "10am works",
+        "attachments": [],
+        "sentAt": "2023-11-14T23:13:20.000Z",
+        "status": "received",
+        "sourceHash": "2002:502",
+        "threadMeta": {
+          "externalId": "2002",
+          "kind": "group",
+          "title": "omnis launch",
+          "participants": [{ "externalId": "43", "displayName": "Logan" }],
+          "lastItemAt": "2023-11-14T23:13:20.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

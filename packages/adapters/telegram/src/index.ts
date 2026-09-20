@@ -1,4 +1,4 @@
-import type { Attachment, NormalizedItem } from "@omnis/protocol";
+import { AdapterError, type Attachment, type NormalizedItem } from "@omnis/protocol";
 
 export const CHANNEL = "telegram" as const;
 
@@ -77,4 +77,35 @@ export function normalize(raw: unknown): NormalizedItem[] {
       },
     },
   ];
+}
+
+export function mapApiError(cause: unknown): AdapterError {
+  const err = cause as { code?: number; message?: string };
+  const floodMatch = /FLOOD_WAIT_(\d+)/.exec(err.message ?? "");
+  if (err.code === 420 || floodMatch !== null) {
+    const secs = Number(floodMatch?.[1] ?? "60");
+    return new AdapterError(
+      "retryable_rate_limit",
+      CHANNEL,
+      `Telegram flood-wait: ${err.message ?? "FLOOD_WAIT"}`,
+      secs * 1000,
+      cause,
+    );
+  }
+  if (err.code === 401 || err.message === "AUTH_KEY_UNREGISTERED") {
+    return new AdapterError(
+      "auth_revoked",
+      CHANNEL,
+      "Telegram session invalidated",
+      undefined,
+      cause,
+    );
+  }
+  return new AdapterError(
+    "retryable_network",
+    CHANNEL,
+    "Telegram MTProto call failed",
+    undefined,
+    cause,
+  );
 }
