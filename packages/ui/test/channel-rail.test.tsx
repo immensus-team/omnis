@@ -42,6 +42,20 @@ describe("ChannelRail (U1 kinso 좌측 레일)", () => {
   });
 });
 
+describe("ChannelRail 브랜드 컬러 (P1: kinso polish)", () => {
+  it("colors each channel tile's glyph with its brand hex", () => {
+    render(<ChannelRail channels={["gmail", "slack"]} selected={null} onSelect={vi.fn()} />);
+    const slackSvg = screen.getByRole("button", { name: "Slack" }).querySelector("svg");
+    expect(slackSvg).toHaveStyle({ color: "#4A154B" });
+  });
+
+  it("colors the Agents tile's sparkle with the accent token", () => {
+    render(<ChannelRail channels={["gmail"]} selected={null} onSelect={vi.fn()} />);
+    const agentSvg = screen.getByRole("button", { name: "Agent" }).querySelector("svg");
+    expect(agentSvg).toHaveStyle({ color: "var(--accent)" });
+  });
+});
+
 describe("ChannelRail 고정 타일", () => {
   it("renders the Agents tile even when no agent account is connected", () => {
     render(<ChannelRail channels={["gmail"]} selected={null} onSelect={vi.fn()} />);

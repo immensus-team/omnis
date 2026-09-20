@@ -2,14 +2,15 @@ import { cn } from "../lib/cn.js";
 import {
   type AgentRuntimeKind,
   type AgentSessionKinsoState,
-  CHANNEL_ICON,
   CHANNEL_LABEL,
   RUNTIME_ICON,
   RUNTIME_LABEL,
+  RUNTIME_LETTER,
   initialsFromName,
   pastelFromName,
 } from "../lib/row-meta.js";
 import type { UiChannel } from "../types.js";
+import { ChannelGlyph } from "./channel-glyph.js";
 import { AgentStatusBadge } from "./status-badge.js";
 
 export interface LabelChip {
@@ -57,13 +58,15 @@ function pickChips(labels: LabelChip[]): { shown: LabelChip[]; more: number } {
 
 function RowAvatarView({ avatar }: { avatar: RowAvatar }) {
   if (avatar.kind === "runtime") {
+    // U5: 실제 브랜드 마크가 있는 런타임(Claude/DeepSeek/…)은 그 로고, 없는 런타임(Hermes)은
+    // 사람 아바타의 이니셜 폴백과 같은 발상으로 글자 한 글자(RUNTIME_LETTER)를 보여준다.
     const Icon = RUNTIME_ICON[avatar.runtime];
     return (
       <span
         className="inbox-row__avatar inbox-row__avatar--runtime"
         aria-label={`${RUNTIME_LABEL[avatar.runtime]} 세션`}
       >
-        <Icon size={16} aria-hidden="true" />
+        {Icon ? <Icon size={16} aria-hidden="true" /> : RUNTIME_LETTER[avatar.runtime]}
       </span>
     );
   }
@@ -115,17 +118,12 @@ export function InboxRow(props: InboxRowProps) {
         {props.agentState ? (
           <AgentStatusBadge state={props.agentState} />
         ) : (
-          (() => {
-            const ChannelIcon = CHANNEL_ICON[props.channel];
-            return (
-              <span
-                className="inbox-row__channel-icon"
-                aria-label={`${CHANNEL_LABEL[props.channel]} 메시지`}
-              >
-                <ChannelIcon size={16} aria-hidden="true" />
-              </span>
-            );
-          })()
+          <span
+            className="inbox-row__channel-icon"
+            aria-label={`${CHANNEL_LABEL[props.channel]} 메시지`}
+          >
+            <ChannelGlyph channel={props.channel} size={16} />
+          </span>
         )}
         {props.hasPendingApproval && (
           <span className="inbox-row__approval-dot" aria-label="승인 대기" />

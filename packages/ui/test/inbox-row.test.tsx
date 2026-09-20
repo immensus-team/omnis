@@ -79,6 +79,21 @@ describe("InboxRow 채널 아이콘 (react-icons/si — US-A26 폴백에서 진�
   });
 });
 
+describe("InboxRow 채널 아이콘 브랜드 컬러 (P1: kinso polish — 회색 아이콘 대신 브랜드 컬러)", () => {
+  it("colors the channel icon with the channel's brand hex, not the default grey", () => {
+    render(<InboxRow {...baseProps} channel="slack" />);
+    const svg = screen.getByLabelText("Slack 메시지").querySelector("svg");
+    expect(svg).toHaveStyle({ color: "#4A154B" });
+  });
+
+  it("gives KakaoTalk a brand-yellow tile behind the (black) glyph", () => {
+    render(<InboxRow {...baseProps} channel="kakaotalk" />);
+    const wrap = screen.getByLabelText("KakaoTalk 메시지");
+    expect(wrap.querySelector(".channel-glyph--tiled")).toHaveStyle({ background: "#FFE812" });
+    expect(wrap.querySelector("svg")).toHaveStyle({ color: "#000000" });
+  });
+});
+
 describe("InboxRow 아바타 (U2: 사진 → 이니셜+파스텔 폴백, agent_session은 런타임 로고)", () => {
   it("shows initials on a pastel background when there is no photo", () => {
     render(<InboxRow {...baseProps} avatar={{ kind: "initials", name: "Sora Kim" }} />);
@@ -93,9 +108,20 @@ describe("InboxRow 아바타 (U2: 사진 → 이니셜+파스텔 폴백, agent_s
         agentState="blocked"
       />,
     );
-    expect(screen.getByLabelText("Claude Code 세션")).toBeInTheDocument();
+    const avatarEl = screen.getByLabelText("Claude Code 세션");
+    expect(avatarEl).toBeInTheDocument();
+    expect(avatarEl.querySelector("svg")).toBeInTheDocument(); // Anthropic 브랜드 마크
     expect(screen.getByText("확인 필요")).toBeInTheDocument();
     expect(screen.queryByLabelText("Slack 메시지")).not.toBeInTheDocument();
+  });
+
+  it("falls back to a letter tile ('H') for a runtime with no brand mark (Hermes)", () => {
+    render(
+      <InboxRow {...baseProps} avatar={{ kind: "runtime", runtime: "hermes" }} agentState="idle" />,
+    );
+    const avatarEl = screen.getByLabelText("Hermes 세션");
+    expect(avatarEl).toHaveTextContent("H");
+    expect(avatarEl.querySelector("svg")).not.toBeInTheDocument();
   });
 });
 
