@@ -10,9 +10,9 @@ const ACTIONS: PaletteAction[] = [
   { id: "discard", name: "Discard draft", group: "Compose", perform: () => {} },
 ];
 
-/** 두 인스턴스가 각자 open 상태를 갖는다 — 한쪽을 닫아도 다른 쪽은 그대로다.
- *  inline은 기본 open=true라 정적 스크린샷에도 내용이 잡힌다. dialog는 고정 오버레이라
- *  기본 열림이면 갤러리 전체를 덮으므로 버튼으로 연다. */
+/** The two instances each hold their own open state — closing one leaves the other untouched.
+ *  inline defaults to open=true so the static screenshot captures content. dialog is a fixed
+ *  overlay that would cover the whole gallery if it defaulted open, so it's opened via a button. */
 export function CommandPaletteDemo() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [inlineOpen, setInlineOpen] = useState(true);

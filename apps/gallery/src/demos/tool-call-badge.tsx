@@ -7,13 +7,13 @@ type Tool = keyof typeof TOOL_LABELS;
 
 const BADGES: { tool: Tool; state: ToolCallBadgeProps["state"]; resultSummary?: string }[] = [
   { tool: "search_memory", state: "loading" },
-  { tool: "propose_draft", state: "done", resultSummary: "답장 초안 1개" },
+  { tool: "propose_draft", state: "done", resultSummary: "1 reply draft" },
   { tool: "read_calendar", state: "error" },
-  { tool: "read", state: "done", resultSummary: "문서 1개 읽음" },
-  { tool: "read_session", state: "done", resultSummary: "세션 2개 확인" },
-  { tool: "propose_task", state: "done", resultSummary: "할 일 3개 추출" },
-  { tool: "propose_delegation", state: "done", resultSummary: "위임 1건 제안" },
-  { tool: "propose_route", state: "done", resultSummary: "노트 2개 라우팅" },
+  { tool: "read", state: "done", resultSummary: "1 document read" },
+  { tool: "read_session", state: "done", resultSummary: "2 sessions checked" },
+  { tool: "propose_task", state: "done", resultSummary: "3 tasks extracted" },
+  { tool: "propose_delegation", state: "done", resultSummary: "1 delegation proposed" },
+  { tool: "propose_route", state: "done", resultSummary: "2 notes routed" },
 ];
 
 export function ToolCallBadgeDemo() {
