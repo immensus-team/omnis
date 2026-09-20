@@ -614,15 +614,13 @@
    }
    ```
 
-4. [ ] `CommandPaletteProps`에 `search?: CommandPaletteSearch`를 추가하고, `CommandPalette` 본문에서 `query` 상태 + 180ms 디바운스 + 모드 분기를 배선한다(기존 `resultList`/`Command.Input` 부분을 아래로 교체).
+4. [ ] `CommandPaletteProps`에 `search?: CommandPaletteSearch`를 추가하고, `CommandPalette` 본문에서 `query` 상태 + 180ms 디바운스 + 모드 분기를 배선한다(기존 `resultList`/`Command.Input` 부분을 아래로 교체 — 기존 `Command.Dialog`/`GlassSurface` 뼈대는 그대로 두고 `search` prop 하나만 얹는다, mode/inline 팔레트는 이 스토리의 목표 밖이라 만들지 않는다).
    ```tsx
    // packages/ui/src/components/command-palette.tsx — CommandPaletteProps에 필드 추가
    export interface CommandPaletteProps {
      open: boolean;
      onOpenChange: (open: boolean) => void;
      actions: PaletteAction[];
-     mode?: "dialog" | "inline";
-     placeholder?: string;
      /** US-B27: 있으면 액션 미매치 시 검색 결과 모드로 전환한다. 없으면 Phase A 동작 그대로. */
      search?: CommandPaletteSearch;
    }
@@ -631,8 +629,6 @@
      open,
      onOpenChange,
      actions,
-     mode = "dialog",
-     placeholder,
      search,
    }: CommandPaletteProps) {
      const [query, setQuery] = useState("");
@@ -671,30 +667,10 @@
        actionList
      );
 
-     const input = (
-       <Command.Input
-         value={query}
-         onValueChange={setQuery}
-         placeholder={placeholder ?? "검색 또는 명령…"}
-       />
-     );
-
-     if (mode === "inline") {
-       return (
-         <InlinePalette open={open} onOpenChange={onOpenChange}>
-           <GlassSurface slot="toolbar" className="ask-bar__pill">
-             <span className="ask-bar__orb" aria-hidden="true" />
-             {input}
-           </GlassSurface>
-           {open && <GlassSurface slot="palette" className="ask-bar__dropdown">{resultList}</GlassSurface>}
-         </InlinePalette>
-       );
-     }
-
      return (
        <Command.Dialog open={open} onOpenChange={onOpenChange} label="omnis command palette">
          <GlassSurface slot="palette">
-           {input}
+           <Command.Input value={query} onValueChange={setQuery} placeholder="검색 또는 명령…" />
            {resultList}
          </GlassSurface>
        </Command.Dialog>
@@ -1010,7 +986,9 @@
    import { useQuery } from "@rocicorp/zero/react";
    import { useMemo, useState } from "react";
    import { decideApproval } from "../api/approvals.js";
-   import { useZeroClient } from "../zero-client.js";
+   import { initZero } from "../zero-client.js";
+
+   const zero = initZero();
 
    /** A5 §3.4: 인사말 텍스트, 스크린리더가 페이지 요지를 즉시 읽도록 <h1>으로 렌더링된다. */
    export function greetingLine(name: string, pendingCount: number, approvalCount: number): string {
@@ -1026,7 +1004,6 @@
    }
 
    export function Today({ onOpenThread }: { onOpenThread?: (threadId: string) => void }) {
-     const zero = useZeroClient();
      const [expandedApprovalId, setExpandedApprovalId] = useState<string | null>(null);
      const now = useMemo(() => new Date(), []);
 
@@ -1335,7 +1312,9 @@
    import { TaskRow, type TaskKind, type TaskState } from "@omnis/ui/components/task-row";
    import { useQuery } from "@rocicorp/zero/react";
    import { useMemo, useState } from "react";
-   import { useZeroClient } from "../zero-client.js";
+   import { initZero } from "../zero-client.js";
+
+   const zero = initZero();
 
    export const TASKS_VIEWS = ["today", "week", "someday", "delegated"] as const;
    export type TasksView = (typeof TASKS_VIEWS)[number];
@@ -1376,7 +1355,6 @@
      onOpenSource?: (itemId: string) => void;
      onOpenDelegation?: (sessionId: string) => void;
    }) {
-     const zero = useZeroClient();
      const [view, setView] = useState<TasksView>("today");
      const [quickAdd, setQuickAdd] = useState("");
      const now = useMemo(() => new Date(), []);
@@ -1646,7 +1624,9 @@
    import { formatRelativeTime } from "@omnis/ui/lib/relative-time";
    import { useQuery } from "@rocicorp/zero/react";
    import { useMemo } from "react";
-   import { useZeroClient } from "../zero-client.js";
+   import { initZero } from "../zero-client.js";
+
+   const zero = initZero();
 
    export interface FollowupCandidate {
      id: string;
@@ -1664,7 +1644,6 @@
    }
 
    export function Network({ onOpenPerson }: { onOpenPerson?: (id: string) => void }) {
-     const zero = useZeroClient();
      const now = useMemo(() => Date.now(), []);
      const [persons] = useQuery(zero.query.persons.orderBy("last_contact_at", "desc"));
 
@@ -1905,7 +1884,9 @@
    import { useQuery } from "@rocicorp/zero/react";
    import { useState } from "react";
    import { routeNote } from "../api/notes.js";
-   import { useZeroClient } from "../zero-client.js";
+   import { initZero } from "../zero-client.js";
+
+   const zero = initZero();
 
    export interface NoteRouteRow {
      route_state: "proposed" | "accepted" | "rejected" | "none";
@@ -1924,7 +1905,6 @@
    }
 
    export function Notes() {
-     const zero = useZeroClient();
      const [body, setBody] = useState("");
      const [notes] = useQuery(zero.query.notes.orderBy("created_at", "desc").limit(20));
 
@@ -2179,7 +2159,9 @@
    import { useQuery } from "@rocicorp/zero/react";
    import { useState } from "react";
    import { undoDigestGroup } from "../api/digest.js";
-   import { useZeroClient } from "../zero-client.js";
+   import { initZero } from "../zero-client.js";
+
+   const zero = initZero();
 
    export interface DigestGroup {
      reason: string;
@@ -2202,7 +2184,6 @@
    }
 
    export function Digest() {
-     const zero = useZeroClient();
      const [expanded, setExpanded] = useState<Set<string>>(new Set());
      const [nightlyDigests] = useQuery(
        zero.query.digests.where("kind", "=", "nightly").orderBy("for_date", "desc").limit(1),
@@ -2674,7 +2655,9 @@
     import { useQuery } from "@rocicorp/zero/react";
     import { useState } from "react";
     import { putSetting } from "../api/settings.js";
-    import { useZeroClient } from "../zero-client.js";
+    import { initZero } from "../zero-client.js";
+
+    const zero = initZero();
 
     export const SETTINGS_TABS = ["accounts", "autonomy", "model-tiers", "general"] as const;
     export type SettingsTab = (typeof SETTINGS_TABS)[number];
@@ -2704,7 +2687,6 @@
     };
 
     export function Settings() {
-      const zero = useZeroClient();
       const [tab, setTab] = useState<SettingsTab>("accounts");
       const [accounts] = useQuery(zero.query.accounts);
       const [settingsRows] = useQuery(zero.query.settings);
