@@ -1,0 +1,50 @@
+{
+  "scenario": "korean_zwj_family_emoji_and_skin_tone",
+  "raw": {
+    "id": 8802,
+    "chat": {
+      "id": 2002,
+      "type": "group",
+      "title": "omnis 운영"
+    },
+    "sender": {
+      "id": 42,
+      "firstName": "Dana",
+      "lastName": "Lee",
+      "username": "danalee"
+    },
+    "text": "가족 👨‍👩‍👧‍👦 이사 완료 👍🏽 다음 주에 봬요 🎉",
+    "date": 1700010100
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "2002",
+        "externalId": "8802",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "42"
+        },
+        "body": "가족 👨‍👩‍👧‍👦 이사 완료 👍🏽 다음 주에 봬요 🎉",
+        "attachments": [],
+        "sentAt": "2023-11-15T01:01:40.000Z",
+        "status": "received",
+        "sourceHash": "2002:8802",
+        "threadMeta": {
+          "externalId": "2002",
+          "kind": "group",
+          "title": "omnis 운영",
+          "participants": [
+            {
+              "externalId": "42",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2023-11-15T01:01:40.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

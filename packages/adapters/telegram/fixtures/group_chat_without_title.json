@@ -1,0 +1,48 @@
+{
+  "scenario": "group_chat_without_title",
+  "raw": {
+    "id": 8603,
+    "chat": {
+      "id": 2002,
+      "type": "group"
+    },
+    "sender": {
+      "id": 43,
+      "firstName": "Logan",
+      "username": "logankim"
+    },
+    "text": "제목 없는 그룹 메시지",
+    "date": 1700008200
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "2002",
+        "externalId": "8603",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "43"
+        },
+        "body": "제목 없는 그룹 메시지",
+        "attachments": [],
+        "sentAt": "2023-11-15T00:30:00.000Z",
+        "status": "received",
+        "sourceHash": "2002:8603",
+        "threadMeta": {
+          "externalId": "2002",
+          "kind": "group",
+          "title": null,
+          "participants": [
+            {
+              "externalId": "43",
+              "displayName": "Logan"
+            }
+          ],
+          "lastItemAt": "2023-11-15T00:30:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "scenario": "video_with_caption",
+  "raw": {
+    "id": 8405,
+    "chat": {
+      "id": -1001234567890,
+      "type": "supergroup",
+      "title": "omnis launch"
+    },
+    "sender": {
+      "id": 43,
+      "firstName": "Logan",
+      "username": "logankim"
+    },
+    "caption": "데모 영상 1분",
+    "date": 1700006400,
+    "media": {
+      "type": "video",
+      "mimeType": "video/mp4",
+      "fileSize": 8388608
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "-1001234567890",
+        "externalId": "8405",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "43"
+        },
+        "body": "",
+        "attachments": [
+          {
+            "kind": "video",
+            "mimeType": "video/mp4",
+            "sizeBytes": 8388608
+          }
+        ],
+        "sentAt": "2023-11-15T00:00:00.000Z",
+        "status": "received",
+        "sourceHash": "-1001234567890:8405",
+        "threadMeta": {
+          "externalId": "-1001234567890",
+          "kind": "group",
+          "title": "omnis launch",
+          "participants": [
+            {
+              "externalId": "43",
+              "displayName": "Logan"
+            }
+          ],
+          "lastItemAt": "2023-11-15T00:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

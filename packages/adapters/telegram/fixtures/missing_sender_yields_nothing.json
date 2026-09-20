@@ -1,0 +1,15 @@
+{
+  "scenario": "missing_sender_yields_nothing",
+  "raw": {
+    "id": 9002,
+    "chat": {
+      "id": 1001,
+      "type": "private"
+    },
+    "text": "sender가 없는 partial update",
+    "date": 1700012000
+  },
+  "expected": {
+    "items": []
+  }
+}

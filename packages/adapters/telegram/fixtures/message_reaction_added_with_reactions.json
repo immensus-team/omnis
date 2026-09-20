@@ -1,0 +1,73 @@
+{
+  "scenario": "message_reaction_added_with_reactions",
+  "raw": {
+    "id": 8301,
+    "chat": {
+      "id": -1001234567890,
+      "type": "supergroup",
+      "title": "omnis launch"
+    },
+    "sender": {
+      "id": 43,
+      "firstName": "Logan",
+      "username": "logankim"
+    },
+    "text": "배포 끝났습니다 🚀",
+    "date": 1700005000,
+    "reactions": [
+      {
+        "emoji": "🔥",
+        "count": 3,
+        "chosenOrder": null
+      },
+      {
+        "emoji": "👍",
+        "count": 1,
+        "chosenOrder": null
+      }
+    ],
+    "recentReactions": [
+      {
+        "senderId": 42,
+        "date": 1700005100,
+        "emoji": "🔥"
+      },
+      {
+        "senderId": 43,
+        "date": 1700005200,
+        "emoji": "👍"
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "-1001234567890",
+        "externalId": "8301",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "43"
+        },
+        "body": "배포 끝났습니다 🚀",
+        "attachments": [],
+        "sentAt": "2023-11-14T23:36:40.000Z",
+        "status": "received",
+        "sourceHash": "-1001234567890:8301",
+        "threadMeta": {
+          "externalId": "-1001234567890",
+          "kind": "group",
+          "title": "omnis launch",
+          "participants": [
+            {
+              "externalId": "43",
+              "displayName": "Logan"
+            }
+          ],
+          "lastItemAt": "2023-11-14T23:36:40.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "scenario": "channel_post_anonymous_no_sender",
+  "raw": {
+    "id": 8602,
+    "chat": {
+      "id": -1009876543210,
+      "type": "channel",
+      "title": "omnis news"
+    },
+    "senderChat": {
+      "id": -1009876543210,
+      "title": "omnis news"
+    },
+    "text": "익명 관리자 공지입니다.",
+    "date": 1700008100
+  },
+  "expected": {
+    "items": []
+  }
+}

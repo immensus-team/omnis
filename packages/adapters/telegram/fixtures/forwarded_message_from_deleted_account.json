@@ -1,0 +1,53 @@
+{
+  "scenario": "forwarded_message_from_deleted_account",
+  "raw": {
+    "id": 9004,
+    "chat": {
+      "id": 2002,
+      "type": "group",
+      "title": "omnis 운영"
+    },
+    "sender": {
+      "id": 43,
+      "firstName": "Logan",
+      "username": "logankim"
+    },
+    "text": "공유합니다",
+    "date": 1700012200,
+    "forward": {
+      "fromName": "Deleted Account",
+      "date": 1699990000
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "2002",
+        "externalId": "9004",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "43"
+        },
+        "body": "공유합니다",
+        "attachments": [],
+        "sentAt": "2023-11-15T01:36:40.000Z",
+        "status": "received",
+        "sourceHash": "2002:9004",
+        "threadMeta": {
+          "externalId": "2002",
+          "kind": "group",
+          "title": "omnis 운영",
+          "participants": [
+            {
+              "externalId": "43",
+              "displayName": "Logan"
+            }
+          ],
+          "lastItemAt": "2023-11-15T01:36:40.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

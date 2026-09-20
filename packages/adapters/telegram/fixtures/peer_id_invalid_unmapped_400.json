@@ -1,0 +1,10 @@
+{
+  "scenario": "peer_id_invalid_unmapped_400",
+  "raw": {
+    "code": 400,
+    "message": "PEER_ID_INVALID"
+  },
+  "expected": {
+    "errorKind": "retryable_network"
+  }
+}

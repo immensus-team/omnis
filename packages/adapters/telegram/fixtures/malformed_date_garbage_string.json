@@ -1,0 +1,50 @@
+{
+  "scenario": "malformed_date_garbage_string",
+  "raw": {
+    "id": 9102,
+    "chat": {
+      "id": 1001,
+      "type": "private"
+    },
+    "sender": {
+      "id": 42,
+      "firstName": "Dana",
+      "lastName": "Lee",
+      "username": "danalee"
+    },
+    "text": "date가 숫자로 안 읽히는 문자열",
+    "date": "not-a-date",
+    "editDate": "also-not-a-date"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "1001",
+        "externalId": "9102",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "42"
+        },
+        "body": "date가 숫자로 안 읽히는 문자열",
+        "attachments": [],
+        "sentAt": "1970-01-01T00:00:00.000Z",
+        "status": "received",
+        "sourceHash": "1001:9102",
+        "threadMeta": {
+          "externalId": "1001",
+          "kind": "dm",
+          "title": null,
+          "participants": [
+            {
+              "externalId": "42",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "1970-01-01T00:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

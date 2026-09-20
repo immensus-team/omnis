@@ -1,0 +1,69 @@
+{
+  "scenario": "reply_in_forum_topic_supergroup",
+  "raw": {
+    "id": 8103,
+    "chat": {
+      "id": -1001234567890,
+      "type": "supergroup",
+      "title": "omnis eng",
+      "isForum": true
+    },
+    "sender": {
+      "id": 43,
+      "firstName": "Logan",
+      "username": "logankim"
+    },
+    "text": "moved this to the topic",
+    "date": 1700007200,
+    "threadId": 77,
+    "isTopicMessage": false,
+    "replyToMessage": {
+      "id": 8102,
+      "chat": {
+        "id": -1001234567890,
+        "type": "supergroup",
+        "title": "omnis eng"
+      },
+      "sender": {
+        "id": 42,
+        "firstName": "Dana",
+        "lastName": "Lee",
+        "username": "danalee"
+      },
+      "text": "deploy는 어디서 봐요?",
+      "date": 1700007100,
+      "threadId": 77
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "-1001234567890",
+        "externalId": "8103",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "43"
+        },
+        "body": "moved this to the topic",
+        "attachments": [],
+        "sentAt": "2023-11-15T00:13:20.000Z",
+        "status": "received",
+        "sourceHash": "-1001234567890:8103",
+        "threadMeta": {
+          "externalId": "-1001234567890",
+          "kind": "group",
+          "title": "omnis eng",
+          "participants": [
+            {
+              "externalId": "43",
+              "displayName": "Logan"
+            }
+          ],
+          "lastItemAt": "2023-11-15T00:13:20.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

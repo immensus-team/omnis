@@ -1,0 +1,56 @@
+{
+  "scenario": "voice_message_without_caption",
+  "raw": {
+    "id": 8403,
+    "chat": {
+      "id": 1001,
+      "type": "private"
+    },
+    "sender": {
+      "id": 43,
+      "firstName": "Logan",
+      "username": "logankim"
+    },
+    "date": 1700006200,
+    "media": {
+      "type": "voice",
+      "fileSize": 30720
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "1001",
+        "externalId": "8403",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "43"
+        },
+        "body": "",
+        "attachments": [
+          {
+            "kind": "audio",
+            "sizeBytes": 30720
+          }
+        ],
+        "sentAt": "2023-11-14T23:56:40.000Z",
+        "status": "received",
+        "sourceHash": "1001:8403",
+        "threadMeta": {
+          "externalId": "1001",
+          "kind": "dm",
+          "title": null,
+          "participants": [
+            {
+              "externalId": "43",
+              "displayName": "Logan"
+            }
+          ],
+          "lastItemAt": "2023-11-14T23:56:40.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

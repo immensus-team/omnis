@@ -1,0 +1,48 @@
+{
+  "scenario": "missing_date_falls_back_to_epoch",
+  "raw": {
+    "id": 9001,
+    "chat": {
+      "id": 1001,
+      "type": "private"
+    },
+    "sender": {
+      "id": 42,
+      "firstName": "Dana",
+      "lastName": "Lee",
+      "username": "danalee"
+    },
+    "text": "partial update라 date가 없음"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "1001",
+        "externalId": "9001",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "42"
+        },
+        "body": "partial update라 date가 없음",
+        "attachments": [],
+        "sentAt": "1970-01-01T00:00:00.000Z",
+        "status": "received",
+        "sourceHash": "1001:9001",
+        "threadMeta": {
+          "externalId": "1001",
+          "kind": "dm",
+          "title": null,
+          "participants": [
+            {
+              "externalId": "42",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "1970-01-01T00:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

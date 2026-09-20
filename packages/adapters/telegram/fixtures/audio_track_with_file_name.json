@@ -1,0 +1,62 @@
+{
+  "scenario": "audio_track_with_file_name",
+  "raw": {
+    "id": 8406,
+    "chat": {
+      "id": 1001,
+      "type": "private"
+    },
+    "sender": {
+      "id": 42,
+      "firstName": "Dana",
+      "lastName": "Lee",
+      "username": "danalee"
+    },
+    "text": "이 곡 들어봐",
+    "date": 1700006500,
+    "media": {
+      "type": "audio",
+      "mimeType": "audio/mpeg",
+      "fileSize": 4194304,
+      "fileName": "track.mp3"
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "1001",
+        "externalId": "8406",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "42"
+        },
+        "body": "이 곡 들어봐",
+        "attachments": [
+          {
+            "kind": "audio",
+            "mimeType": "audio/mpeg",
+            "sizeBytes": 4194304,
+            "caption": "track.mp3"
+          }
+        ],
+        "sentAt": "2023-11-15T00:01:40.000Z",
+        "status": "received",
+        "sourceHash": "1001:8406",
+        "threadMeta": {
+          "externalId": "1001",
+          "kind": "dm",
+          "title": null,
+          "participants": [
+            {
+              "externalId": "42",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2023-11-15T00:01:40.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}
