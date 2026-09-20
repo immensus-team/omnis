@@ -6,7 +6,8 @@ import type { Scheduler } from "../scheduler.js";
 export const HEALTHCHECK_JOB_NAME = "hub_healthcheck";
 export const HEALTHCHECK_CRON = "*/5 * * * *";
 
-/** 스케줄러가 물리는 첫 핸들러(US-A06). DB가 살아 있는지 + 큐가 막히지 않았는지만 본다. */
+/** The first handler the scheduler hangs on (US-A06). Checks only that the DB is alive and the
+ *  queue is not backed up. */
 export function registerHealthcheckJob(
   scheduler: Scheduler,
   deps: { pool: Pool; events: Events },
