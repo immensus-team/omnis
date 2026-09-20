@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { hostProfile, phaseARuntimesFor } from "../src/host-config.js";
 
-/** 스토리 검증 명령 `pnpm --filter @omnis/local-agent test -- --host=mini`가 이 값을 고른다. */
-const flagHost = process.argv.find((a) => a.startsWith("--host="))?.slice("--host=".length);
-const HOST = flagHost === "macbook" ? "macbook" : "mini";
+/** 검증 명령: `pnpm --filter @omnis/local-agent test`. 두 호스트를 한 번에 단언하므로 호스트 플래그가 없다. */
+const HOSTS = ["mini", "macbook"] as const;
 
-describe(`host profile (${HOST})`, () => {
+describe("host profile", () => {
   it("caps active turns at 4 on both hosts (마스터 §9)", () => {
     expect(hostProfile("mini").maxActiveTurns).toBe(4);
     expect(hostProfile("macbook").maxActiveTurns).toBe(4);
@@ -18,7 +17,9 @@ describe(`host profile (${HOST})`, () => {
   });
 
   it("uses the per-host bridge token item name (A2 §2.1)", () => {
-    expect(hostProfile(HOST).token_keychain_item).toBe(`omnis.bridge.token.${HOST}`);
+    for (const host of HOSTS) {
+      expect(hostProfile(host).token_keychain_item).toBe(`omnis.bridge.token.${host}`);
+    }
   });
 
   it("exposes only Codex on the mini in Phase A (Hermes is Phase B)", () => {
