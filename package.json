@@ -1,0 +1,30 @@
+{
+  "name": "omnis",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "packageManager": "pnpm@9.12.3",
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --build --force",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "vitest run",
+    "test:contract": "vitest run --project contract",
+    "test:integration": "vitest run --project integration",
+    "dev": "concurrently -k -n hub,desktop -c blue,magenta \"pnpm --filter @omnis/hub dev\" \"pnpm --filter @omnis/desktop dev\"",
+    "tauri:dev": "pnpm --filter @omnis/desktop tauri dev",
+    "tauri:build": "pnpm --filter @omnis/desktop tauri build",
+    "db:migrate": "pnpm --filter @omnis/db migrate",
+    "db:migrate:create": "pnpm --filter @omnis/db migrate:create",
+    "db:seed": "echo 'no seed files in Phase A — v1 seed rows live in 0002/0006 migrations (A3 §4, §6)'"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "@types/node": "22.7.5",
+    "concurrently": "9.1.0",
+    "tsx": "4.19.2",
+    "typescript": "5.6.3",
+    "vitest": "2.1.9"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@omnis/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run",
+    "test:integration": "vitest run test/integration",
+    "migrate": "tsx src/cli/migrate.ts",
+    "migrate:create": "tsx src/cli/create.ts"
+  },
+  "dependencies": { "pg": "8.13.1" },
+  "devDependencies": { "@types/pg": "8.11.10", "tsx": "4.19.2" }
+}
