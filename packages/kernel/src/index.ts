@@ -63,6 +63,14 @@ export {
 } from "./notify/batch.js";
 
 export {
+  WEBPUSH_GONE_CODES,
+  pruneSubscription,
+  sendWebPush,
+  vapidFromEnv,
+  type VapidKeys,
+} from "./notify/webpush.js";
+
+export {
   ZERO_ITEM_COLUMNS,
   ZERO_LABEL_RULE_COLUMNS,
   ZERO_TABLES,
