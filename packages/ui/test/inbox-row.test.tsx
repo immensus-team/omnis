@@ -77,3 +77,18 @@ describe("InboxRow (A5 §3.1)", () => {
     expect(screen.getByText("초안: 네 확인했습니다")).toBeInTheDocument();
   });
 });
+
+describe("InboxRow 채널 아이콘 (US-A26)", () => {
+  it("renders a visible channel glyph, not just an accessible name", () => {
+    render(<InboxRow {...baseProps} channel="gmail" />);
+    const icon = screen.getByLabelText("Gmail 메시지");
+    expect(icon).toHaveTextContent(/\S/);
+  });
+  it("gives gmail and Google Calendar different glyphs", () => {
+    const { unmount } = render(<InboxRow {...baseProps} channel="gmail" />);
+    const gmail = screen.getByLabelText("Gmail 메시지").textContent;
+    unmount();
+    render(<InboxRow {...baseProps} channel="gcal" />);
+    expect(screen.getByLabelText("Google Calendar 메시지").textContent).not.toBe(gmail);
+  });
+});

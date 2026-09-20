@@ -1,9 +1,11 @@
 // 복제 범위의 단일 소스. A3 §7의 publication(0008_publication.sql)과 반드시 일치한다 —
 // 일치 검사는 assertZeroPublication이 부팅 때마다 한다.
 import {
+  type ExpressionBuilder,
   type Schema,
   boolean,
   createSchema,
+  definePermissions,
   json,
   number,
   relationships,
@@ -326,3 +328,31 @@ export const ZERO_ITEM_COLUMNS: readonly string[] = Object.keys(zeroSchema.table
 export const ZERO_LABEL_RULE_COLUMNS: readonly string[] = Object.keys(
   zeroSchema.tables.label_rules.columns,
 );
+
+// US-A21b: permissions 없이 배포하면 zero-cache는 "no tables will be syncable"로 돌아 한 행도
+// 내려보내지 않는다(deploy-permissions.js의 경고) — US-A22가 본 "쿼리는 resolve되는데 행이 없다"의
+// 정체다. 단일 유저 허브라 규칙은 하나뿐이다: 허브가 서명한 토큰의 sub가 이 유저면 전부 읽기.
+export type AuthData = { sub: string };
+
+/** 허브가 JWT `sub`에 넣는 값과 같아야 한다(apps/hub/src/config.ts의 OMNIS_USER_ID). */
+export const OMNIS_USER_ID: string = globalThis.process?.env?.OMNIS_USER_ID ?? "logan";
+
+// 쓰기 권한은 일부러 비운다: 데스크톱은 읽기 전용이고 쓰기는 전부 허브 HTTP를 거친다(계약 §5).
+// insert/update/delete를 안 주면 Zero가 서버에서 거부한다.
+const readOnlyForOwner = {
+  row: {
+    // ANYONE_CAN과 같은 모양의 테이블-무관 규칙이라 eb의 테이블 파라미터는 never다.
+    select: [
+      (authData: AuthData, eb: ExpressionBuilder<never, Schema>) =>
+        eb.cmpLit(authData.sub, "=", OMNIS_USER_ID),
+    ],
+  },
+};
+
+export const permissions = definePermissions<AuthData, typeof zeroSchema>(zeroSchema, () =>
+  Object.fromEntries(ZERO_TABLES.map((t) => [t, readOnlyForOwner])),
+);
+
+// zero-deploy-permissions CLI는 모듈에서 `schema`·`permissions` 이름을 찾는다
+// (zero-schema/src/schema-config.js의 isSchemaConfig).
+export { zeroSchema as schema };

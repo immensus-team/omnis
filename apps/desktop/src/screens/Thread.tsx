@@ -2,7 +2,7 @@ import { DraftCard, StatusBadge } from "@omnis/ui";
 import type { UiItemStatus } from "@omnis/ui";
 import { useQuery } from "@rocicorp/zero/react";
 import { useMemo } from "react";
-import { initZero } from "../zero-client.js";
+import { useZeroClient } from "../zero-client.js";
 
 export interface ThreadQueryItem {
   id: string;
@@ -15,16 +15,8 @@ export function findDraftItem<T extends ThreadQueryItem>(items: T[]): T | undefi
   return items.find((i) => i.status === "draft");
 }
 
-// Inbox.tsx(Task 4)와 같은 이유로 지연 생성: 모듈 스코프에서 만들면 findDraftItem만
-// import해도 WebSocket이 열린다.
-let zeroClient: ReturnType<typeof initZero> | undefined;
-function getZero() {
-  zeroClient ??= initZero();
-  return zeroClient;
-}
-
 export function Thread({ threadId }: { threadId: string }) {
-  const zero = useMemo(getZero, []);
+  const zero = useZeroClient();
   // 편차(계획 step 9 대비, packages/kernel/src/zero-schema.ts 기준): items 컬럼은
   // camelCase `sentAt`이 아니라 snake_case `sent_at`이다(Task 4의 Inbox.tsx가 이미
   // 같은 이유로 `sent_at`을 쓴다) — 계획의 `orderBy("sentAt", ...)` 예시를 실제 스키마에 맞춘다.

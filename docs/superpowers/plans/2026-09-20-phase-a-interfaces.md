@@ -495,9 +495,30 @@ export function sensitivityFor(item: ItemRow, ctx: ClassifyCtx): Promise<Sensiti
 - 데스크톱 클라이언트: `apps/desktop/src/zero-client.ts`
 
 ```ts
-export function initZero(opts?: { server?: string; userID?: string }): Zero<typeof zeroSchema>;
-// 기본값: server = import.meta.env.OMNIS_ZERO_URL ?? "http://127.0.0.1:4848", userID = "logan", schema = zeroSchema
+export function initZero(opts?: {
+  server?: string;
+  userID?: string;
+  auth?: string;
+}): Zero<typeof zeroSchema>;
+// 기본값: server = import.meta.env.OMNIS_ZERO_URL ?? "http://127.0.0.1:4848", schema = zeroSchema
+//         auth = loadZeroToken()이 받아 둔 허브 토큰, userID = 그 토큰의 sub ?? "logan"
+export async function fetchZeroToken(hubUrl?: string): Promise<string>;
+export async function loadZeroToken(hubUrl?: string): Promise<void>; // main.tsx가 렌더 전에 1회
 ```
+
+**US-A21b 결정(2026-09-20)**: 권한·인증을 계약에 추가한다.
+
+- `packages/kernel/src/zero-schema.ts`가 `permissions`(= `definePermissions<AuthData, …>`),
+  `AuthData = { sub: string }`, `OMNIS_USER_ID`, 그리고 CLI용 별칭 `schema`(= `zeroSchema`)를
+  더 export한다. 규칙은 **모든 복제 테이블의 `row.select` 하나**뿐이다(쓰기는 허브 HTTP, 계약 §5).
+- 허브가 `GET /api/zero-token`을 연다(§5의 라우트 목록에 추가). HS256 `{sub, exp:+7d}`,
+  키는 `ZERO_AUTH_SECRET`, 다른 허브 라우트와 같은 127.0.0.1 경계. 비밀 미설정 시 503.
+- 새 환경변수(§9): `ZERO_AUTH_SECRET`(허브·zero-cache 공유), `OMNIS_USER_ID`(기본 `logan`,
+  허브·permissions 배포 양쪽에서 읽음).
+- 배포 순서: `pnpm db:migrate` → `pnpm zero:deploy-permissions` → zero-cache 기동. 빠뜨리면
+  zero-cache가 한 행도 안 내려보낸다.
+- `initZero`는 계약대로 동기로 남기고, 토큰은 `loadZeroToken()`이 부팅 때 미리 받아 생성자에
+  싣는다 — `connection.connect({auth})`(나중-인증)는 이미 하이드레이션된 쿼리를 다시 태우지 않는다.
 
 ## 8. `apps/local-agent`
 

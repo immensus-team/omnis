@@ -26,3 +26,21 @@ describe("readConfig", () => {
     expect(() => readConfig({})).toThrow(/DATABASE_URL/);
   });
 });
+
+describe("zero auth config (US-A21b)", () => {
+  it("defaults the user id to logan and leaves the secret empty", () => {
+    const c = readConfig({ DATABASE_URL: "postgres://x/y" });
+    expect(c.userId).toBe("logan");
+    expect(c.zeroAuthSecret).toBe("");
+  });
+
+  it("reads OMNIS_USER_ID and ZERO_AUTH_SECRET", () => {
+    const c = readConfig({
+      DATABASE_URL: "postgres://x/y",
+      OMNIS_USER_ID: "someone",
+      ZERO_AUTH_SECRET: "s3cret",
+    });
+    expect(c.userId).toBe("someone");
+    expect(c.zeroAuthSecret).toBe("s3cret");
+  });
+});

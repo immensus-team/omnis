@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { createPool } from "@omnis/db";
 import { type Kernel, createKernel, createLogger } from "@omnis/kernel";
@@ -15,7 +16,14 @@ beforeAll(async () => {
   const server = createHubServer({
     kernel,
     pool,
-    config: { port: 0, host: "127.0.0.1", version: HUB_VERSION },
+    config: {
+      port: 0,
+      host: "127.0.0.1",
+      version: HUB_VERSION,
+      bridgeToken: "",
+      userId: "logan",
+      zeroAuthSecret: "test-zero-secret",
+    },
     logger: createLogger("@omnis/hub"),
     startedAt: Date.now(),
   });
@@ -149,5 +157,33 @@ describe("unknown routes", () => {
 
   it("405s a wrong method on a known path", async () => {
     expect((await fetch(`${base}/health`, { method: "POST" })).status).toBe(405);
+  });
+});
+
+describe("GET /api/zero-token (US-A21b)", () => {
+  it("signs an HS256 JWT the desktop hands to zero-cache", async () => {
+    const res = await fetch(`${base}/api/zero-token`);
+    expect(res.status).toBe(200);
+    const { token } = (await res.json()) as { token: string };
+    const [h, p, sig] = token.split(".");
+    expect(JSON.parse(Buffer.from(h as string, "base64url").toString())).toEqual({
+      alg: "HS256",
+      typ: "JWT",
+    });
+    const claims = JSON.parse(Buffer.from(p as string, "base64url").toString()) as {
+      sub: string;
+      exp: number;
+    };
+    expect(claims.sub).toBe("logan");
+    // 7일 ±1분
+    expect(claims.exp * 1000 - Date.now()).toBeGreaterThan(7 * 86_400_000 - 60_000);
+    expect(claims.exp * 1000 - Date.now()).toBeLessThanOrEqual(7 * 86_400_000);
+    expect(createHmac("sha256", "test-zero-secret").update(`${h}.${p}`).digest("base64url")).toBe(
+      sig,
+    );
+  });
+
+  it("405s a non-GET", async () => {
+    expect((await fetch(`${base}/api/zero-token`, { method: "POST" })).status).toBe(405);
   });
 });
