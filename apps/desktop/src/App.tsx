@@ -118,7 +118,11 @@ function Shell() {
           threadSummary={selectedThreadSummary}
           threadTitle={selectedThreadTitle}
         />
-        <Inbox onOpen={setOpen} channelFilter={railChannel} />
+        <Inbox
+          onOpen={setOpen}
+          channelFilter={railChannel}
+          onChannelFilterChange={setRailChannel}
+        />
       </div>
       {detail && (
         <section data-testid="detail-pane" className="app-shell__detail">

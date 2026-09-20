@@ -1,4 +1,10 @@
-import { OpaqueSurface, type UiChannel, type UiItemStatus } from "@omnis/ui";
+import {
+  type FilterChip,
+  FilterChipBar,
+  OpaqueSurface,
+  type UiChannel,
+  type UiItemStatus,
+} from "@omnis/ui";
 import { groupBy } from "@omnis/ui/components/command-palette";
 import { GroupHeader } from "@omnis/ui/components/group-header";
 import { InboxRow, type LabelChip, type RowAvatar } from "@omnis/ui/components/inbox-row";
@@ -12,6 +18,7 @@ import { formatRelativeTime } from "@omnis/ui/lib/relative-time";
 import {
   type AgentRuntimeKind,
   type AgentSessionKinsoState,
+  CHANNEL_LABEL,
   agentSessionKinsoState,
 } from "@omnis/ui/lib/row-meta";
 import { useQuery } from "@rocicorp/zero/react";
@@ -218,10 +225,14 @@ type FlatItem = { kind: "header"; key: string; pill: ReactNode } | { kind: "row"
 export function Inbox({
   onOpen,
   channelFilter = null,
+  onChannelFilterChange,
 }: {
   onOpen?: (target: OpenTarget) => void;
   /** U1 채널 레일 선택. null = 전체(Inbox 타일). pill 필터(work/personal/…)와 AND로 합쳐진다. */
   channelFilter?: UiChannel | null;
+  /** US-D02: 채널 칩의 ×가 레일 선택을 되돌리는 경로. 안 넘기면 채널 칩 자체를 안 그린다
+   *  (아무 일도 안 하는 ×는 없는 것만 못하다). */
+  onChannelFilterChange?: (c: UiChannel | null) => void;
 }) {
   const zero = useZeroClient();
   const [filter, setFilter] = useState<InboxFilter>("all");
@@ -229,6 +240,8 @@ export function Inbox({
   const [view, setView] = useState<"inbox" | "archived">("inbox");
   // 낙관적 오버라이드: 허브 왕복 + Zero 복제가 도착하기 전까지 행이 그 자리에 남아 있지 않게 한다.
   const [pendingArchive, setPendingArchive] = useState<Record<string, boolean>>({});
+  // US-D02: 라벨 칩 필터. 빈 Set = 라벨 조건 없음(AND로 다른 필터들과 합쳐진다).
+  const [selectedLabelIds, setSelectedLabelIds] = useState<Set<string>>(new Set());
 
   // 편차(계획 A26 step 7 대비, 인터페이스 계약 §7 zeroSchema 기준): zeroSchema(A21, packages/kernel/src/zero-schema.ts)는
   // Inbox/Thread가 실제로 쓰는 관계 3개(threads.items, items.thread, items.author)만 정의한다 —
@@ -406,15 +419,56 @@ export function Inbox({
     () => filterInboxItems(channelFiltered, filter),
     [channelFiltered, filter],
   );
+  // US-D02 라벨 칩: 스레드에 붙은 thread_labels 중 하나라도 고른 라벨이면 통과. 라벨을 하나도
+  // 안 골랐으면 이 단계는 통째로 사라진다(빈 Set으로 거르면 전부 탈락한다 — 그게 기본값 함정).
+  const labelFiltered = useMemo(() => {
+    if (selectedLabelIds.size === 0) return pillFiltered;
+    const matching = new Set<string>();
+    for (const tl of threadLabels) {
+      if (selectedLabelIds.has(tl.label_id)) matching.add(tl.thread_id);
+    }
+    return pillFiltered.filter((r) => matching.has(r.threadId));
+  }, [pillFiltered, threadLabels, selectedLabelIds]);
   const viewFiltered = useMemo(
-    () => applyArchiveView(pillFiltered, view, pendingArchive),
-    [pillFiltered, view, pendingArchive],
+    () => applyArchiveView(labelFiltered, view, pendingArchive),
+    [labelFiltered, view, pendingArchive],
   );
   // Archived는 "보관 시각 역순"이 정렬 기준이다 — needs-attention을 위로 끌어올리지 않는다.
   const filtered = useMemo(
     () => (view === "archived" ? viewFiltered : sortInboxRows(viewFiltered)),
     [viewFiltered, view],
   );
+
+  // US-D02 필터 칩. 칩 문구는 여기서 완성해 넘긴다(FilterChipBar는 "채널/라벨"을 모른다).
+  const chips: FilterChip[] = [];
+  if (channelFilter && onChannelFilterChange) {
+    chips.push({
+      id: "channel",
+      fieldLabel: "Channel",
+      text: `Channel is ${CHANNEL_LABEL[channelFilter]}`,
+      onRemove: () => onChannelFilterChange(null),
+    });
+  }
+  if (selectedLabelIds.size > 0) {
+    chips.push({
+      id: "labels",
+      fieldLabel: "Label",
+      text: `Label is any of ${selectedLabelIds.size}개 라벨`,
+      onRemove: () => setSelectedLabelIds(new Set()),
+    });
+  }
+  const addOptions = {
+    fieldLabel: "Label",
+    options: labels.map((l) => ({ id: l.id, label: l.name })),
+    selectedIds: [...selectedLabelIds],
+    onToggle: (id: string) =>
+      setSelectedLabelIds((s) => {
+        const next = new Set(s);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      }),
+  };
 
   // US-D02: 그룹핑은 인박스의 needs-approval/agents 두 뷰에서만. Archived는 평평하게 둔다
   // (보관 시각 역순이라는 자체 정렬 축이 있고, 그 위에 상태 그룹을 얹으면 두 기준이 싸운다).
@@ -475,6 +529,10 @@ export function Inbox({
           보관됨
         </button>
       </div>
+      {/* 라벨이 하나도 없는 워크스페이스에선 아무것도 못 누르는 빈 바를 그리지 않는다. */}
+      {(chips.length > 0 || labels.length > 0) && (
+        <FilterChipBar chips={chips} addOptions={addOptions} />
+      )}
       <Virtuoso
         role="listbox"
         style={{ flex: "1 1 0", minHeight: 0 }}

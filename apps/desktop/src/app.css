@@ -971,3 +971,74 @@ body {
   background: var(--state-hover);
   color: var(--text-primary);
 }
+
+/* US-D02: 필터 칩 바 — 리스트 헤더 바로 아래, 행들 위에 얹힌다. 칩은 캡슐(999px)이 아니라
+   모서리를 남긴 8px 라운드다(ref-issue-tracker-density.webp: 필터 칩 = 라운드 렉트,
+   상태 pill = 캡슐 — 두 문법을 섞지 않는다). 채움은 강조색 8% 틴트 하나로 끝낸다. */
+.filter-chip-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px 10px;
+}
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 3px 6px 3px 10px;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: color-mix(in oklch, var(--accent) 8%, var(--bg-base));
+}
+.filter-chip button {
+  border: none;
+  background: none;
+  padding: 2px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 1;
+  font-size: 13px;
+  transition: background var(--dur-base) var(--ease-spring), color var(--dur-base)
+    var(--ease-spring);
+}
+.filter-chip button:hover {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}
+.filter-chip-bar__add {
+  border: var(--hairline);
+  border-radius: 8px;
+  padding: 3px 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--dur-base) var(--ease-spring), color var(--dur-base)
+    var(--ease-spring);
+}
+.filter-chip-bar__add:hover {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}
+/* 칩 편집 팝오버 = 떠 있는 패널 → glass-surface(유리). 폭만 잡아 준다. */
+.filter-chip-popover {
+  width: 240px;
+  border-radius: 12px;
+  padding: 6px;
+}
+/* [cmdk-item]의 기본 레이아웃은 팔레트용(이름 왼쪽 · 단축키 오른쪽 space-between)이다.
+   여기선 체크 표시 + 라벨을 왼쪽에 붙여야 하므로 이 팝오버 안에서만 덮는다 — 팔레트는 그대로. */
+.filter-chip-popover [cmdk-item] {
+  justify-content: flex-start;
+  gap: 8px;
+}
+.filter-chip-popover__check {
+  width: 12px;
+  color: var(--accent);
+  font-size: 12px;
+}
