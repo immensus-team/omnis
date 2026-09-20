@@ -41,6 +41,21 @@ const CHANNEL_LABEL: Record<UiChannel, string> = {
   system: "System",
 };
 
+/** US-A26 채널 아이콘. 글리프는 두 글자 모노그램이다 — 이모지는 헤드리스/폰트 환경마다
+ *  렌더가 갈리고, 첫 글자 한 글자는 Gmail/Google Calendar가 겹친다. */
+const CHANNEL_GLYPH: Record<UiChannel, string> = {
+  slack: "SL",
+  gmail: "GM",
+  gcal: "GC",
+  outlook: "OL",
+  telegram: "TG",
+  whatsapp: "WA",
+  kakaotalk: "KA",
+  linkedin: "IN",
+  agent: "AI",
+  system: "SY",
+};
+
 function pickChips(labels: LabelChip[]): { shown: LabelChip[]; more: number } {
   const scope = labels.find((l) => l.kind === "scope");
   const rest = labels.filter((l) => l !== scope);
@@ -90,7 +105,13 @@ export function InboxRow(props: InboxRowProps) {
           </span>
         )}
       </div>
-      <div className="inbox-row__channel" aria-label={`${CHANNEL_LABEL[props.channel]} 메시지`}>
+      <div className="inbox-row__channel">
+        <span
+          className="inbox-row__channel-icon"
+          aria-label={`${CHANNEL_LABEL[props.channel]} 메시지`}
+        >
+          {CHANNEL_GLYPH[props.channel]}
+        </span>
         {props.unread && <span className="inbox-row__unread" aria-label="안읽음" />}
         {props.hasPendingApproval && <span className="inbox-row__approval-dot" />}
       </div>

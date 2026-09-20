@@ -90,6 +90,36 @@ body {
   gap: 4px;
 }
 
+.inbox-row__channel {
+  /* .inbox-row의 두 번째(auto) 칼럼은 이 배지 자리다 — 안 쓰면 행 맨 아래로 흘러내린다. */
+  grid-row: 1;
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inbox-row__channel-icon {
+  border: var(--hairline);
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.inbox-row__unread,
+.inbox-row__approval-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.inbox-row__approval-dot {
+  background: var(--warn-500);
+}
+
 .inbox-row__chip,
 .inbox-row__chip-more,
 .status-badge {

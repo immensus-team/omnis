@@ -43,6 +43,16 @@ export function filterInboxItems<T extends InboxQueryItem>(items: T[], filter: I
   }
 }
 
+/** A5 §3.1 행 제목. Phase A의 IngestSink는 author_person_id를 채우지 않고(kernel/ingest.ts)
+ *  Slack 메시지에는 subject가 없다 — 스레드 제목까지 내려가지 않으면 Inbox 전체가 "(제목 없음)"이 된다. */
+export function inboxRowTitle(item: {
+  author?: { display_name: string } | undefined;
+  subject?: string | null;
+  thread?: { title: string | null } | undefined;
+}): string {
+  return item.author?.display_name ?? item.subject ?? item.thread?.title ?? "(제목 없음)";
+}
+
 const HHMM = new Intl.DateTimeFormat("ko-KR", {
   hour: "2-digit",
   minute: "2-digit",
@@ -113,7 +123,7 @@ export function Inbox({ onOpen }: { onOpen?: (target: OpenTarget) => void }) {
           scope: item.scope as InboxQueryItem["scope"],
           authorKind,
           hasPendingApproval: pendingThreadIds.has(item.thread_id),
-          title: item.author?.display_name ?? item.subject ?? "(제목 없음)",
+          title: inboxRowTitle(item),
           preview: item.body,
           channel: channelByAccount.get(item.account_id) ?? "system",
           timestamp: HHMM.format(new Date(item.sent_at)),
