@@ -195,6 +195,18 @@ async function main(): Promise<void> {
     await page.waitForTimeout(1400);
     await page.screenshot({ path: join(OUT, "row-hover-card.png") });
 
+    // 도달 가능한 최소 폭(src-tauri/tauri.conf.json minWidth 1024)에서 가로 스크롤이 없어야
+    // 한다. 탭 pill에 카운트가 붙어 헤더 줄이 넓어졌으므로 라운드마다 다시 잰다.
+    for (const width of [1024, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.waitForTimeout(400);
+      const over = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      console.log(`width ${width}: overflow ${over}px`);
+      if (over > 0) throw new Error(`가로 스크롤 발생: ${width}px에서 ${over}px`);
+    }
+
     await browser.close();
     console.log("shots written to", OUT);
   } finally {
