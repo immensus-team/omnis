@@ -1,4 +1,4 @@
-// A4 §1.5 읽기 tool. 부작용 없음 — SELECT만 한다.
+// A4 §1.5 read tools. No side effects — SELECT only.
 import { asOf, searchMemories } from "@omnis/memory";
 import { type ToolSet, tool } from "ai";
 import { z } from "zod";
@@ -6,7 +6,7 @@ import { getAgentsPool } from "../pool.js";
 
 export const READ_TOOLS: ToolSet = {
   read_thread: tool({
-    description: "스레드 하나와 최근 item들을 읽는다.",
+    description: "Read one thread and its recent items.",
     inputSchema: z.object({
       thread_id: z.string().uuid(),
       last_n: z.number().int().max(50).default(12),
@@ -45,7 +45,7 @@ export const READ_TOOLS: ToolSet = {
   }),
 
   search_memory: tool({
-    description: "메모리를 의미 검색한다.",
+    description: "Semantic search over memories.",
     inputSchema: z.object({
       query: z.string(),
       k: z.number().int().max(20).default(6),
@@ -61,7 +61,7 @@ export const READ_TOOLS: ToolSet = {
   }),
 
   read_person: tool({
-    description: "사람 한 명의 프로필과 채널 식별자를 읽는다.",
+    description: "Read one person's profile and channel identities.",
     inputSchema: z.object({
       person_id: z.string().uuid().optional(),
       handle: z.string().optional(),
@@ -85,7 +85,7 @@ export const READ_TOOLS: ToolSet = {
   }),
 
   read_entity: tool({
-    description: "엔티티를 as-of 시각 기준으로 읽는다(bi-temporal).",
+    description: "Read an entity as of a given time (bi-temporal).",
     inputSchema: z.object({ entity_id: z.string().uuid(), as_of: z.string().optional() }),
     execute: async ({ entity_id, as_of }) => ({
       entities: await asOf(getAgentsPool(), { entityId: entity_id, at: as_of ?? "now" }),
@@ -93,7 +93,7 @@ export const READ_TOOLS: ToolSet = {
   }),
 
   read_calendar: tool({
-    description: "기간 안의 캘린더 이벤트를 읽는다.",
+    description: "Read calendar events within a time range.",
     inputSchema: z.object({ from: z.string().datetime(), to: z.string().datetime() }),
     execute: async ({ from, to }) => {
       const { rows } = await getAgentsPool().query(
@@ -108,7 +108,7 @@ export const READ_TOOLS: ToolSet = {
   }),
 
   read_tasks: tool({
-    description: "할 일 목록을 읽는다.",
+    description: "Read the task list.",
     inputSchema: z.object({
       state: z.enum(["open", "done", "all"]).default("open"),
       limit: z.number().int().max(50).default(20),
@@ -127,7 +127,8 @@ export const READ_TOOLS: ToolSet = {
   }),
 
   read_session: tool({
-    description: "에이전트 세션의 durable 요약과 마지막 N턴을 읽는다. raw 로그는 없다(마스터 §9).",
+    description:
+      "Read an agent session's durable summary and its last N turns. There are no raw logs (master §9).",
     inputSchema: z.object({
       session_key: z.string(),
       last_n: z.number().int().max(20).default(5),

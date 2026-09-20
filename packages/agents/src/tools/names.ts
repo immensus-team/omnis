@@ -1,4 +1,4 @@
-// A4 §1.5. 이 파일은 값이 아니라 "이름"만 가진다 — 구현은 read.ts / propose.ts, 조립은 registry.ts.
+// A4 §1.5. This file holds names only, not values — the implementations live in read.ts / propose.ts, the assembly in registry.ts.
 
 export type ToolName =
   | "read_thread"
@@ -31,8 +31,8 @@ export const TOOL_NAMES: readonly ToolName[] = [
   "propose_self_model_patch",
 ] as const;
 
-/** A4 §1.5 마지막 문단: 레지스트리에 이 중 하나라도 등록되면 유닛 테스트가 깨진다.
- *  `archive`가 여기 있는 이유 — 자동 보관은 커널 잡의 SQL 전이지 모델이 부르는 tool이 아니다(A4 §9). */
+/** A4 §1.5, last paragraph: a unit test fails if even one of these is registered in the registry.
+ *  Why `archive` is here — auto-archive is a SQL transition in a kernel job, not a tool the model calls (A4 §9). */
 export const PHANTOM_TOOLS: readonly string[] = [
   "send_message",
   "send_email",

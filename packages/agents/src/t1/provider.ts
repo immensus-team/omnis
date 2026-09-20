@@ -1,15 +1,15 @@
-// A4 §12.1: T1 = DeepSeek V4.1 Flash via OpenRouter(토큰 마크업 없음).
-// provider SDK import는 이 디렉터리 밖으로 나가지 않는다(A7 §7 공통 금지의 어댑터 격리 규칙).
+// A4 §12.1: T1 = DeepSeek V4.1 Flash via OpenRouter (no token markup).
+// provider SDK imports never leave this directory (the adapter-isolation rule under A7 §7 common prohibitions).
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { LanguageModel } from "ai";
 
 export const T1_BASE_URL = "https://openrouter.ai/api/v1";
-/** OpenRouter 라우팅 슬러그. agent_runs.model에 넣는 값과 다르다. */
+/** OpenRouter routing slug. Different from the value written to agent_runs.model. */
 export const T1_MODEL_ID = "deepseek/deepseek-v4.1-flash";
-/** A3 §4 agent_runs.model 컬럼에 기록하는 값(A4 §12.1 표기 그대로). */
+/** The value recorded in the A3 §4 agent_runs.model column (A4 §12.1 notation, verbatim). */
 export const T1_RUN_MODEL = "deepseek-v4.1-flash";
 
-/** 키는 Keychain `omnis.openrouter.api_key`(A6-D9)에서 launchd가 env로 주입한다. 값은 절대 로그에 넣지 않는다. */
+/** The key is injected as env by launchd from Keychain `omnis.openrouter.api_key` (A6-D9). Never put the value in a log. */
 export function t1Model(): LanguageModel {
   const apiKey = process.env.OMNIS_OPENROUTER_API_KEY;
   if (apiKey === undefined || apiKey === "") {
