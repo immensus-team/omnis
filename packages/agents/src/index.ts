@@ -43,6 +43,14 @@ export {
   type TriggerContext,
 } from "./loop/spec.js";
 export { getLoop, listLoops, registerLoop, resetLoopRegistryForTest } from "./loop/registry.js";
+export {
+  FAILURE_LIMIT,
+  FAILURE_WINDOW_HOURS,
+  QUARANTINE_HOURS,
+  runLoop,
+  runLoopSpec,
+} from "./loop/run.js";
+export { T2_BASE_URL, T2_MODEL_ID, T2_RUN_MODEL } from "./t2/provider.js";
 export { PHANTOM_TOOLS, TOOL_NAMES, type ToolName } from "./tools/names.js";
 export { READ_TOOLS } from "./tools/read.js";
 export {
