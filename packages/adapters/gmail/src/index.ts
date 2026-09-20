@@ -167,7 +167,7 @@ export function createGmailAdapter(deps: GmailAdapterDeps): Adapter {
       return pull();
     },
 
-    // 승인 게이트(US-A07) 전까지 실제 messages.send는 호출하지 않는다.
+    // Until the approval gate (US-A07) exists, the real messages.send is never called.
     async send(thread: ThreadRef, draft: Outbound): Promise<SendResult> {
       const sink =
         deps.sink ??
@@ -223,8 +223,8 @@ function decodeGmailBody(data: string | undefined): string {
   return Buffer.from(data, "base64url").toString("utf8");
 }
 
-/** RFC 5322 주소 목록을 항목 단위로 자른다. 따옴표 안의 콤마("Lee, Dana" <dana@example.com>)는
- *  구분자가 아니다. */
+/** Splits an RFC 5322 address list item by item. A comma inside quotes ("Lee, Dana" <dana@example.com>) is
+ *  not a separator. */
 function splitAddressList(headerValue: string): string[] {
   const out: string[] = [];
   let quoted = false;
@@ -242,8 +242,8 @@ function splitAddressList(headerValue: string): string[] {
 }
 
 // "Name <a@b.com>, Name2 <c@d.com>" → one ParticipantRef per address, in order, deduped.
-// externalId는 메일박스 주소만 쓴다 — 표시 이름이 바뀔 때마다 같은 사람이 다른 신원이 되면
-// Phase B의 person 해석(A3 §10)이 한 사람을 여럿으로 쪼갠다.
+// externalId uses only the mailbox address — if the same person became a different identity whenever
+// the display name changed, Phase B's person resolution (A3 §10) would split one person into several.
 function parseAddressList(headerValue: string): { externalId: string; displayName: string }[] {
   const seen = new Set<string>();
   const out: { externalId: string; displayName: string }[] = [];

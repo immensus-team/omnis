@@ -59,11 +59,11 @@ export function createGoogleCalendarAdapter(deps: GoogleCalendarAdapterDeps): Ad
 
     async connect(auth: AuthRef): Promise<void> {
       if (deps.oauthClient) {
-        // 테스트 주입 경로: 이미 자격증명이 설정된 클라이언트를 그대로 쓴다(Keychain 조회 없음).
+        // Test injection path: uses a client that already has credentials configured (no Keychain lookup).
         oauth = deps.oauthClient;
       } else {
-        // A1 §2.3: Calendar는 Gmail과 같은 Cloud 프로젝트/client를 쓰므로
-        // auth.keychainService는 호출자가 omnis.gmail.<email>을 그대로 넘긴다(재사용).
+        // A1 §2.3: Calendar uses the same Cloud project/client as Gmail, so
+        // auth.keychainService is passed omnis.gmail.<email> verbatim by the caller (reuse).
         const refreshToken = await readKeychainSecret(
           auth.keychainService,
           auth.keychainAccount,
@@ -170,7 +170,7 @@ export function createGoogleCalendarAdapter(deps: GoogleCalendarAdapterDeps): Ad
       return poll();
     },
 
-    // 승인 게이트(US-A07) 전까지 events.insert/update는 절대 호출하지 않는다(A1 §2.3 "항상 pending_approvals를 거쳐").
+    // Until the approval gate (US-A07) exists, events.insert/update are never called (A1 §2.3, "always through pending_approvals").
     async send(thread: ThreadRef, draft: Outbound): Promise<SendResult> {
       const sink =
         deps.sink ??

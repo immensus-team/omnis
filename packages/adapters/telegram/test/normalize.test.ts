@@ -44,6 +44,6 @@ describe("Telegram normalize()", () => {
     });
     expect(edited[0]?.body).toBe("sync tomorrow at 11am (edited)");
     expect(normalize({ deletedMessageIds: [501], deletedChatId: 1001 })).toEqual([]);
-    expect(normalize({ id: 1 })).toEqual([]); // chat/sender 없음
+    expect(normalize({ id: 1 })).toEqual([]); // no chat/sender
   });
 });
