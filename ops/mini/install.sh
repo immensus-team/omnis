@@ -1,8 +1,8 @@
 #!/bin/bash
-# 미니에 omnis LaunchAgent를 깐다(hub, zero-cache, local-agent + 03:00 백업 잡). sudo 없음.
-# 사용법: ops/mini/install.sh            # 전체
-#         ops/mini/install.sh hub        # 하나만
-#         ops/mini/install.sh backup     # 백업 잡만(plist는 ops/mini/LaunchDaemons/ 아래)
+# Installs the omnis LaunchAgents on the mini (hub, zero-cache, local-agent + the 03:00 backup job). No sudo.
+# Usage: ops/mini/install.sh            # everything
+#        ops/mini/install.sh hub        # just one
+#        ops/mini/install.sh backup     # backup job only (plist lives under ops/mini/LaunchDaemons/)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -19,16 +19,16 @@ for service in "${SERVICES[@]}"; do
   label="com.omnis.$service"
   src="$ROOT/ops/mini/$label.plist"
   [ -f "$src" ] || src="$ROOT/ops/mini/LaunchDaemons/$label.plist"
-  [ -f "$src" ] || { echo "no plist: com.omnis.$service.plist (ops/mini/ 또는 ops/mini/LaunchDaemons/)" >&2; exit 1; }
+  [ -f "$src" ] || { echo "no plist: com.omnis.$service.plist (ops/mini/ or ops/mini/LaunchDaemons/)" >&2; exit 1; }
   sed -e "s#__OMNIS_ROOT__#$ROOT#g" -e "s#__HOME__#$HOME#g" "$src" > "$AGENTS/$label.plist"
   launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
-  # bootout은 비동기다. 서비스가 사라지기 전에 bootstrap하면 "5: Input/output error"로 죽는다.
+  # bootout is asynchronous. Bootstrapping before the service is gone dies with "5: Input/output error".
   for _ in $(seq 20); do
     launchctl print "gui/$(id -u)/$label" >/dev/null 2>&1 || break
     sleep 0.5
   done
   launchctl bootstrap "gui/$(id -u)" "$AGENTS/$label.plist"
-  # 캘린더 잡은 kickstart하면 그 자리에서 백업이 통째로 돈다 — 예약만 걸고 실행은 03:00에 맡긴다.
+  # Kickstarting a calendar job runs a full backup right then — so only register the schedule and leave the run to 03:00.
   [ "$service" = backup ] || launchctl kickstart -k "gui/$(id -u)/$label"
   echo "installed $label"
 done

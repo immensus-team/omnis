@@ -1,8 +1,9 @@
 #!/usr/bin/env -S pnpm exec tsx
-// 채널별 Keychain 항목 존재 + 1회성 read-only API 호출을 확인해 표로 찍는다.
-// 값(토큰)은 절대 stdout에 찍지 않는다: 존재 확인은 `-w` 없이 하고, API 호출에만 값을
-// 메모리로 읽어 바로 쓴다(A6 §9). 지금 배선된 채널은 어댑터가 실제로 있는 slack/gmail/gcal뿐
-// (A1 §2.1-§2.3) — outlook/telegram은 어댑터 자체가 없어 대상 밖(각 README.ko.md 참고).
+// Checks each channel's Keychain item existence plus a one-shot read-only API call, and prints a table.
+// Token values are never printed to stdout: existence is checked without `-w`, and only the API call
+// reads the value into memory and uses it immediately (A6 §9). The only channels wired up today are
+// slack/gmail/gcal, which actually have adapters (A1 §2.1-§2.3) — outlook/telegram have no adapter at
+// all, so they're out of scope (see each README.md).
 
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -28,7 +29,7 @@ export interface Row {
 export interface ChannelSpec {
   channel: string;
   account: string;
-  /** 어댑터가 connect()에서 읽는 Keychain service 전부 — 하나라도 없으면 연결이 깨진다. */
+  /** Every Keychain service the adapter reads in connect() — missing even one breaks the connection. */
   keychainServices: string[];
   keychainAccount: string;
   checkApi: () => Promise<{ ok: boolean; detail?: string }>;
@@ -38,7 +39,7 @@ type ExecFn = (cmd: string, args: string[]) => Promise<{ stdout: string }>;
 
 const realExec: ExecFn = (cmd, args) => execFileAsync(cmd, args);
 
-/** 존재만 확인한다 — `-w`를 안 써서 값은 절대 읽지도 찍지도 않는다. */
+/** Existence check only — `-w` is omitted, so the value is never read or printed. */
 export async function checkKeychainItem(
   service: string,
   account: string,
@@ -52,7 +53,7 @@ export async function checkKeychainItem(
   }
 }
 
-/** API 호출이 실제 값을 필요로 할 때만 쓴다. 반환값을 로그에 싣지 않는 건 호출자 책임. */
+/** Use only when the API call genuinely needs the value. Keeping the return value out of logs is the caller's job. */
 export async function readKeychainValue(
   service: string,
   account: string,
@@ -132,8 +133,9 @@ export function formatReport(rows: Row[]): string {
     .join("\n");
 }
 
-// ---- 실제 채널별 API 체크 — 구현된 어댑터만(slack/gmail/gcal). API는 어댑터가 쓰는 것과
-// 같은 라이브러리를 쓰지만, connect()/subscribe()의 소켓·폴링 부담 없이 read-only 1콜만 한다. ----
+// ---- Actual per-channel API checks — implemented adapters only (slack/gmail/gcal). The API uses the
+// same libraries the adapters do, but makes a single read-only call with none of connect()/subscribe()'s
+// socket and polling overhead. ----
 
 async function slackApiCheck(service: string, account: string) {
   const token = await readKeychainValue(service, account);
@@ -179,7 +181,7 @@ function loadAccounts(): AccountsConfig {
   const local = path.join(DIR, "accounts.local.json");
   if (!existsSync(local)) {
     throw new Error(
-      `${local} not found — cp tools/auth-kit/accounts.example.json tools/auth-kit/accounts.local.json 하고 값 채워넣기`,
+      `${local} not found — run cp tools/auth-kit/accounts.example.json tools/auth-kit/accounts.local.json and fill in the values`,
     );
   }
   return JSON.parse(readFileSync(local, "utf8")) as AccountsConfig;
@@ -193,8 +195,8 @@ function buildSpecs(accounts: AccountsConfig): ChannelSpec[] {
     specs.push({
       channel: "slack",
       account: teamId,
-      // connect()는 xoxb와 app-level(`.app`) 토큰을 둘 다 읽는다 —
-      // packages/adapters/slack/src/index.ts. `.app`이 없으면 Socket Mode가 못 뜬다.
+      // connect() reads both the xoxb and the app-level (`.app`) token —
+      // packages/adapters/slack/src/index.ts. Without `.app`, Socket Mode can't come up.
       keychainServices: [service, `${service}.app`],
       keychainAccount: teamId,
       checkApi: () => slackApiCheck(service, teamId),
@@ -202,8 +204,8 @@ function buildSpecs(accounts: AccountsConfig): ChannelSpec[] {
   }
   if (accounts.google) {
     const { email } = accounts.google;
-    // Gmail·Calendar는 같은 refresh token을 공유한다(A1 §1.3 표, google-calendar adapter가
-    // omnis.gmail.<email>을 그대로 재사용).
+    // Gmail and Calendar share the same refresh token (A1 §1.3 table; the google-calendar adapter
+    // reuses omnis.gmail.<email> as-is).
     const service = `omnis.gmail.${email}`;
     specs.push({
       channel: "gmail",
@@ -226,7 +228,7 @@ function buildSpecs(accounts: AccountsConfig): ChannelSpec[] {
 async function main() {
   const specs = buildSpecs(loadAccounts());
   if (specs.length === 0) {
-    console.log("accounts.local.json에 확인할 채널이 없다 (slack/google 둘 다 비어있음)");
+    console.log("no channels to verify in accounts.local.json (both slack and google are empty)");
     return;
   }
   const rows = await runVerify(specs);

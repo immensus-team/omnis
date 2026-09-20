@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- US-B41. 실측 원칙대로 LaunchAgent(gui 세션, sudo 없음) — Keychain 읽기가 GUI 세션을 요구한다
-     (RUNBOOK §4). 폴더명은 백로그 산출물 경로(ops/mini/LaunchDaemons/*.plist)를 그대로 따른다.
-     `ops/mini/install.sh backup`이 __OMNIS_ROOT__·__HOME__을 치환해 ~/Library/LaunchAgents에 깐다
-     (install.sh가 ops/mini/ 다음으로 이 폴더를 본다). 캘린더 잡이라 kickstart는 하지 않는다. -->
+<!-- US-B41. LaunchAgent (gui session, no sudo) per the measure-first principle — reading the Keychain requires a GUI
+     session (RUNBOOK §4). The folder name follows the backlog deliverable path (ops/mini/LaunchDaemons/*.plist) as-is.
+     `ops/mini/install.sh backup` substitutes __OMNIS_ROOT__ and __HOME__ and installs it into ~/Library/LaunchAgents
+     (install.sh looks at this folder next after ops/mini/). It is a calendar job, so no kickstart is performed. -->
 <plist version="1.0">
 <dict>
   <key>Label</key><string>com.omnis.backup</string>

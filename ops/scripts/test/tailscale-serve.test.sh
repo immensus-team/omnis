@@ -23,19 +23,19 @@ FAKETS
 }
 export PATH="$FAKE_BIN:$PATH"
 
-# 1) /api 마운트가 없으면 --check는 실패해야 한다.
+# 1) With no /api mount, --check must fail.
 write_fake_tailscale '{"Web":{}}' "Funnel off."
 if "$SCRIPT" --check >/dev/null 2>&1; then
   echo "FAIL: --check passed with no /api mount" >&2; exit 1
 fi
 echo "ok: --check fails when /api is not mounted"
 
-# 2) /api 마운트가 있고 Funnel이 꺼져 있으면 --check는 성공해야 한다.
+# 2) With the /api mount present and Funnel off, --check must pass.
 write_fake_tailscale '{"Web":{"mini.ts.net:443":{"Handlers":{"/api":{"Proxy":"http://127.0.0.1:8787"}}}}}' "Funnel off."
 "$SCRIPT" --check
 echo "ok: --check passes with /api mounted and funnel off"
 
-# 3) Funnel이 켜져 있으면 마운트가 맞아도 --check는 실패해야 한다.
+# 3) If Funnel is on, --check must fail even when the mount is correct.
 write_fake_tailscale '{"Web":{"mini.ts.net:443":{"Handlers":{"/api":{"Proxy":"http://127.0.0.1:8787"}}}}}' "Funnel on."
 if "$SCRIPT" --check >/dev/null 2>&1; then
   echo "FAIL: --check passed while funnel is on" >&2; exit 1

@@ -5,7 +5,7 @@ SCRIPT="$ROOT/ops/mini/preflight.sh"
 FAKE_BIN="$(mktemp -d)"
 trap 'rm -rf "$FAKE_BIN"' EXIT
 
-# 전부 "잘 안 됨" 상태를 흉내내는 가짜 바이너리 — 실패 목록에 6항목 전부 나와야 한다.
+# Fake binaries that all simulate a "broken" state — all 6 items must appear in the failure list.
 cat > "$FAKE_BIN/fdesetup"  <<'F'; chmod +x "$FAKE_BIN/fdesetup"
 #!/bin/bash
 echo "FileVault is Off."
@@ -71,7 +71,7 @@ F
 "$SCRIPT" --check
 echo "ok: preflight passes when everything is healthy"
 
-# autorestart만 꺼져 있으면 (정전 복구 시 헤드리스 미니가 안 켜진다) 반드시 실패해야 한다.
+# If only autorestart is off (the headless mini will not power back on after a power outage), it must fail.
 cat > "$FAKE_BIN/pmset"     <<'F'; chmod +x "$FAKE_BIN/pmset"
 #!/bin/bash
 echo " sleep             0"
