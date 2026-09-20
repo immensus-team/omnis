@@ -42,15 +42,6 @@ export async function captureAll(outDir: string): Promise<CaptureResult[]> {
     // networkidle says the bundle is fetched, not that React has mounted.
     await page.locator(`#${GALLERY_COMPONENTS[0].id}`).waitFor();
 
-    // cmdk's Dialog portals to <body>, and nothing in the gallery imports cmdk's stylesheet,
-    // so the dialog-mode palettes render as static full-width blocks instead of a centered
-    // overlay. #root is height:100% while its content overflows past that box, so those blocks
-    // land mid-document and overlap a section's bounding box — and an element screenshot is a
-    // page clip, not an isolated render of the subtree, so they bleed into the shot. Hiding the
-    // portals changes no in-flow layout (they were never in a section's flow) and keeps each
-    // shot faithful to the section it names.
-    await page.addStyleTag({ content: "[cmdk-overlay], [cmdk-dialog] { display: none; }" });
-
     const results: CaptureResult[] = [];
     for (const { id } of GALLERY_COMPONENTS) {
       const el = page.locator(`#${id}`);
@@ -58,6 +49,28 @@ export async function captureAll(outDir: string): Promise<CaptureResult[]> {
       const file = path.join(outDir, `${id}.png`);
       await el.screenshot({ path: file });
       results.push({ id, path: file });
+
+      // The dialog-mode palette is portaled to <body> as a position:fixed overlay, so it is
+      // nowhere near #command-palette's bounding box — it needs a shot of its own. Opened only
+      // after the section shot (which wants it closed) and closed again so the overlay cannot
+      // bleed into the sections captured after this one, since SPA state persists.
+      if (id === "command-palette") {
+        // Every demo renders twice, once per theme pane, so the button is ambiguous by role
+        // alone. The dialog portals to <body>, outside either pane's theme scope, so the light
+        // pane's instance is the one to open.
+        await page
+          .locator("#command-palette .gallery-pane:not([data-theme='dark'])")
+          .getByRole("button", { name: "Open ⌘K dialog" })
+          .click();
+        const dialog = page.locator("[cmdk-dialog]");
+        await dialog.waitFor();
+        const dialogFile = path.join(outDir, "command-palette-dialog.png");
+        await dialog.screenshot({ path: dialogFile });
+        results.push({ id: "command-palette-dialog", path: dialogFile });
+        // Radix Dialog's Escape handler runs the component's onOpenChange(false).
+        await page.keyboard.press("Escape");
+        await dialog.waitFor({ state: "hidden" });
+      }
     }
     return results;
   } finally {
