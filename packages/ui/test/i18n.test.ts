@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { en, ko, t } from "../src/i18n/index";
+import { en, ko, t, tk } from "../src/i18n/index";
 import type { DottedKeyPath, Locale } from "../src/i18n/index";
 
 /** 리프(문자열)까지의 점 표기 경로 → 값. 재귀라 네임스페이스가 늘어도 자동으로 따라간다. */
@@ -98,6 +98,18 @@ describe("i18n 사전 (A5 §8 마이크로카피)", () => {
     );
     expect(t("ko", "relativeTime.minutesAgo", { n: 5 })).toBe("5분 전");
     expect(t("en", "relativeTime.minutesAgo", { n: 5 })).toBe("5m ago");
+  });
+
+  it('tk()가 t("ko", …)와 같은 값을 돌려준다 (변수 있는 키/없는 키 양쪽)', () => {
+    // 변수 있는 키 — 복수형 덩어리를 타는 common.itemCount로 래퍼가 vars를 그대로 넘기는지 본다.
+    expect(tk("common.itemCount", { count: 5 })).toBe(t("ko", "common.itemCount", { count: 5 }));
+    expect(tk("common.itemCount", { count: 5 })).toBe("5개 항목");
+    expect(tk("relativeTime.minutesAgo", { n: 5 })).toBe(
+      t("ko", "relativeTime.minutesAgo", { n: 5 }),
+    );
+    // 변수 없는 키 — 두 번째 인자를 아예 안 넘긴 호출도 동일해야 한다.
+    expect(tk("inbox.title")).toBe(t("ko", "inbox.title"));
+    expect(tk("inbox.title")).toBe("받은 편지함");
   });
 
   it("변수가 빠지면 플레이스홀더를 원문 그대로 남긴다", () => {

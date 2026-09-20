@@ -62,3 +62,9 @@ export function t(locale: Locale, key: DottedKeyPath, vars?: Vars): string {
   const text = lookup(locale, key);
   return vars === undefined ? text : interpolate(resolvePlurals(text, vars), vars);
 }
+
+/** `t()`의 한국어 기본값 버전 — 로케일을 매번 안 넘기고 싶은 호출부용 편의 래퍼.
+ * `t`의 계약(락 없는 명시적 로케일)은 그대로 두고, 가장 흔한 케이스(ko)만 짧게 만든다. */
+export function tk(key: DottedKeyPath, vars?: Vars): string {
+  return t("ko", key, vars);
+}
