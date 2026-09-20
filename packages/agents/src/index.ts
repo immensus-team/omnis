@@ -110,3 +110,13 @@ export {
   type NightlyDigest,
   type NightlyDigestOutputT,
 } from "./loops/digest-nightly.js";
+export {
+  ANTHROPIC_BATCH_MODEL,
+  ANTHROPIC_BATCH_URL,
+  MEMORY_CONSOLIDATE_CRON,
+  MEMORY_HARVEST_CRON,
+  harvestConsolidation,
+  submitConsolidation,
+  type ConsolidationRequest,
+  type ConsolidationResult,
+} from "./memory/consolidate.js";
