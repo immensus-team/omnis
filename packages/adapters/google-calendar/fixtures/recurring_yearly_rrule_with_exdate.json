@@ -4,7 +4,7 @@
     "kind": "calendar#event",
     "id": "evt_rec_yearly_instance_20270101",
     "status": "confirmed",
-    "summary": "창립기념일 휴무",
+    "summary": "Founding Day Holiday",
     "created": "2025-12-01T00:00:00.000Z",
     "updated": "2025-12-01T00:00:00.000Z",
     "creator": {
@@ -33,7 +33,7 @@
     "attendees": [
       {
         "email": "allcompany@example.com",
-        "displayName": "전사",
+        "displayName": "Everyone",
         "responseStatus": "accepted"
       }
     ]
@@ -48,7 +48,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "창립기념일 휴무",
+        "body": "Founding Day Holiday",
         "attachments": [],
         "sentAt": "2027-01-01T00:00:00+09:00",
         "status": "received",
@@ -56,11 +56,11 @@
         "threadMeta": {
           "externalId": "evt_rec_yearly_instance_20270101",
           "kind": "calendar",
-          "title": "창립기념일 휴무",
+          "title": "Founding Day Holiday",
           "participants": [
             {
               "externalId": "allcompany@example.com",
-              "displayName": "전사"
+              "displayName": "Everyone"
             }
           ],
           "lastItemAt": "2027-01-01T00:00:00+09:00",

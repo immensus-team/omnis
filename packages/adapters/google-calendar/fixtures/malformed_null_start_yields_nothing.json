@@ -4,7 +4,7 @@
     "kind": "calendar#event",
     "id": "evt_null_start",
     "status": "confirmed",
-    "summary": "start가 null",
+    "summary": "start is null",
     "start": null,
     "end": null,
     "updated": "2026-09-15T00:00:00.000Z"

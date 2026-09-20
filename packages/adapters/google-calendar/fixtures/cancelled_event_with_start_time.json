@@ -4,7 +4,7 @@
     "kind": "calendar#event",
     "id": "evt_cancelled_with_start",
     "status": "cancelled",
-    "summary": "고객사 킥오프 (취소됨)",
+    "summary": "Client Kickoff (cancelled)",
     "created": "2026-08-20T01:00:00.000Z",
     "updated": "2026-09-10T05:41:00.000Z",
     "creator": {
@@ -26,7 +26,7 @@
     "attendees": [
       {
         "email": "client@example.com",
-        "displayName": "고객사 담당자",
+        "displayName": "Client Contact",
         "responseStatus": "declined"
       }
     ],
@@ -42,7 +42,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "고객사 킥오프 (취소됨)",
+        "body": "Client Kickoff (cancelled)",
         "attachments": [],
         "sentAt": "2026-09-28T14:00:00+09:00",
         "status": "received",
@@ -50,11 +50,11 @@
         "threadMeta": {
           "externalId": "evt_cancelled_with_start",
           "kind": "calendar",
-          "title": "고객사 킥오프 (취소됨)",
+          "title": "Client Kickoff (cancelled)",
           "participants": [
             {
               "externalId": "client@example.com",
-              "displayName": "고객사 담당자"
+              "displayName": "Client Contact"
             }
           ],
           "lastItemAt": "2026-09-28T14:00:00+09:00",

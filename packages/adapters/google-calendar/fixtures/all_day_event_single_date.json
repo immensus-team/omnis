@@ -4,7 +4,7 @@
     "kind": "calendar#event",
     "id": "evt_allday_childrens_day",
     "status": "confirmed",
-    "summary": "어린이날 🎈",
+    "summary": "Children's Day 🎈",
     "created": "2026-01-02T00:00:00.000Z",
     "updated": "2026-01-02T00:00:00.000Z",
     "creator": {

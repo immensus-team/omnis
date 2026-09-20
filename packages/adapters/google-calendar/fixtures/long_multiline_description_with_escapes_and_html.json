@@ -4,8 +4,8 @@
     "kind": "calendar#event",
     "id": "evt_escaped_desc",
     "status": "confirmed",
-    "summary": "장애 회고 (postmortem)",
-    "description": "요약: 09:12 KST 알림 폭주 → 09:41 완화\n\n원인:\n\t\"retry storm\" — 백오프 없이 재시도하는 워커\n\t따옴표(\"), 역슬래시(\\), 탭, 줄바꿈이 모두 든 설명\n\n링크: <a href=\"https://example.com/incidents/1234?a=1&amp;b=2\">https://example.com/incidents/1234?a=1&amp;b=2</a>\n액션 아이템: ① 지수 백오프 ② 서킷 브레이커 ③ 대시보드 임계값 조정",
+    "summary": "Incident Retrospective (postmortem)",
+    "description": "Summary: alert storm at 09:12 KST → mitigated at 09:41\n\nCause:\n\t\"retry storm\" — a worker retrying without backoff\n\tquotes (\"), a backslash (\\), tabs, and newlines\n\nLink: <a href=\"https://example.com/incidents/1234?a=1&amp;b=2\">https://example.com/incidents/1234?a=1&amp;b=2</a>\nAction items: ① exponential backoff ② circuit breaker ③ adjust dashboard thresholds",
     "creator": {
       "email": "281932556+jinhologankim@users.noreply.github.com",
       "self": true
@@ -33,7 +33,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "장애 회고 (postmortem)",
+        "body": "Incident Retrospective (postmortem)",
         "attachments": [],
         "sentAt": "2026-10-08T16:00:00+09:00",
         "status": "received",
@@ -41,7 +41,7 @@
         "threadMeta": {
           "externalId": "evt_escaped_desc",
           "kind": "calendar",
-          "title": "장애 회고 (postmortem)",
+          "title": "Incident Retrospective (postmortem)",
           "participants": [],
           "lastItemAt": "2026-10-08T16:00:00+09:00",
           "archivedAt": null

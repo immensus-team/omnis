@@ -55,9 +55,10 @@ describe("Google Calendar contract: fixture replay", () => {
   }
 });
 
-// 이 어댑터가 커널로 내보내는 모든 아이템에 대해 채널과 무관하게 성립해야 하는 최소 계약.
-// 픽스처에 저장된 JSON이 아니라 실제 normalize() 출력을 검사한다 — 그래야 어댑터가 계약을 지키는지
-// 검증된다(expected.items 쪽을 보면 어댑터가 무엇을 내보내든 통과하는 자기참조 테스트가 된다).
+// The minimum contract that must hold for every item this adapter emits into the kernel, regardless of channel.
+// Checks the real normalize() output rather than the JSON stored in the fixture — only that way is the
+// adapter verified to honor the contract (reading expected.items would make it a self-referential test
+// that passes whatever the adapter emits).
 interface NormalizedItemShape {
   externalId: unknown;
   threadExternalId: unknown;
@@ -76,30 +77,31 @@ describe("Google Calendar contract: NormalizedItem invariants", () => {
       const items = normalize(fixture.raw) as NormalizedItemShape[];
 
       for (const item of items) {
-        // 스레드/아이템 식별자: 커널이 스레드를 묶고 중복을 제거하는 키다 — 비어 있으면 안 된다.
+        // Thread/item identifiers: the keys the kernel uses to group threads and dedupe — must not be empty.
         expect(item.externalId, `${fixture.scenario}: externalId`).toBeTypeOf("string");
         expect(item.externalId, `${fixture.scenario}: externalId`).not.toBe("");
         expect(item.threadExternalId, `${fixture.scenario}: threadExternalId`).toBeTypeOf("string");
         expect(item.threadExternalId, `${fixture.scenario}: threadExternalId`).not.toBe("");
 
-        // sentAt: 정렬·증분 수집의 기준 시각. 파싱 불가능한 문자열이면 안 된다.
+        // sentAt: the reference timestamp for ordering and incremental collection. Must not be an unparseable string.
         const sentAt = item.sentAt as string;
         expect(new Date(sentAt).toString(), `${fixture.scenario}: sentAt`).not.toBe("Invalid Date");
 
-        // 이 어댑터는 API가 준 dateTime 문자열을 오프셋(`+09:00`)·플로팅 시각까지 그대로 보존하므로
-        // `new Date(sentAt).toISOString() === sentAt` 항등식은 성립하지 않는다(outlook 테스트 참고).
-        // 여기서 보장하는 건 "ISO-8601 datetime 표기이고, 어떤 폴백을 타더라도 instant가 유실되지
-        // 않는다"이다 — 폴백이 description 텍스트나 빈 문자열을 sentAt에 흘리면 여기서 걸린다.
+        // This adapter preserves the dateTime string the API returned verbatim, offsets (`+09:00`) and
+        // floating times included, so the identity `new Date(sentAt).toISOString() === sentAt` does not
+        // hold (see the outlook tests). What is guaranteed here is "it is ISO-8601 datetime notation and
+        // the instant is not lost whatever fallback runs" — a fallback leaking description text or an
+        // empty string into sentAt gets caught here.
         expect(sentAt, `${fixture.scenario}: sentAt`).toMatch(
           /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?$/,
         );
 
-        // author: 항상 존재하고 kind가 채워져야 한다(이 어댑터는 system 고정).
+        // author: always present and kind must be populated (this adapter pins it to system).
         expect(item.author, `${fixture.scenario}: author`).toBeDefined();
         expect(item.author?.kind, `${fixture.scenario}: author.kind`).toBeTypeOf("string");
         expect(item.author?.kind, `${fixture.scenario}: author.kind`).not.toBe("");
 
-        // 표현할 내용이 0인 아이템은 내보내지 않는다: body가 있거나 첨부가 있어야 한다.
+        // Never emit an item with nothing to express: it must have a body or an attachment.
         const body = typeof item.body === "string" ? item.body : "";
         const attachments = Array.isArray(item.attachments) ? item.attachments : [];
         expect(
@@ -107,7 +109,7 @@ describe("Google Calendar contract: NormalizedItem invariants", () => {
           `${fixture.scenario}: contentless item ${String(item.externalId)}`,
         ).toBe(true);
 
-        // threadMeta가 실리면 externalId는 필수다(없으면 스레드 병합이 깨진다).
+        // When threadMeta is present, externalId is required (without it, thread merging breaks).
         if (item.threadMeta !== undefined) {
           expect(
             item.threadMeta.externalId,

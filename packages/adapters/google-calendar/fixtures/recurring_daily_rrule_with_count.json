@@ -4,7 +4,7 @@
     "kind": "calendar#event",
     "id": "evt_rec_daily_instance_20261005",
     "status": "confirmed",
-    "summary": "데일리 스탠드업",
+    "summary": "Daily Standup",
     "created": "2026-09-01T00:00:00.000Z",
     "updated": "2026-09-01T00:00:00.000Z",
     "creator": {
@@ -37,7 +37,7 @@
       },
       {
         "email": "sora@example.com",
-        "displayName": "박소라",
+        "displayName": "Sora Park",
         "responseStatus": "tentative"
       }
     ],
@@ -56,7 +56,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "데일리 스탠드업",
+        "body": "Daily Standup",
         "attachments": [],
         "sentAt": "2026-10-05T09:15:00+09:00",
         "status": "received",
@@ -64,7 +64,7 @@
         "threadMeta": {
           "externalId": "evt_rec_daily_instance_20261005",
           "kind": "calendar",
-          "title": "데일리 스탠드업",
+          "title": "Daily Standup",
           "participants": [
             {
               "externalId": "dana@example.com",
@@ -72,7 +72,7 @@
             },
             {
               "externalId": "sora@example.com",
-              "displayName": "박소라"
+              "displayName": "Sora Park"
             }
           ],
           "lastItemAt": "2026-10-05T09:15:00+09:00",

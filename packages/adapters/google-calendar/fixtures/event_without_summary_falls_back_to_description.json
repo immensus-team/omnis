@@ -4,7 +4,7 @@
     "kind": "calendar#event",
     "id": "evt_no_summary",
     "status": "confirmed",
-    "description": "다른 시스템이 밀어 넣은 busy 블록 — summary가 아예 없다.",
+    "description": "Busy block pushed in by another system — no summary at all.",
     "creator": {
       "email": "scheduler@example.com"
     },
@@ -34,7 +34,7 @@
         "externalId": "evt_no_summary",
         "kind": "event",
         "author": { "kind": "system", "id": "" },
-        "body": "다른 시스템이 밀어 넣은 busy 블록 — summary가 아예 없다.",
+        "body": "Busy block pushed in by another system — no summary at all.",
         "attachments": [],
         "sentAt": "2026-10-16T08:00:00+09:00",
         "status": "received",

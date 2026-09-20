@@ -8,9 +8,9 @@
     "htmlLink": "https://www.google.com/calendar/event?eid=recweekly",
     "created": "2026-07-01T00:12:33.000Z",
     "updated": "2026-07-01T00:12:33.000Z",
-    "summary": "주간 스프린트 리뷰",
-    "description": "매주 월/수 반복되는 정기 리뷰. 안건은 스프린트 보드 참고.",
-    "location": "회의실 A (온라인 병행)",
+    "summary": "Weekly Sprint Review",
+    "description": "Recurring review every Monday and Wednesday. See the sprint board for the agenda.",
+    "location": "Meeting Room A (hybrid)",
     "colorId": "9",
     "creator": {
       "email": "281932556+jinhologankim@users.noreply.github.com",
@@ -42,7 +42,7 @@
       },
       {
         "email": "minjun@example.com",
-        "displayName": "김민준",
+        "displayName": "Minjun Kim",
         "responseStatus": "accepted"
       }
     ],
@@ -63,7 +63,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "주간 스프린트 리뷰",
+        "body": "Weekly Sprint Review",
         "attachments": [],
         "sentAt": "2026-09-25T10:00:00+09:00",
         "status": "received",
@@ -71,7 +71,7 @@
         "threadMeta": {
           "externalId": "evt_rec_weekly_instance_20260925",
           "kind": "calendar",
-          "title": "주간 스프린트 리뷰",
+          "title": "Weekly Sprint Review",
           "participants": [
             {
               "externalId": "dana@example.com",
@@ -79,7 +79,7 @@
             },
             {
               "externalId": "minjun@example.com",
-              "displayName": "김민준"
+              "displayName": "Minjun Kim"
             }
           ],
           "lastItemAt": "2026-09-25T10:00:00+09:00",

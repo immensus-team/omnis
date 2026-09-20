@@ -4,8 +4,8 @@
     "kind": "calendar#event",
     "id": "evt_attendees_mixed",
     "status": "confirmed",
-    "summary": "디자인 리뷰",
-    "location": "회의실 B",
+    "summary": "Design Review",
+    "location": "Meeting Room B",
     "creator": {
       "email": "281932556+jinhologankim@users.noreply.github.com",
       "self": true
@@ -30,12 +30,12 @@
       },
       {
         "email": "minjun@example.com",
-        "displayName": "김민준",
+        "displayName": "Minjun Kim",
         "responseStatus": "declined"
       },
       {
         "email": "sora@example.com",
-        "displayName": "박소라",
+        "displayName": "Sora Park",
         "responseStatus": "tentative"
       },
       {
@@ -54,7 +54,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "디자인 리뷰",
+        "body": "Design Review",
         "attachments": [],
         "sentAt": "2026-11-12T15:00:00+09:00",
         "status": "received",
@@ -62,7 +62,7 @@
         "threadMeta": {
           "externalId": "evt_attendees_mixed",
           "kind": "calendar",
-          "title": "디자인 리뷰",
+          "title": "Design Review",
           "participants": [
             {
               "externalId": "dana@example.com",
@@ -70,11 +70,11 @@
             },
             {
               "externalId": "minjun@example.com",
-              "displayName": "김민준"
+              "displayName": "Minjun Kim"
             },
             {
               "externalId": "sora@example.com",
-              "displayName": "박소라"
+              "displayName": "Sora Park"
             },
             {
               "externalId": "guest@example.com",

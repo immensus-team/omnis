@@ -4,8 +4,8 @@
     "kind": "calendar#event",
     "id": "evt_tz_floating_reminder",
     "status": "confirmed",
-    "summary": "플로팅 시간 이벤트 (offset 없음)",
-    "description": "시간대 없는 dateTime — 캘린더 기본 시간대로 해석된다.",
+    "summary": "Floating-Time Event (no offset)",
+    "description": "A dateTime with no timezone — interpreted in the calendar's default timezone.",
     "start": {
       "dateTime": "2026-06-15T09:00:00"
     },
@@ -23,7 +23,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "플로팅 시간 이벤트 (offset 없음)",
+        "body": "Floating-Time Event (no offset)",
         "attachments": [],
         "sentAt": "2026-06-15T09:00:00",
         "status": "received",
@@ -31,7 +31,7 @@
         "threadMeta": {
           "externalId": "evt_tz_floating_reminder",
           "kind": "calendar",
-          "title": "플로팅 시간 이벤트 (offset 없음)",
+          "title": "Floating-Time Event (no offset)",
           "participants": [],
           "lastItemAt": "2026-06-15T09:00:00",
           "archivedAt": null

@@ -4,7 +4,7 @@
     "kind": "calendar#event",
     "id": "evt_attendees_all_declined",
     "status": "confirmed",
-    "summary": "선택 참석 세미나",
+    "summary": "Optional Attendance Seminar",
     "transparency": "transparent",
     "creator": {
       "email": "281932556+jinhologankim@users.noreply.github.com",
@@ -30,7 +30,7 @@
       },
       {
         "email": "sora@example.com",
-        "displayName": "박소라",
+        "displayName": "Sora Park",
         "responseStatus": "declined"
       }
     ]
@@ -45,7 +45,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "선택 참석 세미나",
+        "body": "Optional Attendance Seminar",
         "attachments": [],
         "sentAt": "2026-11-20T13:00:00+09:00",
         "status": "received",
@@ -53,7 +53,7 @@
         "threadMeta": {
           "externalId": "evt_attendees_all_declined",
           "kind": "calendar",
-          "title": "선택 참석 세미나",
+          "title": "Optional Attendance Seminar",
           "participants": [
             {
               "externalId": "dana@example.com",
@@ -61,7 +61,7 @@
             },
             {
               "externalId": "sora@example.com",
-              "displayName": "박소라"
+              "displayName": "Sora Park"
             }
           ],
           "lastItemAt": "2026-11-20T13:00:00+09:00",

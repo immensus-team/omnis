@@ -4,9 +4,9 @@
     "kind": "calendar#event",
     "id": "evt_very_long_desc",
     "status": "confirmed",
-    "summary": "2026년 4분기 제품 로드맵 리뷰 — 어댑터 확장(Telegram/Outlook/Google Calendar), 인제스트 파이프라인 재설계, 승인 게이트(US-A07) 범위 확정, 그리고 온콜 로테이션 개편안까지 한 번에 다루는 아주 긴 제목의 회의 (2시간 블록)",
-    "description": "안건 1. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 2. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 3. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 4. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 5. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 6. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 7. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 8. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 9. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 10. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 11. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 12. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 13. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 14. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 15. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 16. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 17. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 18. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 19. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 20. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 21. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 22. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 23. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.\n안건 24. 이번 분기 우선순위와 리스크를 정리한다. 각 어댑터의 정규화 규칙, 재시도 정책, 스레드 매핑 기준을 확인하고 미해결 항목은 다음 스프린트로 넘긴다.",
-    "location": "회의실 C + Google Meet",
+    "summary": "Q4 2026 Product Roadmap Review — a very long meeting title that covers adapter expansion (Telegram/Outlook/Google Calendar), the ingest pipeline redesign, scoping the approval gate (US-A07), and the on-call rotation overhaul all at once (2-hour block)",
+    "description": "Agenda 1. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 2. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 3. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 4. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 5. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 6. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 7. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 8. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 9. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 10. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 11. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 12. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 13. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 14. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 15. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 16. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 17. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 18. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 19. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 20. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 21. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 22. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 23. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.\nAgenda 24. Review this quarter's priorities and risks. Check each adapter's normalization rules, retry policy, and thread-mapping criteria, and carry unresolved items over to the next sprint.",
+    "location": "Meeting Room C + Google Meet",
     "creator": {
       "email": "281932556+jinhologankim@users.noreply.github.com",
       "self": true
@@ -31,7 +31,7 @@
       },
       {
         "email": "minjun@example.com",
-        "displayName": "김민준",
+        "displayName": "Minjun Kim",
         "responseStatus": "tentative"
       }
     ]
@@ -46,7 +46,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "2026년 4분기 제품 로드맵 리뷰 — 어댑터 확장(Telegram/Outlook/Google Calendar), 인제스트 파이프라인 재설계, 승인 게이트(US-A07) 범위 확정, 그리고 온콜 로테이션 개편안까지 한 번에 다루는 아주 긴 제목의 회의 (2시간 블록)",
+        "body": "Q4 2026 Product Roadmap Review — a very long meeting title that covers adapter expansion (Telegram/Outlook/Google Calendar), the ingest pipeline redesign, scoping the approval gate (US-A07), and the on-call rotation overhaul all at once (2-hour block)",
         "attachments": [],
         "sentAt": "2026-10-06T14:00:00+09:00",
         "status": "received",
@@ -54,7 +54,7 @@
         "threadMeta": {
           "externalId": "evt_very_long_desc",
           "kind": "calendar",
-          "title": "2026년 4분기 제품 로드맵 리뷰 — 어댑터 확장(Telegram/Outlook/Google Calendar), 인제스트 파이프라인 재설계, 승인 게이트(US-A07) 범위 확정, 그리고 온콜 로테이션 개편안까지 한 번에 다루는 아주 긴 제목의 회의 (2시간 블록)",
+          "title": "Q4 2026 Product Roadmap Review — a very long meeting title that covers adapter expansion (Telegram/Outlook/Google Calendar), the ingest pipeline redesign, scoping the approval gate (US-A07), and the on-call rotation overhaul all at once (2-hour block)",
           "participants": [
             {
               "externalId": "dana@example.com",
@@ -62,7 +62,7 @@
             },
             {
               "externalId": "minjun@example.com",
-              "displayName": "김민준"
+              "displayName": "Minjun Kim"
             }
           ],
           "lastItemAt": "2026-10-06T14:00:00+09:00",

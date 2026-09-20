@@ -200,12 +200,12 @@ interface GCalEvent {
 export function normalize(raw: unknown): NormalizedItem[] {
   const e = raw as GCalEvent;
   if (!e.id || !e.start?.dateTime) return [];
-  // summary와 description이 둘 다 없을 때만 표현할 내용이 없다. body: "" + attachments: [] 아이템을
-  // 내보내는 대신 아이템을 만들지 않는다 — Slack(`if (!m.text && !m.files?.length) return [];`)과
-  // Telegram 어댑터도 같은 이유로 같은 가드를 둔다.
-  // summary는 API에서 선택 필드다: 다른 시스템이 밀어 넣은 제목 없는 busy 블록은 summary가 아예
-  // 없지만 description에 실제 내용이 있다. 그런 이벤트를 드롭하면 데이터 손실이므로, 제목 대신
-  // description을 본문으로 삼아 살린다(threadMeta.title은 null로 남는다 — 이미 지원되는 상태).
+  // There is nothing to express only when both summary and description are absent. Rather than emitting an
+  // item with body: "" + attachments: [], we emit no item at all — Slack (`if (!m.text && !m.files?.length) return [];`)
+  // and the Telegram adapter keep the same guard for the same reason.
+  // summary is optional in the API: a title-less busy block pushed in by another system has no summary
+  // at all, while its description carries the real content. Dropping such an event would lose data, so we
+  // keep it by using description as the body instead of the title (threadMeta.title stays null — an already supported state).
   if (!e.summary && !e.description) return [];
   return [
     {

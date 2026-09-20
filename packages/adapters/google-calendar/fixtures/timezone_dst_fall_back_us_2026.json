@@ -4,7 +4,7 @@
     "kind": "calendar#event",
     "id": "evt_tz_dst_fall_2026",
     "status": "confirmed",
-    "summary": "DST fall-back 확인 (중복 시각)",
+    "summary": "DST fall-back check (duplicate time)",
     "creator": {
       "email": "us@example.com"
     },
@@ -19,7 +19,7 @@
       "dateTime": "2026-11-01T02:30:00-05:00",
       "timeZone": "America/New_York"
     },
-    "description": "01:30 EDT 는 같은 날 01:30 EST 와 중복된다."
+    "description": "01:30 EDT overlaps with 01:30 EST on the same day."
   },
   "expected": {
     "items": [
@@ -31,7 +31,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "DST fall-back 확인 (중복 시각)",
+        "body": "DST fall-back check (duplicate time)",
         "attachments": [],
         "sentAt": "2026-11-01T01:30:00-04:00",
         "status": "received",
@@ -39,7 +39,7 @@
         "threadMeta": {
           "externalId": "evt_tz_dst_fall_2026",
           "kind": "calendar",
-          "title": "DST fall-back 확인 (중복 시각)",
+          "title": "DST fall-back check (duplicate time)",
           "participants": [],
           "lastItemAt": "2026-11-01T01:30:00-04:00",
           "archivedAt": null

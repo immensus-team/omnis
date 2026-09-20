@@ -4,9 +4,9 @@
     "kind": "calendar#event",
     "id": "evt_allday_trip_jeju",
     "status": "confirmed",
-    "summary": "제주 워크숍 (2박 3일)",
-    "location": "제주 신라호텔",
-    "description": "첫날 14시 체크인, 마지막날 11시 체크아웃.",
+    "summary": "Jeju Workshop (3 days, 2 nights)",
+    "location": "Jeju Shilla Hotel",
+    "description": "Check in at 14:00 on day one, check out at 11:00 on the last day.",
     "creator": {
       "email": "281932556+jinhologankim@users.noreply.github.com",
       "self": true
@@ -29,7 +29,7 @@
       },
       {
         "email": "minjun@example.com",
-        "displayName": "김민준",
+        "displayName": "Minjun Kim",
         "responseStatus": "accepted"
       }
     ]

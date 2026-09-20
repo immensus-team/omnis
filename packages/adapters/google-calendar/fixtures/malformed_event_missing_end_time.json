@@ -4,7 +4,7 @@
     "kind": "calendar#event",
     "id": "evt_missing_end",
     "status": "confirmed",
-    "summary": "끝 시간 없는 이벤트 (모바일 버그)",
+    "summary": "Event with No End Time (mobile bug)",
     "creator": {
       "email": "281932556+jinhologankim@users.noreply.github.com",
       "self": true
@@ -28,7 +28,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "끝 시간 없는 이벤트 (모바일 버그)",
+        "body": "Event with No End Time (mobile bug)",
         "attachments": [],
         "sentAt": "2026-10-13T09:00:00+09:00",
         "status": "received",
@@ -36,7 +36,7 @@
         "threadMeta": {
           "externalId": "evt_missing_end",
           "kind": "calendar",
-          "title": "끝 시간 없는 이벤트 (모바일 버그)",
+          "title": "Event with No End Time (mobile bug)",
           "participants": [],
           "lastItemAt": "2026-10-13T09:00:00+09:00",
           "archivedAt": null

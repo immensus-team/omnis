@@ -4,8 +4,8 @@
     "kind": "calendar#event",
     "id": "evt_overnight_deploy_window",
     "status": "confirmed",
-    "summary": "연말 배포 윈도우 (자정 넘김)",
-    "description": "12/31 23:30 ~ 1/1 07:00. 롤백 담당 대기.",
+    "summary": "Year-End Deploy Window (crosses midnight)",
+    "description": "12/31 23:30 ~ 1/1 07:00. Rollback owner on standby.",
     "creator": {
       "email": "281932556+jinhologankim@users.noreply.github.com",
       "self": true
@@ -40,7 +40,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "연말 배포 윈도우 (자정 넘김)",
+        "body": "Year-End Deploy Window (crosses midnight)",
         "attachments": [],
         "sentAt": "2026-12-31T23:30:00+09:00",
         "status": "received",
@@ -48,7 +48,7 @@
         "threadMeta": {
           "externalId": "evt_overnight_deploy_window",
           "kind": "calendar",
-          "title": "연말 배포 윈도우 (자정 넘김)",
+          "title": "Year-End Deploy Window (crosses midnight)",
           "participants": [
             {
               "externalId": "oncall@example.com",

@@ -4,7 +4,7 @@
     "kind": "calendar#event",
     "id": "evt_rec_monthly_instance_20261015",
     "status": "confirmed",
-    "summary": "전사 타운홀 (매월 셋째 주 목요일)",
+    "summary": "Company Town Hall (third Thursday of each month)",
     "created": "2026-01-05T01:00:00.000Z",
     "updated": "2026-01-05T01:00:00.000Z",
     "creator": {
@@ -31,7 +31,7 @@
     "attendees": [
       {
         "email": "allcompany@example.com",
-        "displayName": "전사",
+        "displayName": "Everyone",
         "responseStatus": "accepted"
       }
     ],
@@ -53,7 +53,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "전사 타운홀 (매월 셋째 주 목요일)",
+        "body": "Company Town Hall (third Thursday of each month)",
         "attachments": [],
         "sentAt": "2026-10-15T16:00:00+09:00",
         "status": "received",
@@ -61,11 +61,11 @@
         "threadMeta": {
           "externalId": "evt_rec_monthly_instance_20261015",
           "kind": "calendar",
-          "title": "전사 타운홀 (매월 셋째 주 목요일)",
+          "title": "Company Town Hall (third Thursday of each month)",
           "participants": [
             {
               "externalId": "allcompany@example.com",
-              "displayName": "전사"
+              "displayName": "Everyone"
             }
           ],
           "lastItemAt": "2026-10-15T16:00:00+09:00",

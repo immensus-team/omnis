@@ -4,7 +4,7 @@
     "kind": "calendar#event",
     "id": "evt_start_date_only",
     "status": "confirmed",
-    "summary": "date만 온 confirmed 이벤트",
+    "summary": "Confirmed event with only a date",
     "start": {
       "date": "2026-10-15"
     },

@@ -4,7 +4,7 @@
     "kind": "calendar#event",
     "id": "evt_tz_dst_spring_2026",
     "status": "confirmed",
-    "summary": "DST spring-forward 확인 (America/New_York)",
+    "summary": "DST spring-forward check (America/New_York)",
     "creator": {
       "email": "us@example.com"
     },
@@ -19,7 +19,7 @@
       "dateTime": "2026-03-08T03:30:00-04:00",
       "timeZone": "America/New_York"
     },
-    "description": "2026-03-08 02:00 EST → 03:00 EDT 로 점프하는 날."
+    "description": "The day that jumps from 02:00 EST to 03:00 EDT on 2026-03-08."
   },
   "expected": {
     "items": [
@@ -31,7 +31,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "DST spring-forward 확인 (America/New_York)",
+        "body": "DST spring-forward check (America/New_York)",
         "attachments": [],
         "sentAt": "2026-03-08T03:00:00-04:00",
         "status": "received",
@@ -39,7 +39,7 @@
         "threadMeta": {
           "externalId": "evt_tz_dst_spring_2026",
           "kind": "calendar",
-          "title": "DST spring-forward 확인 (America/New_York)",
+          "title": "DST spring-forward check (America/New_York)",
           "participants": [],
           "lastItemAt": "2026-03-08T03:00:00-04:00",
           "archivedAt": null

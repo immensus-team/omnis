@@ -5,8 +5,8 @@
     "etag": "\"3421999999999000\"",
     "id": "evt_rec_weekly_instance_20261009",
     "status": "confirmed",
-    "summary": "주간 스프린트 리뷰 (시간 변경)",
-    "description": "이 회차만 17시로 옮김.",
+    "summary": "Weekly Sprint Review (time changed)",
+    "description": "Moved to 17:00 for this occurrence only.",
     "created": "2026-07-01T00:12:33.000Z",
     "updated": "2026-10-01T08:00:00.000Z",
     "creator": {
@@ -50,7 +50,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "주간 스프린트 리뷰 (시간 변경)",
+        "body": "Weekly Sprint Review (time changed)",
         "attachments": [],
         "sentAt": "2026-10-09T17:00:00+09:00",
         "status": "received",
@@ -58,7 +58,7 @@
         "threadMeta": {
           "externalId": "evt_rec_weekly_instance_20261009",
           "kind": "calendar",
-          "title": "주간 스프린트 리뷰 (시간 변경)",
+          "title": "Weekly Sprint Review (time changed)",
           "participants": [
             {
               "externalId": "dana@example.com",

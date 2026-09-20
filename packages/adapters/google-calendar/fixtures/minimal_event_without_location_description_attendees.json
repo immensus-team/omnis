@@ -3,7 +3,7 @@
   "raw": {
     "id": "evt_minimal_event",
     "status": "confirmed",
-    "summary": "점심 약속",
+    "summary": "Lunch Appointment",
     "start": {
       "dateTime": "2026-09-29T12:00:00+09:00",
       "timeZone": "Asia/Seoul"
@@ -23,7 +23,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "점심 약속",
+        "body": "Lunch Appointment",
         "attachments": [],
         "sentAt": "2026-09-29T12:00:00+09:00",
         "status": "received",
@@ -31,7 +31,7 @@
         "threadMeta": {
           "externalId": "evt_minimal_event",
           "kind": "calendar",
-          "title": "점심 약속",
+          "title": "Lunch Appointment",
           "participants": [],
           "lastItemAt": "2026-09-29T12:00:00+09:00",
           "archivedAt": null

@@ -4,7 +4,7 @@
     "kind": "calendar#event",
     "id": "evt_unknown_fields",
     "status": "confirmed",
-    "summary": "부가 필드가 잔뜩 붙은 이벤트",
+    "summary": "Event with a Pile of Extra Fields",
     "colorId": "11",
     "visibility": "private",
     "transparency": "opaque",
@@ -66,7 +66,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "부가 필드가 잔뜩 붙은 이벤트",
+        "body": "Event with a Pile of Extra Fields",
         "attachments": [],
         "sentAt": "2026-10-19T10:00:00+09:00",
         "status": "received",
@@ -74,7 +74,7 @@
         "threadMeta": {
           "externalId": "evt_unknown_fields",
           "kind": "calendar",
-          "title": "부가 필드가 잔뜩 붙은 이벤트",
+          "title": "Event with a Pile of Extra Fields",
           "participants": [],
           "lastItemAt": "2026-10-19T10:00:00+09:00",
           "archivedAt": null

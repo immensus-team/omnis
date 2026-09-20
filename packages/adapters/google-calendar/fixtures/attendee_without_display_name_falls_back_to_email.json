@@ -4,7 +4,7 @@
     "kind": "calendar#event",
     "id": "evt_attendees_no_displayname",
     "status": "confirmed",
-    "summary": "외부 벤더 미팅",
+    "summary": "External Vendor Meeting",
     "creator": {
       "email": "281932556+jinhologankim@users.noreply.github.com",
       "self": true
@@ -43,7 +43,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "외부 벤더 미팅",
+        "body": "External Vendor Meeting",
         "attachments": [],
         "sentAt": "2026-12-03T11:00:00+09:00",
         "status": "received",
@@ -51,7 +51,7 @@
         "threadMeta": {
           "externalId": "evt_attendees_no_displayname",
           "kind": "calendar",
-          "title": "외부 벤더 미팅",
+          "title": "External Vendor Meeting",
           "participants": [
             {
               "externalId": "vendor@partner.example.com",

@@ -3,7 +3,7 @@
   "raw": {
     "kind": "calendar#event",
     "status": "confirmed",
-    "summary": "id 없는 조각",
+    "summary": "Fragment with no id",
     "updated": "2026-09-13T00:00:00.000Z",
     "start": {
       "dateTime": "2026-10-14T09:00:00+09:00",

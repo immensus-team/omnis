@@ -4,7 +4,7 @@
     "kind": "calendar#event",
     "id": "evt_rec_daily_instance_20261009",
     "status": "cancelled",
-    "summary": "데일리 스탠드업",
+    "summary": "Daily Standup",
     "created": "2026-09-01T00:00:00.000Z",
     "updated": "2026-10-08T22:10:00.000Z",
     "creator": {
@@ -41,7 +41,7 @@
           "kind": "system",
           "id": ""
         },
-        "body": "데일리 스탠드업",
+        "body": "Daily Standup",
         "attachments": [],
         "sentAt": "2026-10-09T09:15:00+09:00",
         "status": "received",
@@ -49,7 +49,7 @@
         "threadMeta": {
           "externalId": "evt_rec_daily_instance_20261009",
           "kind": "calendar",
-          "title": "데일리 스탠드업",
+          "title": "Daily Standup",
           "participants": [],
           "lastItemAt": "2026-10-09T09:15:00+09:00",
           "archivedAt": "2026-10-09T09:15:00+09:00"
