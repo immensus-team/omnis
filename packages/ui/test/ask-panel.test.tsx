@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// 루트 `pnpm test`(vitest.workspace.ts)는 packages/ui/vitest.config.ts를 읽지 않는다.
-// 환경과 셋업(jest-dom matchers + afterEach(cleanup))을 파일 자체가 선언한다.
+// The root `pnpm test` (vitest.workspace.ts) does not read packages/ui/vitest.config.ts, so the
+// environment and the setup (jest-dom matchers + afterEach(cleanup)) are declared by the file itself.
 import "./setup";
 
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -13,22 +13,22 @@ const panel = (threadSelected: boolean, summary: string | null) => (
 
 const tab = (name: string) => screen.getByRole("button", { name });
 
-const summarize = () => screen.getByRole("button", { name: "이 대화 요약" });
+const summarize = () => screen.getByRole("button", { name: "Summarize this thread" });
 
-describe("AskPanel 제안 액션 (US-D01)", () => {
-  it("disables 이 대화 요약 while no thread is selected", () => {
+describe("AskPanel suggested actions (US-D01)", () => {
+  it("disables Summarize this thread while no thread is selected", () => {
     render(panel(false, null));
     expect(summarize()).toBeDisabled();
   });
 
-  it("enables 이 대화 요약 once a thread is selected", () => {
+  it("enables Summarize this thread once a thread is selected", () => {
     render(panel(true, null));
     expect(summarize()).not.toBeDisabled();
   });
 
-  it('keeps 답장 초안 작성 / 할 일 추출 disabled with title="Phase B" regardless of selection', () => {
-    render(panel(true, "테스트 요약"));
-    for (const name of ["답장 초안 작성", "할 일 추출"]) {
+  it('keeps Draft a reply / Extract to-dos disabled with title="Phase B" regardless of selection', () => {
+    render(panel(true, "Test summary"));
+    for (const name of ["Draft a reply", "Extract to-dos"]) {
       const action = screen.getByRole("button", { name });
       expect(action).toBeDisabled();
       expect(action).toHaveAttribute("title", "Phase B");
@@ -36,42 +36,42 @@ describe("AskPanel 제안 액션 (US-D01)", () => {
   });
 });
 
-describe("AskPanel 요약 표시 (US-D01)", () => {
-  it("reveals summary once 이 대화 요약 is pressed", () => {
-    render(panel(true, "테스트 요약"));
-    expect(screen.queryByText("테스트 요약")).toBeNull();
+describe("AskPanel summary display (US-D01)", () => {
+  it("reveals the summary once Summarize this thread is pressed", () => {
+    render(panel(true, "Test summary"));
+    expect(screen.queryByText("Test summary")).toBeNull();
 
     fireEvent.click(summarize());
-    expect(screen.getByText("테스트 요약")).toBeInTheDocument();
+    expect(screen.getByText("Test summary")).toBeInTheDocument();
   });
 
-  it("falls back to 아직 요약 없음 when summary is null", () => {
+  it("falls back to No summary yet when the summary is null", () => {
     render(panel(true, null));
     fireEvent.click(summarize());
 
-    expect(screen.getByText("아직 요약 없음")).toBeInTheDocument();
+    expect(screen.getByText("No summary yet")).toBeInTheDocument();
   });
 });
 
-describe("AskPanel 탭 전환 (US-D01 회귀: 타이핑이 막다른 길이 되면 안 된다)", () => {
-  it("shows 제안 while the ask bar query is empty", () => {
+describe("AskPanel tab switching (US-D01 regression: typing must not become a dead end)", () => {
+  it("shows Suggestions while the ask bar query is empty", () => {
     render(
       <AskPanel
-        commands={<p>명령 목록</p>}
+        commands={<p>Command list</p>}
         threadSelected
         summary={null}
         query=""
         onClose={vi.fn()}
       />,
     );
-    expect(tab("제안")).toHaveAttribute("aria-pressed", "true");
-    expect(screen.queryByText("명령 목록")).toBeNull();
+    expect(tab("Suggestions")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText("Command list")).toBeNull();
   });
 
-  it("auto-switches to 명령 as soon as the query is non-empty", () => {
+  it("auto-switches to Commands as soon as the query is non-empty", () => {
     const { rerender } = render(
       <AskPanel
-        commands={<p>명령 목록</p>}
+        commands={<p>Command list</p>}
         threadSelected
         summary={null}
         query=""
@@ -80,21 +80,21 @@ describe("AskPanel 탭 전환 (US-D01 회귀: 타이핑이 막다른 길이 되�
     );
     rerender(
       <AskPanel
-        commands={<p>명령 목록</p>}
+        commands={<p>Command list</p>}
         threadSelected
         summary={null}
         query=">"
         onClose={vi.fn()}
       />,
     );
-    expect(tab("명령")).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("명령 목록")).toBeInTheDocument();
+    expect(tab("Commands")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Command list")).toBeInTheDocument();
   });
 
-  it("falls back to 제안 when the query clears again", () => {
+  it("falls back to Suggestions when the query clears again", () => {
     const { rerender } = render(
       <AskPanel
-        commands={<p>명령 목록</p>}
+        commands={<p>Command list</p>}
         threadSelected
         summary={null}
         query="go"
@@ -103,34 +103,34 @@ describe("AskPanel 탭 전환 (US-D01 회귀: 타이핑이 막다른 길이 되�
     );
     rerender(
       <AskPanel
-        commands={<p>명령 목록</p>}
+        commands={<p>Command list</p>}
         threadSelected
         summary={null}
         query=""
         onClose={vi.fn()}
       />,
     );
-    expect(tab("제안")).toHaveAttribute("aria-pressed", "true");
+    expect(tab("Suggestions")).toHaveAttribute("aria-pressed", "true");
   });
 
   it("lets an explicit tab click win over the query-derived tab", () => {
     render(
       <AskPanel
-        commands={<p>명령 목록</p>}
+        commands={<p>Command list</p>}
         threadSelected
         summary={null}
         query="go"
         onClose={vi.fn()}
       />,
     );
-    expect(tab("명령")).toHaveAttribute("aria-pressed", "true");
-    fireEvent.click(tab("제안"));
-    expect(tab("제안")).toHaveAttribute("aria-pressed", "true");
-    expect(screen.queryByText("명령 목록")).toBeNull();
+    expect(tab("Commands")).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(tab("Suggestions"));
+    expect(tab("Suggestions")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText("Command list")).toBeNull();
   });
 });
 
-describe("AskPanel 컨텍스트 줄 (US-D01)", () => {
+describe("AskPanel context line (US-D01)", () => {
   it("names the selected thread so the actions have a visible target", () => {
     render(
       <AskPanel
@@ -146,6 +146,6 @@ describe("AskPanel 컨텍스트 줄 (US-D01)", () => {
 
   it("says so when nothing is selected", () => {
     render(panel(false, null));
-    expect(screen.getByText("선택된 스레드 없음")).toBeInTheDocument();
+    expect(screen.getByText("No thread selected")).toBeInTheDocument();
   });
 });

@@ -1,25 +1,28 @@
 import type { ReactNode } from "react";
 import { cn } from "../lib/cn.js";
 
-/** 리스트를 상태별로 묶는 한 줄 헤더(ref-issue-tracker-density.webp의 "In review 6 +" 문법).
- * 레퍼런스 세 조각 중 둘만 만든다: 상태 pill(톤 컬러) → 카운트(pill 밖 별도 회색 칩). "+"는
- * 빼 뒀다 — 세션을 그룹 상태에 맞춰 새로 만드는 흐름이 omnis에 아직 없어서, 그리면 아무 데도
- * 닿지 않는 버튼이 된다(POLISH-LOG US-D02 3회차 편차 항목). 그 흐름이 생기면 여기 `onAdd`를
- * 다시 넣는다.
- * 카운트를 pill 안에 넣으면 헤더가 바로 위 필터 칩 줄과 같은 크기·같은 모양의 네 번째 칩으로
- * 읽힌다 — 분리해야 "섹션 라벨 + 개수"로 읽힌다. 카드 크롬(테두리·배경·그림자)은 두지 않는다:
- * 헤더는 행 사이의 라벨이지 또 하나의 서피스가 아니다. */
+/** A one-line header that groups the list by state (the "In review 6 +" grammar of
+ * ref-issue-tracker-density.webp). Two of the reference's three pieces are built: the status pill
+ * (tone colour) then the count (a separate grey chip outside the pill). The "+" is left out —
+ * omnis has no flow yet for creating a session into a group state, so drawing it would be a button
+ * that reaches nothing (a POLISH-LOG US-D02 round-3 deviation item). If that flow appears, `onAdd`
+ * goes back in here.
+ * Putting the count inside the pill makes the header read as a fourth chip the same size and shape
+ * as the filter chip row directly above it; separating them is what makes it read as "section label
+ * + count". There is no card chrome (border, background, shadow) either: the header is a label
+ * between rows, not another surface. */
 export interface GroupHeaderProps {
   pill: ReactNode; // an <AgentStatusPill/>
-  /** 이 그룹의 행 개수. 0도 실제 값이라 undefined일 때만 칩을 생략한다. */
+  /** This group's row count. 0 is a real value, so the chip is only left out when it is undefined. */
   count?: number | undefined;
   className?: string;
 }
 
 export function GroupHeader({ pill, count, className }: GroupHeaderProps) {
   return (
-    // role="presentation": 이 헤더들은 Virtuoso의 role="listbox" 안에 행과 섞여 들어간다.
-    // 기본 role(generic)이면 AT가 listbox의 자식 수를 옵션 수로 세어 실제 행보다 많게 읽는다.
+    // role="presentation": these headers go inside Virtuoso's role="listbox", mixed in with the
+    // rows. With the default (generic) role, AT counts the listbox's children as options and reads
+    // more of them than there are rows.
     <div role="presentation" className={cn("group-header", className)}>
       {pill}
       {count !== undefined && <span className="group-header__count">{count}</span>}

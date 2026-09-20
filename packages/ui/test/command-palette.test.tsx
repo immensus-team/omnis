@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// 루트 `pnpm test`(vitest.workspace.ts)는 packages/ui/vitest.config.ts를 읽지 않는다.
-// 환경과 셋업(jest-dom matchers + afterEach(cleanup))을 파일 자체가 선언한다.
+// The root `pnpm test` (vitest.workspace.ts) does not read packages/ui/vitest.config.ts, so the
+// environment and the setup (jest-dom matchers + afterEach(cleanup)) are declared by the file itself.
 import "./setup";
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
@@ -14,10 +14,10 @@ import {
   writeAskModel,
 } from "../src/lib/ask-model";
 
-/** US-D01부터 패널의 기본 탭은 "제안"이다 — 명령 목록은 "명령" 탭 뒤에 있다. */
-const openCommandsTab = () => fireEvent.click(screen.getByRole("button", { name: "명령" }));
+/** Since US-D01 the panel's default tab is "Suggestions" — the command list sits behind "Commands". */
+const openCommandsTab = () => fireEvent.click(screen.getByRole("button", { name: "Commands" }));
 
-/** 리터럴로 두되 AskModelId로 좁혀 오타가 컴파일에서 걸리게 한다. */
+/** A literal at the call site, but narrowed to AskModelId so a typo fails at compile time. */
 const FLASH_ID: AskModelId = "deepseek-v4.1-flash";
 
 describe("groupBy", () => {
@@ -45,7 +45,7 @@ describe("CommandPalette (A5 §2.3)", () => {
     const perform = vi.fn();
     const onOpenChange = vi.fn();
     const actions: PaletteAction[] = [
-      { id: "go-inbox", name: "Go to Inbox", group: "이동", perform },
+      { id: "go-inbox", name: "Go to Inbox", group: "Navigate", perform },
     ];
     render(<CommandPalette open onOpenChange={onOpenChange} actions={actions} />);
     fireEvent.click(screen.getByText("Go to Inbox"));
@@ -54,22 +54,22 @@ describe("CommandPalette (A5 §2.3)", () => {
   });
 });
 
-describe('CommandPalette mode="inline" (U1 kinso ask/search 필 바)', () => {
+describe('CommandPalette mode="inline" (the U1 kinso ask/search pill bar)', () => {
   it("shows the kinso placeholder and no dropdown list while closed", () => {
     render(<CommandPalette mode="inline" open={false} onOpenChange={vi.fn()} actions={[]} />);
     expect(screen.getByPlaceholderText("Start typing to ask or search")).toBeInTheDocument();
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 
-  it("mounts the AI 패널 dialog only while open (US-D01)", () => {
+  it("mounts the AI panel dialog only while open (US-D01)", () => {
     const onOpenChange = vi.fn();
     const { rerender } = render(
       <CommandPalette mode="inline" open={false} onOpenChange={onOpenChange} actions={[]} />,
     );
-    expect(screen.queryByRole("dialog", { name: "AI 패널" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "AI panel" })).not.toBeInTheDocument();
 
     rerender(<CommandPalette mode="inline" open onOpenChange={onOpenChange} actions={[]} />);
-    expect(screen.getByRole("dialog", { name: "AI 패널" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "AI panel" })).toBeInTheDocument();
   });
 
   it("typing into the pill opens the palette (onOpenChange(true))", () => {
@@ -91,7 +91,7 @@ describe('CommandPalette mode="inline" (U1 kinso ask/search 필 바)', () => {
   it("when open, renders the same grouped actions as the dialog mode does", () => {
     const perform = vi.fn();
     const actions: PaletteAction[] = [
-      { id: "go-inbox", name: "Go to Inbox", group: "이동", perform },
+      { id: "go-inbox", name: "Go to Inbox", group: "Navigate", perform },
     ];
     render(<CommandPalette mode="inline" open onOpenChange={vi.fn()} actions={actions} />);
     openCommandsTab();
@@ -101,7 +101,7 @@ describe('CommandPalette mode="inline" (U1 kinso ask/search 필 바)', () => {
   });
 });
 
-describe('CommandPalette mode="inline" 닫기 경로 (U1 회귀)', () => {
+describe('CommandPalette mode="inline" close paths (U1 regression)', () => {
   it("Escape closes the inline dropdown", () => {
     const onOpenChange = vi.fn();
     render(<CommandPalette mode="inline" open onOpenChange={onOpenChange} actions={[]} />);
@@ -118,10 +118,10 @@ describe('CommandPalette mode="inline" 닫기 경로 (U1 회귀)', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it("a pointerdown inside the palette does not close it (선택 클릭이 살아 있어야 한다)", () => {
+  it("a pointerdown inside the palette does not close it (a click on a selection has to survive)", () => {
     const onOpenChange = vi.fn();
     const actions: PaletteAction[] = [
-      { id: "go-inbox", name: "Go to Inbox", group: "이동", perform: vi.fn() },
+      { id: "go-inbox", name: "Go to Inbox", group: "Navigate", perform: vi.fn() },
     ];
     render(<CommandPalette mode="inline" open onOpenChange={onOpenChange} actions={actions} />);
     openCommandsTab();
@@ -137,8 +137,8 @@ describe('CommandPalette mode="inline" 닫기 경로 (U1 회귀)', () => {
   });
 });
 
-describe('CommandPalette mode="inline" 모델 선택기 영속성 (US-D01)', () => {
-  // test/setup.ts의 메모리 Storage는 파일 단위로 살아남는다 — 테스트 사이에 비운다.
+describe('CommandPalette mode="inline" model picker persistence (US-D01)', () => {
+  // test/setup.ts's in-memory Storage survives for the whole file — empty it between tests.
   beforeEach(() => localStorage.clear());
 
   it("pick swaps the toggle label and writes the id to localStorage", () => {
@@ -162,14 +162,14 @@ describe('CommandPalette mode="inline" 모델 선택기 영속성 (US-D01)', () 
 
 const askInput = () => screen.getByPlaceholderText("Start typing to ask or search");
 
-describe('CommandPalette mode="inline" 타이핑 경로 (US-D01 회귀)', () => {
+describe('CommandPalette mode="inline" typing path (US-D01 regression)', () => {
   const actions: PaletteAction[] = [
-    { id: "go-inbox", name: "Go to Inbox", group: "이동", perform: vi.fn() },
+    { id: "go-inbox", name: "Go to Inbox", group: "Navigate", perform: vi.fn() },
   ];
 
-  it("typing reaches the cmdk list without clicking the 명령 tab", () => {
+  it("typing reaches the cmdk list without clicking the Commands tab", () => {
     render(<CommandPalette mode="inline" open onOpenChange={vi.fn()} actions={actions} />);
-    // 타이핑 전에는 제안 탭 — 명령 목록은 아직 없다.
+    // Before typing this is the Suggestions tab — there is no command list yet.
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
 
     fireEvent.change(askInput(), { target: { value: "Inbox" } });
@@ -178,33 +178,36 @@ describe('CommandPalette mode="inline" 타이핑 경로 (US-D01 회귀)', () => 
     expect(screen.getByText("Go to Inbox")).toBeInTheDocument();
   });
 
-  it('a leading ">" also lands on the 명령 tab', () => {
+  it('a leading ">" also lands on the Commands tab', () => {
     render(<CommandPalette mode="inline" open onOpenChange={vi.fn()} actions={actions} />);
     fireEvent.change(askInput(), { target: { value: ">" } });
-    expect(screen.getByRole("button", { name: "명령" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Commands" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
-  it("clearing the query returns to the 제안 tab", () => {
+  it("clearing the query returns to the Suggestions tab", () => {
     render(<CommandPalette mode="inline" open onOpenChange={vi.fn()} actions={actions} />);
     fireEvent.change(askInput(), { target: { value: "Inbox" } });
     fireEvent.change(askInput(), { target: { value: "" } });
-    expect(screen.getByRole("button", { name: "답장 초안 작성" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Draft a reply" })).toBeInTheDocument();
   });
 });
 
-describe('CommandPalette mode="inline" @ 멘션 어포던스 (US-D01)', () => {
+describe('CommandPalette mode="inline" @ mention affordance (US-D01)', () => {
   it("is present before any @ is typed and inserts one into the input", () => {
     render(<CommandPalette mode="inline" open onOpenChange={vi.fn()} actions={[]} />);
-    expect(screen.queryByText("@ 멘션")).toBeNull();
+    expect(screen.queryByText("@ mention")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "멘션 추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add mention" }));
 
     expect(askInput()).toHaveValue("@");
-    expect(screen.getByText("@ 멘션")).toBeInTheDocument();
+    expect(screen.getByText("@ mention")).toBeInTheDocument();
   });
 });
 
-describe('CommandPalette mode="inline" 닫힘 스프링 (US-D01)', () => {
+describe('CommandPalette mode="inline" close spring (US-D01)', () => {
   afterEach(() => vi.useRealTimers());
 
   it("keeps the panel mounted for one --dur-panel so the close animation can play", () => {
@@ -214,9 +217,9 @@ describe('CommandPalette mode="inline" 닫힘 스프링 (US-D01)', () => {
     );
     rerender(<CommandPalette mode="inline" open={false} onOpenChange={vi.fn()} actions={[]} />);
 
-    expect(screen.getByRole("dialog", { name: "AI 패널" })).toHaveClass("ask-panel--closing");
+    expect(screen.getByRole("dialog", { name: "AI panel" })).toHaveClass("ask-panel--closing");
 
     act(() => vi.advanceTimersByTime(240));
-    expect(screen.queryByRole("dialog", { name: "AI 패널" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "AI panel" })).not.toBeInTheDocument();
   });
 });

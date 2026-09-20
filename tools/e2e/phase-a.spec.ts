@@ -204,7 +204,7 @@ test("Phase A seeded smoke", async ({ page }) => {
   await shot(page, "03-thread.png");
 
   await check("A6 Agent Session screen shows turns and a ToolCallBadge", async () => {
-    await rows.filter({ hasText: "✓ Turn complete" }).first().click();
+    await rows.filter({ hasText: "✓ Turn completed" }).first().click();
     const detail = page.getByTestId("detail-pane");
     await expect(detail.locator(".tool-call-badge").first()).toBeVisible({ timeout: 20_000 });
     await expect(detail.locator(".agent-session-screen__turn").first()).toBeVisible();
@@ -226,8 +226,7 @@ test("Phase A seeded smoke", async ({ page }) => {
     .screenshot({ path: join(EVIDENCE, "05-approval-card.png") });
 
   await check("A8 Approve → hub moves the approval to decided", async () => {
-    // The "승인" name mirrors approval-card.tsx's still-Korean accept button (owned by US-D01/US-D02) — do not translate.
-    await page.getByRole("button", { name: "승인", exact: true }).first().click();
+    await page.getByRole("button", { name: "Approve", exact: true }).first().click();
     await expect
       .poll(async () => (await hubApprovals("decided")).map((a) => a.id), { timeout: 20_000 })
       .toContain(SEED.approvalId);
@@ -240,8 +239,7 @@ test("Phase A seeded smoke", async ({ page }) => {
   // not as the modal's "Search or command…".
   await check("A9 ⌘K opens the floating AI panel and types into the command list", async () => {
     await page.keyboard.press("Meta+k");
-    // The "AI 패널" name mirrors ask-panel.tsx's still-Korean aria-label (owned by US-D01/US-D02) — do not translate.
-    const panel = page.getByRole("dialog", { name: "AI 패널" });
+    const panel = page.getByRole("dialog", { name: "AI panel" });
     await expect(panel).toBeVisible();
     await page.keyboard.type("Inbox");
     await expect(panel.getByText("Go to Inbox")).toBeVisible();
@@ -249,8 +247,7 @@ test("Phase A seeded smoke", async ({ page }) => {
   });
   await shot(page, "06-command-palette.png");
   await page.keyboard.press("Escape");
-  // The "AI 패널" name mirrors ask-panel.tsx's still-Korean aria-label (owned by US-D01/US-D02) — do not translate.
-  await expect(page.getByRole("dialog", { name: "AI 패널" })).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "AI panel" })).toBeHidden();
 
   // US-A36: archiving is a local state transition that does not go through the approval gate — we
   // check both that it vanishes from the UI and that the hub really wrote threads.archived_at +
