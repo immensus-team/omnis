@@ -124,10 +124,10 @@ const chipCells = (): (string | null | undefined)[][] =>
     chip.querySelector(".filter-chip__value")?.textContent,
   ]);
 
-const addTrigger = () => screen.getByRole("button", { name: "+ 라벨" });
+const addTrigger = () => screen.getByRole("button", { name: "Add Label filter" });
 const optionIn = (label: string) => within(screen.getByRole("dialog")).getByText(label);
 
-describe("Inbox 라벨 필터 칩 (US-D02)", () => {
+describe("Inbox label filter chips (US-D02)", () => {
   it("고른 라벨을 단 스레드만 남기고, 칩의 ×가 전체 목록을 되돌린다", () => {
     renderInbox();
     expect(rowNames()).toEqual(["라벨 없음", "통합 건", "청구 건", "둘 다 건"]);
@@ -141,13 +141,13 @@ describe("Inbox 라벨 필터 칩 (US-D02)", () => {
     fireEvent.click(optionIn("Billing"));
     expect(rowNames()).toEqual(["통합 건", "청구 건", "둘 다 건"]);
 
-    fireEvent.click(screen.getByRole("button", { name: "라벨 필터 제거" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Label filter" }));
     expect(rowNames()).toEqual(["라벨 없음", "통합 건", "청구 건", "둘 다 건"]);
   });
 
-  // 칩 문구는 이 화면의 나머지(보관됨/대기/확인 필요)와 같은 언어여야 한다 — 레퍼런스의
-  // 영어 필터 DSL("Label is any of 2 labels")을 그대로 옮기면 한 칩 안에 두 언어가 섞인다.
-  // 레퍼런스도 값이 하나면 수량사를 접는다("Channel is Slack") — "1개 중 하나"는 사람이
+  // 칩 문구는 이 화면의 나머지(Archived/Pending approval/…)와 같은 언어다 — 영어 필터 DSL
+  // ("Label is any of 2 labels")을 그대로 옮기면 한 칩 안에 두 언어가 섞인다.
+  // 레퍼런스도 값이 하나면 수량사를 접는다("Channel is Slack") — "one of 1"은 사람이
   // 쓰지 않는 말이라 1개일 때는 채널 칩과 같이 이름만 값 칸에 남는다.
   it("라벨이 하나면 이름을, 둘 이상이면 개수를 값 칸에 말한다", () => {
     renderInbox();
@@ -155,9 +155,9 @@ describe("Inbox 라벨 필터 칩 (US-D02)", () => {
     expect(document.querySelector(".filter-chip")).toBeNull();
 
     fireEvent.click(optionIn("Integrations"));
-    expect(chipCells()).toEqual([["라벨", "Integrations"]]);
+    expect(chipCells()).toEqual([["Label", "Integrations"]]);
     fireEvent.click(optionIn("Billing"));
-    expect(chipCells()).toEqual([["라벨", "2개 중 하나"]]);
+    expect(chipCells()).toEqual([["Label", "one of 2"]]);
   });
 
   it("워크스페이스에 라벨이 하나도 없으면 빈 바를 그리지 않는다", () => {
@@ -172,15 +172,15 @@ describe("Inbox 라벨 필터 칩 (US-D02)", () => {
   });
 });
 
-describe("Inbox 채널 필터 칩 (US-D02)", () => {
+describe("Inbox channel filter chips (US-D02)", () => {
   // 채널 칩의 ×는 셸(App.tsx)이 소유한 레일 선택을 되돌린다 — 레일 상태가 여기 없으므로
   // 콜백이 없으면 칩도 그리지 않는다(아무 일도 안 하는 ×는 없는 것만 못하다).
   it("channelFilter + 콜백이 있으면 칩을 그리고 ×가 null을 돌려준다", () => {
     const onChannelFilterChange = vi.fn();
     renderInbox({ channelFilter: "gmail", onChannelFilterChange });
 
-    expect(chipCells()).toEqual([["채널", "Gmail"]]);
-    fireEvent.click(screen.getByRole("button", { name: "채널 필터 제거" }));
+    expect(chipCells()).toEqual([["Channel", "Gmail"]]);
+    fireEvent.click(screen.getByRole("button", { name: "Remove Channel filter" }));
     expect(onChannelFilterChange).toHaveBeenCalledWith(null);
   });
 

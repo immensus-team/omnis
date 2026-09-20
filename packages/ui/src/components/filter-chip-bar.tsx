@@ -47,7 +47,7 @@ export function FilterChipBar({ chips, addOptions }: FilterChipBarProps) {
             type="button"
             // 브리프 문구는 "필터 제거" 하나였지만, 칩이 둘 이상이면 접근성 이름이 같아져
             // 스크린리더가 어느 ×인지 구분할 수 없다 — 필드명을 앞에 붙인다.
-            aria-label={`${chip.field} 필터 제거`}
+            aria-label={`Remove ${chip.field} filter`}
             onClick={chip.onRemove}
           >
             ×
@@ -74,8 +74,17 @@ function AddFilterPopover({
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <button type="button" className="filter-chip-bar__add">
-          + {fieldLabel}
+        <button
+          type="button"
+          className="filter-chip-bar__add"
+          // 좁은 리스트 팬에서는 라벨 글자가 사라지고 "+"만 남는다(app.css @container list).
+          // 그때 이름을 잃지 않도록 명시적 aria-label + 네이티브 툴팁을 함께 단다 —
+          // 접근성 이름은 화면에 보이는 텍스트가 아니라 이 aria-label이 계속 갖는다.
+          aria-label={`Add ${fieldLabel} filter`}
+          title={fieldLabel}
+        >
+          <span aria-hidden="true">+</span>
+          <span className="filter-chip-bar__add-label">{fieldLabel}</span>
         </button>
       </Popover.Trigger>
       <Popover.Portal>
@@ -86,15 +95,15 @@ function AddFilterPopover({
           align="start"
           sideOffset={6}
         >
-          <Command label={`${fieldLabel} 필터`}>
+          <Command label={`${fieldLabel} filter`}>
             {/* 레퍼런스의 필터 팝오버와 같은 입력 크롬: 돋보기 + 아래 헤어라인 한 줄.
                 맨몸 placeholder는 목록 위에 뜬 회색 글자일 뿐 입력칸으로 안 읽힌다. */}
             <div className="filter-chip-popover__search">
               <LuSearch aria-hidden="true" />
-              <Command.Input placeholder={`${fieldLabel} 검색`} autoFocus />
+              <Command.Input placeholder={`Search ${fieldLabel}`} autoFocus />
             </div>
             <Command.List>
-              <Command.Empty>결과가 없어요</Command.Empty>
+              <Command.Empty>No results</Command.Empty>
               {options.map((option) => (
                 <Command.Item
                   key={option.id}

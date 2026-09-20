@@ -81,7 +81,7 @@ test("Phase A seeded smoke", async ({ page }) => {
   // 접근성 이름만 보면 빈 div도 통과한다(실제로 그랬다 — 앞 커밋의 fix(desktop) 참고).
   // U2부터 채널 아이콘은 모노그램 텍스트가 아니라 실제 react-icons/si SVG다 — "보이는 무언가가
   // 있다"는 주장은 이제 svg 자식 노드 존재 + non-zero bounding box로 확인한다.
-  const CHANNEL_LABELS = ["Slack 메시지", "Gmail 메시지", "Google Calendar 메시지"];
+  const CHANNEL_LABELS = ["Slack message", "Gmail message", "Google Calendar message"];
   await check("A2 Inbox rows show a visible channel icon for all three channels", async () => {
     for (const label of CHANNEL_LABELS) {
       await expect
@@ -100,7 +100,7 @@ test("Phase A seeded smoke", async ({ page }) => {
   });
 
   // 시드 행의 제목은 스레드 제목이다 — Phase A는 author_person_id를 안 채우고 Slack에는
-  // subject가 없어서, 이 검증이 없으면 모든 행이 "(제목 없음)"이어도 A1이 통과한다.
+  // subject가 없어서, 이 검증이 없으면 모든 행이 "(no title)"이어도 A1이 통과한다.
   await check("A2b Inbox rows show the seeded thread titles", async () => {
     for (const title of ["#omnis-launch", "omnis launch sync"]) {
       await expect(page.getByText(title, { exact: true }).first()).toBeVisible({ timeout: 15_000 });
@@ -109,8 +109,8 @@ test("Phase A seeded smoke", async ({ page }) => {
   });
 
   await check("A3 Inbox rows carry label chips", async () => {
-    await expect(page.getByLabel("scope 라벨: work").first()).toBeVisible();
-    await expect(page.getByLabel("topic 라벨: launch").first()).toBeVisible();
+    await expect(page.getByLabel("scope label: work").first()).toBeVisible();
+    await expect(page.getByLabel("topic label: launch").first()).toBeVisible();
   });
 
   // U1/U2 셸 크롬: kinso 레퍼런스의 두 고정 요소(왼쪽 채널 레일, 상단 ask/search 필바)가
@@ -185,7 +185,7 @@ test("Phase A seeded smoke", async ({ page }) => {
 
   await check("A5 Thread screen renders seeded items with status badges", async () => {
     // 초안 행은 sent_at=now()라 목록 맨 위에 있다 — Virtuoso 스크롤 없이 바로 누를 수 있다.
-    await rows.filter({ hasText: "초안:" }).first().click();
+    await rows.filter({ hasText: "Draft:" }).first().click();
     const detail = page.getByTestId("detail-pane");
     await expect(detail.locator(".status-badge").first()).toBeVisible({ timeout: 20_000 });
     const badges = await detail.locator(".status-badge").count();
@@ -248,10 +248,10 @@ test("Phase A seeded smoke", async ({ page }) => {
     const target = rows.first();
     const name = ((await target.locator(".inbox-row__name").textContent()) ?? "").trim();
     await target.hover();
-    await target.getByRole("button", { name: "보관", exact: true }).click();
+    await target.getByRole("button", { name: "Archive", exact: true }).click();
     await expect.poll(() => rows.count(), { timeout: 20_000 }).toBe(before - 1);
 
-    const archivedPill = page.getByRole("button", { name: "보관됨", exact: true });
+    const archivedPill = page.getByRole("button", { name: "Archived", exact: true });
     await archivedPill.click();
     const archivedRow = rows.filter({ hasText: name }).first();
     await expect(archivedRow).toBeVisible({ timeout: 20_000 });
@@ -265,7 +265,7 @@ test("Phase A seeded smoke", async ({ page }) => {
       );
       expect(Number(count)).toBeGreaterThanOrEqual(1);
       await archivedRow.hover();
-      await archivedRow.getByRole("button", { name: "되살리기", exact: true }).click();
+      await archivedRow.getByRole("button", { name: "Restore", exact: true }).click();
       await archivedPill.click(); // Inbox 뷰로 복귀
       await expect.poll(() => rows.count(), { timeout: 20_000 }).toBe(before);
       const { actions } = await one<{ actions: string }>(

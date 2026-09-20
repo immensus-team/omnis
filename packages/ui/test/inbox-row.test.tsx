@@ -33,7 +33,7 @@ describe("InboxRow (U2 kinso 대화 행 — 스레드 단위)", () => {
     expect(screen.getByText("3m")).toBeInTheDocument();
     expect(screen.getByText("회의 자료 확인 부탁드립니다")).toBeInTheDocument();
     expect(screen.getByLabelText("Sora Kim")).toBeInTheDocument(); // 아바타
-    expect(screen.getByLabelText("Slack 메시지")).toBeInTheDocument(); // 채널 브랜드 아이콘
+    expect(screen.getByLabelText("Slack message")).toBeInTheDocument(); // 채널 브랜드 아이콘
     fireEvent.click(screen.getByRole("option"));
     expect(baseProps.onSelect).toHaveBeenCalledWith("thread-1");
   });
@@ -41,18 +41,18 @@ describe("InboxRow (U2 kinso 대화 행 — 스레드 단위)", () => {
   it("bolds the name and shows a dot when unread (U2: unread = bold name + dot)", () => {
     render(<InboxRow {...baseProps} unread={true} />);
     expect(screen.getByText("Sora Kim")).toHaveAttribute("data-unread", "true");
-    expect(screen.getByLabelText("안읽음")).toBeInTheDocument();
+    expect(screen.getByLabelText("Unread")).toBeInTheDocument();
   });
 
   it("does not bold the name or show a dot when read", () => {
     render(<InboxRow {...baseProps} unread={false} />);
     expect(screen.getByText("Sora Kim")).toHaveAttribute("data-unread", "false");
-    expect(screen.queryByLabelText("안읽음")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Unread")).not.toBeInTheDocument();
   });
 
-  it("prefixes draft summaries with '초안: ' (A5 §3.1)", () => {
+  it("prefixes draft summaries with 'Draft: ' (A5 §3.1)", () => {
     render(<InboxRow {...baseProps} isDraft={true} summary="네 확인했습니다" />);
-    expect(screen.getByText("초안: 네 확인했습니다")).toBeInTheDocument();
+    expect(screen.getByText("Draft: 네 확인했습니다")).toBeInTheDocument();
   });
 
   it("shows at most 2 chips + N more, scope label first (A5 §3.1 우선순위)", () => {
@@ -66,8 +66,8 @@ describe("InboxRow (U2 kinso 대화 행 — 스레드 단위)", () => {
         ]}
       />,
     );
-    expect(screen.getByLabelText("scope 라벨: work")).toBeInTheDocument();
-    expect(screen.getByLabelText("라벨 1개 더 보기")).toHaveTextContent("+1");
+    expect(screen.getByLabelText("scope label: work")).toBeInTheDocument();
+    expect(screen.getByLabelText("1 more labels")).toHaveTextContent("+1");
   });
 });
 
@@ -76,7 +76,7 @@ describe("InboxRow (U2 kinso 대화 행 — 스레드 단위)", () => {
 describe("InboxRow channel mark (US-D02b: official brand PNGs)", () => {
   it("renders the channel's real brand PNG in the 16px slot", () => {
     render(<InboxRow {...baseProps} channel="gmail" />);
-    const img = screen.getByLabelText("Gmail 메시지").querySelector("img");
+    const img = screen.getByLabelText("Gmail message").querySelector("img");
     expect(img).toBeInTheDocument();
     expect(img?.getAttribute("src")).toMatch(/gmail@1x\.png$/);
     expect(img?.getAttribute("srcSet")).toMatch(/gmail@1x\.png 1x, .*gmail@2x\.png 2x$/);
@@ -86,7 +86,7 @@ describe("InboxRow channel mark (US-D02b: official brand PNGs)", () => {
 
   it("keeps the mark decorative — the row's label carries the accessible name", () => {
     render(<InboxRow {...baseProps} channel="slack" />);
-    const img = screen.getByLabelText("Slack 메시지").querySelector("img");
+    const img = screen.getByLabelText("Slack message").querySelector("img");
     expect(img).toHaveAttribute("alt", "");
     expect(img).toHaveAttribute("aria-hidden", "true");
   });
@@ -94,7 +94,7 @@ describe("InboxRow channel mark (US-D02b: official brand PNGs)", () => {
   // KakaoTalk의 노란 타일은 이제 CSS 배경이 아니라 PNG 안에 들어 있다 — 한 번 더 감싸면 이중 프레임.
   it("does not wrap KakaoTalk in a CSS tile on top of the baked-in one", () => {
     render(<InboxRow {...baseProps} channel="kakaotalk" />);
-    const wrap = screen.getByLabelText("KakaoTalk 메시지");
+    const wrap = screen.getByLabelText("KakaoTalk message");
     expect(wrap.querySelector(".channel-glyph--tiled")).toBeNull();
     expect(wrap.querySelector("img")?.getAttribute("src")).toMatch(/kakaotalk@1x\.png$/);
   });
@@ -114,15 +114,15 @@ describe("InboxRow 아바타 (U2: 사진 → 이니셜+파스텔 폴백, agent_s
         agentState="blocked"
       />,
     );
-    const avatarEl = screen.getByLabelText("Claude Code 세션");
+    const avatarEl = screen.getByLabelText("Claude Code session");
     expect(avatarEl).toBeInTheDocument();
     expect(avatarEl.querySelector("svg")).toBeInTheDocument(); // Anthropic 브랜드 마크
     expect(screen.getByText("확인 필요")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Slack 메시지")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Slack message")).not.toBeInTheDocument();
   });
 
   // 그룹 헤더가 이미 상태를 말할 때(Agents 뷰) 행은 상태를 되풀이하지 않는다 — 그런데 그 자리를
-  // 채널 글리프로 메우면 런타임 세션 행이 "Slack 메시지"라고 주장한다. 슬롯을 비운다.
+  // 채널 글리프로 메우면 런타임 세션 행이 "Slack message"라고 주장한다. 슬롯을 비운다.
   it("groupedByState면 상태 배지도, 대신 들어오는 채널 글리프도 그리지 않는다", () => {
     render(
       <InboxRow
@@ -133,29 +133,29 @@ describe("InboxRow 아바타 (U2: 사진 → 이니셜+파스텔 폴백, agent_s
       />,
     );
     expect(screen.queryByText("확인 필요")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Slack 메시지")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Slack message")).not.toBeInTheDocument();
   });
 
   // 세션이 아닌 행(agentState null)은 그룹 뷰에 섞여 있어도 채널이 그 행의 진짜 사실이다.
   it("groupedByState라도 세션이 아닌 행은 채널 글리프를 그대로 갖는다", () => {
     render(<InboxRow {...baseProps} groupedByState={true} />);
-    expect(screen.getByLabelText("Slack 메시지")).toBeInTheDocument();
+    expect(screen.getByLabelText("Slack message")).toBeInTheDocument();
   });
 
   it("falls back to a letter tile ('H') for a runtime with no brand mark (Hermes)", () => {
     render(
       <InboxRow {...baseProps} avatar={{ kind: "runtime", runtime: "hermes" }} agentState="idle" />,
     );
-    const avatarEl = screen.getByLabelText("Hermes 세션");
+    const avatarEl = screen.getByLabelText("Hermes session");
     expect(avatarEl).toHaveTextContent("H");
     expect(avatarEl.querySelector("svg")).not.toBeInTheDocument();
   });
 });
 
-describe("InboxRow 승인 대기 배지", () => {
+describe("InboxRow pending-approval badge", () => {
   it("shows an approval dot when the thread has a pending approval", () => {
     render(<InboxRow {...baseProps} hasPendingApproval={true} />);
-    expect(screen.getByLabelText("승인 대기")).toBeInTheDocument();
+    expect(screen.getByLabelText("Pending approval")).toBeInTheDocument();
   });
 });
 
@@ -184,31 +184,31 @@ describe("InboxRow 리스트 (U2: 스레드 하나당 행 하나)", () => {
     expect(options).toHaveLength(2);
     expect(screen.getByText("Sora Kim")).toBeInTheDocument();
     expect(screen.getByText("회의 자료 확인 부탁드립니다")).toBeInTheDocument();
-    expect(screen.getByLabelText("Slack 메시지")).toBeInTheDocument();
+    expect(screen.getByLabelText("Slack message")).toBeInTheDocument();
     expect(screen.getByText("#omnis-launch")).toBeInTheDocument();
     expect(screen.getByText("adapter 테스트 3개 실패")).toBeInTheDocument();
-    expect(screen.getByLabelText("Codex 세션")).toBeInTheDocument();
+    expect(screen.getByLabelText("Codex session")).toBeInTheDocument();
   });
 });
 
 describe("InboxRow 보관 액션 (US-A36)", () => {
   it("renders no action button unless onArchive is given", () => {
     render(<InboxRow {...baseProps} />);
-    expect(screen.queryByRole("button", { name: "보관" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
   });
 
   it("calls onArchive with the thread id without selecting the row", () => {
     const onArchive = vi.fn();
     const onSelect = vi.fn();
     render(<InboxRow {...baseProps} onSelect={onSelect} onArchive={onArchive} />);
-    fireEvent.click(screen.getByRole("button", { name: "보관" }));
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
     expect(onArchive).toHaveBeenCalledWith("thread-1");
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it("labels the action 되살리기 on an archived row (A5 §3.8)", () => {
+  it("labels the action Restore on an archived row (A5 §3.8)", () => {
     render(<InboxRow {...baseProps} archived={true} onArchive={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "되살리기" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Restore" })).toBeInTheDocument();
   });
 });
 
@@ -239,8 +239,8 @@ describe("InboxRow 호버 카드 (US-D02)", () => {
     expect(card()).not.toBeNull();
   });
 
-  // 카드의 존재 이유: 행이 한 줄 ellipsis로 잘라 낸 요약의 전문.
-  it("행이 자른 요약 전문과, 행에 없는 채널·안읽음 수를 보여준다", () => {
+  // 카드의 존재 이유: 행이 line-clamp로 잘라 낸 요약의 전문.
+  it("행이 자른 요약 전문과, 행에 없는 채널·Unread 수를 보여준다", () => {
     const long =
       "브라이트스톤 리얼티 매매계약서 최신본을 공유해 달라는 요청입니다. 지난주 검토본 이후 " +
       "특약 두 줄이 바뀌었고 금요일까지 회신이 필요하다고 합니다.";
@@ -249,11 +249,11 @@ describe("InboxRow 호버 카드 (US-D02)", () => {
     const meta = within(card() as HTMLElement);
 
     expect(meta.getByText(long)).toBeInTheDocument();
-    expect(meta.getByText("채널")).toBeInTheDocument();
+    expect(meta.getByText("Channel")).toBeInTheDocument();
     expect(meta.getByText("Slack")).toBeInTheDocument();
-    expect(meta.getByText("안읽음")).toBeInTheDocument();
-    expect(meta.getByText("3개")).toBeInTheDocument();
-    expect(meta.getByText("마지막 활동")).toBeInTheDocument();
+    expect(meta.getByText("Unread")).toBeInTheDocument();
+    expect(meta.getByText("3")).toBeInTheDocument();
+    expect(meta.getByText("Last activity")).toBeInTheDocument();
     expect(meta.getByText("3m")).toBeInTheDocument();
   });
 
@@ -265,8 +265,8 @@ describe("InboxRow 호버 카드 (US-D02)", () => {
     const meta = within(card() as HTMLElement);
 
     expect(meta.getAllByText("Sora Kim")).toHaveLength(1);
-    expect(meta.queryByText("라벨")).not.toBeInTheDocument();
-    expect(meta.queryByText("안읽음")).not.toBeInTheDocument();
+    expect(meta.queryByText("Labels")).not.toBeInTheDocument();
+    expect(meta.queryByText("Unread")).not.toBeInTheDocument();
   });
 
   // 칩 2개 + "+N"으로 잘렸을 때만 전체 라벨 목록이 값을 더한다.
@@ -280,14 +280,14 @@ describe("InboxRow 호버 카드 (US-D02)", () => {
     });
     act(() => vi.advanceTimersByTime(400));
     const meta = within(card() as HTMLElement);
-    expect(meta.getByText("라벨")).toBeInTheDocument();
+    expect(meta.getByText("Labels")).toBeInTheDocument();
     expect(meta.getByText("work, davich, 계약")).toBeInTheDocument();
   });
 
-  // agent_session 행은 우측 슬롯이 채널 아이콘 대신 상태 배지라 "채널"이 의미가 없다.
+  // agent_session 행은 우측 슬롯이 채널 아이콘 대신 상태 배지라 "Channel"이 의미가 없다.
   it("agent 세션 행에는 채널 줄이 없다", () => {
     const card = hoverRow({ agentState: "working" as const });
     act(() => vi.advanceTimersByTime(400));
-    expect(within(card() as HTMLElement).queryByText("채널")).not.toBeInTheDocument();
+    expect(within(card() as HTMLElement).queryByText("Channel")).not.toBeInTheDocument();
   });
 });

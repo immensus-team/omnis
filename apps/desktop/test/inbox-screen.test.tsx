@@ -56,7 +56,7 @@ describe("inboxRowTitle (U2: 스레드 단위 행 제목, 사람 → 스레드 �
   });
   it("uses the placeholder only when nothing identifies the row", () => {
     expect(inboxRowTitle({ personName: null, threadTitle: null, channelHandle: null })).toBe(
-      "(제목 없음)",
+      "(no title)",
     );
   });
 });
@@ -124,7 +124,7 @@ describe("threadSummary (U2: threads.meta.summary → subject → 마지막 item
   });
 });
 
-describe("sortInboxRows (U2: blocked agent session·승인 대기 행이 최상단, 나머지는 원래 순서 유지)", () => {
+describe("sortInboxRows (U2: blocked agent session·Pending approval 행이 최상단, 나머지는 원래 순서 유지)", () => {
   it("moves a pending-approval row to the top without reordering the rest", () => {
     const rows: (SortableInboxRow & { id: string })[] = [
       { id: "a", hasPendingApproval: false, agentState: null },

@@ -43,7 +43,7 @@ const { App } = await import("../src/App");
 describe("App shell (US-A25 '빈 셸' + A26~A31 화면 라우팅)", () => {
   it("mounts the Inbox screen", () => {
     render(<App />);
-    expect(screen.getByRole("radiogroup", { name: "Inbox 필터" })).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "Inbox filters" })).toBeInTheDocument();
   });
 
   it("opens the ask panel on ⌘K (US-D01: 모달 팔레트가 아니라 인라인 ask 바의 AI 패널)", () => {

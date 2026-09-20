@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// US-A36: 행 보관 → Inbox에서 사라지고 "보관됨" 뷰에 뜬다 → 되살리면 돌아온다.
+// US-A36: 행 보관 → Inbox에서 사라지고 "Archived" 뷰에 뜬다 → Restore하면 돌아온다.
 // app-shell.test.tsx의 프록시 목은 모든 쿼리에 같은 값을 주므로 여기서는 테이블 이름을 붙여
 // 테이블별로 다른 행을 주는 목을 쓴다(Inbox는 7개 쿼리를 건다).
 import "./setup";
@@ -93,20 +93,20 @@ const rowNames = (): string[] =>
     .queryAllByRole("option")
     .map((r) => r.querySelector(".inbox-row__name")?.textContent ?? "");
 
-const archivedPill = () => screen.getByRole("button", { name: "보관됨" });
+const archivedPill = () => screen.getByRole("button", { name: "Archived" });
 const url = (call: number): string => String(fetchMock.mock.calls[call]?.[0]);
 
-describe("Inbox 보관/되살리기 (US-A36)", () => {
-  it("hides threads that are already archived and lists them under the 보관됨 pill", () => {
+describe("Inbox archive/restore (US-A36)", () => {
+  it("hides threads that are already archived and lists them under the Archived pill", () => {
     renderInbox();
     expect(rowNames()).toEqual(["새 메일"]);
 
     fireEvent.click(archivedPill());
     expect(rowNames()).toEqual(["묵은 메일"]);
-    expect(screen.getByRole("button", { name: "되살리기" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Restore" })).toBeInTheDocument();
   });
 
-  it("archives the selected row with `e` — it leaves the list at once and shows up in 보관됨", async () => {
+  it("archives the selected row with `e` — it leaves the list at once and shows up in Archived", async () => {
     renderInbox();
     fireEvent.click(screen.getByRole("option", { name: /새 메일/ }));
     fireEvent.keyDown(window, { key: "e" });
@@ -140,7 +140,7 @@ describe("Inbox 보관/되살리기 (US-A36)", () => {
         <Inbox onOpen={onOpen} />
       </VirtuosoMockContext.Provider>,
     );
-    fireEvent.click(screen.getByRole("button", { name: "보관" }));
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
     expect(onOpen).not.toHaveBeenCalled();
     expect(url(0)).toContain(`/api/threads/${THREAD_A}/archive`);
     expect(rowNames()).toEqual([]);

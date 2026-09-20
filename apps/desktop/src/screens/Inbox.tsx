@@ -1,4 +1,5 @@
 import {
+  ArchiveIcon,
   type FilterChip,
   FilterChipBar,
   OpaqueSurface,
@@ -69,7 +70,7 @@ export function inboxRowTitle(row: {
   threadTitle?: string | null;
   channelHandle?: string | null;
 }): string {
-  return row.personName || row.threadTitle || row.channelHandle || "(제목 없음)";
+  return row.personName || row.threadTitle || row.channelHandle || "(no title)";
 }
 
 function firstLine(body: string): string {
@@ -132,7 +133,7 @@ export interface SortableInboxRow {
   agentState: AgentSessionKinsoState | null;
 }
 
-/** U2: "blocked" agent session이거나 승인 대기가 있는 행을 맨 위로. 나머지는 원래 순서(최신순) 유지
+/** U2: "blocked" agent session이거나 Pending approval이 있는 행을 맨 위로. 나머지는 원래 순서(최신순) 유지
  * — Array.prototype.sort는 stable(ES2019+, V8)이라 비교 키가 같은 행끼리는 입력 순서가 보존된다. */
 export function sortInboxRows<T extends SortableInboxRow>(rows: T[]): T[] {
   const needsAttention = (r: SortableInboxRow) =>
@@ -332,7 +333,7 @@ export function Inbox({
   }, [items, approvalByThread, channelByAccount, chipsByThread, sessionByThread, runtimeById]);
 
   // 서버 상태가 오버라이드를 따라잡으면 오버라이드를 버린다 — 그래야 이후의 자동 보관(A4 §9)이나
-  // 다른 기기에서 한 되살리기가 이 화면에서 무시되지 않는다.
+  // 다른 기기에서 한 Restore가 이 화면에서 무시되지 않는다.
   useEffect(() => {
     setPendingArchive((prev) => {
       const settled = threadRows.filter((r) => prev[r.threadId] === (r.archivedAt !== null));
@@ -400,7 +401,7 @@ export function Inbox({
   if (channelFilter && onChannelFilterChange) {
     chips.push({
       id: "channel",
-      field: "채널",
+      field: "Channel",
       value: CHANNEL_LABEL[channelFilter],
       onRemove: () => onChannelFilterChange(null),
     });
@@ -408,18 +409,18 @@ export function Inbox({
   if (selectedLabelIds.size > 0) {
     chips.push({
       id: "labels",
-      field: "라벨",
+      field: "Label",
       // 레퍼런스의 필터 DSL도 값이 하나면 수량사를 접는다("Channel is Slack") —
-      // "1개 중 하나"는 사람이 쓰지 않는 말이라 채널 칩과 같이 이름만 남긴다.
+      // "one of 1"은 사람이 쓰지 않는 말이라 채널 칩과 같이 이름만 남긴다.
       value:
         selectedLabelIds.size === 1
-          ? (labels.find((l) => selectedLabelIds.has(l.id))?.name ?? "1개")
-          : `${selectedLabelIds.size}개 중 하나`,
+          ? (labels.find((l) => selectedLabelIds.has(l.id))?.name ?? "1")
+          : `one of ${selectedLabelIds.size}`,
       onRemove: () => setSelectedLabelIds(new Set()),
     });
   }
   const addOptions = {
-    fieldLabel: "라벨",
+    fieldLabel: "Label",
     options: labels.map((l) => ({ id: l.id, label: l.name })),
     selectedIds: [...selectedLabelIds],
     onToggle: (id: string) =>
@@ -468,7 +469,12 @@ export function Inbox({
     <OpaqueSurface className="inbox-card">
       <div className="inbox-card__header">
         <h2 className="inbox-card__title">{view === "archived" ? "Archived" : "Inbox"}</h2>
-        <div role="radiogroup" aria-label="Inbox 필터" className="inbox-card__pills">
+      </div>
+      {/* US-D02b: 제목 아래 이 한 줄이 필터 UI의 전부다 — 탭 pill·보관 토글·라벨 칩이 세 줄로
+          흩어져 있던 걸(좁은 폭에서 칩이 3줄로 접히던 자리) 하나의 가로 스크롤 스트립으로 합쳤다.
+          좁아지면 접히는 게 아니라 옆으로 밀린다(컨테이너 쿼리로 아이콘만 남기는 건 app.css). */}
+      <div className="inbox-card__filter-row">
+        <div role="radiogroup" aria-label="Inbox filters" className="inbox-card__pills">
           {FILTERS.map((f) => (
             <button
               key={f}
@@ -490,15 +496,18 @@ export function Inbox({
           type="button"
           className="inbox-card__archived-pill"
           aria-pressed={view === "archived"}
+          aria-label="Archived"
+          title="Archived"
           onClick={() => setView((v) => (v === "archived" ? "inbox" : "archived"))}
         >
-          보관됨
+          <ArchiveIcon className="inbox-card__archived-icon" size={14} aria-hidden="true" />
+          <span className="inbox-card__archived-label">Archived</span>
         </button>
+        {/* 라벨이 하나도 없는 워크스페이스에선 아무것도 못 누르는 빈 바를 그리지 않는다. */}
+        {(chips.length > 0 || labels.length > 0) && (
+          <FilterChipBar chips={chips} addOptions={addOptions} />
+        )}
       </div>
-      {/* 라벨이 하나도 없는 워크스페이스에선 아무것도 못 누르는 빈 바를 그리지 않는다. */}
-      {(chips.length > 0 || labels.length > 0) && (
-        <FilterChipBar chips={chips} addOptions={addOptions} />
-      )}
       <Virtuoso
         role="listbox"
         style={{ flex: "1 1 0", minHeight: 0 }}
@@ -517,14 +526,14 @@ export function Inbox({
               // 그룹 헤더가 바로 위에서 상태를 말할 때 행이 같은 말을 다시 하지 않는다
               // (ref-issue-tracker-density.webp도 상태어는 헤더에만 둔다). 다만 세션이라는
               // 사실 자체는 지우지 않는다 — agentState를 null로 덮으면 런타임 세션 행이
-              // 채널 글리프로 떨어져 "Slack 메시지"를 자칭했다(3회차 거절 사유).
+              // 채널 글리프로 떨어져 "Slack message"를 자칭했다(3회차 거절 사유).
               agentState={item.row.agentState}
               groupedByState={grouped}
               timestamp={item.row.timestamp}
               unread={item.row.unread}
               unreadCount={item.row.unreadCount}
               selected={item.row.id === selectedId}
-              // needs-approval 탭에서는 모든 행이 승인 대기다 — 탭이 이미 말한 걸 행마다
+              // needs-approval 탭에서는 모든 행이 Pending approval이다 — 탭이 이미 말한 걸 행마다
               // 점으로 되풀이하면 점이 아무것도 구분하지 못한다(그룹 헤더 아래 상태 배지를
               // 뺀 것과 같은 규칙: 위가 말한 상태를 아래가 반복하지 않는다).
               hasPendingApproval={filter !== "needs-approval" && item.row.hasPendingApproval}

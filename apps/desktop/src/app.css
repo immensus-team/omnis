@@ -539,12 +539,18 @@ body {
   border-radius: 20px;
   box-shadow: var(--shadow-row-selected);
   overflow: hidden;
+  /* US-D02b: 셸(#root, container-name: shell) **안에** 중첩된 두 번째 컨테이너. 리스트 팬은
+     상세 패널이 열려 있으면 창보다 좁으므로, "좁다"의 기준은 창이 아니라 이 팬 자신의 폭이다.
+     아래 `@container list (…)` 블록들이 여기를 보고 판단한다 — 셸 브레이크포인트와 숫자가
+     달라도 되는 이유가 이것이다(560px은 팬의 560px). */
+  container-type: inline-size;
+  container-name: list;
 }
 
+/* US-D02b: 제목만 남은 줄 — 예전엔 이 안에 필터 pill과 보관 토글이 같이 있어서 좁은 폭에서
+   셋이 서로를 밀어냈다(그게 "Archived가 두 줄로 접힌" 스크린샷이다). 이제 이 줄은 제목 전용이고
+   필터 UI는 전부 아래 스트립 하나로 내려갔다. */
 .inbox-card__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   padding: 14px 16px 8px;
 }
 
@@ -554,9 +560,50 @@ body {
   font-weight: 600;
 }
 
+/* US-D02b: 필터 UI의 전부 — 라디오 pill · 보관 토글 · 라벨 칩이 한 줄에 산다. 좁아지면
+   줄바꿈하는 게 아니라 **옆으로 밀린다**(가로 스크롤). 자식은 전부 flex: 0 0 auto라
+   어느 것도 줄어들거나 접히지 않는다 — 접히면 그게 3줄로 깨지던 원래 버그다.
+   마스크는 스크롤된 내용이 팬의 둥근 모서리 밑으로 하드클립되지 않고 사라지게 한다
+   (스크롤 컨테이너의 마스크는 박스에 걸리므로 페이드는 가장자리에 고정된다). */
+.inbox-card__filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  /* 스크롤은 기능이고 스크롤바는 문법이 아니다 — 칩 줄 아래 회색 막대는 이 화면에 없다. */
+  scrollbar-width: none;
+  padding: 0 16px 10px;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 16px,
+    black calc(100% - 16px),
+    transparent
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 16px,
+    black calc(100% - 16px),
+    transparent
+  );
+}
+
+.inbox-card__filter-row::-webkit-scrollbar {
+  display: none;
+}
+
+/* 칩 바는 바깥 여백을 이제 필터 행이 갖는다 — 여기 안에서는 안쪽 여백만 0으로 되돌린다
+   (칩 바 자체의 padding은 다른 화면이 쓰는 값이라 건드리지 않는다). */
+.inbox-card__filter-row .filter-chip-bar {
+  padding: 0;
+}
+
 .inbox-card__pills {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex: 0 0 auto;
   gap: 4px;
 }
 
@@ -578,6 +625,9 @@ body {
 }
 
 .inbox-card__archived-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: var(--hairline);
   border-radius: 999px;
   padding: 1px 8px;
@@ -586,6 +636,8 @@ body {
   font: inherit;
   font-size: 11px;
   cursor: pointer;
+  /* 필터 행의 다른 자식들과 같다 — 좁아져도 이 버튼은 줄지 않는다. */
+  flex: 0 0 auto;
 }
 
 .inbox-card__archived-pill[aria-pressed="true"] {
@@ -594,11 +646,18 @@ body {
   border-color: transparent;
 }
 
+/* 아이콘은 좁은 팬에서만 글자 자리를 대신한다(@container list 아래) — 넓을 땐 지금처럼 글자만. */
+.inbox-card__archived-icon {
+  display: none;
+}
+
 /* U2: kinso 대화 행 — 아바타 | (이름·시간 / 요약·칩) | (채널아이콘 또는 상태배지). 3칼럼×2행 그리드,
    우측 슬롯은 두 행에 걸쳐 세로 중앙 정렬(kinso 실측 — 행 전체 기준 우측 끝 고정, 23 §2). */
 .inbox-row {
   display: grid;
-  grid-template-columns: 40px 1fr auto;
+  /* US-D02b: 가운데 칼럼은 minmax(0, 1fr)이어야 한다 — 그냥 1fr은 최소 크기가 min-content라
+     긴 제목이 행을 넓히고(가로 스크롤) ellipsis 대신 두 줄로 접힌다. 이 한 단어가 대부분의 수정이다. */
+  grid-template-columns: 40px minmax(0, 1fr) auto;
   grid-template-rows: auto auto;
   column-gap: 12px;
   row-gap: 4px;
@@ -655,6 +714,9 @@ body {
   display: flex;
   align-items: baseline;
   gap: 6px;
+  /* flex 아이템의 기본 min-width는 auto다 — 이 한 줄이 없으면 이름이 줄어들지 않고
+     메타 줄 자체를 넓혀 행을 밀어낸다(제목이 두 줄로 접히던 것도, 시간이 밀리던 것도 여기서 시작한다). */
+  min-width: 0;
 }
 
 .inbox-row__name {
@@ -662,6 +724,12 @@ body {
      구분한다(U2 결정 유지, kinso 자체엔 안읽음 개념이 없어 omnis가 얹은 것). */
   font-size: 15px;
   font-weight: 600;
+  /* 줄어드는 건 이름이다(시간이 아니다) — 잘릴 땐 두 줄로 접히지 않고 "…"로 끝난다. */
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .inbox-row__name[data-unread="true"] {
@@ -677,10 +745,19 @@ body {
 }
 
 .inbox-row__timestamp {
-  /* P1: kinso는 시간을 이름 바로 뒤에 붙인다("Natasha Corwin 3m") — 행 끝까지 미는
-     margin-left:auto는 예전(U2) 추정이었고 실측(kinso-inbox.webp)과 달랐다. */
+  /* US-D02b: 시간은 메타 줄의 오른쪽 끝에 고정한다. P1에서 kinso 실측("Natasha Corwin 3m")을
+     근거로 이 auto를 뺐었는데, 그러면 시간의 x가 제목 길이를 따라 움직인다 — 잘린 제목마다
+     시간이 다른 자리에 서서 행을 훑을 때 시간 칸이 흔들린다(스크린샷의 "시간이 밀린다").
+     정렬 안정성을 kinso의 밀도보다 위에 둔다. margin-left:auto는 이 flex 줄(메타)의 끝으로
+     미는 것이고, 행 전체의 오른쪽 끝은 별개 칼럼(.inbox-row__side)이다.
+     min-width + tabular-nums는 "3m"과 "4 Aug"가 서로 다른 폭을 갖지 않게 하는 하한이다. */
   color: var(--text-secondary);
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+  min-width: 32px;
+  text-align: right;
+  margin-left: auto;
 }
 
 .inbox-row__summary-line {
@@ -699,9 +776,12 @@ body {
   flex: 1 1 auto;
   min-width: 0;
   color: var(--text-secondary);
+  /* US-D02b: AI 한 줄 요약은 실제로 두 줄까지 쓴다 — 한 줄로 자르면 요약이 문장 중간에서
+     끊겨 읽히지 않는다. 좁은 팬(479.98px 이하)에서는 다시 한 줄로 떨어진다(아래 @container list). */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .inbox-row__summary[data-draft="true"] {
@@ -781,6 +861,14 @@ body {
   font-size: 12px;
   color: var(--text-secondary);
   white-space: nowrap;
+}
+
+/* US-D02b: 라벨 이름은 사용자가 짓는다 — 긴 이름 하나가 칩 줄을 밀어내지 않게 상한을 둔다
+   (몇 개를 보여줄지는 inbox-row.tsx의 pickChips가 이미 JS에서 정한다: 2개 + "+N"). */
+.inbox-row__chip {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* P1: 상태 배지는 라벨 칩(outline)과 달리 "soft pill" — 테두리 대신 은은한 채운 배경
@@ -1037,14 +1125,19 @@ body {
    (왜 셋이 아닌지는 filter-chip-bar.tsx 주석에 있다). */
 .filter-chip-bar {
   display: flex;
-  flex-wrap: wrap;
+  /* US-D02b: 인박스에서는 이 바가 필터 행(가로 스크롤)의 자식이라 접히면 안 된다 — 접히는 순간
+     3줄짜리 칩 더미가 되돌아온다. 다른 화면도 같은 바를 쓰지만, 그쪽도 폭이 모자라면 접는 것보다
+     미는 게 맞다(레퍼런스의 필터 DSL도 한 줄이다). */
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
   padding: 0 16px 10px;
+  flex: 0 0 auto;
 }
 .filter-chip {
   display: inline-flex;
   align-items: stretch;
+  flex: 0 0 auto;
   height: 28px;
   border: 1px solid var(--accent);
   border-radius: 8px;
@@ -1107,6 +1200,10 @@ body {
   transform: scale(0.9);
 }
 .filter-chip-bar__add {
+  /* "+"와 라벨 글자를 한 덩어리로 — 좁은 팬에서 라벨이 사라져도 "+"는 남는다. */
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: var(--hairline);
   border-radius: 8px;
   padding: 3px 10px;
@@ -1115,6 +1212,7 @@ body {
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+  flex: 0 0 auto;
   transition: background var(--dur-base) var(--ease-spring), color var(--dur-base)
     var(--ease-spring);
 }
@@ -1391,5 +1489,49 @@ body {
   /* 기둥 전용 아래 여백 — 가로 바에서는 타일을 2px 위로 밀어내기만 한다. */
   .channel-rail__tile--inbox {
     margin-bottom: 0;
+  }
+}
+
+/* ==========================================================================================
+   US-D02b 반응형 리스트 팬 — 셸이 아니라 **리스트 팬 자신**의 폭에 반응한다
+   (@container list, 위 .inbox-card가 컨테이너). 상세 패널이 열려 있으면 팬이 창보다 좁으므로
+   여기 숫자는 창 폭이 아니다: 560px은 팬의 560px이다. 창 기준으로 잡으면 3칼럼 레이아웃에서
+   팬이 이미 좁은데도 규칙이 안 걸린다.
+   경계에 .98을 붙이는 건 셸 블록과 같은 이유 — 같은 픽셀에서 두 블록이 겹치지 않게.
+   ========================================================================================== */
+
+/* ≤559.98: 필터 행의 두 버튼이 글자를 벗고 아이콘만 남는다. 필터 행이 가로로 밀리긴 하지만
+   탭 5개 + 보관 + 칩 + "+"는 560px 아래에서 한 화면에 안 들어간다 — 가장 정보가 적은 둘
+   ("+ Label"의 "Label", "Archived"의 글자)을 접어 스크롤해야 하는 양 자체를 줄인다.
+   높이는 지켜야 한다: 이 블록에서 버튼이 32px가 되므로 아래 여백을 10px→8px로 내려
+   필터 행 전체를 40px 이하로 유지한다(넓은 폭에서는 여백이 그대로 10px다). */
+@container list (max-width: 559.98px) {
+  .filter-chip-bar__add-label,
+  .inbox-card__archived-label {
+    display: none;
+  }
+
+  .inbox-card__archived-icon {
+    display: block;
+  }
+
+  /* 아이콘만 남은 버튼의 타깃은 32px 이상 — 글자가 빠진 만큼을 아이콘 여백이 메운다. */
+  .filter-chip-bar__add,
+  .inbox-card__archived-pill {
+    min-height: 32px;
+    min-width: 32px;
+    justify-content: center;
+  }
+
+  .inbox-card__filter-row {
+    padding-bottom: 8px;
+  }
+}
+
+/* ≤479.98: 요약도 한 줄로. 두 줄 클램프를 유지하면 행 높이가 요약 길이에 따라 들쭉날쭉해지는데,
+   이 폭에서는 행 하나가 세로로 쓸 수 있는 여유가 없다. */
+@container list (max-width: 479.98px) {
+  .inbox-row__summary {
+    -webkit-line-clamp: 1;
   }
 }

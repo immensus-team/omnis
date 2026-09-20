@@ -32,7 +32,7 @@ describe("FilterChipBar (US-D02)", () => {
   it("draws each chip as a field cell and a value cell, not one flat string", () => {
     const chips: FilterChip[] = [
       { id: "channel", field: "Channel", value: "Slack", onRemove: vi.fn() },
-      { id: "labels", field: "Label", value: "2개 중 하나", onRemove: vi.fn() },
+      { id: "labels", field: "Label", value: "one of 2", onRemove: vi.fn() },
     ];
     const { container } = render(<FilterChipBar chips={chips} />);
 
@@ -42,7 +42,7 @@ describe("FilterChipBar (US-D02)", () => {
     ]);
     expect(cells).toEqual([
       ["Channel", "Slack"],
-      ["Label", "2개 중 하나"],
+      ["Label", "one of 2"],
     ]);
   });
 
@@ -53,13 +53,13 @@ describe("FilterChipBar (US-D02)", () => {
       <FilterChipBar
         chips={[
           { id: "channel", field: "Channel", value: "Slack", onRemove: channel },
-          { id: "labels", field: "Label", value: "2개 중 하나", onRemove: labels },
+          { id: "labels", field: "Label", value: "one of 2", onRemove: labels },
         ]}
       />,
     );
 
     // 칩이 둘이면 ×도 둘 — 접근성 이름이 필드명으로 갈려야 어느 쪽인지 고를 수 있다.
-    fireEvent.click(screen.getByRole("button", { name: "Channel 필터 제거" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Channel filter" }));
     expect(channel).toHaveBeenCalledOnce();
     expect(labels).not.toHaveBeenCalled();
   });
@@ -69,12 +69,12 @@ describe("FilterChipBar (US-D02)", () => {
     render(<FilterChipBar chips={[]} addOptions={addOptions({ onToggle })} />);
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "+ Label" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Label filter" }));
 
     const popover = screen.getByRole("dialog");
     // placeholder는 필드명을 물려받는다 — 하드코딩된 영어 "Filter…"는 한국어 UI 한가운데
     // 혼자 영어로 남는다(실사용 화면에서 그대로 보였다).
-    expect(within(popover).getByPlaceholderText("Label 검색")).toBeInTheDocument();
+    expect(within(popover).getByPlaceholderText("Search Label")).toBeInTheDocument();
     expect(within(popover).getByText("Integrations")).toBeInTheDocument();
     expect(within(popover).getByText("Billing")).toBeInTheDocument();
 
@@ -89,17 +89,17 @@ describe("FilterChipBar (US-D02)", () => {
   // 끊는다. 그 크롬이 없으면 placeholder가 목록 위에 맨몸으로 떠 입력칸으로 안 읽힌다.
   it("gives the popover input a search glyph and a rule above the list", () => {
     render(<FilterChipBar chips={[]} addOptions={addOptions()} />);
-    fireEvent.click(screen.getByRole("button", { name: "+ Label" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Label filter" }));
 
     const search = screen.getByRole("dialog").querySelector(".filter-chip-popover__search");
     expect(search).not.toBeNull();
     expect(search?.querySelector("svg")).not.toBeNull();
-    expect(search?.contains(screen.getByPlaceholderText("Label 검색"))).toBe(true);
+    expect(search?.contains(screen.getByPlaceholderText("Search Label"))).toBe(true);
   });
 
   it("shows the ✓ only on the selected options", () => {
     render(<FilterChipBar chips={[]} addOptions={addOptions({ selectedIds: ["l1"] })} />);
-    fireEvent.click(screen.getByRole("button", { name: "+ Label" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Label filter" }));
 
     const popover = screen.getByRole("dialog");
     expect(within(popover).getByText("Integrations").previousSibling).toHaveTextContent("✓");
@@ -108,6 +108,6 @@ describe("FilterChipBar (US-D02)", () => {
 
   it("renders no add trigger when addOptions is omitted", () => {
     render(<FilterChipBar chips={[]} />);
-    expect(screen.queryByRole("button", { name: "+ Label" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add Label filter" })).not.toBeInTheDocument();
   });
 });

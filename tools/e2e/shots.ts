@@ -1,5 +1,5 @@
 // docs/design/screens/*.png 캡처 스크립트. e2e 스택을 그대로 올리고 seed.ts 위에 "밀도"를
-// 더한 뒤(승인 대기 여러 건 + 에이전트 세션 4상태) Playwright로 찍는다.
+// 더한 뒤(needs-approval 여러 건 + 에이전트 세션 4상태) Playwright로 찍는다.
 // 커밋한다: 디자인 스크린샷은 라운드마다 다시 찍어야 하고, 그때 화면에 무엇이 있었는지가
 // 스크린샷만큼 증거다(어떤 픽스처가 그 밀도를 만들었는지는 densify()에만 적혀 있다).
 // 실행: pnpm tsx tools/e2e/shots.ts (e2e와 같은 포트를 쓰므로 e2e와 동시에 돌리지 않는다).
@@ -31,7 +31,7 @@ const logger = createLogger("@omnis/shots");
 async function densify(pool: Pool): Promise<void> {
   const kernel = createKernel({ pool, logger });
   try {
-    // 승인 대기 여러 건 — 전부 커널의 실제 propose 경로.
+    // needs-approval 여러 건 — 전부 커널의 실제 propose 경로.
     const threads = await query<{ id: string; title: string | null }>(
       pool,
       "SELECT id, title FROM threads WHERE kind <> 'agent_session' ORDER BY created_at",
@@ -160,7 +160,7 @@ async function main(): Promise<void> {
     await page.waitForSelector(".inbox-row", { timeout: 60_000 });
     await page.waitForTimeout(2500);
 
-    // 1) needs-approval — 탭 pill 안의 대기 건수 + 승인 대기 행들 + 필터 칩 바.
+    // 1) needs-approval — 탭 pill 안의 대기 건수 + Pending approval 행들 + 필터 칩 바.
     //    파일 이름이 "approvals-density"였는데 이 뷰에는 상태 pill도 그룹 헤더도 없다
     //    (아래 2번이 그 둘을 담는 뷰다) — 화면 이름 그대로 needs-approval.png로 부른다.
     await page.getByRole("radio", { name: /^needs-approval/ }).click();
@@ -175,7 +175,7 @@ async function main(): Promise<void> {
     // 3) 필터 칩: 라벨 2개를 실제로 고른 뒤 칩 + 팝오버(✓)를 같이 담는다
     await page.getByRole("radio", { name: "all" }).click();
     await page.waitForTimeout(400);
-    await page.getByRole("button", { name: "+ 라벨" }).click();
+    await page.getByRole("button", { name: "Add Label filter" }).click();
     await page.waitForTimeout(300);
     const dialog = page.getByRole("dialog");
     const options = dialog.getByRole("option");
@@ -189,7 +189,7 @@ async function main(): Promise<void> {
 
     // 4) 행 호버 카드 — 요약이 긴 행 위에서 400ms 이상 머문다
     await page.keyboard.press("Escape");
-    await page.getByRole("button", { name: "라벨 필터 제거" }).click();
+    await page.getByRole("button", { name: "Remove Label filter" }).click();
     await page.waitForTimeout(400);
     const row = page.locator(".inbox-row", { hasText: "#omnis-launch" }).first();
     await row.hover();
