@@ -8,9 +8,17 @@ export const KEYCHAIN_ACCOUNT = "281932556+jinhologankim@users.noreply.github.co
 export async function readKeychainSecret(
   item: string,
   account: string = KEYCHAIN_ACCOUNT,
-  exec: (cmd: string, args: string[]) => Promise<{ stdout: string }> = (cmd, args) => run(cmd, args),
+  exec: (cmd: string, args: string[]) => Promise<{ stdout: string }> = (cmd, args) =>
+    run(cmd, args),
 ): Promise<string> {
-  const { stdout } = await exec("security", ["find-generic-password", "-s", item, "-a", account, "-w"]);
+  const { stdout } = await exec("security", [
+    "find-generic-password",
+    "-s",
+    item,
+    "-a",
+    account,
+    "-w",
+  ]);
   const secret = stdout.trim();
   if (secret.length === 0) throw new Error(`keychain item is empty: ${item}`);
   return secret;

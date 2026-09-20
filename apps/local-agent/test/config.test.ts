@@ -33,7 +33,11 @@ describe("loadConfig precedence (A2-D15)", () => {
     expect(envOnly.config.hub_url).toBe("ws://127.0.0.1:9999/bridge");
     expect(envOnly.provenance.hub_url).toBe("env");
 
-    const both = loadConfig({ ...base, argv: ["--hub", "http://127.0.0.1:8787"], env: { OMNIS_HUB_URL: "ws://127.0.0.1:9999/bridge" } });
+    const both = loadConfig({
+      ...base,
+      argv: ["--hub", "http://127.0.0.1:8787"],
+      env: { OMNIS_HUB_URL: "ws://127.0.0.1:9999/bridge" },
+    });
     expect(both.config.hub_url).toBe("ws://127.0.0.1:8787/bridge");
     expect(both.provenance.hub_url).toBe("cli");
   });
@@ -47,7 +51,9 @@ describe("loadConfig precedence (A2-D15)", () => {
 
   it("normalises the plist's http base URL into a ws bridge URL (A6 §10.2)", () => {
     expect(normalizeHubUrl("http://127.0.0.1:8787")).toBe("ws://127.0.0.1:8787/bridge");
-    expect(normalizeHubUrl("https://omnis-hub.your-tailnet.ts.net/api")).toBe("wss://omnis-hub.your-tailnet.ts.net/api/bridge");
+    expect(normalizeHubUrl("https://omnis-hub.your-tailnet.ts.net/api")).toBe(
+      "wss://omnis-hub.your-tailnet.ts.net/api/bridge",
+    );
     expect(normalizeHubUrl("ws://127.0.0.1:8787/bridge")).toBe("ws://127.0.0.1:8787/bridge");
   });
 
@@ -58,17 +64,29 @@ describe("loadConfig precedence (A2-D15)", () => {
   });
 
   it("rejects HTTP fields on a process runtime and vice versa", () => {
-    expect(() => loadConfig({ ...base, tomlText: `host="mini"\n[[runtime]]\nkind="codex"\nbinary="/x"\nallowed_roots=["/Users/logankim/dev"]\nbase_url="http://127.0.0.1:8642"\n` })).toThrow(/base_url/);
-    expect(() => loadConfig({ ...base, tomlText: `host="mini"\n[[runtime]]\nkind="hermes"\ntoken_keychain_item="a"\nbinary="/x"\n` })).toThrow(/binary/);
+    expect(() =>
+      loadConfig({
+        ...base,
+        tomlText: `host="mini"\n[[runtime]]\nkind="codex"\nbinary="/x"\nallowed_roots=["/Users/logankim/dev"]\nbase_url="http://127.0.0.1:8642"\n`,
+      }),
+    ).toThrow(/base_url/);
+    expect(() =>
+      loadConfig({
+        ...base,
+        tomlText: `host="mini"\n[[runtime]]\nkind="hermes"\ntoken_keychain_item="a"\nbinary="/x"\n`,
+      }),
+    ).toThrow(/binary/);
   });
 
   it("refuses $HOME or / as an allowed root (A2 §2.1 fail-fast)", () => {
     for (const root of ["/", "/Users/logankim"]) {
-      expect(() => loadConfig({
-        ...base,
-        env: { HOME: "/Users/logankim" },
-        tomlText: `host="mini"\n[[runtime]]\nkind="codex"\nbinary="/x"\nallowed_roots=["${root}"]\n`,
-      })).toThrow(ConfigError);
+      expect(() =>
+        loadConfig({
+          ...base,
+          env: { HOME: "/Users/logankim" },
+          tomlText: `host="mini"\n[[runtime]]\nkind="codex"\nbinary="/x"\nallowed_roots=["${root}"]\n`,
+        }),
+      ).toThrow(ConfigError);
     }
   });
 

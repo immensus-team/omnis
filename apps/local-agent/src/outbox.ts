@@ -2,7 +2,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { BridgeMethod } from "@omnis/protocol";
 
-export interface OutboxEntry { method: BridgeMethod; params: Record<string, unknown>; at?: string }
+export interface OutboxEntry {
+  method: BridgeMethod;
+  params: Record<string, unknown>;
+  at?: string;
+}
 
 /** A2 §2.2: durable만 쌓는다. ephemeral 델타는 버린다. approval.requested는 절대 안 버린다. */
 export class Outbox {
@@ -15,7 +19,9 @@ export class Outbox {
     this.#maxBytes = opts.maxBytes ?? 50 * 1024 * 1024;
     mkdirSync(dirname(this.#path), { recursive: true });
     if (existsSync(this.#path)) {
-      this.#buf = readFileSync(this.#path, "utf8").split("\n").filter((l) => l.length > 0)
+      this.#buf = readFileSync(this.#path, "utf8")
+        .split("\n")
+        .filter((l) => l.length > 0)
         .map((l) => JSON.parse(l) as OutboxEntry);
     }
   }
@@ -30,9 +36,15 @@ export class Outbox {
     this.#flushToDisk();
   }
 
-  entries(): readonly OutboxEntry[] { return this.#buf; }
-  length(): number { return this.#buf.length; }
-  sizeBytes(): number { return Buffer.byteLength(this.#serialise(), "utf8"); }
+  entries(): readonly OutboxEntry[] {
+    return this.#buf;
+  }
+  length(): number {
+    return this.#buf.length;
+  }
+  sizeBytes(): number {
+    return Buffer.byteLength(this.#serialise(), "utf8");
+  }
 
   /** 순서대로 보내고 성공한 것만 지운다. 던지면 남은 것은 파일에 그대로 남는다. */
   async drain(send: (e: OutboxEntry) => Promise<void>): Promise<void> {
@@ -49,6 +61,10 @@ export class Outbox {
     }
   }
 
-  #serialise(): string { return this.#buf.map((e) => JSON.stringify(e)).join("\n"); }
-  #flushToDisk(): void { writeFileSync(this.#path, this.#serialise(), "utf8"); }
+  #serialise(): string {
+    return this.#buf.map((e) => JSON.stringify(e)).join("\n");
+  }
+  #flushToDisk(): void {
+    writeFileSync(this.#path, this.#serialise(), "utf8");
+  }
 }

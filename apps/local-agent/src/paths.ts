@@ -12,9 +12,17 @@ export function assertPathAllowed(cwd: string, allowedRoots: string[]): string {
   }
   const ok = allowedRoots.some((root) => {
     let realRoot: string;
-    try { realRoot = realpathSync(resolve(root)); } catch { return false; }
+    try {
+      realRoot = realpathSync(resolve(root));
+    } catch {
+      return false;
+    }
     return real === realRoot || real.startsWith(realRoot.endsWith(sep) ? realRoot : realRoot + sep);
   });
-  if (!ok) throw new BridgeError(BRIDGE_ERRORS.PATH_NOT_ALLOWED, `cwd outside allowed_roots: ${cwd}`, { cwd, allowedRoots });
+  if (!ok)
+    throw new BridgeError(BRIDGE_ERRORS.PATH_NOT_ALLOWED, `cwd outside allowed_roots: ${cwd}`, {
+      cwd,
+      allowedRoots,
+    });
   return real;
 }

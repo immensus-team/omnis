@@ -1,16 +1,28 @@
 import { describe, expect, it, vi } from "vitest";
-import { HubClient, backoffDelayMs, type SocketLike } from "../src/hub-client.js";
+import { HubClient, type SocketLike, backoffDelayMs } from "../src/hub-client.js";
 import { createLogger } from "../src/logger.js";
 
 function fakeSocket() {
   const sent: string[] = [];
   const handlers: Record<string, ((...a: unknown[]) => void)[]> = {};
-  const sock: SocketLike = {
-    send: (d) => { sent.push(d); },
-    close: () => { (handlers.close ?? []).forEach((h) => h()); },
-    on: (ev, fn) => { (handlers[ev] ??= []).push(fn as (...a: unknown[]) => void); return sock; },
+  const fire = (ev: string, ...a: unknown[]): void => {
+    for (const h of handlers[ev] ?? []) h(...a);
   };
-  return { sock, sent, fire: (ev: string, ...a: unknown[]) => (handlers[ev] ?? []).forEach((h) => h(...a)) };
+  const sock: SocketLike = {
+    send: (d) => {
+      sent.push(d);
+    },
+    close: () => {
+      fire("close");
+    },
+    on: (ev, fn) => {
+      const list = handlers[ev] ?? [];
+      list.push(fn as (...a: unknown[]) => void);
+      handlers[ev] = list;
+      return sock;
+    },
+  };
+  return { sock, sent, fire };
 }
 
 const deps = (connect: () => SocketLike) => ({
@@ -39,7 +51,12 @@ describe("HubClient", () => {
   it("dials with a bearer token and stamps _meta on outgoing requests", async () => {
     const f = fakeSocket();
     const headers: Record<string, string>[] = [];
-    const c = new HubClient(deps((u?: string, h?: Record<string, string>) => { headers.push(h ?? {}); return f.sock; }) as never);
+    const c = new HubClient(
+      deps((u?: string, h?: Record<string, string>) => {
+        headers.push(h ?? {});
+        return f.sock;
+      }) as never,
+    );
     await c.start();
     f.fire("open");
     c.notify("health", { host: "mini", runtimes: [], at: "2026-09-20T00:00:00.000Z" });
@@ -55,9 +72,19 @@ describe("HubClient", () => {
     const c = new HubClient(deps(() => f.sock) as never);
     await c.start();
     f.fire("open");
-    f.fire("message", JSON.stringify({ jsonrpc: "2.0", id: "h-1", method: "session.close", params: { _meta: { "ai.omnis/protocolVersion": "2026-09-20" } } }));
+    f.fire(
+      "message",
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id: "h-1",
+        method: "session.close",
+        params: { _meta: { "ai.omnis/protocolVersion": "2026-09-20" } },
+      }),
+    );
     await vi.waitFor(() => expect(f.sent.some((s) => JSON.parse(s).id === "h-1")).toBe(true));
-    expect(JSON.parse(f.sent.find((s) => JSON.parse(s).id === "h-1") as string).result).toEqual({ echoed: "session.close" });
+    expect(JSON.parse(f.sent.find((s) => JSON.parse(s).id === "h-1") as string).result).toEqual({
+      echoed: "session.close",
+    });
   });
 
   it("resolves an outbound request when the hub replies", async () => {

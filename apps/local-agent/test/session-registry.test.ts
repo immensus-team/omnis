@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, symlinkSync } from "node:fs";
+import { mkdirSync, mkdtempSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BridgeError } from "@omnis/protocol";
@@ -8,9 +8,14 @@ import { SessionRegistry } from "../src/session-registry.js";
 
 const KEY = "agent:codex:mini:proj-omnis";
 const newSession = () => ({
-  session_key: KEY, runtime: "codex" as const, runtime_id: "7f1f0c6a-1b9e-4c0b-9a6f-2c3d4e5f6071",
-  cwd: "/tmp", purpose: "proj:omnis", origin: "human" as const,
-  permission_profile: "trusted" as const, opened_at: "2026-09-20T00:00:00.000Z",
+  session_key: KEY,
+  runtime: "codex" as const,
+  runtime_id: "7f1f0c6a-1b9e-4c0b-9a6f-2c3d4e5f6071",
+  cwd: "/tmp",
+  purpose: "proj:omnis",
+  origin: "human" as const,
+  permission_profile: "trusted" as const,
+  opened_at: "2026-09-20T00:00:00.000Z",
 });
 
 describe("assertPathAllowed", () => {

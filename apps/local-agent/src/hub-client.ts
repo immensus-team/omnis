@@ -54,31 +54,30 @@ export class HubClient {
   #connect(): void {
     const sock = this.deps.connect(this.deps.url, { Authorization: `Bearer ${this.deps.token}` });
     this.#sock = sock;
-    sock.on(
-      "open",
-      (() => {
-        this.#open = true;
-        this.#attempt = 0;
-        this.deps.logger.info("bridge connected", { url: this.deps.url });
-        void this.deps.onOpen?.();
-      }) as never,
-    );
+    sock.on("open", (() => {
+      this.#open = true;
+      this.#attempt = 0;
+      this.deps.logger.info("bridge connected", { url: this.deps.url });
+      void this.deps.onOpen?.();
+    }) as never);
     sock.on("message", ((raw: unknown) => {
       void this.#onMessage(String(raw));
     }) as never);
-    sock.on(
-      "close",
-      (() => {
-        this.#open = false;
-        this.deps.onClose?.();
-        if (this.#stopped) return;
-        const delay = backoffDelayMs(this.#attempt++);
-        this.deps.logger.warn("bridge disconnected, retrying", { delay_ms: delay, attempt: this.#attempt });
-        void (this.deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms))))(delay).then(() => {
-          if (!this.#stopped) this.#connect();
-        });
-      }) as never,
-    );
+    sock.on("close", (() => {
+      this.#open = false;
+      this.deps.onClose?.();
+      if (this.#stopped) return;
+      const delay = backoffDelayMs(this.#attempt++);
+      this.deps.logger.warn("bridge disconnected, retrying", {
+        delay_ms: delay,
+        attempt: this.#attempt,
+      });
+      void (this.deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms))))(
+        delay,
+      ).then(() => {
+        if (!this.#stopped) this.#connect();
+      });
+    }) as never);
     sock.on("error", ((e: unknown) => {
       this.deps.logger.error("bridge socket error", { reason: String(e) });
     }) as never);
@@ -106,7 +105,13 @@ export class HubClient {
   }
 
   async #onMessage(raw: string): Promise<void> {
-    let msg: { id?: string; method?: string; params?: unknown; result?: unknown; error?: { code: number; message: string } };
+    let msg: {
+      id?: string;
+      method?: string;
+      params?: unknown;
+      result?: unknown;
+      error?: { code: number; message: string };
+    };
     try {
       msg = JSON.parse(raw);
     } catch {

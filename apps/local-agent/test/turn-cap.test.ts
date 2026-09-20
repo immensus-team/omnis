@@ -1,4 +1,4 @@
-import { BridgeError } from "@omnis/protocol";
+import type { BridgeError } from "@omnis/protocol";
 import { describe, expect, it } from "vitest";
 import { TurnCap } from "../src/turn-cap.js";
 

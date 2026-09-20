@@ -1,6 +1,10 @@
 import {
-  BRIDGE_ERRORS, BridgeError,
-  type PermissionProfile, type RuntimeKind, type SessionOrigin, type SessionState,
+  BRIDGE_ERRORS,
+  BridgeError,
+  type PermissionProfile,
+  type RuntimeKind,
+  type SessionOrigin,
+  type SessionState,
 } from "@omnis/protocol";
 
 export interface SessionRecord {
@@ -31,11 +35,16 @@ export class SessionRegistry {
     return rec;
   }
 
-  get(key: string): SessionRecord | undefined { return this.#byKey.get(key); }
+  get(key: string): SessionRecord | undefined {
+    return this.#byKey.get(key);
+  }
 
   require(key: string): SessionRecord {
     const rec = this.#byKey.get(key);
-    if (rec === undefined) throw new BridgeError(BRIDGE_ERRORS.SESSION_NOT_FOUND, `unknown session_key: ${key}`, { session_key: key });
+    if (rec === undefined)
+      throw new BridgeError(BRIDGE_ERRORS.SESSION_NOT_FOUND, `unknown session_key: ${key}`, {
+        session_key: key,
+      });
     return rec;
   }
 
@@ -53,7 +62,11 @@ export class SessionRegistry {
     return rec;
   }
 
-  close(key: string): void { this.setState(key, "closed"); }
+  close(key: string): void {
+    this.setState(key, "closed");
+  }
 
-  list(): SessionRecord[] { return [...this.#byKey.values()]; }
+  list(): SessionRecord[] {
+    return [...this.#byKey.values()];
+  }
 }
