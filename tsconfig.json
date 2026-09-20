@@ -3,6 +3,7 @@
   "references": [
     { "path": "./packages/protocol" },
     { "path": "./packages/db" },
+    { "path": "./packages/memory" },
     { "path": "./packages/kernel" },
     { "path": "./apps/hub" },
     { "path": "./packages/agents" },
