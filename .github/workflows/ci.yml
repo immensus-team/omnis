@@ -49,8 +49,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
-      # 컨테이너 없이 도는 unit 프로젝트만(계약 §2). integration은 아래 job이 맡는다.
-      - run: pnpm test
+      # 컨테이너 없이 도는 unit + contract 프로젝트만(계약 §2). integration은 아래 job이 맡는다.
+      # `--`가 필수다 — 없으면 pnpm이 --project를 자기 옵션으로 읽고 Unknown option으로 죽는다.
+      - run: pnpm test -- --project unit --project contract
 
   integration:
     name: integration (postgres 17 + pgvector)
