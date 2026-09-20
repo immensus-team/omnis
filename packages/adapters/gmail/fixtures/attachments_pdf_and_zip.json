@@ -55,7 +55,7 @@
         {
           "partId": "1",
           "mimeType": "application/pdf",
-          "filename": "2024_인수인계_체크리스트.pdf",
+          "filename": "2024_handoff_checklist.pdf",
           "headers": [
             {
               "name": "Content-Disposition",

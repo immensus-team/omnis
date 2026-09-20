@@ -32,8 +32,9 @@ describe("Gmail contract: fixture replay", () => {
   }
 });
 
-// 케이스별 기대값(위 블록)과 별개로, 어떤 payload에서 나왔든 item이 갖춰야 할 성질을 본다.
-// payload가 늘어날 때 "정규화는 됐지만 쓸 수 없는 item"이 조용히 섞여 들어오는 걸 막는 그물.
+// Separate from the per-case expectations above, this checks the properties every item must have
+// no matter which payload produced it. A safety net against "normalized but unusable" items quietly
+// slipping in as the payload set grows.
 describe("Gmail contract: item invariants", () => {
   const itemsFixtures = fixtures.filter(({ fixture }) => fixture.expected.items !== undefined);
 

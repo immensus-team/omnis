@@ -260,9 +260,9 @@ function parseAddressList(headerValue: string): { externalId: string; displayNam
   return out;
 }
 
-/** Date 헤더가 깨진 메일(스팸, 게이트웨이 경유)은 흔하다. toISOString()이 RangeError를 던지면
- *  normalize()를 부른 backfill 스트림 전체가 그 메일 하나 때문에 죽으므로, Gmail이 항상 함께 주는
- *  internalDate(epoch ms)로, 그것도 없으면 now()로 물러난다. */
+/** Mail with a broken Date header (spam, gateway relays) is common. If toISOString() throws a
+ *  RangeError, the whole backfill stream calling normalize() dies over that one message, so fall
+ *  back to the internalDate (epoch ms) Gmail always sends with it, and to now() if that is missing. */
 function parseSentAt(dateHeader: string, internalDate: string | undefined): string {
   const parsed = [
     dateHeader ? new Date(dateHeader) : null,
