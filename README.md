@@ -188,8 +188,8 @@ palette, auto-archive and notifications, tasks, drafts, network and the nightly 
 transcript and unified search, and the hub's adapter registry. W4b — the remaining surfaces — is in
 progress.
 
-**Evidence.** The last full suite recorded on this history is 175 test files / 1,383 tests passing, with
-`pnpm lint` and `pnpm typecheck` clean (2026-09-21). `pnpm e2e:phase-a` runs 19 checks and passes all of
+**Evidence.** The last full suite recorded on this history is 183 test files / 1,461 tests passing, with
+`pnpm lint` and `pnpm typecheck` clean (2026-09-21). `pnpm e2e:phase-a` runs 38 checks and passes all of
 them in two consecutive runs, which is the idempotence check. The per-story plan, wave and gate status
 lives in [`docs/superpowers/plans/README.md`](docs/superpowers/plans/README.md).
 
