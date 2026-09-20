@@ -1,0 +1,66 @@
+{
+  "scenario": "conversation_reply_in_sent_items_folder",
+  "note": "Our own reply, synced out of Sent Items. The adapter reads no folder fields, so it is reported as a received item like any other (Gmail/Outlook 둘 다 동일).",
+  "raw": {
+    "id": "AAMkAGI1msg014",
+    "conversationId": "AAQkAGI1conv010",
+    "internetMessageId": "<msg-014@outlook.com>",
+    "subject": "RE: omnis launch sync",
+    "body": {
+      "contentType": "text",
+      "content": "Checklist is in the shared drive."
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Logan Kim",
+        "address": "logan@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Dana Lee",
+          "address": "dana@example.com"
+        }
+      }
+    ],
+    "parentFolderId": "AAMkAGI1sentitems",
+    "receivedDateTime": "2023-11-15T03:40:00Z",
+    "sentDateTime": "2023-11-15T03:40:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv010",
+        "externalId": "AAMkAGI1msg014",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "logan@example.com"
+        },
+        "body": "Subject: RE: omnis launch sync\n\nChecklist is in the shared drive.",
+        "attachments": [],
+        "sentAt": "2023-11-15T03:40:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-014@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv010",
+          "kind": "email",
+          "title": "RE: omnis launch sync",
+          "participants": [
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            },
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2023-11-15T03:40:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

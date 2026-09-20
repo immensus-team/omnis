@@ -1,0 +1,65 @@
+{
+  "scenario": "html_body_with_style_and_script_tags",
+  "note": "Known v1 simplification (see the stripHtml ponytail note in src): only tags are removed, so the CSS inside <style> survives as body text. Pinned as-is — the search index eats it, and promoting to a real HTML→text converter is the documented upgrade path.",
+  "raw": {
+    "id": "AAMkAGI1msg050",
+    "conversationId": "AAQkAGI1conv050",
+    "internetMessageId": "<msg-050@outlook.com>",
+    "subject": "Weekly digest #212",
+    "body": {
+      "contentType": "html",
+      "content": "<html><head><style type=\"text/css\">.footer{color:#888;font-size:11px}</style><script>trackOpen(\"digest212\")</script></head><body><p>Top stories this week.</p><p class=\"footer\">Unsubscribe at any time.</p></body></html>"
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Weekly Digest",
+        "address": "newsletter@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-15T08:00:00Z",
+    "sentDateTime": "2023-11-15T08:00:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv050",
+        "externalId": "AAMkAGI1msg050",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "newsletter@example.com"
+        },
+        "body": "Subject: Weekly digest #212\n\n.footer{color:#888;font-size:11px} trackOpen(\"digest212\") Top stories this week. Unsubscribe at any time.",
+        "attachments": [],
+        "sentAt": "2023-11-15T08:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-050@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv050",
+          "kind": "email",
+          "title": "Weekly digest #212",
+          "participants": [
+            {
+              "externalId": "newsletter@example.com",
+              "displayName": "Weekly Digest"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T08:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

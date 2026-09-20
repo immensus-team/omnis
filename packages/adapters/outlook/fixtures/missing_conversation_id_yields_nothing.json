@@ -1,0 +1,23 @@
+{
+  "scenario": "missing_conversation_id_yields_nothing",
+  "note": "A message without conversationId cannot be placed in a thread, so normalize() yields nothing — the id/conversationId guard.",
+  "raw": {
+    "id": "AAMkAGI1msg103",
+    "internetMessageId": "<msg-103@outlook.com>",
+    "subject": "Orphan message",
+    "body": {
+      "contentType": "text",
+      "content": "No conversationId."
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Dana Lee",
+        "address": "dana@example.com"
+      }
+    },
+    "receivedDateTime": "2023-11-15T13:15:00Z"
+  },
+  "expected": {
+    "items": []
+  }
+}

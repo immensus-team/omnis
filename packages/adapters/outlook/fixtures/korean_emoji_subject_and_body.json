@@ -1,0 +1,65 @@
+{
+  "scenario": "korean_emoji_subject_and_body",
+  "note": "Korean subject/body with emoji, passed through as UTF-8 (no decoding involved for Graph text bodies).",
+  "raw": {
+    "id": "AAMkAGI1msg080",
+    "conversationId": "AAQkAGI1conv080",
+    "internetMessageId": "<msg-080@outlook.com>",
+    "subject": "옴니스 런칭 스프린트 리뷰 🚀",
+    "body": {
+      "contentType": "text",
+      "content": "안녕하세요, 이번 주 스프린트 리뷰 일정 공유드립니다. 📅 목요일 오후 3시에 뵙겠습니다!"
+    },
+    "from": {
+      "emailAddress": {
+        "name": "김다나",
+        "address": "dana@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "김진호",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-15T11:00:00Z",
+    "sentDateTime": "2023-11-15T11:00:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv080",
+        "externalId": "AAMkAGI1msg080",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "dana@example.com"
+        },
+        "body": "Subject: 옴니스 런칭 스프린트 리뷰 🚀\n\n안녕하세요, 이번 주 스프린트 리뷰 일정 공유드립니다. 📅 목요일 오후 3시에 뵙겠습니다!",
+        "attachments": [],
+        "sentAt": "2023-11-15T11:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-080@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv080",
+          "kind": "email",
+          "title": "옴니스 런칭 스프린트 리뷰 🚀",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "김다나"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "김진호"
+            }
+          ],
+          "lastItemAt": "2023-11-15T11:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

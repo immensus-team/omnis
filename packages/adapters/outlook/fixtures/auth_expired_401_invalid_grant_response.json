@@ -1,0 +1,16 @@
+{
+  "scenario": "auth_expired_401_invalid_grant_response",
+  "note": "Graph OAuth failure surfaced as 401 — retryable only after re-consent.",
+  "raw": {
+    "statusCode": 401,
+    "body": {
+      "error": {
+        "code": "InvalidAuthenticationToken",
+        "message": "Access token has expired."
+      }
+    }
+  },
+  "expected": {
+    "errorKind": "auth_expired"
+  }
+}

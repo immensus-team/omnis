@@ -1,0 +1,16 @@
+{
+  "scenario": "auth_revoked_403_insufficient_scope_response",
+  "note": "403 = the grant no longer covers the scope (Mail.ReadWrite revoked by an admin).",
+  "raw": {
+    "statusCode": 403,
+    "body": {
+      "error": {
+        "code": "ErrorAccessDenied",
+        "message": "Access is denied."
+      }
+    }
+  },
+  "expected": {
+    "errorKind": "auth_revoked"
+  }
+}

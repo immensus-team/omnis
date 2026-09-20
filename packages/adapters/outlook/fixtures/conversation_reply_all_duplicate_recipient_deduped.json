@@ -1,0 +1,89 @@
+{
+  "scenario": "conversation_reply_all_duplicate_recipient_deduped",
+  "note": "Reply-all where the sender also sits in toRecipients and dana appears in both to and cc. participants dedupes by address, first occurrence (from, then to, then cc) wins.",
+  "raw": {
+    "id": "AAMkAGI1msg012",
+    "conversationId": "AAQkAGI1conv010",
+    "internetMessageId": "<msg-012@outlook.com>",
+    "subject": "RE: omnis launch sync",
+    "body": {
+      "contentType": "text",
+      "content": "Adding Priya for the infra side."
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Logan Kim",
+        "address": "logan@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Dana Lee",
+          "address": "dana@example.com"
+        }
+      },
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "ccRecipients": [
+      {
+        "emailAddress": {
+          "name": "Priya Raman",
+          "address": "priya@example.com"
+        }
+      },
+      {
+        "emailAddress": {
+          "name": "Dana Lee",
+          "address": "dana@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-15T01:12:00Z",
+    "sentDateTime": "2023-11-15T01:12:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv010",
+        "externalId": "AAMkAGI1msg012",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "logan@example.com"
+        },
+        "body": "Subject: RE: omnis launch sync\n\nAdding Priya for the infra side.",
+        "attachments": [],
+        "sentAt": "2023-11-15T01:12:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-012@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv010",
+          "kind": "email",
+          "title": "RE: omnis launch sync",
+          "participants": [
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            },
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "priya@example.com",
+              "displayName": "Priya Raman"
+            }
+          ],
+          "lastItemAt": "2023-11-15T01:12:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

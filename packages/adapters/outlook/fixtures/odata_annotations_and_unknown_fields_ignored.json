@@ -1,0 +1,85 @@
+{
+  "scenario": "odata_annotations_and_unknown_fields_ignored",
+  "note": "Full default message resource: @odata.* annotations, changeKey, categories, importance, flag, bodyPreview, webLink. None of it reaches the item.",
+  "raw": {
+    "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users('logan')/messages/$entity",
+    "@odata.etag": "W/\"CQAAABYAAAB3\"",
+    "@odata.type": "#microsoft.graph.message",
+    "id": "AAMkAGI1msg112",
+    "conversationId": "AAQkAGI1conv112",
+    "conversationIndex": "HQAAAAAQkAGI1",
+    "internetMessageId": "<msg-112@outlook.com>",
+    "subject": "Vendor renewal",
+    "body": {
+      "contentType": "text",
+      "content": "Renewal is due on the 30th."
+    },
+    "bodyPreview": "Renewal is due on the 30th.",
+    "uniqueBody": {
+      "contentType": "text",
+      "content": "Renewal is due on the 30th."
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Vendor Billing",
+        "address": "vendor@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "categories": ["Finance"],
+    "importance": "normal",
+    "isRead": false,
+    "isDraft": false,
+    "hasAttachments": false,
+    "changeKey": "CQAAABYAAAB3",
+    "flag": {
+      "flagStatus": "notFlagged"
+    },
+    "webLink": "https://outlook.office365.com/owa/?ItemID=AAMkAGI1msg112",
+    "parentFolderId": "AAMkAGI1inbox",
+    "receivedDateTime": "2023-11-15T14:40:00Z",
+    "sentDateTime": "2023-11-15T14:40:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv112",
+        "externalId": "AAMkAGI1msg112",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "vendor@example.com"
+        },
+        "body": "Subject: Vendor renewal\n\nRenewal is due on the 30th.",
+        "attachments": [],
+        "sentAt": "2023-11-15T14:40:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-112@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv112",
+          "kind": "email",
+          "title": "Vendor renewal",
+          "participants": [
+            {
+              "externalId": "vendor@example.com",
+              "displayName": "Vendor Billing"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T14:40:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

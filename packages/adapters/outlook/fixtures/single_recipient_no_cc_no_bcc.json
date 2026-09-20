@@ -1,0 +1,65 @@
+{
+  "scenario": "single_recipient_no_cc_no_bcc",
+  "note": "Minimal recipient set: ccRecipients and bccRecipients are simply absent from the payload, so participants is from + the single to.",
+  "raw": {
+    "id": "AAMkAGI1msg061",
+    "conversationId": "AAQkAGI1conv061",
+    "internetMessageId": "<msg-061@outlook.com>",
+    "subject": "1:1 agenda",
+    "body": {
+      "contentType": "text",
+      "content": "Three things for tomorrow."
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Dana Lee",
+        "address": "dana@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-15T09:20:00Z",
+    "sentDateTime": "2023-11-15T09:20:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv061",
+        "externalId": "AAMkAGI1msg061",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "dana@example.com"
+        },
+        "body": "Subject: 1:1 agenda\n\nThree things for tomorrow.",
+        "attachments": [],
+        "sentAt": "2023-11-15T09:20:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-061@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv061",
+          "kind": "email",
+          "title": "1:1 agenda",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T09:20:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

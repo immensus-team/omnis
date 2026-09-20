@@ -1,0 +1,13 @@
+{
+  "scenario": "tombstone_without_id_yields_nothing",
+  "note": "Truncated tombstone (no id). The @removed check runs before the id/conversationId guard, so this is [] either way.",
+  "raw": {
+    "conversationId": "AAQkAGI1conv032",
+    "@removed": {
+      "reason": "deleted"
+    }
+  },
+  "expected": {
+    "items": []
+  }
+}

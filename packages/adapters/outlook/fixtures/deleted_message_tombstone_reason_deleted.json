@@ -1,0 +1,14 @@
+{
+  "scenario": "deleted_message_tombstone_reason_deleted",
+  "note": "Delta tombstone for a message deleted out of the folder. No content — normalize() returns [] rather than an empty item (the store deletes off the tombstone, A3 §11).",
+  "raw": {
+    "id": "AAMkAGI1msg030",
+    "conversationId": "AAQkAGI1conv030",
+    "@removed": {
+      "reason": "deleted"
+    }
+  },
+  "expected": {
+    "items": []
+  }
+}

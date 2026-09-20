@@ -1,0 +1,61 @@
+{
+  "scenario": "missing_body_object_subject_only",
+  "note": "No body object at all (e.g. $select without body). bodyText is '', so the item is the subject line alone — body still non-empty thanks to the 'Subject: ' prefix.",
+  "raw": {
+    "id": "AAMkAGI1msg101",
+    "conversationId": "AAQkAGI1conv101",
+    "internetMessageId": "<msg-101@outlook.com>",
+    "subject": "Meeting moved to 4pm",
+    "from": {
+      "emailAddress": {
+        "name": "Dana Lee",
+        "address": "dana@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-15T12:45:00Z",
+    "sentDateTime": "2023-11-15T12:45:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv101",
+        "externalId": "AAMkAGI1msg101",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "dana@example.com"
+        },
+        "body": "Subject: Meeting moved to 4pm\n\n",
+        "attachments": [],
+        "sentAt": "2023-11-15T12:45:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-101@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv101",
+          "kind": "email",
+          "title": "Meeting moved to 4pm",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T12:45:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

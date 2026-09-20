@@ -1,0 +1,66 @@
+{
+  "scenario": "attachment_inline_image_html_cid_reference",
+  "note": "HTML mail with an inline image referenced as cid:. The <img> tag disappears in stripHtml and the referenced part is not fetched inline, so the body reads as plain text.",
+  "raw": {
+    "id": "AAMkAGI1msg041",
+    "conversationId": "AAQkAGI1conv041",
+    "internetMessageId": "<msg-041@outlook.com>",
+    "subject": "Launch banner preview",
+    "body": {
+      "contentType": "html",
+      "content": "<div><img src=\"cid:launch-banner@omnis\" alt=\"launch banner\" width=\"600\"></div><div>The banner above is the final cut.</div>"
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Design Team",
+        "address": "design@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "hasAttachments": true,
+    "receivedDateTime": "2023-11-15T07:00:00Z",
+    "sentDateTime": "2023-11-15T07:00:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv041",
+        "externalId": "AAMkAGI1msg041",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "design@example.com"
+        },
+        "body": "Subject: Launch banner preview\n\nThe banner above is the final cut.",
+        "attachments": [],
+        "sentAt": "2023-11-15T07:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-041@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv041",
+          "kind": "email",
+          "title": "Launch banner preview",
+          "participants": [
+            {
+              "externalId": "design@example.com",
+              "displayName": "Design Team"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T07:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}
