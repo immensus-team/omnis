@@ -61,6 +61,21 @@ export async function registerIngestJobs(deps: {
     await runIngest({ pool, logger, kind: "github" });
   });
 
+  // A4 §10.6: 주간 평가. 실패해도 허브를 죽이지 않는다 — 점수는 로그와 다음 브리핑이 알린다.
+  scheduler.register("eval_weekly", "0 22 * * 0", async () => {
+    const { execFile } = await import("node:child_process");
+    const { promisify } = await import("node:util");
+    const run = promisify(execFile);
+    try {
+      const { stdout } = await run("pnpm", ["eval:memory"], { cwd: process.cwd() });
+      logger.info("memory recall eval", { report: stdout.trim().slice(0, 2000) });
+    } catch (e) {
+      logger.error("memory recall eval failed", {
+        err: e instanceof Error ? e.message : String(e),
+      });
+    }
+  });
+
   // A4 §10.1: 미니는 FSEvents 실시간 + 부팅 시 1회 재스캔. 통지는 다음 틱을 당기지 않고
   // 로그만 남긴다 — 10분 틱이면 충분하고, 저장 폭풍마다 임베딩을 돌릴 이유가 없다.
   // ponytail: 즉시성이 필요해지면 여기서 디바운스된 runIngest를 부른다.

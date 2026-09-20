@@ -3,7 +3,7 @@
 import { query } from "@omnis/db";
 import type { MemoryKind, MemorySourceKind } from "@omnis/protocol";
 import type { Pool } from "pg";
-import { MemoryEmbedError, embed, toVectorLiteral } from "./embed.js";
+import { EMBED_QUERY_PREFIX, MemoryEmbedError, embed, toVectorLiteral } from "./embed.js";
 
 export interface MemoryHit {
   memory_id: string;
@@ -44,7 +44,7 @@ export async function searchMemories(
   q: { query: string; k?: number; kinds?: MemoryKind[]; minScore?: number },
 ): Promise<MemoryHit[]> {
   const k = q.k ?? 10;
-  const [vec] = await embed([q.query]);
+  const [vec] = await embed([EMBED_QUERY_PREFIX + q.query]);
   if (vec === null || vec === undefined) {
     // 조용히 빈 배열을 돌려주면 루프가 "기억이 없다"로 오해하고 근거 없는 초안을 쓴다.
     throw new MemoryEmbedError("query embedding failed — ollama unreachable");

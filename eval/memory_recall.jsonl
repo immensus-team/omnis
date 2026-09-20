@@ -1,0 +1,50 @@
+{"id":"q01","q":"다비치 PoC 기획서 마감이 언제였지?","seed":"다비치안경 PoC 기획서 마감은 2026년 9월 23일 수요일이다","source_kind":"file","source_ref":"/Users/logan/notes/davich.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q02","q":"다비치 NDA는 언제 썼나","seed":"다비치안경 방문과 NDA 서명은 2026년 9월 21일 월요일이었다","source_kind":"file","source_ref":"/Users/logan/notes/davich.md","as_of":"2026-09-22T00:00:00.000Z"}
+{"id":"q03","q":"언더핀 모토가 뭐였지","seed":"언더핀의 모토는 회사 운영을 자율주행처럼이다","source_kind":"file","source_ref":"/Users/logan/underpin/copy.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q04","q":"언더핀 타깃 고객 규모","seed":"언더핀은 10~200인 규모 회사를 위한 AI 운영 시스템이다","source_kind":"file","source_ref":"/Users/logan/underpin/copy.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q05","q":"omnis 허브는 어느 포트에 붙나","seed":"omnis 허브는 127.0.0.1 8787 포트에만 bind한다","source_kind":"github","source_ref":"https://github.com/logankim/omnis/commit/aaa0001","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q06","q":"임베딩 모델과 차원","seed":"omnis는 nomic-embed-text-v1.5로 768차원 임베딩을 만든다","source_kind":"github","source_ref":"https://github.com/logankim/omnis/commit/aaa0002","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q07","q":"월 비용 상한 얼마로 정했지","seed":"에이전트 월 비용 상한은 60달러이고 VIP 예비비가 10퍼센트다","source_kind":"file","source_ref":"/Users/logan/omnis/decisions.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q08","q":"아이폰은 어떻게 쓰기로 했나","seed":"아이폰은 Phase B에서 설치형 PWA로 간다 Tauri iOS는 Phase D다","source_kind":"file","source_ref":"/Users/logan/omnis/decisions.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q09","q":"Hermes 세션 권한","seed":"Hermes는 Phase B에서 읽기 전용 세션이고 위임 대상이 아니다","source_kind":"file","source_ref":"/Users/logan/omnis/decisions.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q10","q":"위임 정책","seed":"위임은 자동 제안 후 사람이 승인해야 실행된다 완전 자율은 기본 꺼짐","source_kind":"file","source_ref":"/Users/logan/omnis/decisions.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q11","q":"mem0 쓰기로 했었나","seed":"mem0-ts는 쓰지 않는다 벡터 메모리는 직접 붙는 pgvector 레이어다","source_kind":"file","source_ref":"/Users/logan/omnis/decisions.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q12","q":"설정 테이블 구조","seed":"설정은 settings 단일 key value 테이블 하나로 관리한다","source_kind":"github","source_ref":"https://github.com/logankim/omnis/commit/aaa0003","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q13","q":"아바타 어떻게 그리기로 했지","seed":"아바타는 이니셜만 쓰고 persons에 avatar_url 컬럼을 만들지 않는다","source_kind":"github","source_ref":"https://github.com/logankim/omnis/commit/aaa0004","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q14","q":"슬랙 신원 키","seed":"슬랙 identity 키는 team_id 콜론 user_id이고 표시 이름은 키가 아니다","source_kind":"github","source_ref":"https://github.com/logankim/omnis/commit/aaa0005","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q15","q":"카톡 신원 키가 불안정한 이유","seed":"카카오톡은 안정적인 사용자 id가 없어 방과 이름 해시로 키를 만들고 verified는 false다","source_kind":"github","source_ref":"https://github.com/logankim/omnis/commit/aaa0006","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q16","q":"self-model 파일 상한","seed":"USER.md는 1200 토큰 VOICE.md와 PROJECTS.md는 각각 1500 토큰 상한이다","source_kind":"file","source_ref":"/Users/logan/omnis/agent-notes.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q17","q":"컨텍스트 절삭 순서 첫 단계","seed":"컨텍스트 절삭은 스레드 중간 턴부터 깎고 USER.md와 마지막 3턴은 건드리지 않는다","source_kind":"file","source_ref":"/Users/logan/omnis/agent-notes.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q18","q":"캐시 경계 규칙","seed":"타임스탬프와 nonce는 반드시 캐시 경계 뒤에 둔다 안 그러면 캐시 단가가 50배가 된다","source_kind":"file","source_ref":"/Users/logan/omnis/agent-notes.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q19","q":"인젝션 플래그 종류","seed":"인젝션 플래그는 instruction_override credential_request exfil_link phantom_tool tag_escape 다섯 가지다","source_kind":"file","source_ref":"/Users/logan/omnis/agent-notes.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q20","q":"팬텀 tool이 뭐야","seed":"send_email과 run_agent 같은 이름은 레지스트리에 없는 팬텀 tool이고 호출 시도는 기록된다","source_kind":"file","source_ref":"/Users/logan/omnis/agent-notes.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q21","q":"드라이브 폴링 방식","seed":"Drive는 changes.getStartPageToken 베이스라인 후 changes.list를 10분마다 폴링한다","source_kind":"drive","source_ref":"1AbCdEfGhIjK001","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q22","q":"드라이브 삭제 감지","seed":"Drive 삭제는 includeRemoved true tombstone으로 오고 memories를 지우지 않고 무효화한다","source_kind":"drive","source_ref":"1AbCdEfGhIjK002","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q23","q":"깃헙 폴링 주기","seed":"GitHub은 ETag 조건부 요청으로 15분마다 폴링하고 304면 본문을 받지 않는다","source_kind":"drive","source_ref":"1AbCdEfGhIjK003","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q24","q":"폴링 토큰 잃어버리면","seed":"Drive pageToken이 만료되면 베이스라인을 다시 잡고 전체 재스캔은 하지 않는다","source_kind":"drive","source_ref":"1AbCdEfGhIjK004","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q25","q":"dead letter 기준","seed":"같은 소스가 3회 연속 실패하면 dead-letter 시스템 Item을 인박스에 남긴다","source_kind":"file","source_ref":"/Users/logan/omnis/ops.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q26","q":"재시도 백오프","seed":"API 5xx 재시도는 1초 4초 16초 세 번이고 그 이상은 다음 틱을 기다린다","source_kind":"file","source_ref":"/Users/logan/omnis/ops.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q27","q":"파일 크기 상한","seed":"ingest 파일 크기 상한은 2MB이고 초과분은 경로만 시스템 Item으로 남긴다","source_kind":"file","source_ref":"/Users/logan/omnis/ops.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q28","q":"바이너리 판정","seed":"첫 8KB에 NUL 바이트가 있으면 바이너리로 보고 읽지 않는다","source_kind":"file","source_ref":"/Users/logan/omnis/ops.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q29","q":"백업 어떻게 하나","seed":"백업은 pg_dump와 restic이고 jobs 테이블이 아니라 launchd가 돌린다","source_kind":"file","source_ref":"/Users/logan/omnis/ops.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q30","q":"테스트 DB 이름","seed":"통합 테스트 DB 이름은 omnis_test이고 개발 DB는 omnis다","source_kind":"github","source_ref":"https://github.com/logankim/omnis/commit/aaa0007","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q31","q":"마이그레이션 규칙","seed":"마이그레이션은 append-only이고 적용된 파일은 절대 수정하지 않는다","source_kind":"github","source_ref":"https://github.com/logankim/omnis/commit/aaa0008","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q32","q":"Zero 복제 제외 테이블","seed":"memories entities relations는 Zero 복제 대상이 아니고 폰으로 나가지 않는다","source_kind":"github","source_ref":"https://github.com/logankim/omnis/commit/aaa0009","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q33","q":"승인 없이 들어가는 것","seed":"ingest된 memories entities relations는 승인 없이 들어가고 self-model만 승인을 탄다","source_kind":"file","source_ref":"/Users/logan/omnis/agent-notes.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q34","q":"청킹 토큰 범위","seed":"문서 청크는 500에서 800 토큰이고 오버랩은 100 토큰이다","source_kind":"file","source_ref":"/Users/logan/omnis/agent-notes.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q35","q":"코드 청킹 기준","seed":"코드는 함수와 클래스 경계로 자르고 라인 고정 분할을 쓰지 않는다","source_kind":"file","source_ref":"/Users/logan/omnis/agent-notes.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q36","q":"캘린더 청킹","seed":"캘린더는 이벤트 한 건이 청크 한 개다","source_kind":"calendar","source_ref":"evt-0001","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q37","q":"9월 23일 킥오프 참석자","seed":"9월 23일 다비치 킥오프 참석자는 대표님과 데이터팀 두 명이다","source_kind":"calendar","source_ref":"evt-0002","as_of":"2026-09-24T00:00:00.000Z"}
+{"id":"q38","q":"주간 회고 시간","seed":"주간 회고는 매주 금요일 오후 4시에 한다","source_kind":"calendar","source_ref":"evt-0003","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q39","q":"온워드랩 위치","seed":"온워드랩 사무실은 서울 강남에 있다","source_kind":"file","source_ref":"/Users/logan/notes/company.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q40","q":"이멘서스 우선순위","seed":"다비치 딜에서 이멘서스가 최우선 항목이다","source_kind":"file","source_ref":"/Users/logan/notes/davich.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q41","q":"데이터 기간 권고","seed":"다비치 분석에 필요한 데이터 기간은 3년을 권고했다","source_kind":"file","source_ref":"/Users/logan/notes/davich.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q42","q":"IRM 잠긴 파일","seed":"다비치가 준 파일 일부는 IRM으로 잠겨 있어 열리지 않았다","source_kind":"file","source_ref":"/Users/logan/notes/davich.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q43","q":"언더핀 소스 오브 트루스","seed":"언더핀 콘텐츠의 소스는 최신 레포와 라이브 사이트뿐이고 옛 프레임은 버린 것이다","source_kind":"file","source_ref":"/Users/logan/underpin/copy.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q44","q":"디자인 방향 이름","seed":"omnis 데스크톱 디자인 방향의 이름은 kinso이고 라이트가 기본이다","source_kind":"github","source_ref":"https://github.com/logankim/omnis/commit/aaa0010","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q45","q":"조용시간","seed":"알림 조용시간은 밤 11시부터 아침 7시까지 한국 시간 기준이다","source_kind":"file","source_ref":"/Users/logan/omnis/decisions.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q46","q":"자동 보관 되돌리기 창","seed":"자동 보관 되돌리기 창은 7일이고 재보관 제외 기간은 30일이다","source_kind":"file","source_ref":"/Users/logan/omnis/decisions.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q47","q":"위임 일일 상한","seed":"위임은 하루 5건 같은 스레드는 24시간에 2건까지다","source_kind":"file","source_ref":"/Users/logan/omnis/decisions.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q48","q":"추출 예산","seed":"청크 한 건 추출 예산은 입력 2000 출력 500 토큰 20초 티어 T1이다","source_kind":"file","source_ref":"/Users/logan/omnis/agent-notes.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q49","q":"recall 목표","seed":"메모리 recall at 10 목표는 0.80 이상이다","source_kind":"file","source_ref":"/Users/logan/omnis/agent-notes.md","as_of":"2026-09-20T00:00:00.000Z"}
+{"id":"q50","q":"제외 규칙 위반 허용치","seed":"memories의 source_ref에 제외 패턴이 한 건이라도 있으면 CI가 실패한다","source_kind":"file","source_ref":"/Users/logan/omnis/agent-notes.md","as_of":"2026-09-20T00:00:00.000Z"}
