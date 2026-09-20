@@ -1,0 +1,150 @@
+{"id": "n1", "handle": "no-reply@news0.example", "body": "이번 주 프로덕트 소식입니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n2", "handle": "no-reply@news1.example", "body": "9월 뉴스레터를 보내드립니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n3", "handle": "no-reply@news2.example", "body": "주간 디자인 링크 모음입니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n4", "handle": "no-reply@news3.example", "body": "이번 달 추천 아티클 5선.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n5", "handle": "no-reply@news4.example", "body": "새 블로그 글이 올라왔습니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n6", "handle": "no-reply@news5.example", "body": "가을 신제품을 소개합니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n7", "handle": "no-reply@news6.example", "body": "이번 주 채용 공고 요약입니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n8", "handle": "no-reply@news0.example", "body": "커뮤니티 이벤트 안내입니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n9", "handle": "no-reply@news1.example", "body": "주간 마켓 리포트를 첨부합니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n10", "handle": "no-reply@news2.example", "body": "오늘의 뉴스 브리핑.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n11", "handle": "no-reply@news3.example", "body": "Weekly digest for your team.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n12", "handle": "no-reply@news4.example", "body": "Your Monday reading list is here.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n13", "handle": "no-reply@news5.example", "body": "This week in engineering.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n14", "handle": "no-reply@news6.example", "body": "New features shipped last week.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n15", "handle": "no-reply@news0.example", "body": "Our latest case study is live.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n16", "handle": "no-reply@news1.example", "body": "이번 주 인기 글 TOP 10.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n17", "handle": "no-reply@news2.example", "body": "10월 웨비나 일정을 공유합니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n18", "handle": "no-reply@news3.example", "body": "신규 강의가 열렸습니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n19", "handle": "no-reply@news4.example", "body": "주간 회고 뉴스레터입니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n20", "handle": "no-reply@news5.example", "body": "분기 리포트가 공개되었습니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n21", "handle": "no-reply@news6.example", "body": "Monthly product changelog.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n22", "handle": "no-reply@news0.example", "body": "Your subscription summary for September.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n23", "handle": "no-reply@news1.example", "body": "Trending repositories this week.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n24", "handle": "no-reply@news2.example", "body": "Design weekly, issue 142.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n25", "handle": "no-reply@news3.example", "body": "Startup news roundup.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n26", "handle": "no-reply@news4.example", "body": "이번 주 세미나 다시보기 링크입니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n27", "handle": "no-reply@news5.example", "body": "가을 할인 기간이 시작되었습니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n28", "handle": "no-reply@news6.example", "body": "신규 파트너사를 소개합니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n29", "handle": "no-reply@news0.example", "body": "주간 보안 소식 요약.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "n30", "handle": "no-reply@news1.example", "body": "연말 컨퍼런스 라인업 공개.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t1", "handle": "notifications@github.example", "body": "빌드가 성공했습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t2", "handle": "notifications@jira.example", "body": "이슈 상태가 Done으로 바뀌었습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t3", "handle": "alerts@monitoring.example", "body": "CPU 사용률이 정상으로 돌아왔습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t4", "handle": "alert@status.example", "body": "서비스가 복구되었습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t5", "handle": "mailer@shop.example", "body": "주문이 배송 완료되었습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t6", "handle": "bounce@list.example", "body": "메일 전송이 완료되었습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t7", "handle": "donotreply@bank.example", "body": "이번 달 명세서가 발행되었습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t8", "handle": "noreply@calendar.example", "body": "일정이 업데이트되었습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t9", "handle": "no-reply@drive.example", "body": "문서가 공유되었습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t10", "handle": "notification@slackbot.example", "body": "채널에 새 글이 올라왔습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t11", "handle": "notifications@linkedin.example", "body": "회원님의 게시물이 좋아요를 받았습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t12", "handle": "alerts@ci.example", "body": "야간 빌드가 통과했습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t13", "handle": "no-reply@zoom.example", "body": "회의 녹화본이 준비되었습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t14", "handle": "noreply@figma.example", "body": "파일에 새 코멘트가 달렸습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t15", "handle": "notifications@notion.example", "body": "페이지가 업데이트되었습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t16", "handle": "mailer@delivery.example", "body": "택배가 출발했습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t17", "handle": "no-reply@appstore.example", "body": "앱 업데이트가 게시되었습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t18", "handle": "alerts@uptime.example", "body": "모니터가 정상입니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t19", "handle": "notifications@stripe.example", "body": "영수증이 발행되었습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t20", "handle": "no-reply@docs.example", "body": "주간 사용량 리포트입니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t21", "handle": "noreply@ticket.example", "body": "티켓이 종료되었습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t22", "handle": "notifications@discord.example", "body": "서버에 새 공지가 있습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t23", "handle": "alerts@backup.example", "body": "백업이 완료되었습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t24", "handle": "no-reply@vercel.example", "body": "배포가 완료되었습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "t25", "handle": "mailer@newsroom.example", "body": "보도자료가 등록되었습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "b1", "handle": "buildbot0", "body": "빌드 #482 성공", "meta": {"bot": true}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "b2", "handle": "buildbot1", "body": "배포 파이프라인이 끝났습니다.", "meta": {"bot": true}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "b3", "handle": "buildbot2", "body": "야간 테스트 전부 통과", "meta": {"bot": true}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "b4", "handle": "buildbot3", "body": "알림: 디스크 사용률 62%", "meta": {"bot": true}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "b5", "handle": "buildbot4", "body": "오늘의 스탠드업 리마인더입니다.", "meta": {"bot": true}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "b6", "handle": "buildbot5", "body": "PR이 자동 머지되었습니다.", "meta": {"bot": true}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "b7", "handle": "buildbot6", "body": "스케줄 잡이 완료되었습니다.", "meta": {"bot": true}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "b8", "handle": "buildbot7", "body": "로그 롤오버가 끝났습니다.", "meta": {"bot": true}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "b9", "handle": "buildbot8", "body": "주간 지표가 갱신되었습니다.", "meta": {"bot": true}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "b10", "handle": "buildbot9", "body": "봇이 채널을 정리했습니다.", "meta": {"bot": true}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "k1", "handle": "hello@brand0.example", "body": "가을 프로모션 안내드립니다.", "meta": {"headers": {"Precedence": "bulk"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "k2", "handle": "hello@brand1.example", "body": "신규 기능 소개 자료입니다.", "meta": {"headers": {"Precedence": "bulk"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "k3", "handle": "hello@brand2.example", "body": "고객 감사 이벤트를 진행합니다.", "meta": {"headers": {"Precedence": "bulk"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "k4", "handle": "hello@brand3.example", "body": "연간 구독 혜택 안내입니다.", "meta": {"headers": {"Precedence": "bulk"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "k5", "handle": "hello@brand4.example", "body": "세미나 사전 등록이 열렸습니다.", "meta": {"headers": {"Precedence": "bulk"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "k6", "handle": "hello@brand5.example", "body": "신간 도서를 소개합니다.", "meta": {"headers": {"Precedence": "bulk"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "k7", "handle": "hello@brand6.example", "body": "멤버십 등급이 유지되었습니다.", "meta": {"headers": {"Precedence": "bulk"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "k8", "handle": "hello@brand7.example", "body": "이달의 인기 상품 모음.", "meta": {"headers": {"Precedence": "bulk"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "k9", "handle": "hello@brand8.example", "body": "브랜드 리뉴얼 소식입니다.", "meta": {"headers": {"Precedence": "bulk"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "k10", "handle": "hello@brand9.example", "body": "한정 수량 판매가 시작되었습니다.", "meta": {"headers": {"Precedence": "bulk"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "m1", "handle": "marketing@brand.example", "body": "새 소식을 전해드립니다. 자세한 내용은 링크를 참고해 주세요.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "m2", "handle": "promo@shop.example", "body": "새 소식을 전해드립니다. 자세한 내용은 링크를 참고해 주세요.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "m3", "handle": "team@startup.example", "body": "새 소식을 전해드립니다. 자세한 내용은 링크를 참고해 주세요.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "m4", "handle": "hello@saas.example", "body": "새 소식을 전해드립니다. 자세한 내용은 링크를 참고해 주세요.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "m5", "handle": "events@conf.example", "body": "새 소식을 전해드립니다. 자세한 내용은 링크를 참고해 주세요.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "m6", "handle": "info@agency.example", "body": "새 소식을 전해드립니다. 자세한 내용은 링크를 참고해 주세요.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "m7", "handle": "press@media.example", "body": "새 소식을 전해드립니다. 자세한 내용은 링크를 참고해 주세요.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "m8", "handle": "community@forum.example", "body": "새 소식을 전해드립니다. 자세한 내용은 링크를 참고해 주세요.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "q1", "handle": "no-reply@promo0.example", "body": "이번 주 트렌드가 궁금하신가요? 뉴스레터에서 확인하세요.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "q2", "handle": "no-reply@promo1.example", "body": "새 기능 써보셨나요? 지금 확인해 보세요.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "q3", "handle": "no-reply@promo2.example", "body": "올해 목표는 정하셨나요? 가이드를 받아보세요.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "q4", "handle": "no-reply@promo3.example", "body": "주말 계획 있으신가요? 추천 코스를 모았습니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "q5", "handle": "no-reply@promo4.example", "body": "어떤 강의가 맞을까요? 진단 테스트를 준비했습니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "q6", "handle": "no-reply@promo5.example", "body": "리포트 보셨나요? 요약본을 첨부합니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "q7", "handle": "no-reply@promo6.example", "body": "새 앱 써보실래요? 베타 링크입니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": true}
+{"id": "h1", "handle": "kim@client.example", "body": "견적서 언제 받을 수 있을까요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h2", "handle": "park@partner.example", "body": "내일 회의 시간 조정 가능할까요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h3", "handle": "lee@vendor.example", "body": "계약서 초안 검토 부탁드려도 될까요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h4", "handle": "choi@corp.example", "body": "샘플 수량은 몇 개로 할까요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h5", "handle": "jung@agency.example", "body": "디자인 시안 언제쯤 공유해 주실 수 있나요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h6", "handle": "han@lab.example", "body": "실험 결과 공유 가능하신가요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h7", "handle": "sun@client.example", "body": "예산 범위를 알려주실 수 있을까요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h8", "handle": "yoon@corp.example", "body": "다음 주 방문 일정 괜찮으신가요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h9", "handle": "oh@partner.example", "body": "API 문서 링크 다시 주실 수 있나요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h10", "handle": "seo@vendor.example", "body": "납기일 확정이 가능할까요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h11", "handle": "amy@acme.example", "body": "Could you send the invoice today?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h12", "handle": "ben@acme.example", "body": "Are we still on for Thursday?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h13", "handle": "cara@beta.example", "body": "Can you review the spec by Friday?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h14", "handle": "dan@gamma.example", "body": "Who should I loop in for legal?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h15", "handle": "erin@delta.example", "body": "What is the current headcount plan?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h16", "handle": "kang@client.example", "body": "수정본 반영해 주실 수 있나요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h17", "handle": "min@corp.example", "body": "이번 건 진행해도 될까요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h18", "handle": "noh@partner.example", "body": "담당자분 연락처 알 수 있을까요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h19", "handle": "bae@vendor.example", "body": "결제 조건 다시 확인 부탁드려도 될까요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "h20", "handle": "shin@lab.example", "body": "다음 스프린트에 포함할까요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "r1", "handle": "kim@client.example", "body": "말씀하신 대로 반영했습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": true, "expect_archive": false}
+{"id": "r2", "handle": "park@partner.example", "body": "확인했습니다. 감사합니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": true, "expect_archive": false}
+{"id": "r3", "handle": "lee@vendor.example", "body": "첨부 파일 보내드립니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": true, "expect_archive": false}
+{"id": "r4", "handle": "choi@corp.example", "body": "일정 공유드립니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": true, "expect_archive": false}
+{"id": "r5", "handle": "amy@acme.example", "body": "Thanks, sending the draft shortly.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": true, "expect_archive": false}
+{"id": "r6", "handle": "ben@acme.example", "body": "Noted, will follow up.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": true, "expect_archive": false}
+{"id": "r7", "handle": "jung@agency.example", "body": "회의록 정리해서 올렸습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": true, "expect_archive": false}
+{"id": "r8", "handle": "han@lab.example", "body": "데이터 업데이트했습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": true, "expect_archive": false}
+{"id": "v1", "handle": "ceo@onward.example", "body": "오늘 안에 정리해서 공유 부탁합니다.", "meta": {}, "sensitivity": "normal", "vip": true, "i_replied": false, "expect_archive": false}
+{"id": "v2", "handle": "cfo@onward.example", "body": "이번 분기 숫자 확인 바랍니다.", "meta": {}, "sensitivity": "normal", "vip": true, "i_replied": false, "expect_archive": false}
+{"id": "v3", "handle": "lead@bigclient.example", "body": "다음 주 데모 준비 부탁드립니다.", "meta": {}, "sensitivity": "normal", "vip": true, "i_replied": false, "expect_archive": false}
+{"id": "v4", "handle": "investor@fund.example", "body": "업데이트 메일 기다리고 있습니다.", "meta": {}, "sensitivity": "normal", "vip": true, "i_replied": false, "expect_archive": false}
+{"id": "v5", "handle": "no-reply@boardroom.example", "body": "이사회 자료가 배포되었습니다.", "meta": {"headers": {"List-Unsubscribe": "<https://example.com/u>"}}, "sensitivity": "normal", "vip": true, "i_replied": false, "expect_archive": false}
+{"id": "v6", "handle": "partner@keyaccount.example", "body": "계약 건 진행 상황 공유 바랍니다.", "meta": {}, "sensitivity": "normal", "vip": true, "i_replied": false, "expect_archive": false}
+{"id": "s1", "handle": "no-reply@bank.example", "body": "이체 내역 안내", "meta": {}, "sensitivity": "finance", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "s2", "handle": "statements@bank.example", "body": "카드 명세서가 도착했습니다.", "meta": {}, "sensitivity": "finance", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "s3", "handle": "no-reply@hospital.example", "body": "검진 결과가 등록되었습니다.", "meta": {}, "sensitivity": "health", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "s4", "handle": "noreply@clinic.example", "body": "진료 예약이 확정되었습니다.", "meta": {}, "sensitivity": "health", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "s5", "handle": "legal@lawfirm.example", "body": "계약 관련 안내드립니다.", "meta": {}, "sensitivity": "legal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "s6", "handle": "no-reply@court.example", "body": "서류가 접수되었습니다.", "meta": {}, "sensitivity": "legal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "s7", "handle": "family@home.example", "body": "주말 가족 모임 장소 정리했습니다.", "meta": {}, "sensitivity": "personal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "s8", "handle": "no-reply@insurance.example", "body": "보험료 납입 내역입니다.", "meta": {}, "sensitivity": "finance", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "nq1", "handle": "no-reply@survey.example", "body": "설문에 참여해 주시겠어요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "nq2", "handle": "noreply@support.example", "body": "이 답변이 도움이 되었나요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "nq3", "handle": "no-reply@hr.example", "body": "연말정산 서류를 제출하셨나요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "nq4", "handle": "notifications@github.example", "body": "이 PR을 리뷰해 주시겠어요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "nq5", "handle": "alerts@security.example", "body": "이 로그인이 본인 활동이 맞나요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "nq6", "handle": "no-reply@billing.example", "body": "플랜을 계속 유지하시겠어요?", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "p1", "handle": "kim@client.example", "body": "방금 통화 내용 정리해서 보냅니다. 확인 부탁드립니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "p2", "handle": "park@partner.example", "body": "요청하신 자료 첨부합니다. 검토 후 회신 주세요.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "p3", "handle": "amy@acme.example", "body": "Here is the updated timeline. Please confirm.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "p4", "handle": "lee@vendor.example", "body": "계약서 서명본 보내드립니다. 원본은 우편으로 발송했습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "p5", "handle": "jung@agency.example", "body": "다음 주 워크숍 준비물 목록입니다. 준비 부탁드립니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "p6", "handle": "han@lab.example", "body": "실험 프로토콜 수정본입니다. 반영해 주세요.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "x1", "handle": "no-reply@ticket.example", "body": "티켓에 새 댓글이 달렸습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": true, "expect_archive": false}
+{"id": "x2", "handle": "notifications@jira.example", "body": "담당자가 변경되었습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": true, "expect_archive": false}
+{"id": "x3", "handle": "no-reply@crm.example", "body": "리드 상태가 업데이트되었습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": true, "expect_archive": false}
+{"id": "x4", "handle": "notifications@github.example", "body": "이슈에 새 코멘트가 달렸습니다.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": true, "expect_archive": false}
+{"id": "fp1", "handle": "alerts@billing.example", "body": "결제가 실패했습니다. 카드 정보를 업데이트해 주세요.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}
+{"id": "fp2", "handle": "no-reply@gov.example", "body": "세금 신고 마감이 내일입니다. 기한 내 제출하세요.", "meta": {}, "sensitivity": "normal", "vip": false, "i_replied": false, "expect_archive": false}

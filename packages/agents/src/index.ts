@@ -73,3 +73,14 @@ export {
   type Register,
 } from "./draft/register.js";
 export { SELF_CHECK_ITEMS, selfCheck, type SelfCheckCtx } from "./draft/selfcheck.js";
+export {
+  AUTO_ARCHIVE_RULES,
+  AutoArchiveOutput,
+  T1_ARCHIVE_CONFIDENCE_MIN,
+  autoArchiveLoop,
+  hardGate,
+  nonHumanSender,
+  sweepAutoArchive,
+  type AutoArchiveOutputT,
+  type HardGateResult,
+} from "./loops/auto-archive.js";
