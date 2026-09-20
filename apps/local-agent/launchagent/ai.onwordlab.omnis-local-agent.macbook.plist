@@ -12,7 +12,7 @@
     <string>--host</string>
     <string>macbook</string>
     <string>--hub</string>
-    <string>https://omnis-hub.your-tailnet.ts.net/api</string>
+    <string>https://your-hub.your-tailnet.ts.net</string>
     <string>--runtimes</string>
     <string>claude_code,codex,claude_ds</string>
   </array>

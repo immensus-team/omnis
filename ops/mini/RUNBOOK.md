@@ -10,7 +10,7 @@
 | 진입점 | `ops/mini/run.sh <service>` — `ops/mini/env.sh`를 source해 Keychain 비밀을 export한 뒤 exec |
 | 로그 | `~/Library/Logs/omnis/{hub,zero-cache,local-agent}.{log,err.log}` |
 | DB | `postgres://vigor@127.0.0.1:5432/omnis` (같은 클러스터에 miniflux가 있다 — 건드리지 말 것) |
-| 외부 노출 | `https://your-hub.your-tailnet.ts.net/api/…` → 127.0.0.1:8787 (tailnet only) |
+| 외부 노출 | `https://your-hub.your-tailnet.ts.net/…` → 127.0.0.1:8787 (tailnet only, **prefix strip 없음** — 경로가 허브 라우트 그대로다) |
 
 > **미니의 기존 설비는 건드리지 않는다**: Hermes/omh/buzz(`~/.hermes`, 포트 8642), colima, miniflux, recap-server(:8090).
 
@@ -63,6 +63,15 @@ install.sh는 `ops/mini/env.sh`(없으면 `env.sh.example`에서)와 `~/.omnis/l
 (없으면 `local-agent.toml.example`에서)을 깔고, plist를 치환해 `gui/$(id -u)`에 bootstrap한다.
 `env.sh`는 **커밋하지 않는다**(.gitignore) — 값은 전부 Keychain 조회다.
 
+### 6) tailnet 노출
+
+```bash
+/Applications/Tailscale.app/Contents/MacOS/Tailscale serve --bg --set-path=/ http://127.0.0.1:8787
+```
+`/`에 붙인다 — Serve는 `--set-path`로 붙인 prefix를 **떼고** 백엔드에 넘기기 때문에, `/api`에 마운트하면
+허브의 `/api/zero-token`이 `/zero-token`으로 도착해 404가 된다. 더 구체적인 경로가 이기므로
+기존 `/recaps`(:8090) 마운트는 그대로 산다. 확인은 `serve status`.
+
 ## 업데이트 (코드가 바뀌었을 때)
 
 ```bash
@@ -87,7 +96,9 @@ zero-cache 재기동 **전에** 한 번 더 돌린다 — 안 그러면 쿼리�
 ```bash
 launchctl print gui/501/com.omnis.hub | grep -E '^\s+(state|pid|last exit code) = '
 curl -s http://127.0.0.1:8787/health                         # {"ok":true,"db":"up",...}
-curl -s https://your-hub.your-tailnet.ts.net/api/health # 맥북/아이폰에서
+curl -s https://your-hub.your-tailnet.ts.net/health       # 맥북/아이폰에서
+curl -so /dev/null -w '%{http_code}\n' \
+  https://your-hub.your-tailnet.ts.net/api/zero-token       # 200 (허브 라우트가 실제로 /api/zero-token이다)
 curl -so /dev/null -w '%{http_code}\n' http://127.0.0.1:4848/   # zero-cache → 200
 grep '"bridge connected"' ~/Library/Logs/omnis/hub.log | tail -1   # local-agent 등록 확인
 psql -U vigor -d omnis -Atc \
@@ -125,7 +136,7 @@ for s in hub zero-cache local-agent; do
   launchctl bootout "gui/501/com.omnis.$s" 2>/dev/null
   rm -f ~/Library/LaunchAgents/com.omnis.$s.plist
 done
-/Applications/Tailscale.app/Contents/MacOS/Tailscale serve --https=443 --set-path=/api off
+/Applications/Tailscale.app/Contents/MacOS/Tailscale serve --https=443 --set-path=/ off   # /recaps는 남긴다
 psql -U vigor -d omnis -Atc "SELECT pg_drop_replication_slot('zero_0_a')"   # 슬롯부터. 안 지우면 WAL이 쌓인다
 dropdb -U vigor omnis
 rm -rf /Users/vigor/omnis /Users/vigor/omnis-var ~/.omnis ~/Library/Logs/omnis
@@ -145,5 +156,6 @@ miniflux가 같이 끊긴다.
 | 08:45 | Keychain 항목 3개 생성, LaunchAgent 3개 bootstrap |
 | 08:45 | `zero:deploy-permissions` (hash 6ed5e84) |
 | 08:48 | `tailscale serve --bg --https=443 --set-path=/api http://127.0.0.1:8787` — 기존 `/recaps` 마운트는 그대로 |
+| 11:3x | `tailscale serve --bg --set-path=/ http://127.0.0.1:8787` + `--set-path=/api off` — `/api` prefix strip 때문에 `/api/zero-token`이 404였다. 이제 `/`에 그대로 붙는다(`/health` 200, `/api/zero-token` 200, `/recaps` 200 유지) |
 
 `npm i -g pnpm@9.12.3`도 이때 깔았다. Postgres의 메모리 파라미터(A6 §4)는 **건드리지 않았다**.

@@ -13,7 +13,7 @@ describe("host profile", () => {
   it("points the mini at loopback and the macbook at the tailnet bridge", () => {
     expect(hostProfile("mini").hub_url).toBe("ws://127.0.0.1:8787/bridge");
     expect(hostProfile("macbook").hub_url.startsWith("wss://")).toBe(true);
-    expect(hostProfile("macbook").hub_url.endsWith("/api/bridge")).toBe(true);
+    expect(hostProfile("macbook").hub_url.endsWith(".ts.net/bridge")).toBe(true);
   });
 
   it("uses the per-host bridge token item name (A2 §2.1)", () => {

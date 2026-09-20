@@ -42,7 +42,8 @@ export interface LoadConfigResult {
 export const HOST_DEFAULTS: Record<HostId, { hub_url: string; token_keychain_item: string }> = {
   mini: { hub_url: "ws://127.0.0.1:8787/bridge", token_keychain_item: "omnis.bridge.token.mini" },
   macbook: {
-    hub_url: "wss://omnis-hub.your-tailnet.ts.net/api/bridge",
+    // 미니의 Tailscale Serve는 /에 허브를 그대로 붙인다(prefix strip 없음) — 경로는 허브 라우트와 1:1이다.
+    hub_url: "wss://your-hub.your-tailnet.ts.net/bridge",
     token_keychain_item: "omnis.bridge.token.macbook",
   },
 };
