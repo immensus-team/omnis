@@ -1,4 +1,3 @@
-import { Sparkles } from "lucide-react";
 import type { ElementType } from "react";
 import { PiOpenAiLogo } from "react-icons/pi";
 import { SiAnthropic, SiDeepseek } from "react-icons/si";
@@ -81,15 +80,21 @@ export const RUNTIME_LABEL: Record<AgentRuntimeKind, string> = {
 // reasons (5.7.0 only has SiOpenaigym left — it "looks like" SiOpenai because of prefix matching).
 // pi is the set that actually carries the mark. The earlier lucide Bot was a stand-in from when no
 // OpenAI mark existed. A real hermes mark, if one appears, is one line here.
+//
+// US-D05: `omnis: Sparkles` used to sit in this map, and it broke the standard the paragraph above
+// sets. Every other entry is a real brand mark out of a mark set; Sparkles is a generic lucide
+// glyph, and here it stood for omnis's *own* identity — the one mark in the app that cannot come
+// from someone else's set. omnis's mark is the orb, and a hand-drawn approximation of it is barred
+// (CLAUDE.md: never hand-draw brand SVGs), so the honest answer is the one the next comment already
+// documents: a runtime with no mark falls through to RUNTIME_LETTER. Deleted rather than replaced.
 export const RUNTIME_ICON: Partial<Record<AgentRuntimeKind, ElementType>> = {
   claude_code: SiAnthropic,
   claude_ds: SiDeepseek,
   codex: PiOpenAiLogo,
-  omnis: Sparkles,
 };
 
-/** The letter fallback for a runtime with no mark in RUNTIME_ICON (today: hermes) — the same idea
- * as the avatar fallback (initialsFromName), one runtime initial instead of a person's
+/** The letter fallback for a runtime with no mark in RUNTIME_ICON (today: hermes, omnis) — the same
+ * idea as the avatar fallback (initialsFromName), one runtime initial instead of a person's
  * (DESIGN-DIRECTION.md P1: Hermes -> "H"). */
 export const RUNTIME_LETTER: Record<AgentRuntimeKind, string> = {
   claude_code: "C",

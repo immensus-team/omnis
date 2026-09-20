@@ -93,7 +93,7 @@
         "kind": "email",
         "author": {
           "kind": "person",
-          "id": "Dana Lee <dana@example.com>"
+          "id": "dana@example.com"
         },
         "body": "Subject: Q4 handoff bundle\n\n",
         "attachments": [],

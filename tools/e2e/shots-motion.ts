@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { chromium } from "@playwright/test";
 import { Pool } from "../../packages/db/src/index.js";
 import { assertNoOverflow, describeOverflow, measureOverflow } from "./overflow.js";
-import { seed } from "./seed.js";
+import { seed, varyInboxCopy } from "./seed.js";
 import {
   HUB_PORT,
   REPO_ROOT,
@@ -81,6 +81,7 @@ async function main(): Promise<void> {
   try {
     const seeded = await seed(pool, env);
     closeBridge = seeded.closeBridge;
+    await varyInboxCopy(pool);
 
     mkdirSync(OUT, { recursive: true });
     const browser = await chromium.launch();

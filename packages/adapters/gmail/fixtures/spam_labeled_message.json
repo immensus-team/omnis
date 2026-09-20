@@ -41,7 +41,7 @@
         "kind": "email",
         "author": {
           "kind": "person",
-          "id": "Promo <promo@deals.example.net>"
+          "id": "promo@deals.example.net"
         },
         "body": "Subject: You have won a free audit!!!\n\nClaim your prize within 24 hours.",
         "attachments": [],

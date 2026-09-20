@@ -78,7 +78,7 @@
         "kind": "email",
         "author": {
           "kind": "person",
-          "id": "\"Brand, Omnis\" <brand@example.com>"
+          "id": "brand@example.com"
         },
         "body": "Subject: Launch banner preview\n\n",
         "attachments": [],

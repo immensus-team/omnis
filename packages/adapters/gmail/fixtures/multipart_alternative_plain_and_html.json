@@ -68,7 +68,7 @@
         "kind": "email",
         "author": {
           "kind": "person",
-          "id": "Priya Raman <priya@example.com>"
+          "id": "priya@example.com"
         },
         "body": "Subject: Notes from the sync\n\n",
         "attachments": [],

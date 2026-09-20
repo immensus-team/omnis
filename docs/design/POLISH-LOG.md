@@ -141,8 +141,9 @@ saying the wrong thing than the pixels being wrong.
    grey chip** beside the status pill with the + after it — that grammar, plus more space above the
    header than between rows. The `count` prop was deleted from `StatusPill` (if there are two ways
    to draw the number, both end up used).
-5. **Chip wording unified.** The chip read as the reference's English filter DSL with localised
-   nouns bolted onto it. It reads as a single language now.
+5. **Chip wording unified.** The reference's English filter DSL with localised nouns bolted onto it
+   is gone: the chip's field cell (`Label`) and its value cell (`one of 2`) both read in one
+   language now.
 6. **The cap came back to the `pending_approvals` query.** Round 1 dropped `.where(state,pending)`,
    so the client was replicating the entire approval history unbounded. Pending only, as the name
    says, `created_at desc` + `limit(200)` (the same cap as the items query right above it).
@@ -279,15 +280,20 @@ none.
    "Slack message". The fact that something is a session lives in `agentState` alone; "the header
    already states it" is said by the new `groupedByState` prop — when grouped, a session row's right
    slot is **empty** (it is not padded with an unrelated icon).
-4. **The one-value filter chip drops the quantifier.** The reference DSL folds it too ("Channel is
-   Slack"). The count grammar starts at two.
-5. **Chip × button 17x17 → 24x24.** The chip itself does not grow. Measured: without
-   `margin: -3px 0` the chip grows 26px → 32px; with it the chip stays 26px and only the button box
-   is 24x24.
+4. **The one-value filter chip drops the quantifier.** The value cell holds the bare name when
+   there is one value (`[Label][launch]`) — the reference DSL folds the quantifier too ("Channel is
+   Slack"), and "one of 1" is not something a person writes. The count grammar starts at two, where
+   the value cell reads `one of 2`.
+5. **Chip × button: 20px painted, 28x28 pointer.** The chip itself does not grow. Its height stays
+   28px, the × is a 20px box centred in it (`margin-left: 2px`), and only the pointer target is
+   widened, to 28x28, by `::after { inset: -4px }` — a 28px box in a 28px chip would touch the
+   border top and bottom.
 6. **One tint formula.** `.filter-chip` was using `color-mix(in oklch, …)` twenty lines below a
    `.status-pill` comment explaining that this very function rotates the hue toward
    `--bg-elevated`'s h260. One file had two formulas doing the same job and one of them was
-   documented as wrong — unified on `oklch(from …)`.
+   documented as wrong — unified on `oklch(from …)`. (US-D06 §1.4 row 11 later took even that tint
+   out: at graphite the accent-derived fill landed at L0.97 on an L0.98 canvas, an invisible tint
+   pretending to be one, so the chip's fill is the `--bg-elevated` surface token now.)
 
 ### A note on radius
 
@@ -434,3 +440,95 @@ where the fixture used to repeat one sentence three times.
 `test/integration/zero-client.test.ts` still failing to collect on an unresolved `@omnis/db` — the
 same pre-existing suite the round above recorded. `pnpm tsx tools/e2e/shots.ts` reports `overflow 0px`
 and zero chip/side-slot overlaps across all 12 rows at each of 390/768/1024/1280/1440.
+
+## US-D05 — the anti-slop audit, and an identity that was never a name (2026-09-21)
+
+Baseline: `Skill(avoid-ai-design)` in `detect` mode and `Skill(hallmark) audit` over `apps/desktop`
+and `packages/ui`, plus SKILLS.md's 12-line checklist and frontend-design's five clichés. Evidence:
+the five screens `shots.ts` writes, re-shot; `screens/inbox-kinso.png` refreshed in place.
+
+### What changed
+
+1. **The Gmail adapter was using a mail header as a person's identity.** `normalize()` set
+   `author.id` to the raw `From` value, so the id was `"Dana Lee <dana@example.com>"` — display name
+   and mailbox in one string. Nothing downstream could resolve it: `kernel/ingest.ts` finds a
+   person's display name by matching `author.id` against `threadMeta.participants[].externalId`, and
+   `parseAddressList` had already produced those participants keyed by **mailbox** (with a comment
+   saying the address is the identity). The lookup missed on both counts at once, so the kernel
+   created a person named after the header and the inbox row printed that header in its bold
+   first-line slot — `Dana Lee <dana@example.com>`, avatar initials `D<`. It is now the mailbox
+   address, which is also what the 25 fixtures in the adapter's contract corpus now expect. This
+   was the root cause; every symptom below was downstream of it.
+2. **The screenshots had no hierarchy because B3 had nothing to summarize.** `seed()` is a replay of
+   the adapter fixtures, and those fixtures are a contract corpus rather than prose: gcal's three
+   events are one recurring series, so the `summary` gcal normalizes into *both* the thread title
+   and the item body is the same sentence twice, and B3's fallback (subject, else the body's first
+   line) wrote that sentence into `threads.meta.summary` — the row's own title printed underneath
+   the row's own title. Gmail's bodies are headed `Subject: …\n\n`, so its fallback landed on a mail
+   header. New `varyInboxCopy()` in `tools/e2e/seed.ts` gives the shot runs their own copy, keyed by
+   the fixtures' own external ids. It is deliberately **not** inside `seed()`: phase-a's G5 ingests a
+   marker into the first Slack thread and asserts it reaches that row, and `waitForSummaries` in
+   `shots-accent.ts` is a B3 regression guard — neither survives a seed that arrives pre-summarized.
+   It also waits for B3's `summary_at` before writing, because B3 owns that field until its 30s
+   debounce fires and would otherwise clobber the copy.
+3. **`DraftCard`'s provenance line was template chrome.** It read `omnis draft · rationale: …`:
+   the middle dot is the `A · B · C` metadata separator (checklist 5), "rationale" is the *prop's*
+   name rather than a word anyone using the app has met, and "omnis draft" is a lowercase machine tag
+   standing where a sentence belongs. It is one sentence now — `Drafted from {sources}` — and
+   `i18n/en.ts`'s `draftProvenance` holds the same wording.
+4. **`RUNTIME_ICON.omnis` was a generic glyph in a map of real brand marks.** Every other entry is a
+   mark out of `react-icons/si` or `/pi`, and the map's own comment says a runtime with no mark falls
+   through to a letter (`RUNTIME_LETTER`) — Hermes is the documented case. `omnis: Sparkles` was the
+   one entry that was neither, and it was standing for omnis's *own* identity, the single mark in the
+   app that cannot come from someone else's set. Omnis's mark is the orb, and hand-drawing one is
+   barred (CLAUDE.md), so the line is deleted rather than replaced and `omnis` falls through to `"O"`.
+   A test pins the invariant: every defined value is a real logo, and omnis is not defined.
+5. **Carried over from D2's review.** `filter-chip-bar.tsx` imported `LuSearch` from `react-icons/lu`
+   while the other five `packages/ui` files use lucide-react's `Search`; it now matches, with the
+   regression test asserting `svg.lucide-search`. And the filter-chip description in this log still
+   described the old single-string chip — it is the split `[field][value][×]` chip.
+6. **`densify()`'s approval strings and the calendar rows** now carry one sentence per thread and
+   one-line summaries respectively, so no screenshot shows the same string twice.
+
+### Checked and clean
+
+- **1** — no warm-cream/serif/terracotta: no `#D97757`, `#F4F1EA` or `#FAF9F5` anywhere in `apps/desktop/src` or `packages/ui/src`.
+- **2** — radius census matches the documented scale, and shadow use is three tokens plus one focus
+  ring rather than one soft `rgba(0,0,0,.1)` under everything.
+- **3** — every `linear-gradient`/`radial-gradient` in the app is a mask (`mask-image` for the fade
+  edges), the aurora orb, or the glass tint. None is a decorative wash.
+- **4** — no italic headings and no single-word colour emphasis.
+- **5** — no `text-transform` or `uppercase` in any stylesheet or component; no spaced em dash in UI
+  copy (the ` — ` hits are all in code comments).
+- **6/7** — no invented metrics (the spend line reads `$0.00` because the fixture really is zero) and
+  no re-drawn browser chrome.
+- **9/10** — all four animated surfaces have a `prefers-reduced-motion` fade fallback, and the
+  entrance is the one 160/240/320ms spring rather than a fade-up on every card.
+- **11** — `overflow 0px` at 390/768/1024/1280/1440 in `shots.ts`, with zero chip/side-slot overlaps
+  across all 12 rows at each width; `shots-accent.ts` reports the same at 390/1440.
+- **12** — only `.inbox-row--selected` elevates; unselected rows draw no hairline.
+
+### Deliberately not done this round
+
+- **`threadSubline`'s middle dot** (`Thread.tsx:59`). It is the live `channel · people · last
+  activity` line the detail pane documents, and it survives checklist 5 on its merits: the three
+  fields are heterogeneous and one of them is itself a comma list, so a comma join would misparse,
+  while the spaced em dash is another named flag. Checklist 5's target is the *reflexive* dot — the
+  one standing in for structure that does not exist (item 3 above, now fixed), not a compact
+  metadata line with three real fields behind it.
+- **The middle dots in `packages/ui/src/i18n/*.ts`.** Nothing imports that module: it is the A5 §8
+  copy deck, exercised by its own test and by nothing the user sees, so `digest.heading`,
+  `restoredToast`, `systemDelegated`, the settings tooltips and their siblings have no render path to
+  fix. Editing them would move the Korean in `ko.ts` too, and writing new Korean is
+  barred by the repo's English-only rule.
+- **`ask-panel`'s `Sparkles`** on "Summarize this thread" stays: unlike the runtime mark, the glyph
+  carries meaning here (this action is the model's), and it sits beside `PenLine` and `ListChecks`,
+  which are the same kind of icon.
+- **The 13 non-`i18n` files carrying Korean comments.** Out of scope for a design task, and the
+  English-only rule's own carve-out; reported to the reviewer rather than swept here.
+
+### Evidence
+
+`pnpm lint` and `pnpm typecheck` exit 0. `@omnis/ui` and `@omnis/adapters/gmail` green, including the
+25 updated fixtures. `pnpm tsx tools/e2e/shots.ts` and `pnpm tsx tools/e2e/shots-accent.ts` both
+complete, with the overflow assertions quoted above.

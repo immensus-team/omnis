@@ -50,7 +50,7 @@
         "kind": "email",
         "author": {
           "kind": "person",
-          "id": "Ops <ops@example.com>"
+          "id": "ops@example.com"
         },
         "body": "Subject: Roll call\n\nTwo recipients, one in Cc too.",
         "attachments": [],

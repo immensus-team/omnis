@@ -44,7 +44,7 @@
         "kind": "email",
         "author": {
           "kind": "person",
-          "id": "Dana Lee <dana@example.com>"
+          "id": "dana@example.com"
         },
         "body": "Subject: PoC slides\n\n",
         "attachments": [],

@@ -49,7 +49,7 @@
         "kind": "email",
         "author": {
           "kind": "person",
-          "id": "GitHub <noreply@github.com>"
+          "id": "noreply@github.com"
         },
         "body": "Subject: [omnis/omnis] Run failed: ci (main)\n\nWorkflow run #7788 failed on main.",
         "attachments": [],

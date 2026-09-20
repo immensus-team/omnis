@@ -46,7 +46,7 @@
         "kind": "email",
         "author": {
           "kind": "person",
-          "id": "Pierre <pierre@example.fr>"
+          "id": "pierre@example.fr"
         },
         "body": "Subject: Cafe meeting\n\nCaf� at 10",
         "attachments": [],

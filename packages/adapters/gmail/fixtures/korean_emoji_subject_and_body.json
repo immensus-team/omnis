@@ -46,7 +46,7 @@
         "kind": "email",
         "author": {
           "kind": "person",
-          "id": "정하늘 <haneul@example.com>"
+          "id": "haneul@example.com"
         },
         "body": "Subject: 🎉 배포 완료! 🚀 다음 단계는?\n\n배포 성공했어요 🙌 내일 회고에서 봬요 👋",
         "attachments": [],

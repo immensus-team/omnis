@@ -10,7 +10,7 @@ import { chromium } from "@playwright/test";
 import { Pool, one, query } from "../../packages/db/src/index.js";
 import { createKernel, createLogger } from "../../packages/kernel/src/index.js";
 import { assertNoOverflow, describeOverflow, measureOverflow } from "./overflow.js";
-import { seed } from "./seed.js";
+import { seed, varyInboxCopy } from "./seed.js";
 import {
   HUB_PORT,
   REPO_ROOT,
@@ -169,6 +169,8 @@ async function main(): Promise<void> {
   try {
     const seeded = await seed(pool, env);
     closeBridge = seeded.closeBridge;
+    // Before densify(): the copy layer waits on B3, and densify's own items would push that wait out.
+    await varyInboxCopy(pool);
     await densify(pool);
 
     mkdirSync(OUT, { recursive: true });
