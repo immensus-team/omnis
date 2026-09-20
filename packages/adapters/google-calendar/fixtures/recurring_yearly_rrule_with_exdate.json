@@ -1,0 +1,72 @@
+{
+  "scenario": "recurring_yearly_rrule_with_exdate",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_rec_yearly_instance_20270101",
+    "status": "confirmed",
+    "summary": "창립기념일 휴무",
+    "created": "2025-12-01T00:00:00.000Z",
+    "updated": "2025-12-01T00:00:00.000Z",
+    "creator": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "organizer": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "transparency": "transparent",
+    "start": {
+      "dateTime": "2027-01-01T00:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2027-01-01T23:59:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "recurringEventId": "evt_rec_yearly_base",
+    "originalStartTime": {
+      "dateTime": "2027-01-01T00:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "recurrence": ["RRULE:FREQ=YEARLY", "EXDATE;TZID=Asia/Seoul:20280101T000000"],
+    "attendees": [
+      {
+        "email": "allcompany@example.com",
+        "displayName": "전사",
+        "responseStatus": "accepted"
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_rec_yearly_instance_20270101",
+        "externalId": "evt_rec_yearly_instance_20270101",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "창립기념일 휴무",
+        "attachments": [],
+        "sentAt": "2027-01-01T00:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_rec_yearly_instance_20270101",
+        "threadMeta": {
+          "externalId": "evt_rec_yearly_instance_20270101",
+          "kind": "calendar",
+          "title": "창립기념일 휴무",
+          "participants": [
+            {
+              "externalId": "allcompany@example.com",
+              "displayName": "전사"
+            }
+          ],
+          "lastItemAt": "2027-01-01T00:00:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

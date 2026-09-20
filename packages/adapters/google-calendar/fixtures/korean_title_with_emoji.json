@@ -1,0 +1,74 @@
+{
+  "scenario": "korean_title_with_emoji",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_korean_emoji",
+    "status": "confirmed",
+    "summary": "🚀 omnis 런치 싱크",
+    "description": "출시 당일 런칭 체크리스트 점검 ✅\n- 배포 창\n- 모니터링 대시보드\n- CS 매크로 준비 📮",
+    "location": "서울 강남구 테헤란로 123, 8층 대회의실",
+    "creator": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "organizer": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "start": {
+      "dateTime": "2026-10-01T10:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-10-01T11:30:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "attendees": [
+      {
+        "email": "dana@example.com",
+        "displayName": "Dana Lee",
+        "responseStatus": "accepted"
+      },
+      {
+        "email": "minjun@example.com",
+        "displayName": "김민준",
+        "responseStatus": "accepted"
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_korean_emoji",
+        "externalId": "evt_korean_emoji",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "🚀 omnis 런치 싱크",
+        "attachments": [],
+        "sentAt": "2026-10-01T10:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_korean_emoji",
+        "threadMeta": {
+          "externalId": "evt_korean_emoji",
+          "kind": "calendar",
+          "title": "🚀 omnis 런치 싱크",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "minjun@example.com",
+              "displayName": "김민준"
+            }
+          ],
+          "lastItemAt": "2026-10-01T10:00:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

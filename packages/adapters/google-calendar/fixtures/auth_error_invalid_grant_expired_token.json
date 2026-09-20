@@ -1,0 +1,10 @@
+{
+  "scenario": "auth_error_invalid_grant_expired_token",
+  "raw": {
+    "error": "invalid_grant",
+    "error_description": "Token has been expired or revoked."
+  },
+  "expected": {
+    "errorKind": "auth_revoked"
+  }
+}

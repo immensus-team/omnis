@@ -1,0 +1,66 @@
+{
+  "scenario": "cancelled_event_with_start_time",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_cancelled_with_start",
+    "status": "cancelled",
+    "summary": "고객사 킥오프 (취소됨)",
+    "created": "2026-08-20T01:00:00.000Z",
+    "updated": "2026-09-10T05:41:00.000Z",
+    "creator": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "organizer": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "start": {
+      "dateTime": "2026-09-28T14:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-09-28T15:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "attendees": [
+      {
+        "email": "client@example.com",
+        "displayName": "고객사 담당자",
+        "responseStatus": "declined"
+      }
+    ],
+    "sequence": 2
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_cancelled_with_start",
+        "externalId": "evt_cancelled_with_start",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "고객사 킥오프 (취소됨)",
+        "attachments": [],
+        "sentAt": "2026-09-28T14:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_cancelled_with_start",
+        "threadMeta": {
+          "externalId": "evt_cancelled_with_start",
+          "kind": "calendar",
+          "title": "고객사 킥오프 (취소됨)",
+          "participants": [
+            {
+              "externalId": "client@example.com",
+              "displayName": "고객사 담당자"
+            }
+          ],
+          "lastItemAt": "2026-09-28T14:00:00+09:00",
+          "archivedAt": "2026-09-28T14:00:00+09:00"
+        }
+      }
+    ]
+  }
+}

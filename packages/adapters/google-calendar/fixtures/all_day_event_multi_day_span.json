@@ -1,0 +1,40 @@
+{
+  "scenario": "all_day_event_multi_day_span",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_allday_trip_jeju",
+    "status": "confirmed",
+    "summary": "제주 워크숍 (2박 3일)",
+    "location": "제주 신라호텔",
+    "description": "첫날 14시 체크인, 마지막날 11시 체크아웃.",
+    "creator": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "organizer": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "start": {
+      "date": "2026-10-26"
+    },
+    "end": {
+      "date": "2026-10-29"
+    },
+    "attendees": [
+      {
+        "email": "dana@example.com",
+        "displayName": "Dana Lee",
+        "responseStatus": "accepted"
+      },
+      {
+        "email": "minjun@example.com",
+        "displayName": "김민준",
+        "responseStatus": "accepted"
+      }
+    ]
+  },
+  "expected": {
+    "items": []
+  }
+}

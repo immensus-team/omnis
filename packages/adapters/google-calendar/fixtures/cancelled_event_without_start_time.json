@@ -1,0 +1,13 @@
+{
+  "scenario": "cancelled_event_without_start_time",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_cancelled_no_start",
+    "status": "cancelled",
+    "summary": "삭제된 이벤트",
+    "updated": "2026-09-11T01:00:00.000Z"
+  },
+  "expected": {
+    "items": []
+  }
+}

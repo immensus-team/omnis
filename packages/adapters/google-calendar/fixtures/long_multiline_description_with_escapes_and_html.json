@@ -1,0 +1,52 @@
+{
+  "scenario": "long_multiline_description_with_escapes_and_html",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_escaped_desc",
+    "status": "confirmed",
+    "summary": "장애 회고 (postmortem)",
+    "description": "요약: 09:12 KST 알림 폭주 → 09:41 완화\n\n원인:\n\t\"retry storm\" — 백오프 없이 재시도하는 워커\n\t따옴표(\"), 역슬래시(\\), 탭, 줄바꿈이 모두 든 설명\n\n링크: <a href=\"https://example.com/incidents/1234?a=1&amp;b=2\">https://example.com/incidents/1234?a=1&amp;b=2</a>\n액션 아이템: ① 지수 백오프 ② 서킷 브레이커 ③ 대시보드 임계값 조정",
+    "creator": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "organizer": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "start": {
+      "dateTime": "2026-10-08T16:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-10-08T17:30:00+09:00",
+      "timeZone": "Asia/Seoul"
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_escaped_desc",
+        "externalId": "evt_escaped_desc",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "장애 회고 (postmortem)",
+        "attachments": [],
+        "sentAt": "2026-10-08T16:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_escaped_desc",
+        "threadMeta": {
+          "externalId": "evt_escaped_desc",
+          "kind": "calendar",
+          "title": "장애 회고 (postmortem)",
+          "participants": [],
+          "lastItemAt": "2026-10-08T16:00:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

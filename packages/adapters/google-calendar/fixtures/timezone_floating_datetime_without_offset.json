@@ -1,0 +1,42 @@
+{
+  "scenario": "timezone_floating_datetime_without_offset",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_tz_floating_reminder",
+    "status": "confirmed",
+    "summary": "플로팅 시간 이벤트 (offset 없음)",
+    "description": "시간대 없는 dateTime — 캘린더 기본 시간대로 해석된다.",
+    "start": {
+      "dateTime": "2026-06-15T09:00:00"
+    },
+    "end": {
+      "dateTime": "2026-06-15T09:30:00"
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_tz_floating_reminder",
+        "externalId": "evt_tz_floating_reminder",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "플로팅 시간 이벤트 (offset 없음)",
+        "attachments": [],
+        "sentAt": "2026-06-15T09:00:00",
+        "status": "received",
+        "sourceHash": "evt_tz_floating_reminder",
+        "threadMeta": {
+          "externalId": "evt_tz_floating_reminder",
+          "kind": "calendar",
+          "title": "플로팅 시간 이벤트 (offset 없음)",
+          "participants": [],
+          "lastItemAt": "2026-06-15T09:00:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

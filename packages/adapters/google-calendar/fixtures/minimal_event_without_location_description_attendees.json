@@ -1,0 +1,42 @@
+{
+  "scenario": "minimal_event_without_location_description_attendees",
+  "raw": {
+    "id": "evt_minimal_event",
+    "status": "confirmed",
+    "summary": "점심 약속",
+    "start": {
+      "dateTime": "2026-09-29T12:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-09-29T13:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_minimal_event",
+        "externalId": "evt_minimal_event",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "점심 약속",
+        "attachments": [],
+        "sentAt": "2026-09-29T12:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_minimal_event",
+        "threadMeta": {
+          "externalId": "evt_minimal_event",
+          "kind": "calendar",
+          "title": "점심 약속",
+          "participants": [],
+          "lastItemAt": "2026-09-29T12:00:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

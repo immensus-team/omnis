@@ -1,0 +1,33 @@
+{
+  "scenario": "event_without_summary_yields_nothing",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_no_summary",
+    "status": "confirmed",
+    "description": "다른 시스템이 밀어 넣은 busy 블록 — summary가 아예 없다.",
+    "creator": {
+      "email": "scheduler@example.com"
+    },
+    "organizer": {
+      "email": "scheduler@example.com"
+    },
+    "start": {
+      "dateTime": "2026-10-16T08:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-10-16T09:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "attendees": [
+      {
+        "email": "dana@example.com",
+        "displayName": "Dana Lee",
+        "responseStatus": "accepted"
+      }
+    ]
+  },
+  "expected": {
+    "items": []
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "scenario": "network_timeout_etimedout",
+  "raw": {
+    "code": "ETIMEDOUT",
+    "errno": -60,
+    "syscall": "connect",
+    "message": "connect ETIMEDOUT 142.250.196.138:443"
+  },
+  "expected": {
+    "errorKind": "retryable_network"
+  }
+}

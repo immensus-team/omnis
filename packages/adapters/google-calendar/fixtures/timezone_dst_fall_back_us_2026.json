@@ -1,0 +1,50 @@
+{
+  "scenario": "timezone_dst_fall_back_us_2026",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_tz_dst_fall_2026",
+    "status": "confirmed",
+    "summary": "DST fall-back 확인 (중복 시각)",
+    "creator": {
+      "email": "us@example.com"
+    },
+    "organizer": {
+      "email": "us@example.com"
+    },
+    "start": {
+      "dateTime": "2026-11-01T01:30:00-04:00",
+      "timeZone": "America/New_York"
+    },
+    "end": {
+      "dateTime": "2026-11-01T02:30:00-05:00",
+      "timeZone": "America/New_York"
+    },
+    "description": "01:30 EDT 는 같은 날 01:30 EST 와 중복된다."
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_tz_dst_fall_2026",
+        "externalId": "evt_tz_dst_fall_2026",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "DST fall-back 확인 (중복 시각)",
+        "attachments": [],
+        "sentAt": "2026-11-01T01:30:00-04:00",
+        "status": "received",
+        "sourceHash": "evt_tz_dst_fall_2026",
+        "threadMeta": {
+          "externalId": "evt_tz_dst_fall_2026",
+          "kind": "calendar",
+          "title": "DST fall-back 확인 (중복 시각)",
+          "participants": [],
+          "lastItemAt": "2026-11-01T01:30:00-04:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

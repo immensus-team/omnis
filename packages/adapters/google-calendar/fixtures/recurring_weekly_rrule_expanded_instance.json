@@ -1,0 +1,91 @@
+{
+  "scenario": "recurring_weekly_rrule_expanded_instance",
+  "raw": {
+    "kind": "calendar#event",
+    "etag": "\"3420135312345000\"",
+    "id": "evt_rec_weekly_instance_20260925",
+    "status": "confirmed",
+    "htmlLink": "https://www.google.com/calendar/event?eid=recweekly",
+    "created": "2026-07-01T00:12:33.000Z",
+    "updated": "2026-07-01T00:12:33.000Z",
+    "summary": "주간 스프린트 리뷰",
+    "description": "매주 월/수 반복되는 정기 리뷰. 안건은 스프린트 보드 참고.",
+    "location": "회의실 A (온라인 병행)",
+    "colorId": "9",
+    "creator": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "organizer": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "start": {
+      "dateTime": "2026-09-25T10:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-09-25T10:30:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "recurringEventId": "evt_rec_weekly_base",
+    "originalStartTime": {
+      "dateTime": "2026-09-25T10:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=MO,WE;UNTIL=20261230T045959Z"],
+    "attendees": [
+      {
+        "email": "dana@example.com",
+        "displayName": "Dana Lee",
+        "responseStatus": "accepted"
+      },
+      {
+        "email": "minjun@example.com",
+        "displayName": "김민준",
+        "responseStatus": "accepted"
+      }
+    ],
+    "reminders": {
+      "useDefault": true
+    },
+    "sequence": 0,
+    "iCalUID": "recweekly@google.com",
+    "eventType": "default"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_rec_weekly_instance_20260925",
+        "externalId": "evt_rec_weekly_instance_20260925",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "주간 스프린트 리뷰",
+        "attachments": [],
+        "sentAt": "2026-09-25T10:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_rec_weekly_instance_20260925",
+        "threadMeta": {
+          "externalId": "evt_rec_weekly_instance_20260925",
+          "kind": "calendar",
+          "title": "주간 스프린트 리뷰",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "minjun@example.com",
+              "displayName": "김민준"
+            }
+          ],
+          "lastItemAt": "2026-09-25T10:00:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

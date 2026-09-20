@@ -1,0 +1,73 @@
+{
+  "scenario": "attendees_all_declined_optional_event",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_attendees_all_declined",
+    "status": "confirmed",
+    "summary": "선택 참석 세미나",
+    "transparency": "transparent",
+    "creator": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "organizer": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "start": {
+      "dateTime": "2026-11-20T13:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-11-20T14:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "attendees": [
+      {
+        "email": "dana@example.com",
+        "displayName": "Dana Lee",
+        "responseStatus": "declined"
+      },
+      {
+        "email": "sora@example.com",
+        "displayName": "박소라",
+        "responseStatus": "declined"
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_attendees_all_declined",
+        "externalId": "evt_attendees_all_declined",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "선택 참석 세미나",
+        "attachments": [],
+        "sentAt": "2026-11-20T13:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_attendees_all_declined",
+        "threadMeta": {
+          "externalId": "evt_attendees_all_declined",
+          "kind": "calendar",
+          "title": "선택 참석 세미나",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "sora@example.com",
+              "displayName": "박소라"
+            }
+          ],
+          "lastItemAt": "2026-11-20T13:00:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}
