@@ -43,8 +43,12 @@ body {
   padding: 12px 0;
 }
 
-/* kinso의 레일 타일은 캔버스가 아니라 흰 레일 플레이트 위에 얹혀 있다 — 이 플레이트가 없으면
-   --bg-elevated와 --bg-canvas의 명도차(1%)가 너무 작아 타일이 그냥 안 보인다. */
+/* kinso의 레일 타일은 캔버스가 아니라 레일 플레이트 위에 얹혀 있다 — 이 플레이트가 없으면
+   --bg-elevated와 --bg-canvas의 명도차(1%)가 너무 작아 타일이 그냥 안 보인다.
+   US-D01: 여기 있던 `background: var(--bg-base)` + `box-shadow: var(--shadow-row-selected)`는
+   표면을 불투명하게 되돌려 유리를 죽이고 있었다(app.css가 tokens.css 다음에 로드돼 같은 명시도에서
+   이긴다). 지우면 .glass-surface의 blur/틴트/--shadow-glass가 그대로 살아난다 — 그래서 여기선
+   아무것도 다시 선언하지 않는다(중복 선언 금지). 남는 건 플레이트 고유의 모양(레이아웃)뿐. */
 .channel-rail__plate {
   display: flex;
   flex-direction: column;
@@ -52,8 +56,6 @@ body {
   gap: 4px;
   padding: 8px 6px;
   border-radius: 22px;
-  background: var(--bg-base);
-  box-shadow: var(--shadow-row-selected);
 }
 
 .channel-rail__tile,
@@ -121,11 +123,18 @@ body {
 }
 
 /* U1 ask/search pill — CommandPalette mode="inline"이 렌더한다.
-   .glass-surface의 기본 hairline 보더 대신 흰 pill + 포커스 시 그라데이션 스트로크. */
+   .glass-surface의 기본 hairline 보더 대신 그라데이션 스트로크(포커스 시 --ask-gradient). */
 .ask-bar {
   position: relative;
 }
 
+/* US-D01: kinso의 그라데이션 스트로크(padding-box 채움 + border-box 스트로크 2겹 트릭)는
+   그대로 두고 채움색만 유리로 바꾼다 — 이전엔 `var(--bg-base)`(불투명) + `backdrop-filter: none`
+   이라 .glass-surface의 blur가 아예 꺼져 있었다. 이제 채움색은 --bg-overlay(= .glass-surface가
+   쓰는 바로 그 토큰)라 투명도 축소 사용자 폴백까지 자동으로 같이 간다(tokens.css).
+   box-shadow는 지웠다 — .glass-surface의 --shadow-glass가 이미 표면을 띄운다.
+   position+z-index: backdrop-filter가 스태킹 컨텍스트를 만들어서, 모델 메뉴(안쪽)는 자기 z-index로는
+   패널(z 5) 위로 못 올라온다 — pill 자체가 패널 위에 서야 메뉴가 레퍼런스처럼 패널을 덮는다. */
 .ask-bar__pill {
   display: flex;
   align-items: center;
@@ -134,15 +143,14 @@ body {
   padding: 0 16px;
   border-radius: 999px;
   border: 1.5px solid transparent;
-  background: linear-gradient(var(--bg-base), var(--bg-base)) padding-box,
+  background: linear-gradient(var(--bg-overlay), var(--bg-overlay)) padding-box,
     linear-gradient(var(--border-hairline), var(--border-hairline)) border-box;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow: 0 1px 2px oklch(0 0 0 / 0.04);
+  position: relative;
+  z-index: 6;
 }
 
 .ask-bar__pill:focus-within {
-  background: linear-gradient(var(--bg-base), var(--bg-base)) padding-box, var(--ask-gradient)
+  background: linear-gradient(var(--bg-overlay), var(--bg-overlay)) padding-box, var(--ask-gradient)
     border-box;
 }
 
@@ -154,20 +162,247 @@ body {
   background: var(--ask-gradient);
 }
 
+/* min-width: 0 — input의 기본 min-content(20자)를 풀지 않으면 320px에서 컴포저 어포던스가
+   붙은 바가 뷰포트를 밀어낸다(모바일 가로 스크롤 금지 규칙). */
 .ask-bar__pill [cmdk-input] {
   padding: 0;
+  min-width: 0;
 }
 
-.ask-bar__dropdown {
+.ask-bar__chip {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.ask-bar__attach {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.ask-bar__attach:not(:disabled):hover {
+  background: var(--bg-elevated);
+}
+
+.ask-bar__attach:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ask-bar__model {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.ask-bar__model-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: color-mix(in oklch, var(--bg-base) 70%, transparent);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ask-bar__model-toggle:hover {
+  color: var(--text-primary);
+}
+
+/* 일부러 불투명하다(주석 참조): 유리 위에 유리를 겹치면(apple-design §12) 글자가 죽는다.
+   레퍼런스(ref-glass-mail-ai-panel.webp)의 모델 드롭다운도 패널보다 확실히 불투명하다. */
+.ask-bar__model-menu {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 8px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 168px;
+  padding: 4px;
+  border: var(--hairline);
+  border-radius: 12px;
+  background: var(--bg-base);
+  box-shadow: var(--shadow-glass);
+}
+
+.ask-bar__model-menu button {
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ask-bar__model-menu button:hover {
+  background: var(--bg-elevated);
+}
+
+.ask-bar__model-menu button[aria-pressed="true"] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* US-D01: ask 바 아래로 펼쳐지는 플로팅 유리 패널(.glass-surface 유리 표면 + palette 슬롯).
+   레퍼런스(ref-glass-mail-ai-panel.webp)의 AI 채팅 패널: 바 바로 아래 앵커, 위에서 내려오는 등장. */
+.ask-panel {
+  position: absolute;
+  top: calc(100% + 8px);
   left: 0;
   right: 0;
   z-index: 5;
-  border-radius: 12px;
-  padding: 8px;
-  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px;
+  border-radius: 20px;
+  /* 명령 목록 탭이 길어질 수 있다 — 패널이 뷰포트를 넘기지 않게 여기서 자른다. */
+  max-height: min(60vh, 420px);
   overflow-y: auto;
+  transform-origin: top center;
+  /* 스프링 등장(240ms, --ease-spring). 별도 reduced-motion 블록이 필요 없다: tokens.css가
+     reduce에서 --dur-panel을 0ms로 낮추므로 애니메이션이 즉시 끝 상태로 떨어진다. */
+  animation: ask-panel-in var(--dur-panel) var(--ease-spring);
+}
+
+@keyframes ask-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ask-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 2px 8px;
+}
+
+.ask-panel__tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.ask-panel__tabs button {
+  border: 0;
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ask-panel__tabs button[aria-pressed="true"] {
+  background: color-mix(in oklch, var(--bg-base) 72%, transparent);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.ask-panel__tabs button:not([aria-pressed="true"]):hover {
+  background: color-mix(in oklch, var(--bg-base) 40%, transparent);
+}
+
+.ask-panel__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.ask-panel__close:hover {
+  background: color-mix(in oklch, var(--bg-base) 60%, transparent);
+  color: var(--text-primary);
+}
+
+.ask-panel__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ask-panel__action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ask-panel__action:not(:disabled):hover {
+  background: color-mix(in oklch, var(--bg-base) 65%, transparent);
+}
+
+/* Phase B 미배선 액션은 "누를 수 있는 척"하지 않는다 — 흐리게 + 금지 커서. */
+.ask-panel__action:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.ask-panel__action svg {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+}
+
+.ask-panel__summary {
+  margin: 6px 0 0;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--bg-base) 72%, transparent);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ask-panel__summary--empty {
+  color: var(--text-tertiary);
 }
 
 .inbox-card {
