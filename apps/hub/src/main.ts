@@ -11,6 +11,7 @@ import {
 import { createBridgeHub } from "./bridge.js";
 import { type HubConfig, readConfig } from "./config.js";
 import { createHubServer } from "./http.js";
+import { registerIngestJobs } from "./ingest-job.js";
 import { registerSummaryJob } from "./summarize-job.js";
 
 export interface RunningHub {
@@ -29,6 +30,19 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
 
   registerHealthcheckJob(kernel.scheduler, { pool, events: kernel.events });
   registerCostDailyJob(kernel.scheduler, { pool, audit: kernel.audit, logger });
+
+  const bridge = createBridgeHub({ kernel, pool, logger, token: config.bridgeToken });
+  if (config.bridgeToken === "") {
+    logger.warn("OMNIS_BRIDGE_TOKEN is empty — WS /bridge refuses every upgrade with 503");
+  }
+  // ingest 잡(drive_poll/github_poll)도 scheduler.register()를 쓴다 — start() 전에 등록해야
+  // jobs 테이블 행이 생긴다(register-after-start는 조용히 영원히 안 돈다, Task 14의 jobs upsert).
+  const stopIngestWatch = await registerIngestJobs({
+    pool,
+    logger,
+    scheduler: kernel.scheduler,
+    bridge,
+  });
   await kernel.scheduler.start();
 
   // B3: kinso 인박스 행의 AI 한 줄 요약 — @omnis/agents는 모듈 싱글톤 pool을 쓴다(pool.ts).
@@ -41,10 +55,6 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
   // 등록된 루프를 커널 이벤트/스케줄러에 건다(A4 §1.2).
   const stopLoops = startLoops({ kernel, logger });
 
-  const bridge = createBridgeHub({ kernel, pool, logger, token: config.bridgeToken });
-  if (config.bridgeToken === "") {
-    logger.warn("OMNIS_BRIDGE_TOKEN is empty — WS /bridge refuses every upgrade with 503");
-  }
   const startedAt = Date.now();
   const server = createHubServer({
     kernel,
@@ -75,6 +85,7 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
           setTimeout(() => server.closeAllConnections(), 2000).unref();
         });
         await bridge.close();
+        stopIngestWatch();
         stopSummaryJob();
         stopLoops();
         // 2) 스케줄러를 멈추고 진행 중 틱이 claimed_at을 풀고 끝나기를 기다린다(Task 14의 stop()).
