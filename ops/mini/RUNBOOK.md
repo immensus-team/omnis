@@ -91,6 +91,25 @@ If `packages/kernel/src/zero-schema.ts` or `OMNIS_USER_ID` changed, run `pnpm ze
 > `--delete` removes files that exist only on the mini. `ops/mini/env.sh` is in the exclude list, so it survives.
 > If you leave out `--exclude dist`, artifacts built on the MacBook overwrite things — just run `pnpm build` again on the mini.
 
+## Re-embedding (when the model or the prefixes changed)
+
+If `EMBED_MODEL`, `EMBED_DOCUMENT_PREFIX` or `EMBED_QUERY_PREFIX` in
+`packages/memory/src/embed.ts` changes, **the vectors already stored live in a different space than the new
+query vectors** — search silently gets worse. There is no version column (it does not change often enough to
+warrant one), so throw the whole lot away at once and backfill.
+
+```bash
+ssh <hub-user>@<hub-host> 'psql omnis -c "UPDATE memories SET embedding = NULL WHERE invalidated_at IS NULL"'
+```
+
+`drive_poll` (every 10 min) backfills 100 rows per tick via `reembedNulls()` — about 17 hours for 10k rows. If
+you are in a hurry, just leave it alone after the SQL above while Ollama is up, rather than restarting
+`pnpm --filter @omnis/hub start` on the mini. Check progress with `psql omnis -c "SELECT count(*) FROM memories
+WHERE embedding IS NULL AND invalidated_at IS NULL"`.
+
+> While the backfill runs, those rows do not show up in search (the partial HNSW index does not index NULL).
+> The prefix rollout of 2026-09-21 (`search_document: ` / `search_query: `) is the first case that needed this.
+
 ## Web Push VAPID keys (US-B16)
 
 ```bash
