@@ -1,0 +1,8 @@
+{"type":"system","subtype":"init","session_id":"s-mock-1","capabilities":["interrupt_receipt_v1"],"tools":["Bash","Read"],"cwd":"/Users/u/dev/omnis"}
+{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Listing "}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"src/."}}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Listing src/."}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu_1","name":"Bash","input":{"command":"ls src"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tu_1","is_error":false,"content":"index.ts\nmain.ts"}]}}
+{"type":"result","subtype":"success","total_cost_usd":0.0121,"duration_ms":4210,"num_turns":1}

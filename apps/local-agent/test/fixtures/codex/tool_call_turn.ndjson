@@ -1,0 +1,9 @@
+{"jsonrpc":"2.0","method":"thread.started","params":{"threadId":"th_mock_1"}}
+{"jsonrpc":"2.0","method":"turn.started","params":{"turnId":"turn_1"}}
+{"jsonrpc":"2.0","method":"item/started","params":{"item":{"id":"i1","type":"agentMessage"}}}
+{"jsonrpc":"2.0","method":"item/reasoning/textDelta","params":{"itemId":"r1","delta":"considering"}}
+{"jsonrpc":"2.0","method":"item/agentMessage/delta","params":{"itemId":"i1","delta":"Running "}}
+{"jsonrpc":"2.0","method":"item/completed","params":{"item":{"id":"i1","type":"agentMessage","text":"Running tests."}}}
+{"jsonrpc":"2.0","method":"item/started","params":{"item":{"id":"i2","type":"quantumToolCall"}}}
+{"jsonrpc":"2.0","method":"item/completed","params":{"item":{"id":"i2","type":"quantumToolCall","output":"done"}}}
+{"jsonrpc":"2.0","method":"turn.completed","params":{"durationMs":3300}}

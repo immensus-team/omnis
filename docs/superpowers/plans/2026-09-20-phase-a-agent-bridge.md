@@ -2943,7 +2943,7 @@ Co-Authored-By: Claude Opus <noreply@anthropic.com>"
 
 > **목표**(A7 §7): 맥미니 호스트에서 `local-agent` 기동(Codex 브리지만 노출, Hermes는 Phase B) + host별 동시성 캡 4 적용(맥미니/맥북 각각)
 > **산출물**: `apps/local-agent/src/host-config.ts`(host=`mini`/`macbook` 분기), LaunchAgent plist(A6-D10 방식)
-> **검증 명령**: `pnpm --filter @omnis/local-agent test -- --host=mini`
+> **검증 명령**: `pnpm --filter @omnis/local-agent test`
 > **티어**: Sonnet · **의존**: US-A17, US-A19
 
 ### Task 16: 호스트 프로파일 (US-A19b, tier: Sonnet)
@@ -2964,11 +2964,10 @@ Co-Authored-By: Claude Opus <noreply@anthropic.com>"
 import { describe, expect, it } from "vitest";
 import { hostProfile, phaseARuntimesFor } from "../src/host-config.js";
 
-/** 스토리 검증 명령 `pnpm --filter @omnis/local-agent test -- --host=mini`가 이 값을 고른다. */
-const flagHost = process.argv.find((a) => a.startsWith("--host="))?.slice("--host=".length);
-const HOST = flagHost === "macbook" ? "macbook" : "mini";
+/** 검증 명령: `pnpm --filter @omnis/local-agent test`. 두 호스트를 한 번에 단언하므로 호스트 플래그가 없다. */
+const HOSTS = ["mini", "macbook"] as const;
 
-describe(`host profile (${HOST})`, () => {
+describe("host profile", () => {
   it("caps active turns at 4 on both hosts (마스터 §9)", () => {
     expect(hostProfile("mini").maxActiveTurns).toBe(4);
     expect(hostProfile("macbook").maxActiveTurns).toBe(4);
@@ -2981,7 +2980,9 @@ describe(`host profile (${HOST})`, () => {
   });
 
   it("uses the per-host bridge token item name (A2 §2.1)", () => {
-    expect(hostProfile(HOST).token_keychain_item).toBe(`omnis.bridge.token.${HOST}`);
+    for (const host of HOSTS) {
+      expect(hostProfile(host).token_keychain_item).toBe(`omnis.bridge.token.${host}`);
+    }
   });
 
   it("exposes only Codex on the mini in Phase A (Hermes is Phase B)", () => {
@@ -2995,7 +2996,7 @@ describe(`host profile (${HOST})`, () => {
 });
 ```
 
-2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/local-agent test -- --host=mini`
+2. - [ ] 실행해 실패를 확인한다: `pnpm --filter @omnis/local-agent test`
    기대 실패: `Failed to resolve import "../src/host-config.js"`
 
 3. - [ ] `apps/local-agent/src/host-config.ts`를 만든다:
@@ -3038,7 +3039,7 @@ export function phaseARuntimesFor(host: HostId): RuntimeKind[] {
 }
 ```
 
-4. - [ ] 테스트를 돌린다: `pnpm --filter @omnis/local-agent test -- --host=mini` → 5 passed
+4. - [ ] 테스트를 돌린다: `pnpm --filter @omnis/local-agent test` → 5 passed
 
 5. - [ ] 커밋한다:
 
@@ -3310,7 +3311,7 @@ launchctl print "gui/$(id -u)/${LABEL}" | grep -E '^\s+state = ' || { echo "loca
 echo "installed ${LABEL} for host=${HOST}"
 ```
 
-6. - [ ] 실행 권한을 주고 테스트를 돌린다: `chmod +x scripts/install-local-agent.sh && pnpm --filter @omnis/local-agent test -- --host=mini` → 3 passed (launchagent)
+6. - [ ] 실행 권한을 주고 테스트를 돌린다: `chmod +x scripts/install-local-agent.sh && pnpm --filter @omnis/local-agent test` → 3 passed (launchagent)
 
 7. - [ ] 커밋한다:
 
@@ -3638,7 +3639,7 @@ Co-Authored-By: Claude Sonnet <noreply@anthropic.com>"
 | US-A17 | `pnpm --filter @omnis/local-agent test` | config 우선순위 8건 + 레지스트리 6건 + WS 5건 + outbox 3건 + 디스패처 6건 |
 | US-A18 | `pnpm --filter @omnis/local-agent test` | stream-json 8건 + claude-code 10건, durable에 델타 0건 |
 | US-A19 | `pnpm --filter @omnis/local-agent test` | app-server 3건 + codex 8건 + probe 4건 |
-| US-A19b | `pnpm --filter @omnis/local-agent test -- --host=mini` | host-config 5건 + turn-cap 4건 + plist 3건 |
+| US-A19b | `pnpm --filter @omnis/local-agent test` | host-config 5건 + turn-cap 4건 + plist 3건 |
 | US-A20 | `pnpm --filter @omnis/local-agent test` | 불변식 8개 전부 green, 실 CLI 호출 0회 |
 
 ## 자기 점검 결과 (계획 작성자)

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>ai.onwordlab.omnis-local-agent</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/omnis-run-with-secrets.sh</string>
+    <string>mini</string>
+    <string>/usr/local/bin/node</string>
+    <string>/opt/omnis/local-agent/dist/main.js</string>
+    <string>--host</string>
+    <string>mini</string>
+    <string>--hub</string>
+    <string>http://127.0.0.1:8787</string>
+    <string>--runtimes</string>
+    <string>codex</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/Users/logankim/Library/Logs/omnis/local-agent-mini.log</string>
+  <key>StandardErrorPath</key><string>/Users/logankim/Library/Logs/omnis/local-agent-mini.err.log</string>
+</dict>
+</plist>

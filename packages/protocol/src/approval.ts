@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** 계약 §3.4 / A3 §4 pending_approvals. HumanInterrupt/HumanResponse를 그대로 이식(A3-D11). */
+/** 계약 §3.4 (A3 §4 / A4 / research 22). 비가역 액션의 승인 객체. */
 export const ApprovalAction = z.enum([
   "send",
   "delete",
@@ -9,6 +9,8 @@ export const ApprovalAction = z.enum([
   "self_model_edit",
   "memory_write",
 ]);
+export type ApprovalAction = z.infer<typeof ApprovalAction>;
+
 export const ApprovalState = z.enum([
   "pending",
   "decided",
@@ -17,12 +19,12 @@ export const ApprovalState = z.enum([
   "failed",
   "expired",
 ]);
-export const ApprovalDecision = z.enum(["accept", "edit", "respond", "ignore"]);
-export const ApprovalRisk = z.enum(["normal", "high"]);
-
-export type ApprovalAction = z.infer<typeof ApprovalAction>;
 export type ApprovalState = z.infer<typeof ApprovalState>;
+
+export const ApprovalDecision = z.enum(["accept", "edit", "respond", "ignore"]);
 export type ApprovalDecision = z.infer<typeof ApprovalDecision>;
+
+export const ApprovalRisk = z.enum(["normal", "high"]);
 export type ApprovalRisk = z.infer<typeof ApprovalRisk>;
 
 export const HumanInterrupt = z.object({
@@ -36,12 +38,7 @@ export const HumanInterrupt = z.object({
       allow_respond: z.boolean(),
       allow_ignore: z.boolean(),
     })
-    .default({
-      allow_accept: true,
-      allow_edit: true,
-      allow_respond: false,
-      allow_ignore: true,
-    }),
+    .default({ allow_accept: true, allow_edit: true, allow_respond: false, allow_ignore: true }),
   risk: ApprovalRisk.default("normal"),
   requested_by: z.string().uuid().optional(),
   thread_id: z.string().uuid().optional(),
