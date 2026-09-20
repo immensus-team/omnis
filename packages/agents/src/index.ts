@@ -43,6 +43,7 @@ export {
   type TriggerContext,
 } from "./loop/spec.js";
 export { getLoop, listLoops, registerLoop, resetLoopRegistryForTest } from "./loop/registry.js";
+export { LOOP_JOB_NAME, startLoops, type LoopKernel, type LoopLogger } from "./loop/start.js";
 export {
   FAILURE_LIMIT,
   FAILURE_WINDOW_HOURS,
