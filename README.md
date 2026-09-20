@@ -53,4 +53,4 @@ pnpm test:integration              # integration only; wipes and re-migrates the
 pnpm lint && pnpm typecheck
 ```
 
-`e2e:phase-a` (Playwright smoke across Inbox/Thread/Agent Session/Approval) is planned but not wired up yet — blocked on the Logan-assisted gates above (real channel connections to smoke-test against).
+`pnpm e2e:phase-a` runs the seeded Playwright smoke (hub + zero-cache + local-agent mock runtime + desktop dev server) across Inbox/Thread/Agent Session/Approval; results and screenshots land in [`tools/e2e/REPORT.md`](tools/e2e/REPORT.md). It seeds through the real adapter/kernel code paths — smoking against *live* Slack/Gmail/Calendar still waits on the Logan-assisted gates above.
