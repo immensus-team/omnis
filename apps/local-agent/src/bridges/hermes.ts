@@ -3,6 +3,7 @@ import {
   BridgeError,
   type RuntimeCapabilities,
   type RuntimeKind,
+  type TurnInput,
 } from "@omnis/protocol";
 import type { EventSink, RuntimeAdapter, TurnHandle } from "../rpc-dispatch.js";
 import type { SessionRecord } from "../session-registry.js";
@@ -79,11 +80,63 @@ export class HermesAdapter implements RuntimeAdapter {
     return { version: "hermes", capabilities: parseHermesCapabilities(body) };
   }
 
-  async startTurn(_s: SessionRecord, _input: unknown, _sink: EventSink): Promise<TurnHandle> {
-    throw new BridgeError(
-      BRIDGE_ERRORS.CAPABILITY_UNSUPPORTED,
-      "startTurn not implemented until Task 12",
-    );
+  async startTurn(s: SessionRecord, input: TurnInput, sink: EventSink): Promise<TurnHandle> {
+    if (s.origin !== "human") {
+      throw new BridgeError(
+        BRIDGE_ERRORS.CAPABILITY_UNSUPPORTED,
+        "Hermes sessions are read-only in Phase B — origin must be 'human' (A2-D9)",
+      );
+    }
+    const fetchFn = this.cfg.fetchFn ?? fetch;
+    const now = this.cfg.now ?? ((): Date => new Date());
+    const turnId = `t-${Date.now().toString(36)}`;
+    const controller = new AbortController();
+    const previousResponseId = this.#lastResponseId.get(s.session_key);
+    const body: Record<string, unknown> =
+      previousResponseId === undefined || previousResponseId === ""
+        ? { conversation: s.session_key, input: input.text }
+        : { previous_response_id: previousResponseId, input: input.text };
+
+    const res = await fetchFn(`${this.cfg.baseUrl}/v1/responses`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        authorization: `Bearer ${this.cfg.token}`,
+        "content-type": "application/json",
+        "X-Hermes-Session-Key": s.session_key,
+        accept: "text/event-stream",
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok || res.body === null) {
+      throw new BridgeError(
+        BRIDGE_ERRORS.RUNTIME_UNAVAILABLE,
+        `Hermes /v1/responses failed: ${res.status}`,
+      );
+    }
+    // §4.4: 다음 턴은 이 id로 체인한다(session_key는 그대로, session_id만 갈린다).
+    const sessionId = res.headers.get("X-Hermes-Session-Id");
+    if (sessionId !== null) this.#lastResponseId.set(s.session_key, sessionId);
+
+    sink.turnStarted({ session_key: s.session_key, turn_id: turnId, at: now().toISOString() });
+    void this.#pump(res.body, s.session_key, turnId, sink);
+
+    return {
+      turn_id: turnId,
+      cancel: async (): Promise<boolean> => {
+        controller.abort();
+        return true;
+      },
+    };
+  }
+
+  async #pump(
+    _body: ReadableStream<Uint8Array>,
+    _sessionKey: string,
+    _turnId: string,
+    _sink: EventSink,
+  ): Promise<void> {
+    /* Task 13이 SSE 파싱을 채운다 */
   }
 
   async cancel(): Promise<boolean> {
