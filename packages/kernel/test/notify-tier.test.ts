@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PUSH_BATCH_HOURS_KST, inQuietHours, notifyTierFor } from "../src/notify/tier.js";
 
-/** KST 기준 시각을 UTC Date로 만든다(Asia/Seoul은 DST가 없어 고정 -9h). */
+/** Builds a UTC Date for a KST wall-clock time (Asia/Seoul has no DST, so a fixed -9h). */
 const kst = (h: number, m = 0): Date => new Date(Date.UTC(2026, 8, 20, h - 9, m));
 
 describe("inQuietHours (A4 §3.6)", () => {

@@ -27,7 +27,7 @@ const EXPECTED_TABLES = [
   "settings",
 ];
 
-// A3 §7 제외 테이블. 하나라도 새어 들어가면 비밀·감사·768d 임베딩이 폰까지 간다.
+// Tables excluded by A3 §7. One leak sends secrets, audit data, and 768d embeddings to the phone.
 const FORBIDDEN_TABLES = [
   "account_secrets",
   "events",
@@ -41,7 +41,7 @@ const FORBIDDEN_TABLES = [
 ];
 
 describe("zeroSchema", () => {
-  it("replicates exactly the 17 tables A3 §7 + 델타 §6 list", () => {
+  it("replicates exactly the 17 tables A3 §7 + delta §6 list", () => {
     expect([...ZERO_TABLES].sort()).toEqual([...EXPECTED_TABLES].sort());
     expect(Object.keys(zeroSchema.tables).sort()).toEqual([...EXPECTED_TABLES].sort());
   });
@@ -71,7 +71,7 @@ describe("zeroSchema", () => {
   });
 });
 
-// US-A21b: permissions가 없으면 zero-cache는 "no tables will be syncable"로 돌아 한 행도 안 보낸다.
+// US-A21b: without permissions, zero-cache sends nothing ("no tables will be syncable").
 describe("zero permissions (US-A21b)", () => {
   it("grants select on every replicated table and no writes at all", async () => {
     const compiled = await permissions;

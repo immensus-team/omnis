@@ -1,12 +1,13 @@
 -- 0009_settings.sql
--- 델타 §6 / B-D2 (US-B33): 설정 kv 테이블 1개. W0 스키마 번들 소유.
+-- Delta §6 / B-D2 (US-B33): a single settings kv table. Owned by the W0 schema bundle.
 CREATE TABLE settings (
   key        text PRIMARY KEY,
   value      jsonb NOT NULL,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- omnis_control은 이미 0007_notify.sql이 만든 채널이다 — settings 변경을 얹어 탄다(델타 §6: 새 NOTIFY 채널 없음).
+-- omnis_control is the channel 0007_notify.sql already created — settings changes ride on it
+-- (Delta §6: no new NOTIFY channel).
 CREATE OR REPLACE FUNCTION notify_settings_change() RETURNS trigger AS $$
 BEGIN
   PERFORM pg_notify('omnis_control', json_build_object('settings', NEW.key)::text);

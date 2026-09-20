@@ -25,7 +25,7 @@ const ITEM_KIND_TO_THREAD_KIND: Record<NormalizedItem["kind"], ThreadKind> = {
   system: "system",
 };
 
-/** accounts.channel은 계정당 불변이다. 메시지마다 조회하지 않는다. */
+/** accounts.channel is immutable per account. Do not look it up for every message. */
 async function channelOf(
   c: PoolClient,
   cache: Map<string, Channel>,
@@ -40,13 +40,14 @@ async function channelOf(
   return row.channel;
 }
 
-/** 어댑터가 threadMeta 없이 첫 아이템을 보냈을 때의 최후 수단(root fix, 이전엔 여기서 throw했다) —
- *  아이템 자체가 들고 있는 정보만으로 스레드를 합성한다. NormalizedItem에는 subject도 채널명도
- *  없으니 제목은 참가자(= 작성자)에서 뽑는다. 어댑터가 normalize()에서 threadMeta를 채우면
- *  이 함수는 아예 호출되지 않는다. */
+/** Last resort for when an adapter sends the first item without threadMeta (root fix; this used to
+ *  throw). Synthesizes the thread from what the item itself carries. NormalizedItem has neither a
+ *  subject nor a channel name, so the title comes from the participants (= the author). If the
+ *  adapter fills in threadMeta in normalize(), this function is never called at all. */
 function deriveThreadMeta(e: NormalizedItem): NormalizedThread {
-  // threads.participants(persons.id의 uuid[])는 Phase A에서 쓰지 않는다(A3 §10) — 여기 값은
-  // 제목 합성에 쓰이고, 신원 해석이 들어오는 Phase B에서 그대로 영속화 대상이 된다.
+  // threads.participants (uuid[] of persons.id) is unused in Phase A (A3 §10) — the value here
+  // feeds title synthesis, and becomes a persistence target in Phase B when identity resolution
+  // lands.
   const participants =
     e.author.kind === "person" ? [{ externalId: e.author.id, displayName: e.author.id }] : [];
   return {
@@ -59,13 +60,15 @@ function deriveThreadMeta(e: NormalizedItem): NormalizedThread {
   };
 }
 
-/** 들어오는 아이템은 스레드를 "덮어쓰지" 않는다. 어댑터가 이제 모든 아이템에 threadMeta를
- *  싣기 때문에 이 UPDATE는 메시지 한 통마다 돈다 — 무조건 대입이면 다음이 깨진다.
- *  - title: 제목을 처음 아는 아이템이 정한다. 뒤따르는 답장 제목("Re: ...")이 스레드 이름을
- *    바꾸거나, 제목 없는(null) 메시지가 이름을 지워서는 안 된다. 진짜 rename 경로
- *    (conversations.info 싱크 등)는 Phase B에서 명시적으로 UPDATE한다.
- *  - archived_at: 사용자가 보관한 스레드를 새 메시지 한 통이 조용히 되살리면 안 된다.
- *    어댑터가 보관을 주장할 때만(gcal cancelled) 채워지고, null은 "해제"가 아니라 "모름"이다. */
+/** An incoming item never "overwrites" the thread. Adapters now attach threadMeta to every item,
+ *  so this UPDATE runs for every single message — an unconditional assignment would break the
+ *  following:
+ *  - title: the first item that knows a title decides it. A trailing reply title ("Re: ...") must
+ *    not rename the thread, and a null-subject message must not erase the name. The real rename
+ *    paths (conversations.info sync, etc.) UPDATE explicitly in Phase B.
+ *  - archived_at: one new message must not silently revive a thread the user archived. It is set
+ *    only when the adapter claims archival (gcal cancelled), and null means "unknown", not
+ *    "unarchived". */
 async function upsertThread(
   c: PoolClient,
   accountId: string,
@@ -85,9 +88,9 @@ async function upsertThread(
   return row.id;
 }
 
-/** 어댑터가 밀어넣는 유일한 입구(계약 §3.3 IngestSink).
- *  US-B03: author_person_id와 threads.participants를 채운다. author_is_me는 아직 커널이 내
- *  identity 목록을 갖고 있지 않아 false로 남는다(US-B34 온보딩이 채운다). */
+/** The only entry point adapters push into (contract §3.3 IngestSink).
+ *  US-B03: fills author_person_id and threads.participants. author_is_me stays false for now
+ *  because the kernel does not yet have the user's identity list (US-B34 onboarding fills it). */
 export function createIngestSink(deps: { pool: Pool; logger: Logger }): IngestSink {
   const { pool, logger } = deps;
   const channelCache = new Map<string, Channel>();
@@ -124,8 +127,8 @@ export function createIngestSink(deps: { pool: Pool; logger: Logger }): IngestSi
             )[0]?.id ?? null)
           : null;
 
-      // US-B03: 해석이 실패해도 아이템은 반드시 저장한다 — 인박스에 안 뜨는 메시지가
-      // 잘못된 author보다 나쁘다.
+      // US-B03: store the item even if resolution fails — a message missing from the inbox is
+      // worse than a wrong author.
       let personId: string | null = null;
       if (e.author.kind === "person") {
         const channel = await channelOf(c, channelCache, accountId);

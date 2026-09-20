@@ -1,11 +1,12 @@
-// 델타 §5 (B-D2, US-B33): settings kv 테이블의 유일한 읽기·쓰기 경로.
+// Delta §5 (B-D2, US-B33): the only read/write path for the settings kv table.
 import { query } from "@omnis/db";
 import type { Pool } from "pg";
 
 export type SettingKey =
   | "cost.cap_usd"
   | "cost.reserve_ratio"
-  // 내부 키 — CostState 전이 감지가 쓰고 Settings 화면에는 노출하지 않는다(델타 §5).
+  // Internal key — used by CostState transition detection, never exposed in the
+  // Settings screen (delta §5).
   | "cost.last_state"
   | "notify.quiet_hours"
   | "notify.vip_override"
@@ -39,7 +40,7 @@ export async function getSetting<T>(pool: Pool, key: SettingKey, fallback: T): P
   return rows[0]?.value ?? fallback;
 }
 
-/** 전체 키를 한 번에 읽는다 — 없는 행은 SETTING_DEFAULTS로 채운다(허브 `GET /settings`). */
+/** Reads every key at once — missing rows fall back to SETTING_DEFAULTS (hub `GET /settings`). */
 export async function getAllSettings(pool: Pool): Promise<Record<SettingKey, unknown>> {
   const rows = await query<{ key: SettingKey; value: unknown }>(
     pool,
@@ -52,8 +53,9 @@ export async function getAllSettings(pool: Pool): Promise<Record<SettingKey, unk
   return Object.fromEntries(entries) as Record<SettingKey, unknown>;
 }
 
-/** audit_log는 계약 §5가 필수로 못박는다 — settings.ts는 pool만 받는 낮은 레벨 모듈이라
- * Kernel.audit(순환 의존 유발)을 거치지 않고 직접 insert한다(identity.ts와 같은 패턴). */
+/** Contract §5 mandates audit_log — settings.ts is a low-level, pool-only module, so it inserts
+ * directly rather than through Kernel.audit (which would create a circular dependency), the same
+ * pattern as identity.ts. */
 export async function setSetting(
   pool: Pool,
   key: SettingKey,

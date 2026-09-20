@@ -50,15 +50,15 @@ describe("0004_tasks_approvals", () => {
       `INSERT INTO pending_approvals (action, args, description)
        VALUES ('send','{}'::jsonb,'coupling') RETURNING id`,
     );
-    // pending인데 decision이 있으면 거부
+    // rejected: state is pending but a decision is set
     await expect(
       query(pool, `UPDATE pending_approvals SET decision = 'accept' WHERE id = $1`, [a.id]),
     ).rejects.toThrow(/approvals_decided_ck/);
-    // pending이 아닌데 decision이 NULL이어도 거부 — expired 포함
+    // rejected too when state is not pending and decision is NULL — expired included
     await expect(
       query(pool, `UPDATE pending_approvals SET state = 'expired' WHERE id = $1`, [a.id]),
     ).rejects.toThrow(/approvals_decided_ck/);
-    // 둘을 같이 바꾸면 통과
+    // passes when both are changed together
     await query(
       pool,
       `UPDATE pending_approvals SET state='decided', decision='accept', decided_at=now() WHERE id=$1`,

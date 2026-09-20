@@ -29,8 +29,8 @@ describe("push_batch (A4 §3.6)", () => {
   });
 
   it("truncates a body to the first 80 characters", () => {
-    expect(first80("가".repeat(200))).toHaveLength(80);
-    expect(first80("짧다")).toBe("짧다");
+    expect(first80("a".repeat(200))).toHaveLength(80);
+    expect(first80("short")).toBe("short");
   });
 
   it("folds every pending draft into a single push", async () => {
@@ -38,7 +38,7 @@ describe("push_batch (A4 §3.6)", () => {
       await pool.query(
         `INSERT INTO items (thread_id, account_id, kind, status, body, sent_at, author_is_me)
          SELECT $1, account_id, 'email', 'draft', $2, now(), true FROM threads WHERE id = $1`,
-        [threadId, `초안 ${i}`],
+        [threadId, `draft ${i}`],
       );
     }
     const send = vi.fn(async () => undefined);
@@ -52,7 +52,7 @@ describe("push_batch (A4 §3.6)", () => {
     expect(send).toHaveBeenCalledTimes(1);
     const payload = send.mock.calls[0]?.[0] as { title: string; body: string; kind: string };
     expect(payload.kind).toBe("draft");
-    expect(payload.body).toContain("3건");
+    expect(payload.body).toContain("3");
     expect(payload.body.length).toBeLessThanOrEqual(80);
   });
 

@@ -25,16 +25,16 @@ CREATE TABLE relations (
   attributes     jsonb NOT NULL DEFAULT '{}'::jsonb,
   source_item_id uuid REFERENCES items(id) ON DELETE SET NULL,
   confidence     real NOT NULL DEFAULT 0.5,
-  valid_from     timestamptz NOT NULL,     -- 사실이 유효해진 시점
-  valid_until    timestamptz,              -- 사실이 무효해진 시점
-  recorded_at    timestamptz NOT NULL DEFAULT now(),   -- 시스템이 알게 된 시점
-  invalidated_at timestamptz               -- 시스템이 "더 이상 사실 아님"을 알게 된 시점
+  valid_from     timestamptz NOT NULL,     -- when the fact became true
+  valid_until    timestamptz,              -- when the fact stopped being true
+  recorded_at    timestamptz NOT NULL DEFAULT now(),   -- when the system learned it
+  invalidated_at timestamptz               -- when the system learned it is no longer true
 );
 CREATE INDEX relations_from_idx ON relations (from_entity_id, type, valid_from DESC);
 CREATE INDEX relations_to_idx   ON relations (to_entity_id, type, valid_from DESC);
 CREATE INDEX relations_asof_idx ON relations (valid_from, valid_until);
 
--- L2-2 벡터 메모리. nomic-embed-text-v1.5 = 768d, HNSW 한계 2,000d 안쪽.
+-- L2-2 vector memory. nomic-embed-text-v1.5 = 768d, within the HNSW 2,000d limit.
 CREATE TABLE memories (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   content        text NOT NULL,
@@ -43,7 +43,7 @@ CREATE TABLE memories (
   scope          text NOT NULL DEFAULT 'unknown',
   source_item_id uuid REFERENCES items(id) ON DELETE SET NULL,
   source_kind    text NOT NULL DEFAULT 'inbox',  -- inbox|calendar|file|drive|github|self
-  source_ref     text,                            -- 파일 경로, Drive fileId, GitHub URL 등
+  source_ref     text,                            -- file path, Drive fileId, GitHub URL, etc.
   person_id      uuid REFERENCES persons(id) ON DELETE SET NULL,
   entity_id      uuid REFERENCES entities(id) ON DELETE SET NULL,
   confidence     real NOT NULL DEFAULT 0.5,
@@ -56,10 +56,10 @@ CREATE TABLE memories (
   CONSTRAINT memories_scope_ck CHECK (scope IN ('work','personal','unknown'))
 );
 
--- 현재 유효한 메모리만 인덱싱한다.
+-- Index only currently valid memories.
 CREATE INDEX memories_embedding_idx ON memories
   USING hnsw (embedding vector_cosine_ops)
-  WITH (m = 16, ef_construction = 64)   -- 파라미터 근거: UNVERIFIED — spike (A3 §14 S-A3-7)
+  WITH (m = 16, ef_construction = 64)   -- parameter basis: UNVERIFIED — spike (A3 §14 S-A3-7)
   WHERE invalidated_at IS NULL;
 CREATE INDEX memories_person_idx ON memories (person_id, recorded_at DESC);
 CREATE INDEX memories_source_idx ON memories (source_kind, source_ref);

@@ -1,3 +1,3 @@
 -- packages/db/migrations/0013_publication_phase_b.sql
--- 델타 §6: settings만 복제에 더한다. ingest_sources·push_subscriptions는 추가하지 않는다.
+-- delta §6: add only settings to replication, not ingest_sources·push_subscriptions.
 ALTER PUBLICATION zero_omnis ADD TABLE settings;

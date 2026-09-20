@@ -18,8 +18,8 @@ describe("approvals.propose", () => {
   it("inserts a pending row with the contract's default config and risk", async () => {
     const id = await approvals.propose({
       action: "send",
-      args: { thread_id: "t", text: "안녕하세요" },
-      description: "Slack DM 답장",
+      args: { thread_id: "t", text: "hello" },
+      description: "Slack DM reply",
       config: { allow_accept: true, allow_edit: true, allow_respond: false, allow_ignore: true },
       risk: "normal",
     });
@@ -41,7 +41,7 @@ describe("approvals.propose", () => {
     expect(row.decision).toBeNull();
     expect(row.risk).toBe("normal");
     expect(row.config.allow_respond).toBe(false);
-    expect(row.args.text).toBe("안녕하세요");
+    expect(row.args.text).toBe("hello");
   });
 
   it("accepts all 6 actions from A3 approvals_action_ck", async () => {
@@ -71,7 +71,7 @@ describe("approvals.propose", () => {
     );
     await expect(
       approvals.propose({
-        // @ts-expect-error — 런타임 방어를 검증하려고 일부러 타입을 깬다
+        // @ts-expect-error — types deliberately broken to exercise the runtime guard
         action: "wire_money",
         args: {},
         description: "nope",
@@ -105,7 +105,7 @@ describe("approvals.propose", () => {
     const id = await approvals.propose({
       action: "delegate",
       args: { runtime: "codex" },
-      description: "맥북 Codex에 위임",
+      description: "Delegate to Codex on the MacBook",
       config: { allow_accept: true, allow_edit: false, allow_respond: false, allow_ignore: true },
       risk: "high",
       requested_by: runtime.id,

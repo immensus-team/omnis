@@ -1,9 +1,10 @@
--- A4 §10.5: 폴링 커서와 실패 카운터. Zero 복제 대상이 아니다(델타 §10) — 클라이언트가 쓸 일이 없다.
+-- A4 §10.5: polling cursor and failure counter. Not a Zero replication target (Delta §10) —
+-- clients have no use for it.
 
 CREATE TABLE ingest_sources (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   source_kind text NOT NULL,
-  source_ref  text NOT NULL,          -- 로컬 루트 경로, Drive 'changes', owner/repo 등
+  source_ref  text NOT NULL,          -- local root path, Drive 'changes', owner/repo, etc.
   cursor      jsonb NOT NULL DEFAULT '{}'::jsonb,
   last_ok_at  timestamptz,
   fail_count  integer NOT NULL DEFAULT 0,

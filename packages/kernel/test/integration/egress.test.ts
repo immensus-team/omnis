@@ -65,8 +65,8 @@ afterAll(async () => {
 });
 
 const base = {
-  args: { text: "보냅니다" },
-  description: "Slack 답장 발송",
+  args: { text: "Sending it" },
+  description: "Send Slack reply",
   config: { allow_accept: true, allow_edit: true, allow_respond: false, allow_ignore: true },
   risk: "normal" as const,
 };
@@ -84,7 +84,7 @@ describe("runEgress", () => {
       kernel,
       { approvalId, actor: "me", action: "item.sent", targetTable: "items" },
       (token: EgressToken) =>
-        outbox.send(token, { accountId: "a", externalId: "C1" }, { text: "보냅니다" }),
+        outbox.send(token, { accountId: "a", externalId: "C1" }, { text: "Sending it" }),
     );
     expect(result.externalId).toBe("1758.000900");
     expect(sent).toHaveLength(1);
@@ -177,7 +177,8 @@ describe("runEgress", () => {
   });
 
   it("cannot be bypassed: outbox.send needs a token only runEgress can mint", () => {
-    // @ts-expect-error — 토큰 없이 부르면 컴파일되지 않는다. 이것이 강제 장치다.
+    // @ts-expect-error — calling it without a token does not compile.
+    // This is the enforcement device.
     void (() => outbox.send({ accountId: "a", externalId: "C1" }, { text: "x" }));
   });
 

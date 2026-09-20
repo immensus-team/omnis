@@ -1,5 +1,5 @@
 // packages/kernel/src/archive.ts
-// A4 §9.3·§9.4. 하드 삭제는 어떤 경우에도 하지 않는다(A3 §11: items는 영구 보존).
+// A4 §9.3·§9.4. Never hard-delete, under any circumstances (A3 §11: items are kept forever).
 import { query } from "@omnis/db";
 import type { Pool } from "pg";
 import type { Audit } from "./audit.js";
@@ -13,7 +13,7 @@ export interface ArchivedByMeta {
   tier: "T0" | "T1";
   confidence: number;
   run_id: string;
-  /** undo 7일 창의 기준 시각. items에는 보관 시각 컬럼이 없다(A4 §9.3). */
+  /** Reference time for the 7-day undo window. items has no archived-at column (A4 §9.3). */
   at: string;
 }
 
@@ -27,7 +27,7 @@ export async function archiveItem(pool: Pool, itemId: string, meta: ArchivedByMe
   );
 }
 
-/** 사람이 되살린 스레드는 30일간 자동 보관 대상에서 제외한다(A4 §9.4). */
+/** A thread a human revived is excluded from auto-archive for 30 days (A4 §9.4). */
 export async function isRearchiveExcluded(
   pool: Pool,
   threadId: string,
@@ -87,11 +87,11 @@ export interface ArchivedGroup {
   item_ids: string[];
 }
 
-/** 밤 다이제스트가 하루치를 reason으로 묶어 읽는다(A4 §9.4 "전량 노출"). */
+/** The nightly digest reads a day's worth grouped by reason (A4 §9.4 "full exposure"). */
 export async function archivedSince(pool: Pool, since: Date): Promise<ArchivedGroup[]> {
   const rows = await query<{ reason: string; count: string; item_ids: string[] }>(
     pool,
-    `SELECT COALESCE(meta->'archived_by'->>'reason', '기타') AS reason,
+    `SELECT COALESCE(meta->'archived_by'->>'reason', 'Other') AS reason,
             count(*)::text AS count,
             (array_agg(id ORDER BY sent_at DESC))[1:50] AS item_ids
        FROM items

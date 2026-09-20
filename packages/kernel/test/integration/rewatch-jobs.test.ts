@@ -87,7 +87,7 @@ describe("gmail_rewatch / graph_sub_renew jobs", () => {
       pool,
       "SELECT last_status FROM jobs WHERE name = 'gmail_rewatch'",
     );
-    expect(job.last_status).toBe("ok"); // 콜백 없음 = 정상 스킵, 실패가 아니다
+    expect(job.last_status).toBe("ok"); // no callback = a normal skip, not a failure
     await scheduler.stop();
   });
 });

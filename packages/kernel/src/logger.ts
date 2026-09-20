@@ -7,7 +7,8 @@ export interface Logger {
   error(msg: string, extra?: Record<string, unknown>): void;
 }
 
-/** 계약 §9: 한 줄 JSON을 stdout으로. 필수 키 ts/level/pkg/msg/trace_id. 시크릿은 어떤 키에도 넣지 않는다. */
+/** Contract §9: one JSON line to stdout. Required keys ts/level/pkg/msg/trace_id.
+ *  Secrets never go into any key. */
 export function createLogger(pkg: string, traceId: string | null = null): Logger {
   const write = (level: LogLevel, msg: string, extra?: Record<string, unknown>): void => {
     process.stdout.write(

@@ -1,7 +1,7 @@
 import { nextRunAt } from "@omnis/kernel";
 import { describe, expect, it } from "vitest";
 
-/** KST 기준 시각을 UTC Date로 만든다(Asia/Seoul = UTC+9, DST 없음). */
+/** Builds a UTC Date for a KST wall-clock time (Asia/Seoul = UTC+9, no DST). */
 function kst(iso: string): Date {
   return new Date(`${iso}+09:00`);
 }

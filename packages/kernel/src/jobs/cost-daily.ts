@@ -1,4 +1,5 @@
-// A4 §12.4: 매일 00:05 KST 집계 + 상태 전이 감지. 뷰는 SQL이 갱신하므로 잡은 전이만 본다.
+// A4 §12.4: aggregate daily at 00:05 KST and detect state transitions. The view is refreshed by
+// SQL, so the job only looks at transitions.
 import { query } from "@omnis/db";
 import type { Pool } from "pg";
 import type { Audit } from "../audit.js";
@@ -16,14 +17,14 @@ export interface CostDailyDeps {
   now?: Date;
 }
 
-/** A4 §12.4 상태 표의 임계 그대로. `Policy.note`는 "무엇이 멈췄나"만 말하므로
- *  "왜 지금 바뀌었나"를 한 문장 앞에 붙인다. */
+/** Exactly the thresholds from the A4 §12.4 state table. `Policy.note` only says "what stopped",
+ *  so prefix it with one sentence saying "why it changed now". */
 const HEADLINE: Record<CostState, string> = {
-  normal: "LLM 비용이 정상 범위로 돌아왔습니다",
-  warn: "이번 달 LLM 비용이 월 상한의 60%를 넘었습니다",
-  degraded: "이번 달 LLM 비용이 월 상한의 80%를 넘었습니다",
-  reserve_only: "일반 예산이 소진되어 VIP·민감 예비비만 남았습니다",
-  frozen: "월 상한을 전부 소진했습니다",
+  normal: "LLM cost is back within the normal range",
+  warn: "This month's LLM cost has passed 60% of the monthly cap",
+  degraded: "This month's LLM cost has passed 80% of the monthly cap",
+  reserve_only: "The general budget is exhausted; only the VIP/sensitive reserve is left",
+  frozen: "The monthly cap is fully exhausted",
 };
 
 async function lastState(pool: Pool): Promise<CostState | null> {
@@ -54,11 +55,11 @@ export async function runCostDaily(deps: CostDailyDeps): Promise<CostState> {
     before: { from: previous },
     after: { to: state, mtdUsd, reserveUsd },
   });
-  const body = `${HEADLINE[state]}(이번 달 $${mtdUsd.toFixed(2)}, 예비비 $${reserveUsd.toFixed(2)}).${
+  const body = `${HEADLINE[state]} (month $${mtdUsd.toFixed(2)}, reserve $${reserveUsd.toFixed(2)}).${
     policy.note === null ? "" : ` ${policy.note}`
   }`;
-  // ponytail: @omnis/kernel은 @omnis/agents를 의존할 수 없어 writeSystemItem을 쓰지 못한다.
-  // 같은 형태의 INSERT — 의도된 중복이다(계약 §12).
+  // ponytail: @omnis/kernel cannot depend on @omnis/agents, so it cannot use writeSystemItem.
+  // Same shape of INSERT — deliberate duplication (contract §12).
   await query(
     pool,
     `WITH acc AS (

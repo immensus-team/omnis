@@ -42,14 +42,14 @@ async function seedItem(personId: string, externalId: string): Promise<void> {
   await query(
     pool,
     `INSERT INTO items (thread_id, account_id, external_id, kind, author_person_id, body, sent_at)
-       VALUES ($1,$2,$3,'email',$4,'본문', now())`,
+       VALUES ($1,$2,$3,'email',$4,'body', now())`,
     [threadId, accountId, externalId, personId],
   );
 }
 
 describe("mergePersons (A3 §10)", () => {
   it("moves identities and items, tombstones the source, and logs the merge", async () => {
-    const a = await tx(pool, (c) => resolvePerson(c, "gmail", "a@corp.com", "김진호"));
+    const a = await tx(pool, (c) => resolvePerson(c, "gmail", "a@corp.com", "Jinho Kim"));
     const b = await tx(pool, (c) => resolvePerson(c, "gmail", "b@corp.com", "Jinho Kim"));
     await seedItem(a.person_id, "m1");
 
@@ -69,7 +69,7 @@ describe("mergePersons (A3 §10)", () => {
       "SELECT merged_into FROM persons WHERE id = $1",
       [a.person_id],
     );
-    expect(tombstone.merged_into).toBe(b.person_id); // 지우지 않는다
+    expect(tombstone.merged_into).toBe(b.person_id); // not deleted
 
     const merge = await one<{ kind: string; from_person_id: string; to_person_id: string }>(
       pool,
@@ -89,7 +89,7 @@ describe("mergePersons (A3 §10)", () => {
   });
 
   it("refuses to merge a person into itself", async () => {
-    const a = await tx(pool, (c) => resolvePerson(c, "gmail", "a@corp.com", "김진호"));
+    const a = await tx(pool, (c) => resolvePerson(c, "gmail", "a@corp.com", "Jinho Kim"));
     await expect(mergePersons(pool, a.person_id, a.person_id, "me")).rejects.toThrow(/itself/);
   });
 
@@ -105,7 +105,7 @@ describe("mergePersons (A3 §10)", () => {
       "SELECT merged_into FROM persons WHERE id = $1",
       [a.person_id],
     );
-    expect(row.merged_into).toBe(cPerson.person_id); // 깊이 1로 평탄화
+    expect(row.merged_into).toBe(cPerson.person_id); // flattened to depth 1
   });
 });
 
@@ -159,7 +159,7 @@ describe("splitIdentity (A3 §10)", () => {
       pool,
       "SELECT author_person_id FROM items WHERE external_id = 'm1'",
     );
-    expect(item.author_person_id).toBeNull(); // 자동 재배정 불가
+    expect(item.author_person_id).toBeNull(); // cannot auto-reassign
     const thread = await one<{ meta: { reassign_needed?: boolean } }>(
       pool,
       "SELECT meta FROM threads WHERE id = $1",

@@ -1,5 +1,6 @@
-// A5 §4.4 + A4 §3.6. 키는 Keychain omnis.webpush.vapid_* → launchd가 env로 주입한다(델타 §9).
-// Web Push 단일 오너: VAPID 설정·발송·구독 정리는 이 파일만 갖는다(교차 리뷰 M-webpush).
+// A5 §4.4 + A4 §3.6. Keychain omnis.webpush.vapid_* → injected as env by launchd (delta §9).
+// Single Web Push owner: only this file has VAPID setup, sending and subscription pruning
+// (cross review M-webpush).
 import { query } from "@omnis/db";
 import type { PushPayload } from "@omnis/protocol";
 import type { Pool } from "pg";
@@ -13,7 +14,7 @@ export interface VapidKeys {
   subject: string;
 }
 
-/** 구독이 사라졌음을 뜻하는 응답. 둘 다 조용히 지운다(RFC 8030). */
+/** Response meaning the subscription is gone. Both are deleted silently (RFC 8030). */
 export const WEBPUSH_GONE_CODES: readonly number[] = [404, 410];
 
 export function vapidFromEnv(env: NodeJS.ProcessEnv = process.env): VapidKeys {
@@ -43,13 +44,13 @@ export async function sendWebPush(
     pool,
     "SELECT endpoint, p256dh, auth FROM push_subscriptions",
   );
-  // 액션 2개는 A5 §4.4 그대로. approve는 앱을 열지 않고 POST /approvals/:id/decide를 친다.
+  // Two actions, exactly A5 §4.4: approve POSTs /approvals/:id/decide without opening the app.
   const body = JSON.stringify({
     title: payload.title,
     body: first80(payload.body),
     actions: [
-      { action: "approve", title: "승인" },
-      { action: "open", title: "열기" },
+      { action: "approve", title: "Approve" },
+      { action: "open", title: "Open" },
     ],
     data: {
       deep_link: payload.deep_link,
@@ -82,7 +83,7 @@ export async function sendWebPush(
         "UPDATE push_subscriptions SET fail_count = fail_count + 1 WHERE endpoint = $1",
         [s.endpoint],
       );
-      // 키·엔드포인트는 로그에 넣지 않는다(A6-D9).
+      // Keys and endpoints never go into logs (A6-D9).
       logger.error("web push failed", { code: code ?? null });
     }
   }

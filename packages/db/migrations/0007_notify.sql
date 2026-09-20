@@ -1,6 +1,6 @@
 -- 0007_notify.sql
--- A3 §6.2 / A3-D7: 허브 내부 팬아웃 전용, 페이로드는 id만(8,000B 한도).
--- omnis_control은 테이블이 없다 — kill switch가 커널에서 pg_notify로 직접 쏜다.
+-- A3 §6.2 / A3-D7: hub-internal fan-out only; the payload is the id alone (8,000B limit).
+-- omnis_control has no table — the kill switch fires pg_notify straight from the kernel.
 
 CREATE OR REPLACE FUNCTION omnis_notify_item() RETURNS trigger
 LANGUAGE plpgsql AS $fn$
@@ -22,7 +22,7 @@ BEGIN
 END
 $fn$;
 
--- 계약 §4: state는 'pending' | 'decided' 두 값만 흘린다.
+-- Contract §4: state only ever carries two values, 'pending' | 'decided'.
 CREATE OR REPLACE FUNCTION omnis_notify_approval() RETURNS trigger
 LANGUAGE plpgsql AS $fn$
 BEGIN

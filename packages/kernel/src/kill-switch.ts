@@ -30,7 +30,8 @@ interface KillSwitchRow {
   reason: string | null;
 }
 
-/** 허브 GET /kill-switch가 쓰는 읽기 전용 조회. 상태는 audit_log의 최신 row가 전부다(계약 §5). */
+/** Read-only lookup used by hub GET /kill-switch. The newest audit_log row is the whole state
+ *  (contract §5). */
 export async function killSwitchStatus(pool: Pool): Promise<KillSwitchRow> {
   const rows = await query<{ at: Date; after: { on?: unknown; reason?: unknown } | null }>(
     pool,
@@ -51,7 +52,7 @@ export function createKillSwitch(deps: KillSwitchDeps): KillSwitch {
   const { pool, events, audit, logger } = deps;
   let cached: boolean | null = null;
 
-  // 다른 프로세스가 스위치를 만지면 캐시를 버린다(계약 §5).
+  // Drop the cache if another process touches the switch (contract §5).
   events.subscribe("omnis_control", (p) => {
     cached = p.kill_switch === true;
     logger.warn("kill switch changed elsewhere", { on: cached });

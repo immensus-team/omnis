@@ -100,7 +100,7 @@ describe("audit.record", () => {
   });
 });
 
-describe("countUnapprovedSends (A3 §9 rule 5 / 마스터 §2)", () => {
+describe("countUnapprovedSends (A3 §9 rule 5 / master §2)", () => {
   it("counts item.sent rows that carry no approval_id", async () => {
     const since = new Date(Date.now() - 60_000);
     const before = await countUnapprovedSends(pool, since);

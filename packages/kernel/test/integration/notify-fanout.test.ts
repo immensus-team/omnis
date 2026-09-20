@@ -13,7 +13,7 @@ beforeAll(async () => {
   for (const ch of ["omnis_item", "omnis_thread", "omnis_approval"]) {
     events.subscribe(ch, (p) => received.push({ channel: ch, payload: p }));
   }
-  // LISTEN이 걸릴 때까지 한 박자 기다린다(subscribe는 비동기로 커넥션을 잡는다).
+  // Wait one beat for LISTEN to take effect (subscribe grabs its connection asynchronously).
   await new Promise((r) => setTimeout(r, 300));
 });
 afterAll(async () => {
