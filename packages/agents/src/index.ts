@@ -73,3 +73,12 @@ export {
   type Register,
 } from "./draft/register.js";
 export { SELF_CHECK_ITEMS, selfCheck, type SelfCheckCtx } from "./draft/selfcheck.js";
+export {
+  DRAFT_PLACEHOLDER_MS,
+  DRAFT_SLA_MS,
+  DraftOutput,
+  draftLoop,
+  shouldEscalate,
+  writePlaceholderDraft,
+  type DraftOutputT,
+} from "./loops/draft.js";
