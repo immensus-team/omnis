@@ -136,5 +136,8 @@ export async function loadTranscript(
       ORDER BY sent_at ASC`,
     [sessionId, lastN * 8],
   );
-  return buildSessionSummary(session, rows);
+  // buildSessionSummary() always keeps up to MAX_RECENT_TURNS (10); narrow to the caller's
+  // requested lastN (<= 10) so `?last_n=1` actually returns one turn instead of up to 10.
+  const summary = buildSessionSummary(session, rows);
+  return { ...summary, recent_turns: summary.recent_turns.slice(-lastN) };
 }

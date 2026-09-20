@@ -113,8 +113,10 @@ describe("GET /transcript/:session_id", () => {
     expect(res.status).toBe(405);
   });
 
-  // No test for `?last_n=N` narrowing the turn window: transcript.ts threads lastN into the
-  // DB over-fetch (lastN * 8) but the result is sliced to MAX_RECENT_TURNS, not lastN, so
-  // last_n=1 still returns every turn. Fixing that means touching transcript.ts — out of
-  // scope for this task (the route itself passes clampLastN's value through correctly).
+  it("?last_n narrows the turn window instead of always returning up to 10", async () => {
+    const res = await fetch(`${base}/transcript/${sessionId}?last_n=1`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { recent_turns: { text: string }[] };
+    expect(body.recent_turns.map((t) => t.text)).toEqual(["second turn"]);
+  });
 });
