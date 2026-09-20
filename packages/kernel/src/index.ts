@@ -31,6 +31,15 @@ export {
   registerTokenRefreshJob,
 } from "./jobs/token-refresh.js";
 export type { TokenRefreshDeps, TokenRefresher } from "./jobs/token-refresh.js";
+export {
+  GMAIL_REWATCH_CRON,
+  GMAIL_REWATCH_JOB_NAME,
+  GRAPH_SUB_RENEW_CRON,
+  GRAPH_SUB_RENEW_JOB_NAME,
+  registerGmailRewatchJob,
+  registerGraphSubRenewJob,
+} from "./jobs/rewatch.js";
+export type { RewatchDeps, RewatchFn } from "./jobs/rewatch.js";
 export { KillSwitchError, createKillSwitch, killSwitchStatus } from "./kill-switch.js";
 export type { KillSwitch, KillSwitchDeps } from "./kill-switch.js";
 export { createLogger } from "./logger.js";
