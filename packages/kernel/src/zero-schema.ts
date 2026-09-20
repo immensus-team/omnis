@@ -308,6 +308,11 @@ export const zeroSchema = createSchema({
     digests,
   ],
   relationships: [threadRelationships, itemRelationships],
+  // US-A22 편차: @rocicorp/zero@1.9.0에서 `createRunnableBuilder`(= `zero.query.<table>...run()`,
+  // 인터페이스 계약 §7·A5 §5의 모든 화면 태스크가 쓰는 패턴)는 이 플래그 없이는 스키마 검증 없이
+  // 조용히 `undefined`를 반환한다(gate-06 스파이크가 예견한 API 드리프트 #2). A21은 이 API 경로를
+  // 실제로 호출한 적이 없어(원시 WAL 드레인만 테스트) 지금까지 드러나지 않았다.
+  enableLegacyQueries: true,
 }) satisfies Schema;
 
 export const ZERO_TABLES: readonly string[] = Object.keys(zeroSchema.tables);
