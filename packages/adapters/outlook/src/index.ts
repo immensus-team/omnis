@@ -190,14 +190,22 @@ export function createOutlookAdapter(deps: OutlookAdapterDeps): Adapter {
     capabilities: () => CAPABILITIES,
 
     async connect(auth: AuthRef): Promise<void> {
-      const refreshToken = await readKeychainSecret(
-        auth.keychainService,
-        auth.keychainAccount,
-        CHANNEL,
-      );
       try {
-        const { accessToken } = await refreshAccessToken(deps.oauthClientId, refreshToken, fetchFn);
-        if (deps.graphClient === undefined) {
+        if (deps.graphClient !== undefined) {
+          // 테스트 주입 경로: 이미 자격증명이 설정된 클라이언트를 그대로 쓴다(Keychain 조회 없음,
+          // google-calendar 어댑터와 동일 패턴 — packages/adapters/google-calendar/src/index.ts connect()).
+          graphClient = deps.graphClient;
+        } else {
+          const refreshToken = await readKeychainSecret(
+            auth.keychainService,
+            auth.keychainAccount,
+            CHANNEL,
+          );
+          const { accessToken } = await refreshAccessToken(
+            deps.oauthClientId,
+            refreshToken,
+            fetchFn,
+          );
           const { Client } = await import("@microsoft/microsoft-graph-client");
           graphClient = Client.init({
             authProvider: (done) => done(null, accessToken),
@@ -216,16 +224,65 @@ export function createOutlookAdapter(deps: OutlookAdapterDeps): Adapter {
       status = "down";
     },
 
-    backfill(): AsyncIterable<NormalizedItem> {
-      throw new AdapterError("fatal_unsupported", CHANNEL, "backfill not implemented until Task 4");
+    async *backfill(): AsyncIterable<NormalizedItem> {
+      if (graphClient === undefined)
+        throw new AdapterError("fatal_protocol", CHANNEL, "backfill() called before connect()");
+      const client = graphClient;
+      let link = "/me/mailFolders/inbox/messages?$top=50";
+      for (;;) {
+        let res: { value?: unknown[]; "@odata.nextLink"?: string };
+        try {
+          res = (await client.api(link).get()) as {
+            value?: unknown[];
+            "@odata.nextLink"?: string;
+          };
+        } catch (cause) {
+          throw mapApiError(cause);
+        }
+        for (const raw of res.value ?? []) {
+          for (const item of normalize(raw)) yield item;
+        }
+        const next = res["@odata.nextLink"];
+        if (next === undefined) break;
+        link = next;
+      }
     },
 
     subscribe(): AsyncIterable<NormalizedItem | AdapterEvent> {
-      throw new AdapterError(
-        "fatal_unsupported",
-        CHANNEL,
-        "subscribe not implemented until Task 4",
-      );
+      if (graphClient === undefined)
+        throw new AdapterError("fatal_protocol", CHANNEL, "subscribe() called before connect()");
+      const client = graphClient;
+      const intervalMs = deps.pollIntervalMs ?? 300_000; // outlook_delta_poll cron */5 * * * *
+      const BASE = "/me/mailFolders/inbox/messages/delta";
+
+      async function* poll(): AsyncGenerator<NormalizedItem | AdapterEvent> {
+        let link = BASE;
+        for (;;) {
+          let res: { value?: unknown[]; "@odata.nextLink"?: string; "@odata.deltaLink"?: string };
+          try {
+            res = (await client.api(link).get()) as {
+              value?: unknown[];
+              "@odata.nextLink"?: string;
+              "@odata.deltaLink"?: string;
+            };
+          } catch (cause) {
+            const err = cause as { statusCode?: number };
+            if (err.statusCode === 410) {
+              link = BASE; // delta token 만료 → 풀 재동기화(A1 §2.4)
+              continue;
+            }
+            throw mapApiError(cause);
+          }
+          for (const raw of res.value ?? []) {
+            for (const item of normalize(raw)) yield item;
+          }
+          const settled = res["@odata.deltaLink"];
+          link = res["@odata.nextLink"] ?? settled ?? BASE;
+          if (settled !== undefined && intervalMs > 0)
+            await new Promise((r) => setTimeout(r, intervalMs));
+        }
+      }
+      return poll();
     },
 
     async send(): Promise<never> {
