@@ -14,6 +14,6 @@
     "test": "vitest run",
     "test:integration": "vitest run test/integration"
   },
-  "dependencies": { "@omnis/db": "workspace:*", "pg": "8.13.1" },
+  "dependencies": { "@omnis/db": "workspace:*", "@omnis/protocol": "workspace:*", "pg": "8.13.1" },
   "devDependencies": { "@types/pg": "8.11.10" }
 }

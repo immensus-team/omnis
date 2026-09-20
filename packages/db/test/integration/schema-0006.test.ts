@@ -1,6 +1,6 @@
+import { createPool, one, query } from "@omnis/db";
 import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createPool, one, query } from "@omnis/db";
 
 let pool: Pool;
 beforeAll(() => {
@@ -27,7 +27,7 @@ describe("0006_kernel", () => {
     await expect(
       query(pool, `UPDATE events SET kind = 'mutated' WHERE seq = $1`, [ev.seq]),
     ).rejects.toThrow(/append-only: UPDATE on events is forbidden/);
-    await expect(query(pool, `DELETE FROM events WHERE seq = $1`, [ev.seq])).rejects.toThrow(
+    await expect(query(pool, "DELETE FROM events WHERE seq = $1", [ev.seq])).rejects.toThrow(
       /retention window/,
     );
   });
@@ -41,10 +41,10 @@ describe("0006_kernel", () => {
     await expect(
       query(pool, `UPDATE audit_log SET action = 'x' WHERE seq = $1`, [row.seq]),
     ).rejects.toThrow(/append-only: UPDATE on audit_log is forbidden/);
-    await expect(query(pool, `DELETE FROM audit_log WHERE seq = $1`, [row.seq])).rejects.toThrow(
+    await expect(query(pool, "DELETE FROM audit_log WHERE seq = $1", [row.seq])).rejects.toThrow(
       /append-only: DELETE on audit_log is forbidden/,
     );
-    await expect(query(pool, `TRUNCATE audit_log`)).rejects.toThrow(
+    await expect(query(pool, "TRUNCATE audit_log")).rejects.toThrow(
       /append-only: TRUNCATE on audit_log is forbidden/,
     );
   });
@@ -56,7 +56,7 @@ describe("0006_kernel", () => {
     );
     const out = await one<{ deleted: string }>(
       pool,
-      `SELECT deleted::text AS deleted FROM omnis_events_rolloff()`,
+      "SELECT deleted::text AS deleted FROM omnis_events_rolloff()",
     );
     expect(Number(out.deleted)).toBeGreaterThanOrEqual(1);
 
@@ -76,7 +76,7 @@ describe("0006_kernel", () => {
   it("seeds the 16 jobs A3 §6 lists, with the A4-owned schedules", async () => {
     const rows = await query<{ name: string; schedule: string }>(
       pool,
-      `SELECT name, schedule FROM jobs ORDER BY name`,
+      "SELECT name, schedule FROM jobs ORDER BY name",
     );
     expect(rows).toHaveLength(16);
     const byName = new Map(rows.map((r) => [r.name, r.schedule]));

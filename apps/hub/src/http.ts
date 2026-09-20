@@ -1,0 +1,158 @@
+import { type IncomingMessage, type Server, type ServerResponse, createServer } from "node:http";
+import type { Duplex } from "node:stream";
+import { query } from "@omnis/db";
+import { ApprovalStateError, type Kernel, type Logger, killSwitchStatus } from "@omnis/kernel";
+import type { Pool } from "pg";
+import type { HubConfig } from "./config.js";
+
+const APPROVAL_STATES = [
+  "pending",
+  "decided",
+  "executing",
+  "executed",
+  "failed",
+  "expired",
+] as const;
+const MAX_BODY_BYTES = 64 * 1024;
+
+export interface HubServerDeps {
+  kernel: Kernel;
+  pool: Pool;
+  config: HubConfig;
+  logger: Logger;
+  startedAt: number;
+  /** Task 26(hub-bridge-ws)이 WS /bridge를 여기에 꽂는다. 주입 안 되면 업그레이드는 501이다. */
+  onUpgrade?: (req: IncomingMessage, socket: Duplex, head: Buffer) => void;
+}
+
+function send(res: ServerResponse, status: number, body: unknown): void {
+  const text = JSON.stringify(body);
+  res.writeHead(status, {
+    "content-type": "application/json; charset=utf-8",
+    "content-length": Buffer.byteLength(text),
+  });
+  res.end(text);
+}
+
+async function readJson(req: IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    const buf = chunk as Buffer;
+    size += buf.length;
+    if (size > MAX_BODY_BYTES) throw new SyntaxError("body too large");
+    chunks.push(buf);
+  }
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
+export function createHubServer(deps: HubServerDeps): Server {
+  const { kernel, pool, config, logger, startedAt } = deps;
+
+  const server = createServer((req, res) => {
+    void handle(req, res).catch((e: unknown) => {
+      logger.error("route threw", {
+        url: req.url,
+        err: e instanceof Error ? e.message : String(e),
+      });
+      if (!res.headersSent) send(res, 500, { error: "internal" });
+    });
+  });
+
+  async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const url = new URL(req.url ?? "/", `http://${config.host}:${config.port}`);
+    const path = url.pathname;
+    const method = req.method ?? "GET";
+
+    if (path === "/health") {
+      if (method !== "GET") return send(res, 405, { error: "method not allowed" });
+      let db: "up" | "down" = "up";
+      try {
+        await query(pool, "SELECT 1");
+      } catch {
+        db = "down";
+      }
+      return send(res, 200, {
+        ok: db === "up",
+        version: config.version,
+        db,
+        uptimeSec: Math.floor((Date.now() - startedAt) / 1000),
+        killSwitch: await kernel.killSwitch.isOn(),
+      });
+    }
+
+    if (path === "/approvals") {
+      if (method !== "GET") return send(res, 405, { error: "method not allowed" });
+      const stateParam = url.searchParams.get("state");
+      if (
+        stateParam !== null &&
+        !APPROVAL_STATES.includes(stateParam as (typeof APPROVAL_STATES)[number])
+      ) {
+        return send(res, 400, { error: `unknown state: ${stateParam}` });
+      }
+      const limitParam = url.searchParams.get("limit");
+      const limit = limitParam === null ? 50 : Number(limitParam);
+      if (!Number.isInteger(limit) || limit < 1) return send(res, 400, { error: "bad limit" });
+      const approvals = await kernel.approvals.list({
+        ...(stateParam !== null ? { state: stateParam as (typeof APPROVAL_STATES)[number] } : {}),
+        limit,
+      });
+      return send(res, 200, { approvals });
+    }
+
+    const decide = /^\/approvals\/([0-9a-fA-F-]{36})\/decide$/.exec(path);
+    if (decide !== null) {
+      if (method !== "POST") return send(res, 405, { error: "method not allowed" });
+      const id = decide[1];
+      if (id === undefined) return send(res, 400, { error: "bad id" });
+      let body: unknown;
+      try {
+        body = await readJson(req);
+      } catch {
+        return send(res, 400, { error: "invalid json body" });
+      }
+      try {
+        await kernel.approvals.decide(id, body);
+      } catch (e) {
+        if (e instanceof ApprovalStateError) return send(res, 409, { error: e.message });
+        return send(res, 400, { error: e instanceof Error ? e.message : "bad request" });
+      }
+      return send(res, 200, { id, state: "decided" });
+    }
+
+    if (path === "/kill-switch") {
+      if (method === "GET") return send(res, 200, await killSwitchStatus(pool));
+      if (method === "POST") {
+        let body: unknown;
+        try {
+          body = await readJson(req);
+        } catch {
+          return send(res, 400, { error: "invalid json body" });
+        }
+        const b = body as { on?: unknown; reason?: unknown };
+        if (typeof b.on !== "boolean" || typeof b.reason !== "string" || b.reason.length === 0) {
+          return send(res, 400, { error: "expected { on: boolean, reason: string }" });
+        }
+        await kernel.killSwitch.set(b.on, b.reason);
+        const status = await killSwitchStatus(pool);
+        return send(res, 200, { on: status.on, since: status.since });
+      }
+      return send(res, 405, { error: "method not allowed" });
+    }
+
+    // /search, /memory/search, /transcript/:id는 다른 부록이 소유한다(계약 §5) — Phase A는 열지 않는다.
+    return send(res, 404, { error: "not found" });
+  }
+
+  server.on("upgrade", (req, socket, head) => {
+    if (deps.onUpgrade !== undefined) {
+      deps.onUpgrade(req, socket, head as Buffer);
+      return;
+    }
+    // WS /bridge는 Task 26이 붙인다.
+    socket.write("HTTP/1.1 501 Not Implemented\r\n\r\n");
+    socket.destroy();
+  });
+
+  return server;
+}

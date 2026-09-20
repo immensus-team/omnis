@@ -1,4 +1,9 @@
 {
   "files": [],
-  "references": [{ "path": "./packages/db" }, { "path": "./packages/kernel" }]
+  "references": [
+    { "path": "./packages/protocol" },
+    { "path": "./packages/db" },
+    { "path": "./packages/kernel" },
+    { "path": "./apps/hub" }
+  ]
 }

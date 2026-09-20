@@ -1,0 +1,22 @@
+{
+  "name": "@omnis/hub",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "test": "vitest run",
+    "test:integration": "vitest run test/integration"
+  },
+  "dependencies": {
+    "@omnis/db": "workspace:*",
+    "@omnis/kernel": "workspace:*",
+    "@omnis/protocol": "workspace:*",
+    "pg": "8.13.1",
+    "ws": "8.18.0"
+  },
+  "devDependencies": { "@types/pg": "8.11.10", "@types/ws": "8.5.13" }
+}
