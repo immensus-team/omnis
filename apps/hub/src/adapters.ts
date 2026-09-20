@@ -1,5 +1,7 @@
+import { query } from "@omnis/db";
 import type { Logger } from "@omnis/kernel";
 import type { Adapter, AdapterEvent, AuthRef, Channel, NormalizedItem } from "@omnis/protocol";
+import type { Pool } from "pg";
 
 // US-B45: `accounts` rows → `Adapter` instances. The hub deals only with the Keychain item **name**
 // and never touches the value (A3-D4: `account_secrets.auth_ref` = the Keychain item name; each
@@ -47,14 +49,29 @@ export interface BuildAdaptersDeps {
   recordAdapterHealth?: HealthReporter;
 }
 
+/** The registry's input: every account row plus its Keychain item name (A3-D4 — never the value).
+ *  `account_secrets` is a LEFT JOIN so an account with no secret still shows up and gets logged. */
+export async function loadAccountRows(pool: Pool): Promise<AccountRow[]> {
+  return query<AccountRow>(
+    pool,
+    `SELECT a.id, a.channel, a.external_id, a.state, s.auth_ref
+       FROM accounts a
+       LEFT JOIN account_secrets s ON s.account_id = a.id`,
+  );
+}
+
 /** Health reporting is best effort — ntfy may be down, the DB may blip. A failed report is logged
  *  and swallowed: it must never abort hub startup or kill a subscribe() loop. */
-async function reportHealth(deps: BuildAdaptersDeps, h: AdapterStatus): Promise<void> {
-  if (deps.recordAdapterHealth === undefined) return;
+async function reportHealth(
+  logger: Logger,
+  report: HealthReporter | undefined,
+  h: AdapterStatus,
+): Promise<void> {
+  if (report === undefined) return;
   try {
-    await deps.recordAdapterHealth(h);
+    await report(h);
   } catch (e) {
-    deps.logger.warn("adapter health report failed", {
+    logger.warn("adapter health report failed", {
       account: h.accountId,
       channel: h.channel,
       err: e instanceof Error ? e.message : String(e),
@@ -99,7 +116,7 @@ export async function buildAdapters(deps: BuildAdaptersDeps): Promise<BoundAdapt
       // If one account's expired token blocked hub startup, every other channel would die with it.
       const err = e instanceof Error ? e.message : String(e);
       logger.error("adapter connect failed", { account: a.id, channel: a.channel, err });
-      await reportHealth(deps, {
+      await reportHealth(logger, deps.recordAdapterHealth, {
         accountId: a.id,
         channel: a.channel,
         status: "down",
@@ -156,7 +173,7 @@ export function startAdapterLoops(deps: StartLoopsDeps): AdapterLoops {
           attempt,
           err,
         });
-        await reportHealth(deps, {
+        await reportHealth(logger, deps.recordAdapterHealth, {
           accountId,
           channel: adapter.channel,
           status: "down",

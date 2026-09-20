@@ -133,6 +133,21 @@ importers:
 
   apps/hub:
     dependencies:
+      '@omnis/adapter-gmail':
+        specifier: workspace:*
+        version: link:../../packages/adapters/gmail
+      '@omnis/adapter-google-calendar':
+        specifier: workspace:*
+        version: link:../../packages/adapters/google-calendar
+      '@omnis/adapter-outlook':
+        specifier: workspace:*
+        version: link:../../packages/adapters/outlook
+      '@omnis/adapter-slack':
+        specifier: workspace:*
+        version: link:../../packages/adapters/slack
+      '@omnis/adapter-telegram':
+        specifier: workspace:*
+        version: link:../../packages/adapters/telegram
       '@omnis/agents':
         specifier: workspace:*
         version: link:../../packages/agents

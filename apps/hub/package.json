@@ -12,6 +12,11 @@
     "test:integration": "vitest run test/integration"
   },
   "dependencies": {
+    "@omnis/adapter-gmail": "workspace:*",
+    "@omnis/adapter-google-calendar": "workspace:*",
+    "@omnis/adapter-outlook": "workspace:*",
+    "@omnis/adapter-slack": "workspace:*",
+    "@omnis/adapter-telegram": "workspace:*",
     "@omnis/agents": "workspace:*",
     "@omnis/db": "workspace:*",
     "@omnis/kernel": "workspace:*",

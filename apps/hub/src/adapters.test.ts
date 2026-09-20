@@ -1,3 +1,4 @@
+import type { Logger } from "@omnis/kernel";
 import type { Adapter, AdapterEvent, AuthRef, NormalizedItem } from "@omnis/protocol";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -8,7 +9,7 @@ import {
   startAdapterLoops,
 } from "./adapters.js";
 
-const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as never;
+const logger: Logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
 
 function fakeAdapter(over: Partial<Adapter> = {}): Adapter {
   return {
