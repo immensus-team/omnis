@@ -108,14 +108,48 @@ describe("buildAdapters", () => {
     });
   });
 
-  it("skips non-active accounts, channels with no factory, and accounts with no secret — and says which", async () => {
+  it("skips channels with no factory and accounts with no secret — and says which", async () => {
     const factories: AdapterFactories = {
       gmail: () => fakeAdapter(),
       outlook: () => fakeAdapter(),
     };
     const built = await buildAdapters({ accounts, factories, logger });
-    expect(built.map((b) => b.accountId)).toEqual(["a1"]); // a2 broken, a3 no factory, a4 no auth_ref
+    expect(built.map((b) => b.accountId)).toEqual(["a1"]); // a2/a3 no factory, a4 no auth_ref
     expect(logger.warn).toHaveBeenCalled();
+  });
+
+  // F2: 'broken' is a health verdict (3 consecutive subscribe() failures), not a user decision.
+  // Skipping it meant the channel's adapter was never rebuilt — not even across a hub restart — so
+  // recovery needed a hand-written UPDATE. 'paused' is the user switching the account off: keep
+  // skipping it.
+  it("retries a 'broken' account and still skips a 'paused' one", async () => {
+    const built = await buildAdapters({
+      accounts: [
+        { ...outlookAccount, id: "broken", state: "broken" },
+        { ...outlookAccount, id: "paused", state: "paused" },
+      ],
+      factories: { outlook: () => fakeAdapter() },
+      logger,
+    });
+    expect(built.map((b) => b.accountId)).toEqual(["broken"]);
+  });
+
+  // F2: recordAdapterHealth(ok=true) is the only thing that clears the failure counter and flips a
+  // 'broken' account back to 'active'. Nothing reported healthy, so the counter only ever went up.
+  it("reports a successful connect as healthy", async () => {
+    const recordAdapterHealth = vi.fn(async () => {});
+    const built = await buildAdapters({
+      accounts: [accounts[0] as AccountRow, outlookAccount],
+      factories: { gmail: () => fakeAdapter(), outlook: () => fakeAdapter() },
+      logger,
+      recordAdapterHealth,
+    });
+    expect(built.map((b) => b.accountId)).toEqual(["a1", "a4"]);
+    expect(recordAdapterHealth).toHaveBeenCalledWith({
+      accountId: "a1",
+      channel: "gmail",
+      status: "healthy",
+    });
   });
 
   it("boots cleanly with zero accounts and zero factories", async () => {

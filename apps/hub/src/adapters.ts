@@ -109,7 +109,11 @@ export async function buildAdapters(deps: BuildAdaptersDeps): Promise<BoundAdapt
   const connectTimeoutMs = deps.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
   const out: BoundAdapter[] = [];
   for (const a of accounts) {
-    if (a.state !== "active") {
+    // 'broken' is a health verdict (recordAdapterHealth set it after N consecutive failures), not a
+    // user decision — retry it, so a channel that has recovered since heals on the next boot. This
+    // is the only way back: nothing else resets accounts.state. 'paused' is the user switching the
+    // account off, so it stays skipped.
+    if (a.state !== "active" && a.state !== "broken") {
       logger.info("adapter skipped: account not active", {
         account: a.id,
         channel: a.channel,
@@ -138,6 +142,14 @@ export async function buildAdapters(deps: BuildAdaptersDeps): Promise<BoundAdapt
       const adapter = make();
       await connectWithTimeout(adapter, auth, connectTimeoutMs);
       out.push({ accountId: a.id, channel: a.channel as Channel, adapter });
+      // A connect that worked is the proof that the channel is healthy again: report it, so the
+      // kernel's failure counter resets and a 'broken' account goes back to 'active'. Without this
+      // the counter only ever climbs and a broken channel can never recover on its own.
+      await reportHealth(logger, deps.recordAdapterHealth, {
+        accountId: a.id,
+        channel: a.channel,
+        status: "healthy",
+      });
     } catch (e) {
       // If one account's expired token blocked hub startup, every other channel would die with it.
       const err = e instanceof Error ? e.message : String(e);
