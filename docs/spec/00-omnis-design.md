@@ -276,7 +276,7 @@ interface Adapter {
 
 - 화면: Inbox(통합, 필터 pill: All / Work / Personal / Agents / Needs approval), Thread, Agent Session(같은 Thread 뷰 + tool 배지), Today(아침 브리핑, 오늘 일정, 대기 중 승인), Tasks, Network(사람 카드, 팔로업 큐), Notes(입력 한 줄 → 라우팅 제안), Digest(밤 요약, 되살리기), Settings(계정, 자율 허용 규칙, 모델 티어, kill switch).
 - 핵심 인터랙션: ⌘K 커맨드 팔레트(에이전트 액션 + 통합 검색: items 전문검색 + memories kNN, Phase B), 키보드 우선 triage(j/k, e, r, a), 초안 카드의 "Edit & send" 게이트, 우측 고정 채널 아이콘, 선택 행 elevation, 라벨은 InboxRow 2행 우측에 칩 2개 + `+N`. KakaoTalk send는 read 안정 14일 미만이면 비활성이고 잔여일을 표시한다.
-- 디자인 언어: 다크 우선, 근흑 캔버스 + 단일 액센트, Liquid Glass는 sidebar/toolbar/sheet/팔레트에만, 리스트와 본문은 불투명. Pretendard + Inter. 모션 100/160/400ms.
+- 디자인 언어(2026-09-20 Logan 결정으로 교정): **kinso를 따른다** — 라이트 기본(다크는 옵션), 왼쪽 스쿼클 채널 레일, 상단 "ask or search" 필 바, 행 = 아바타 + 이름 + 상대시간 + AI 한 줄 요약 + 우측 채널 아이콘, 헤어라인 없이 선택 행만 카드로. Liquid Glass는 sidebar/toolbar/sheet/팔레트에만. Pretendard + Inter. 모션 100/160/400ms. 상세는 `docs/design/DESIGN-DIRECTION.md`, A5의 다크 우선 항목은 폐기.
 - iPhone: 한 손 triage. 승인, 스누즈, 짧은 답장, 노트 입력. 긴 편집은 맥으로. 탭바 5칸(Inbox, Today, Tasks, Network, Notes). Digest는 Today 상단 카드로 진입한다. 알림 정책의 오너는 A4 §3.6이고 폰에도 그대로 적용된다. 즉시 푸시(VIP·긴급 초안, 80자 미리보기 + Approve), 묶음 푸시(3시간 간격), 다이제스트 푸시(밤 1회). 브리프의 "초안을 작성하고 나에게 따로 알림"은 이 세 등급으로 구현한다.
 
 ## 13. 보안 (상세는 A4, A6)
