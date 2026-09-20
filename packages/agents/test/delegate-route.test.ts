@@ -9,6 +9,9 @@ import {
 
 const hosts = { mini: { lastHeartbeatMs: 0 }, macbook: { lastHeartbeatMs: 0 } };
 
+// Frozen fixtures: every Korean string below is a Korean-language task prompt fed to extractHints /
+// routeByRule. They are the inputs the Korean routing regexes (GUI_CHANNEL / ALWAYS_ON / MINUTES /
+// HOURS in src/delegate/route.ts) exist to match, so translating them would change routing.
 describe("extractHints (A4 §5.2)", () => {
   it("pulls absolute paths, cron words and minutes out of text with regex only", () => {
     const h = extractHints(

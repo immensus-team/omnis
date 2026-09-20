@@ -4,7 +4,7 @@ import { registerLoop, resetLoopRegistryForTest } from "../src/loop/registry.js"
 import type { LoopSpec, TriggerContext } from "../src/loop/spec.js";
 import { LOOP_JOB_NAME, startLoops } from "../src/loop/start.js";
 
-// runLoopSpec은 DB(agent_runs)를 요구한다 — 배선만 보는 유닛 테스트라 실행부는 대역으로 둔다.
+// runLoopSpec needs the DB (agent_runs) — this unit test only checks the wiring, so the executor is stubbed.
 const mocks = vi.hoisted(() => ({ runLoopSpec: vi.fn() }));
 vi.mock("../src/loop/run.js", () => ({ runLoopSpec: mocks.runLoopSpec }));
 

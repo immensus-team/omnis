@@ -23,7 +23,7 @@ describe("memory consolidation via Message Batches (A4 §6.5)", () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     vi.stubEnv("OMNIS_ANTHROPIC_API_KEY", "");
-    expect(await submitConsolidation([{ custom_id: "m1", prompt: "요약해줘" }])).toBe(null);
+    expect(await submitConsolidation([{ custom_id: "m1", prompt: "summarize this" }])).toBe(null);
     expect(fetchSpy).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
