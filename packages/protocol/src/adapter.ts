@@ -105,3 +105,103 @@ export const NormalizedItem = z.object({
   threadMeta: NormalizedThread.optional(),
 });
 export type NormalizedItem = z.infer<typeof NormalizedItem>;
+
+export const AdapterEvent = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("connected"), at: z.string().datetime() }),
+  z.object({ kind: z.literal("disconnected"), reason: z.string(), at: z.string().datetime() }),
+  z.object({
+    kind: z.literal("auth_required"),
+    reason: z.string(),
+    authUrl: z.string().optional(),
+    at: z.string().datetime(),
+  }),
+  z.object({
+    kind: z.literal("rate_limited"),
+    retryAfterMs: z.number().int(),
+    endpoint: z.string(),
+    at: z.string().datetime(),
+  }),
+  z.object({
+    kind: z.literal("backfill_progress"),
+    done: z.number().int(),
+    total: z.number().int().nullable(),
+    at: z.string().datetime(),
+  }),
+]);
+export type AdapterEvent = z.infer<typeof AdapterEvent>;
+
+export const AuthRef = z.object({
+  channel: Channel,
+  accountExternalId: z.string(),
+  keychainService: z.string(),
+  keychainAccount: z.string(),
+});
+export type AuthRef = z.infer<typeof AuthRef>;
+
+export type AdapterErrorKind =
+  | "retryable_network"
+  | "retryable_rate_limit"
+  | "auth_expired"
+  | "auth_revoked"
+  | "fatal_protocol"
+  | "fatal_unsupported";
+
+export class AdapterError extends Error {
+  constructor(
+    readonly kind: AdapterErrorKind,
+    readonly channel: Channel,
+    message: string,
+    readonly retryAfterMs?: number,
+    override readonly cause?: unknown,
+  ) {
+    super(message);
+    this.name = "AdapterError";
+  }
+}
+
+export interface Health {
+  channel: Channel;
+  accountExternalId: string;
+  status: "healthy" | "degraded" | "down";
+  lastEventAt: string | null;
+  lastError?: { kind: AdapterErrorKind; message: string; at: string };
+  latencyMsP50?: number;
+}
+
+export interface ThreadRef {
+  accountId: string;
+  externalId: string;
+}
+export interface OutboundAttachment {
+  kind: "image" | "file";
+  localPath: string;
+  mimeType: string;
+  caption?: string;
+}
+export interface Outbound {
+  text: string;
+  bodyHtml?: string;
+  attachments?: OutboundAttachment[];
+  replyToExternalId?: string;
+}
+export interface SendResult {
+  externalId: string;
+  sentAt: string;
+}
+
+export interface Adapter {
+  id: string;
+  channel: Channel;
+  capabilities(): Capabilities;
+  connect(auth: AuthRef): Promise<void>;
+  disconnect?(): Promise<void>;
+  backfill(since?: Date): AsyncIterable<NormalizedItem>;
+  subscribe(): AsyncIterable<NormalizedItem | AdapterEvent>;
+  send(thread: ThreadRef, draft: Outbound): Promise<SendResult>;
+  markRead?(thread: ThreadRef): Promise<void>;
+  archive?(thread: ThreadRef): Promise<void>;
+  health(): Promise<Health>;
+}
+
+export type Normalize = (raw: unknown) => NormalizedItem[];
+export type IngestSink = (accountId: string, e: NormalizedItem | AdapterEvent) => Promise<void>;
