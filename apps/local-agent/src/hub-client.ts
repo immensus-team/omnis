@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { type BridgeMethod, toJsonRpcError, withMeta } from "@omnis/protocol";
+import { type BridgeMethod, type HostId, toJsonRpcError, withMeta } from "@omnis/protocol";
 import type { Logger } from "./logger.js";
 
 export interface SocketLike {
@@ -11,6 +11,8 @@ export interface SocketLike {
 export interface HubClientDeps {
   url: string;
   token: string;
+  /** 허브 handleUpgrade가 x-omnis-host를 요구한다 — 없으면 400으로 끊긴다(apps/hub/src/bridge.ts). */
+  host: HostId;
   logger: Logger;
   connect: (url: string, headers: Record<string, string>) => SocketLike;
   dispatch: (method: string, params: unknown) => Promise<unknown>;
@@ -52,7 +54,10 @@ export class HubClient {
   }
 
   #connect(): void {
-    const sock = this.deps.connect(this.deps.url, { Authorization: `Bearer ${this.deps.token}` });
+    const sock = this.deps.connect(this.deps.url, {
+      Authorization: `Bearer ${this.deps.token}`,
+      "x-omnis-host": this.deps.host,
+    });
     this.#sock = sock;
     sock.on("open", (() => {
       this.#open = true;
