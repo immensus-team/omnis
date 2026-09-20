@@ -23,8 +23,39 @@ fn apply_glass(_window: &tauri::WebviewWindow) -> bool {
     false
 }
 
+/// A6 §9: 시크릿 조회/저장은 `/usr/bin/security` CLI 패턴만 쓴다(서드파티 keychain 플러그인
+/// 없음 — Task 9 산출물, US-A31 재작업 메모 참고). 인자 생성은 순수 함수로 분리해 테스트한다.
+fn add_generic_password_args(service: &str, account: &str) -> Vec<String> {
+    vec![
+        "add-generic-password".into(),
+        "-U".into(),
+        "-s".into(),
+        service.into(),
+        "-a".into(),
+        account.into(),
+        "-w".into(),
+    ]
+}
+
+#[tauri::command]
+fn keychain_set(service: String, account: String, secret: String) -> Result<(), String> {
+    use std::process::Command;
+    let mut args = add_generic_password_args(&service, &account);
+    args.push(secret);
+    let status = Command::new("/usr/bin/security")
+        .args(&args)
+        .status()
+        .map_err(|e| e.to_string())?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("security exited with status {status}"))
+    }
+}
+
 fn main() {
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![keychain_set])
         .setup(|app| {
             let window = app.get_webview_window("main").expect("main window must exist (tauri.conf.json)");
             let applied = apply_glass(&window);
@@ -50,5 +81,20 @@ mod tests {
     #[test]
     fn css_fallback_when_glass_not_applied() {
         assert_eq!(vibrancy_attr(false), "css-fallback");
+    }
+}
+
+#[cfg(test)]
+mod keychain_tests {
+    use super::add_generic_password_args;
+
+    #[test]
+    fn builds_the_expected_security_cli_flags() {
+        // 계약 §9: Slack bot 토큰의 실제 서비스명은 omnis.slack.xoxb.<team_id>, account는 <team_id>(계약 리뷰 M7).
+        let args = add_generic_password_args("omnis.slack.xoxb.T123", "T123");
+        assert_eq!(
+            args,
+            vec!["add-generic-password", "-U", "-s", "omnis.slack.xoxb.T123", "-a", "T123", "-w"]
+        );
     }
 }
