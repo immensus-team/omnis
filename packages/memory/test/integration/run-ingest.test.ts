@@ -40,12 +40,17 @@ beforeEach(() => {
   resetIngestProviders();
   setExtractor(null);
 });
-// 통합 프로젝트는 한 DB를 공유하고 파일이 겹쳐 돌 수 있다. 싹 지우면 같은 순간에 도는 다른
-// 파일의 행까지 날아간다(schema-0005가 실제로 그렇게 깨졌다) — 이 파일이 만든 것만 지운다.
+// 통합 프로젝트는 한 DB를 공유한다. 싹 지우면 다른 파일의 행까지 날아가고(schema-0005가 실제로
+// 그렇게 깨졌다), 반대로 읽기를 안 좁히면 앞 파일이 남긴 행(schema-0005는 memories/entities/
+// relations를 정리 없이 남긴다)이 섞여 들어온다 — 쓰기도 읽기도 이 파일이 만든 행으로만 좁힌다.
+const MINE = "WHERE source_kind IN ('file', 'calendar')";
+const MINE_ENTITIES = "WHERE name IN ('omnis', '온워드랩')";
+const MINE_RELATIONS = "WHERE type = 'owned_by'";
+
 afterEach(async () => {
-  await query(pool, "DELETE FROM relations WHERE type = 'owned_by'");
-  await query(pool, "DELETE FROM entities WHERE name IN ('온워드랩', 'omnis')");
-  await query(pool, "DELETE FROM memories WHERE source_kind IN ('file', 'calendar')");
+  await query(pool, `DELETE FROM relations ${MINE_RELATIONS}`);
+  await query(pool, `DELETE FROM entities ${MINE_ENTITIES}`);
+  await query(pool, `DELETE FROM memories ${MINE}`);
   await query(pool, "DELETE FROM ingest_sources WHERE source_ref IN ('/roots', 'calendar_events')");
   await query(pool, "DELETE FROM calendar_events WHERE external_id = 'evt-1'");
   await query(pool, "DELETE FROM items WHERE kind = 'event' AND subject = '킥오프'");
@@ -86,7 +91,10 @@ describe("runIngest — 기본 경로", () => {
       source_ref: string;
       valid_from: Date;
       embedding: string | null;
-    }>(pool, "SELECT content, source_kind, source_ref, valid_from, embedding FROM memories");
+    }>(
+      pool,
+      `SELECT content, source_kind, source_ref, valid_from, embedding FROM memories ${MINE}`,
+    );
     expect(row.source_kind).toBe("file");
     expect(row.source_ref).toBe("/roots/notes.md");
     expect(row.valid_from.toISOString()).toBe(VALID_FROM);
@@ -98,7 +106,7 @@ describe("runIngest — 기본 경로", () => {
     registerIngestProvider(provider(docs));
     await runIngest({ pool, logger, kind: "file" });
     await runIngest({ pool, logger, kind: "file" });
-    expect(await query(pool, "SELECT id FROM memories")).toHaveLength(1);
+    expect(await query(pool, `SELECT id FROM memories ${MINE}`)).toHaveLength(1);
   });
 
   it("uses code chunking for a source_ref that looks like code", async () => {
@@ -112,7 +120,7 @@ describe("runIngest — 기본 경로", () => {
       ]),
     );
     await runIngest({ pool, logger, kind: "file" });
-    const row = await one<{ content: string }>(pool, "SELECT content FROM memories");
+    const row = await one<{ content: string }>(pool, `SELECT content FROM memories ${MINE}`);
     expect(row.content).toContain("export function f");
   });
 
@@ -125,7 +133,10 @@ describe("runIngest — 기본 경로", () => {
     );
     const out = await runIngest({ pool, logger, kind: "file" });
     expect(out.chunks).toBe(1);
-    const refs = await query<{ source_ref: string }>(pool, "SELECT source_ref FROM memories");
+    const refs = await query<{ source_ref: string }>(
+      pool,
+      `SELECT source_ref FROM memories ${MINE}`,
+    );
     expect(refs.map((r) => r.source_ref)).toEqual(["/roots/ok.md"]);
   });
 
@@ -145,7 +156,7 @@ describe("runIngest — 기본 경로", () => {
 
     const rows = await query<{ invalidated_at: Date | null }>(
       pool,
-      "SELECT invalidated_at FROM memories",
+      `SELECT invalidated_at FROM memories ${MINE}`,
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.invalidated_at).toBeInstanceOf(Date);
@@ -207,10 +218,10 @@ describe("runIngest — 추출(T1)", () => {
     // COLLATE "C": 기본 로케일에서는 한글이 ASCII보다 먼저 온다 — 순서를 DB 로케일에 맡기지 않는다.
     const names = await query<{ name: string }>(
       pool,
-      'SELECT name FROM entities ORDER BY name COLLATE "C"',
+      `SELECT name FROM entities ${MINE_ENTITIES} ORDER BY name COLLATE "C"`,
     );
     expect(names.map((n) => n.name)).toEqual(["omnis", "온워드랩"]);
-    const rel = await one<{ type: string }>(pool, "SELECT type FROM relations");
+    const rel = await one<{ type: string }>(pool, `SELECT type FROM relations ${MINE_RELATIONS}`);
     expect(rel.type).toBe("owned_by");
   });
 
@@ -229,7 +240,7 @@ describe("runIngest — 추출(T1)", () => {
     );
     const out = await runIngest({ pool, logger, kind: "file" });
     expect(out.chunks).toBe(2);
-    expect(await query(pool, "SELECT id FROM memories")).toHaveLength(2); // 청크 메모리는 둘 다 남는다
+    expect(await query(pool, `SELECT id FROM memories ${MINE}`)).toHaveLength(2); // 청크 메모리는 둘 다 남는다
   });
 });
 
