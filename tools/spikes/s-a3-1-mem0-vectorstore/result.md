@@ -1,14 +1,14 @@
-# S-A3-1 — mem0-ts 커스텀 VectorStore 어댑터 (A3-D12)
+# S-A3-1 — mem0-ts custom VectorStore adapter (A3-D12)
 
-**판정: FAIL** (2026-09-20). `@omnis/memory`가 `public.memories`에 직접 붙는 A3-D12 폴백 경로가 정본이 된다(백로그 B-D1).
+**Result (Pass/Fail)**: **FAIL** (2026-09-20). The A3-D12 fallback path — `@omnis/memory` attaching directly to `public.memories` — becomes the canonical approach (backlog B-D1).
 
-실측 방법: `npm pack mem0ai@3.2.0` 후 `dist/oss/index.d.ts` 확인.
+Measurement method: run `npm pack mem0ai@3.2.0`, then inspect `dist/oss/index.d.ts`.
 
-1. `type VectorStore`는 export되지만 **타입만**이다. `MemoryConfig.vectorStore`는 `{provider: string, config: VectorStoreConfig}`이고 생성은 `VectorStoreFactory.create(provider, config)` 정적 팩토리를 탄다 — **외부 구현 인스턴스를 꽂는 슬롯이 없다.** A3-D12의 "커스텀 VectorStore 어댑터" 전제가 여기서 깨진다.
-2. 번들된 `PGVector`는 `createDatabase`/`createCol`로 **자기 테이블을 만든다.** `memories`의 타입 컬럼(`kind`/`scope`/`source_kind`/4-timestamp/`superseded_by`)과 부분 HNSW(`WHERE invalidated_at IS NULL`)를 표현할 방법이 없다.
-3. graph memory는 v2.0.0에서 제거됐다. entity/relation은 어차피 우리 테이블(`entities`/`relations`)이다.
-4. 패키지가 `@langchain/core`를 타입 경로로 끌고 오고 vector store 드라이버 20종을 포함한다 — 1인용 단일 Postgres에 붙이자고 질 의존이 아니다.
+1. `type VectorStore` is exported, but **as a type only**. `MemoryConfig.vectorStore` is `{provider: string, config: VectorStoreConfig}`, and construction goes through the static factory `VectorStoreFactory.create(provider, config)` — **there is no slot for plugging in an instance of an external implementation.** A3-D12's premise of a "custom VectorStore adapter" breaks here.
+2. The bundled `PGVector` **creates its own tables** via `createDatabase`/`createCol`. There is no way to express the type columns of `memories` (`kind`/`scope`/`source_kind`/4-timestamp/`superseded_by`) or the partial HNSW index (`WHERE invalidated_at IS NULL`).
+3. graph memory was removed in v2.0.0. entity/relation are our own tables (`entities`/`relations`) anyway.
+4. The package pulls in `@langchain/core` through its type path and ships 20 kinds of vector store drivers — not a dependency to take on just to attach to a single Postgres for one person.
 
-**남기는 것:** mem0의 fact-extraction 프롬프트 구조(ADD/UPDATE/DELETE 판정)는 **참고만** 한다. 코드·문자열을 복사하지 않는다.
+**What we keep:** the structure of mem0's fact-extraction prompt (the ADD/UPDATE/DELETE decision) is used **for reference only**. We do not copy code or strings.
 
-**뒤집히는 조건:** mem0가 인스턴스 주입 API를 열면 재검토. 그 전까지 이 판정이 정본이다.
+**Conditions that would reverse this:** if mem0 opens an instance-injection API, revisit. Until then, this result is canonical.
