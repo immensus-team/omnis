@@ -28,13 +28,16 @@ function approval(over: Partial<ApprovalStackItem> & { id: string }): ApprovalSt
 const A = approval({ id: "a", thread_id: "t1", risk: "normal", created_at: 100 });
 const B = approval({ id: "b", thread_id: "t1", risk: "high", created_at: 50 });
 const C = approval({ id: "c", thread_id: "t2", risk: "normal", created_at: 200 });
-const ALL = [A, B, C];
+// t2's own riskiest — the queue's newest, and the reason "t1's stack does not show it" is a real
+// assertion rather than a coincidence of ordering.
+const D = approval({ id: "d", thread_id: "t2", risk: "high", created_at: 300 });
+const ALL = [A, B, C, D];
 
 describe("scopeApprovalStack (US-D03: hierarchy instead of an identical card wall)", () => {
   it("expands the open thread's riskiest approval and collapses the rest", () => {
     const { primary, collapsed } = scopeApprovalStack(ALL, "t1");
     expect(primary?.id).toBe("b");
-    expect(collapsed.map((a) => a.id)).toEqual(["a", "c"]);
+    expect(collapsed.map((a) => a.id)).toEqual(["a"]);
   });
 
   it("prefers the newest when risk ties", () => {
@@ -43,26 +46,27 @@ describe("scopeApprovalStack (US-D03: hierarchy instead of an identical card wal
     expect(scopeApprovalStack([older, newer], "t1").primary?.id).toBe("new");
   });
 
-  it("keeps a thread's own approvals ahead of other threads' in the collapsed list", () => {
-    const other = approval({ id: "other", thread_id: "t9", risk: "high", created_at: 999 });
-    expect(scopeApprovalStack([B, other, A], "t1").collapsed.map((a) => a.id)).toEqual([
-      "a",
-      "other",
-    ]);
+  it("leaves other threads' approvals out of the open thread's stack entirely", () => {
+    // The inbox's needs-approval tab is the queue surface. Listing the rest of the queue here put
+    // another conversation's work at the top of this pane, above the title of the thread it was
+    // supposed to be about, so the pane never opened on its own subject.
+    const { primary, collapsed } = scopeApprovalStack(ALL, "t1");
+    expect([primary?.id, ...collapsed.map((a) => a.id)]).toEqual(["b", "a"]);
+    expect(scopeApprovalStack(ALL, "t1").collapsed.some((a) => a.thread_id !== "t1")).toBe(false);
   });
 
   it("falls back to the whole queue when no thread is open", () => {
-    // Nothing is open, so there is no narrower scope to read — the pane still leads with one real
-    // card rather than three stubs.
+    // Nothing is open, so there is no narrower scope to read — and this pane is only ever drawn
+    // for the queue itself, so it still leads with one real card rather than a list of stubs.
     const { primary, collapsed } = scopeApprovalStack(ALL, null);
-    expect(primary?.id).toBe("b");
-    expect(collapsed).toHaveLength(2);
+    expect(primary?.id).toBe("d");
+    expect(collapsed.map((a) => a.id)).toEqual(["b", "c", "a"]);
   });
 
-  it("collapses everything when the open thread has no approval", () => {
+  it("empties the stack when the open thread has no approval of its own", () => {
     const { primary, collapsed } = scopeApprovalStack(ALL, "t3");
     expect(primary).toBeNull();
-    expect(collapsed).toHaveLength(3);
+    expect(collapsed).toEqual([]);
   });
 });
 
@@ -72,20 +76,38 @@ describe("ApprovalStack (US-D03)", () => {
     // The expanded card keeps its four buttons; the collapsed rows do not carry any.
     expect(screen.getByText("Approve")).toBeInTheDocument();
     expect(screen.getAllByText("Approve")).toHaveLength(1);
-    expect(screen.getByText("2 more waiting")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /approval [ac]/ })).toHaveLength(2);
+    expect(screen.getByText("1 more waiting")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /approval [a-d]/ })).toHaveLength(1);
+  });
+
+  it("draws nothing for an open thread that has no approval of its own", () => {
+    // The whole-queue fallback is for the pane with nothing open. With a thread open, an empty
+    // scope is an empty pane — not four rows about four other conversations.
+    const { container } = render(
+      <ApprovalStack approvals={ALL} openThreadId="t3" onDecide={vi.fn()} />,
+    );
+    expect(container).toBeEmptyDOMElement();
   });
 
   it("names the action and the risk on a collapsed row", () => {
-    render(<ApprovalStack approvals={ALL} openThreadId="t3" onDecide={vi.fn()} />);
-    expect(screen.getByText("High risk")).toBeInTheDocument();
-    expect(screen.getAllByText("Send")).toHaveLength(3);
+    // Two high-risk approvals in one thread: the newer takes the card, so the older is the only
+    // way a collapsed row can carry the risk badge at all (the ranking always promotes the risky
+    // one to the card).
+    const highNew = approval({ id: "high-new", thread_id: "t5", risk: "high", created_at: 20 });
+    const highOld = approval({ id: "high-old", thread_id: "t5", risk: "high", created_at: 10 });
+    const calm = approval({ id: "calm", thread_id: "t5", risk: "normal", created_at: 30 });
+    render(
+      <ApprovalStack approvals={[highOld, calm, highNew]} openThreadId="t5" onDecide={vi.fn()} />,
+    );
+    expect(screen.getAllByText("High risk")).toHaveLength(1);
+    expect(screen.getAllByText("Send")).toHaveLength(2);
   });
 
   it("promotes a collapsed row when it is picked, and does not leave it behind in the list", () => {
-    render(<ApprovalStack approvals={ALL} openThreadId="t1" onDecide={vi.fn()} />);
+    // t2 is the one thread here with two approvals, so it is the one where a row can be picked.
+    render(<ApprovalStack approvals={ALL} openThreadId="t2" onDecide={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: /approval c/ }));
-    expect(screen.getByText("1 more waiting")).toBeInTheDocument();
+    expect(screen.queryByText(/more waiting/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /approval c/ })).not.toBeInTheDocument();
     expect(screen.getByText("Approve")).toBeInTheDocument();
   });
