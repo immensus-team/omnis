@@ -38,3 +38,14 @@ export {
 } from "./loop/spec.js";
 export { getLoop, listLoops, registerLoop, resetLoopRegistryForTest } from "./loop/registry.js";
 export { PHANTOM_TOOLS, TOOL_NAMES, type ToolName } from "./tools/names.js";
+export { READ_TOOLS } from "./tools/read.js";
+export {
+  PROPOSE_TOOLS,
+  ProposeDelegationInput,
+  ProposeDraftInput,
+  ProposeLabelInput,
+  ProposeRouteInput,
+  ProposeSelfModelPatchInput,
+  ProposeTaskInput,
+} from "./tools/propose.js";
+export { toolRegistry } from "./tools/registry.js";
