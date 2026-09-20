@@ -146,6 +146,57 @@ function readMassFilters(): MassInfo[] {
   return out;
 }
 
+interface RailAurora {
+  /** The wrapper's own computed display. `contents` is the narrow tier's arrangement: the box is
+   *  dissolved so the wrapper adds no second glass layer to the bar. */
+  wrapperDisplay: string;
+  /** True when the wrapper does keep a box and that box is the clip — `.aurora`'s own
+   *  `position: relative; overflow: hidden`. The other safe arrangement. */
+  clipsOwnBox: boolean;
+  /** `.aurora::before`, `.aurora::after`, `.aurora__mass`, `.aurora__grain` — all four layers of the
+   *  recipe in tokens.css, named so a failure says which one is still painting. */
+  layerNames: string[];
+  layerDisplays: string[];
+}
+
+/** Runs in the page, for the same reason as readAuroras. The rail's aurora wrapper and the four
+ *  layers of the texture recipe it owns.
+ *
+ *  The defect this exists for: all four layers are `position: absolute`, so each one needs a
+ *  *positioned* containing block that clips it. In the narrow tier the wrapper is `display: contents`
+ *  (app.css's `@container shell (max-width: 899.98px)` block) to keep a second glass layer off the
+ *  bar — but `display: contents` does not retire the layers along with the box. It promotes the
+ *  element's children *and* its `::before` / `::after` into the parent's box tree, where the nearest
+ *  positioned ancestor is `.channel-rail`: `position: fixed`, full width. A `::before` left live
+ *  there resolves against the whole bar. Measured on the un-fixed CSS at 390 and 768: wrapper
+ *  display=contents, `::before` display=block, opacity=0.34, filter=blur(6px), containing block
+ *  `.channel-rail` at 390x57 — a butter-to-peach radial washing the full width of the bottom bar,
+ *  with `::after`'s vignette fading back over it. That is §3.2's surface map broken: the aurora
+ *  belongs to the rail plate's own footprint (ACCENT-DIRECTION.md §4.1.1, "no bleed").
+ *
+ *  The child spans are read with `querySelector` and report `absent` when missing, so that deleting
+ *  one of them is a failure too rather than a silent pass. */
+function readRailAurora(): RailAurora | null {
+  const rail = document.querySelector(".aurora.channel-rail__aurora");
+  if (rail === null) return null;
+  const cs = getComputedStyle(rail);
+  const layerNames = [".aurora::before", ".aurora::after", ".aurora__mass", ".aurora__grain"];
+  const layerDisplays = [
+    getComputedStyle(rail, "::before").display,
+    getComputedStyle(rail, "::after").display,
+  ];
+  for (const sel of [".aurora__mass", ".aurora__grain"]) {
+    const el = rail.querySelector(sel);
+    layerDisplays.push(el === null ? "absent" : getComputedStyle(el).display);
+  }
+  return {
+    wrapperDisplay: cs.display,
+    clipsOwnBox: cs.position === "relative" && cs.overflow === "hidden",
+    layerNames: layerNames,
+    layerDisplays: layerDisplays,
+  };
+}
+
 interface GlassInfo {
   classes: string;
   backdropFilter: string;
@@ -398,7 +449,49 @@ test.describe("US-D06 aurora surface map", () => {
         overhang,
         `the sheet or the ask panel is off an edge on screen ${screen} at ${String(width)}px`,
       ).toEqual([]);
-      notes.push(`${String(width)}px: ${describeOverflow(overflow)}`);
+      // US-D06 fix: all four of the committed 390 captures (screens 1 and 2, the palette, the agents
+      // filter) had a warm bloom under the rail's tiles — the rail aurora's two pseudo-elements,
+      // still generating boxes after `display: contents` dissolved their wrapper (readRailAurora's
+      // header has the measurement). This is the guard. There are two safe arrangements and no
+      // third: the wrapper keeps a box and that box is the clip, or the wrapper is dissolved and all
+      // four of its layers are off. Anything else paints the aurora outside the rail's footprint.
+      const railAurora = await page.evaluate(readRailAurora);
+      expect(railAurora, "the rail's aurora wrapper is not in the document").not.toBeNull();
+      if (railAurora !== null) {
+        if (railAurora.wrapperDisplay === "contents") {
+          const live: string[] = [];
+          for (let i = 0; i < railAurora.layerNames.length; i++) {
+            const display = railAurora.layerDisplays[i];
+            if (display !== "none") {
+              live.push(`${String(railAurora.layerNames[i])} (display: ${String(display)})`);
+            }
+          }
+          expect(
+            live,
+            `screen ${screen} at ${String(width)}px: the rail wrapper is display: contents but ${String(
+              live.length,
+            )} of its four aurora layers still generate a box — each one resolves against the fixed, full-width .channel-rail instead of the plate`,
+          ).toEqual([]);
+        } else {
+          expect(
+            railAurora.clipsOwnBox,
+            `screen ${screen} at ${String(width)}px: the rail aurora keeps a box (display: ${
+              railAurora.wrapperDisplay
+            }) but is not the clip (position: relative + overflow: hidden), so its layers bleed`,
+          ).toBe(true);
+        }
+      }
+      let railNote = "rail aurora: wrapper keeps its own clip";
+      if (railAurora !== null && railAurora.wrapperDisplay === "contents") {
+        let off = 0;
+        for (const display of railAurora.layerDisplays) {
+          if (display === "none") off += 1;
+        }
+        railNote = `rail aurora: dissolved, ${String(off)}/${String(
+          railAurora.layerNames.length,
+        )} layers off`;
+      }
+      notes.push(`${String(width)}px: ${describeOverflow(overflow)}; ${railNote}`);
     }
     return notes.join("; ");
   }

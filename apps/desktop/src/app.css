@@ -2097,14 +2097,24 @@ body {
   /* US-D06: and for the same reason the bar's aurora is off. Leaving the wrapper alive here would
      put a second glass layer back on the bar (the wrap in channel-rail.tsx is unconditional), so it
      goes `display: contents` as well — that dissolves its box while leaving the DOM intact, and the
-     tiles stay direct children of the bar's flex row with one gap. The two texture layers are
-     `display: none` rather than dissolved: `.aurora__mass` and `.aurora__grain` are absolutely
-     positioned, so with the wrapper out of the box tree they would resolve against the fixed bar
-     and paint a full-width grain over it. */
+     tiles stay direct children of the bar's flex row with one gap.
+
+     The wrapper has four layers, and `display: contents` does not retire any of them: it promotes
+     the element's children *and* its pseudo-elements into the parent's box tree. Every one of the
+     four is absolutely positioned, so with the wrapper's box gone they resolve their containing
+     block against `.channel-rail` — which is `position: fixed` and full width — and paint across the
+     whole shell. So all four are named and turned off. */
   .aurora.channel-rail__aurora {
     display: contents;
   }
 
+  /* Field, silhouette, grain, vignette — the complete set (tokens.css's four). Naming only the two
+     spans left `::before` painting a butter-to-peach radial across the bottom bar and `::after`
+     fading it back over the tiles: a warm bloom under the tiles at 390 and 768, which §3.2's surface
+     map forbids ("the aurora belongs to the rail plate's own footprint"). tools/e2e/aurora.spec.ts's
+     narrow-tier check is the guard. */
+  .aurora.channel-rail__aurora::before,
+  .aurora.channel-rail__aurora::after,
   .aurora.channel-rail__aurora > .aurora__mass,
   .aurora.channel-rail__aurora > .aurora__grain {
     display: none;
