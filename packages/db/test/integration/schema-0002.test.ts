@@ -1,6 +1,6 @@
+import { createPool, one, query, tx } from "@omnis/db";
 import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createPool, one, query, tx } from "@omnis/db";
 
 let pool: Pool;
 beforeAll(() => {
@@ -16,17 +16,19 @@ describe("0002_core_inbox", () => {
       pool,
       `SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = ANY($1) ORDER BY table_name`,
-      [[
-        "accounts",
-        "account_secrets",
-        "agent_runtimes",
-        "calendar_events",
-        "identities",
-        "items",
-        "person_merges",
-        "persons",
-        "threads",
-      ]],
+      [
+        [
+          "accounts",
+          "account_secrets",
+          "agent_runtimes",
+          "calendar_events",
+          "identities",
+          "items",
+          "person_merges",
+          "persons",
+          "threads",
+        ],
+      ],
     );
     expect(rows).toHaveLength(9);
   });
@@ -42,7 +44,10 @@ describe("0002_core_inbox", () => {
     expect(row.state).toBe("online");
 
     await expect(
-      query(pool, "INSERT INTO agent_runtimes (runtime, host, display) VALUES ('omnis','macbook','dup')"),
+      query(
+        pool,
+        "INSERT INTO agent_runtimes (runtime, host, display) VALUES ('omnis','macbook','dup')",
+      ),
     ).rejects.toThrow(/agent_runtimes_omnis_uq/);
   });
 
@@ -61,7 +66,10 @@ describe("0002_core_inbox", () => {
         c,
         `INSERT INTO persons (display_name) VALUES ('Someone') RETURNING id`,
       );
-      const run = await one<{ id: string }>(c, `SELECT id FROM agent_runtimes WHERE runtime='omnis'`);
+      const run = await one<{ id: string }>(
+        c,
+        `SELECT id FROM agent_runtimes WHERE runtime='omnis'`,
+      );
       return { accountId: acc.id, threadId: thr.id, personId: per.id, runtimeId: run.id };
     });
 

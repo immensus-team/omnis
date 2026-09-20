@@ -26,7 +26,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await scheduler.stop();
   // 공유 omnis_test DB: 스케줄러가 upsert한 잡 행을 남기면 0006의 seed 개수 단언이 깨진다.
-  await query(pool, `DELETE FROM jobs WHERE name = $1`, [HEALTHCHECK_JOB_NAME]);
+  await query(pool, "DELETE FROM jobs WHERE name = $1", [HEALTHCHECK_JOB_NAME]);
   await events.close();
   await pool.end();
 });
@@ -35,7 +35,7 @@ describe("hub_healthcheck job", () => {
   it("registers itself with a 5-minute schedule", async () => {
     const row = await one<{ schedule: string; enabled: boolean }>(
       pool,
-      `SELECT schedule, enabled FROM jobs WHERE name = $1`,
+      "SELECT schedule, enabled FROM jobs WHERE name = $1",
       [HEALTHCHECK_JOB_NAME],
     );
     expect(row.schedule).toBe(HEALTHCHECK_CRON);
@@ -50,7 +50,7 @@ describe("hub_healthcheck job", () => {
 
     const job = await one<{ last_status: string }>(
       pool,
-      `SELECT last_status FROM jobs WHERE name = $1`,
+      "SELECT last_status FROM jobs WHERE name = $1",
       [HEALTHCHECK_JOB_NAME],
     );
     expect(job.last_status).toBe("ok");

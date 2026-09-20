@@ -1,6 +1,6 @@
+import { createPool, one, query } from "@omnis/db";
 import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createPool, one, query } from "@omnis/db";
 
 let pool: Pool;
 beforeAll(() => {
@@ -24,7 +24,10 @@ describe("0005_memory", () => {
       query(pool, `INSERT INTO entities (type, name) VALUES ('org','onward lab')`),
     ).rejects.toThrow(/entities_live_uq/);
 
-    await query(pool, `UPDATE entities SET invalidated_at = now() WHERE lower(name) = 'onward lab'`);
+    await query(
+      pool,
+      `UPDATE entities SET invalidated_at = now() WHERE lower(name) = 'onward lab'`,
+    );
     await query(pool, `INSERT INTO entities (type, name) VALUES ('org','Onward Lab')`);
     const live = await one<{ n: string }>(
       pool,
@@ -74,7 +77,7 @@ describe("0005_memory", () => {
     );
     const hit = await query<{ content: string }>(
       pool,
-      `SELECT content FROM memories WHERE invalidated_at IS NULL ORDER BY embedding <=> $1::vector LIMIT 1`,
+      "SELECT content FROM memories WHERE invalidated_at IS NULL ORDER BY embedding <=> $1::vector LIMIT 1",
       [unit768],
     );
     expect(hit[0]?.content).toContain("한국어");

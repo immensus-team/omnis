@@ -1,6 +1,6 @@
+import { createPool, one, query, tx } from "@omnis/db";
 import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createPool, one, query, tx } from "@omnis/db";
 
 let pool: Pool;
 let personId = "";

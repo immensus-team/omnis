@@ -24,7 +24,7 @@ const base = {
 async function stateOf(id: string): Promise<string> {
   const row = await one<{ state: string }>(
     pool,
-    `SELECT state FROM pending_approvals WHERE id = $1`,
+    "SELECT state FROM pending_approvals WHERE id = $1",
     [id],
   );
   return row.state;
@@ -45,7 +45,7 @@ describe("approvals state machine", () => {
     expect(await stateOf(id)).toBe("executed");
     const row = await one<{ executed_at: Date }>(
       pool,
-      `SELECT executed_at FROM pending_approvals WHERE id = $1`,
+      "SELECT executed_at FROM pending_approvals WHERE id = $1",
       [id],
     );
     expect(row.executed_at).toBeInstanceOf(Date);
@@ -59,7 +59,7 @@ describe("approvals state machine", () => {
 
     const row = await one<{ state: string; fail_reason: string }>(
       pool,
-      `SELECT state, fail_reason FROM pending_approvals WHERE id = $1`,
+      "SELECT state, fail_reason FROM pending_approvals WHERE id = $1",
       [id],
     );
     expect(row.state).toBe("failed");
@@ -93,7 +93,7 @@ describe("approvals state machine", () => {
 
     const row = await one<{ state: string; decision: string; decided_at: Date }>(
       pool,
-      `SELECT state, decision, decided_at FROM pending_approvals WHERE id = $1`,
+      "SELECT state, decision, decided_at FROM pending_approvals WHERE id = $1",
       [id],
     );
     expect(row.state).toBe("expired");

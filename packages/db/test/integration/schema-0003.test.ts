@@ -1,6 +1,6 @@
+import { createPool, one, query } from "@omnis/db";
 import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createPool, one, query } from "@omnis/db";
 
 let pool: Pool;
 beforeAll(() => {
@@ -41,7 +41,9 @@ describe("0003_labels", () => {
     expect(rule.positives).toEqual([]);
 
     await expect(
-      query(pool, `INSERT INTO label_rules (label_id, prompt, tier) VALUES ($1,'x','T9')`, [label.id]),
+      query(pool, `INSERT INTO label_rules (label_id, prompt, tier) VALUES ($1,'x','T9')`, [
+        label.id,
+      ]),
     ).rejects.toThrow(/label_rules_tier_ck/);
   });
 
@@ -66,7 +68,7 @@ describe("0003_labels", () => {
       pool,
       `INSERT INTO labels (name, kind) VALUES ('urgent','priority') RETURNING id`,
     );
-    const thread = await one<{ id: string }>(pool, `SELECT id FROM threads LIMIT 1`);
+    const thread = await one<{ id: string }>(pool, "SELECT id FROM threads LIMIT 1");
     await expect(
       query(pool, `INSERT INTO thread_labels (thread_id, label_id, by) VALUES ($1,$2,'robot')`, [
         thread.id,

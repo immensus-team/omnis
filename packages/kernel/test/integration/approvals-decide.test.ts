@@ -33,7 +33,7 @@ describe("approvals.decide", () => {
       decided_at: Date;
     }>(
       pool,
-      `SELECT state, decision, decided_args, decided_at FROM pending_approvals WHERE id = $1`,
+      "SELECT state, decision, decided_args, decided_at FROM pending_approvals WHERE id = $1",
       [id],
     );
     expect(row.state).toBe("decided");
@@ -47,7 +47,7 @@ describe("approvals.decide", () => {
     await approvals.decide(id, { decision: "ignore" });
     const row = await one<{ decision: string; decided_args: unknown }>(
       pool,
-      `SELECT decision, decided_args FROM pending_approvals WHERE id = $1`,
+      "SELECT decision, decided_args FROM pending_approvals WHERE id = $1",
       [id],
     );
     expect(row.decision).toBe("ignore");
@@ -72,7 +72,7 @@ describe("approvals.decide", () => {
     );
     const row = await one<{ state: string }>(
       pool,
-      `SELECT state FROM pending_approvals WHERE id = $1`,
+      "SELECT state FROM pending_approvals WHERE id = $1",
       [id],
     );
     expect(row.state).toBe("pending");
@@ -93,6 +93,6 @@ describe("approvals.decide", () => {
     ).rejects.toThrow(/not found/);
     const id = await approvals.propose({ ...base, action: "send" });
     await expect(approvals.decide(id, { decision: "maybe" })).rejects.toThrow();
-    await query(pool, `SELECT 1`);
+    await query(pool, "SELECT 1");
   });
 });

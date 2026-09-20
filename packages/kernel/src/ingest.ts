@@ -42,7 +42,7 @@ export function createIngestSink(deps: { pool: Pool; logger: Logger }): IngestSi
       } else {
         const rows = await query<{ id: string }>(
           c,
-          `SELECT id FROM threads WHERE account_id = $1 AND external_id = $2`,
+          "SELECT id FROM threads WHERE account_id = $1 AND external_id = $2",
           [accountId, e.threadExternalId],
         );
         const row = rows[0];
@@ -58,7 +58,7 @@ export function createIngestSink(deps: { pool: Pool; logger: Logger }): IngestSi
       const agentId =
         e.author.kind === "agent"
           ? ((
-              await query<{ id: string }>(c, `SELECT id FROM agent_runtimes WHERE id = $1`, [
+              await query<{ id: string }>(c, "SELECT id FROM agent_runtimes WHERE id = $1", [
                 e.author.id,
               ])
             )[0]?.id ?? null)

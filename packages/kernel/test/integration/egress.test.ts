@@ -1,16 +1,16 @@
-import type { Adapter, Outbound, SendResult, ThreadRef } from "@omnis/protocol";
-import type { Pool } from "pg";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createPool, one } from "@omnis/db";
 import {
   ApprovalStateError,
   type EgressToken,
-  KillSwitchError,
   type Kernel,
+  KillSwitchError,
   createKernel,
   createOutbox,
   runEgress,
 } from "@omnis/kernel";
+import type { Adapter, Outbound, SendResult, ThreadRef } from "@omnis/protocol";
+import type { Pool } from "pg";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 let pool: Pool;
 let kernel: Kernel;
@@ -91,14 +91,14 @@ describe("runEgress", () => {
 
     const ap = await one<{ state: string }>(
       pool,
-      `SELECT state FROM pending_approvals WHERE id = $1`,
+      "SELECT state FROM pending_approvals WHERE id = $1",
       [approvalId],
     );
     expect(ap.state).toBe("executed");
 
     const log = await one<{ approval_id: string; after: Record<string, unknown> }>(
       pool,
-      `SELECT approval_id, after FROM audit_log WHERE approval_id = $1 ORDER BY seq DESC LIMIT 1`,
+      "SELECT approval_id, after FROM audit_log WHERE approval_id = $1 ORDER BY seq DESC LIMIT 1",
       [approvalId],
     );
     expect(log.approval_id).toBe(approvalId);
@@ -119,7 +119,7 @@ describe("runEgress", () => {
 
     const ap = await one<{ state: string }>(
       pool,
-      `SELECT state FROM pending_approvals WHERE id=$1`,
+      "SELECT state FROM pending_approvals WHERE id=$1",
       [approvalId],
     );
     expect(ap.state).toBe("decided");
@@ -162,7 +162,7 @@ describe("runEgress", () => {
 
     const ap = await one<{ state: string; fail_reason: string }>(
       pool,
-      `SELECT state, fail_reason FROM pending_approvals WHERE id = $1`,
+      "SELECT state, fail_reason FROM pending_approvals WHERE id = $1",
       [approvalId],
     );
     expect(ap.state).toBe("failed");
@@ -170,7 +170,7 @@ describe("runEgress", () => {
 
     const log = await one<{ after: Record<string, unknown> }>(
       pool,
-      `SELECT after FROM audit_log WHERE approval_id = $1 ORDER BY seq DESC LIMIT 1`,
+      "SELECT after FROM audit_log WHERE approval_id = $1 ORDER BY seq DESC LIMIT 1",
       [approvalId],
     );
     expect(log.after.ok).toBe(false);

@@ -1,8 +1,8 @@
+import { createPool, one } from "@omnis/db";
+import { type Kernel, createKernel } from "@omnis/kernel";
 import type { NormalizedItem } from "@omnis/protocol";
 import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createPool, one } from "@omnis/db";
-import { type Kernel, createKernel } from "@omnis/kernel";
 
 let pool: Pool;
 let kernel: Kernel;

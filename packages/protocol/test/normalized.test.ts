@@ -4,8 +4,14 @@ import { Capabilities, NormalizedItem } from "../src/adapter.js";
 describe("Capabilities", () => {
   it("rejects a missing field", () => {
     const missingDelete = {
-      read: true, write: true, realtime: true, history: true,
-      media: true, markRead: true, typing: false, archive: false,
+      read: true,
+      write: true,
+      realtime: true,
+      history: true,
+      media: true,
+      markRead: true,
+      typing: false,
+      archive: false,
     };
     expect(() => Capabilities.parse(missingDelete)).toThrow();
   });
@@ -31,9 +37,15 @@ describe("NormalizedItem", () => {
   it("rejects status other than 'received'", () => {
     expect(() =>
       NormalizedItem.parse({
-        threadExternalId: "C1", externalId: "e1", kind: "message",
-        author: { kind: "person", id: "U1" }, body: "hi", attachments: [],
-        sentAt: "2023-11-14T22:13:20.000Z", status: "sent", sourceHash: "h1",
+        threadExternalId: "C1",
+        externalId: "e1",
+        kind: "message",
+        author: { kind: "person", id: "U1" },
+        body: "hi",
+        attachments: [],
+        sentAt: "2023-11-14T22:13:20.000Z",
+        status: "sent",
+        sourceHash: "h1",
       }),
     ).toThrow();
   });

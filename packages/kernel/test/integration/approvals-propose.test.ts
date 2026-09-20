@@ -32,7 +32,7 @@ describe("approvals.propose", () => {
       args: Record<string, unknown>;
     }>(
       pool,
-      `SELECT action, state, decision, risk, config, args FROM pending_approvals WHERE id = $1`,
+      "SELECT action, state, decision, risk, config, args FROM pending_approvals WHERE id = $1",
       [id],
     );
 
@@ -67,7 +67,7 @@ describe("approvals.propose", () => {
   it("rejects an action outside the enum before touching the database", async () => {
     const before = await one<{ n: string }>(
       pool,
-      `SELECT count(*)::text AS n FROM pending_approvals`,
+      "SELECT count(*)::text AS n FROM pending_approvals",
     );
     await expect(
       approvals.propose({
@@ -81,7 +81,7 @@ describe("approvals.propose", () => {
     ).rejects.toThrow();
     const after = await one<{ n: string }>(
       pool,
-      `SELECT count(*)::text AS n FROM pending_approvals`,
+      "SELECT count(*)::text AS n FROM pending_approvals",
     );
     expect(after.n).toBe(before.n);
   });
@@ -119,7 +119,7 @@ describe("approvals.propose", () => {
       expires_at: Date;
     }>(
       pool,
-      `SELECT thread_id, requested_by, risk, expires_at FROM pending_approvals WHERE id = $1`,
+      "SELECT thread_id, requested_by, risk, expires_at FROM pending_approvals WHERE id = $1",
       [id],
     );
     expect(row.thread_id).toBe(thr.id);

@@ -1,6 +1,6 @@
+import { createPool, one, query } from "@omnis/db";
 import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createPool, one, query } from "@omnis/db";
 
 let pool: Pool;
 beforeAll(() => {
@@ -36,8 +36,11 @@ describe("0004_tasks_approvals", () => {
       });
     }
     await expect(
-      query(pool, `INSERT INTO pending_approvals (action, args, description)
-                   VALUES ('wire_money','{}'::jsonb,'nope')`),
+      query(
+        pool,
+        `INSERT INTO pending_approvals (action, args, description)
+                   VALUES ('wire_money','{}'::jsonb,'nope')`,
+      ),
     ).rejects.toThrow(/approvals_action_ck/);
   });
 
@@ -63,7 +66,7 @@ describe("0004_tasks_approvals", () => {
     );
     const after = await one<{ state: string; decision: string }>(
       pool,
-      `SELECT state, decision FROM pending_approvals WHERE id = $1`,
+      "SELECT state, decision FROM pending_approvals WHERE id = $1",
       [a.id],
     );
     expect([after.state, after.decision]).toEqual(["decided", "accept"]);
@@ -88,13 +91,19 @@ describe("0004_tasks_approvals", () => {
     expect(second.escalated_from).toBe(first.id);
 
     await expect(
-      query(pool, `INSERT INTO agent_runs (loop, model_tier, provider, model)
-                   VALUES ('classify','T7','local','x')`),
+      query(
+        pool,
+        `INSERT INTO agent_runs (loop, model_tier, provider, model)
+                   VALUES ('classify','T7','local','x')`,
+      ),
     ).rejects.toThrow(/agent_runs_tier_ck/);
   });
 
   it("keys agent_sessions by (runtime_id, session_key)", async () => {
-    const runtime = await one<{ id: string }>(pool, `SELECT id FROM agent_runtimes WHERE runtime='omnis'`);
+    const runtime = await one<{ id: string }>(
+      pool,
+      `SELECT id FROM agent_runtimes WHERE runtime='omnis'`,
+    );
     const account = await one<{ id: string }>(
       pool,
       `INSERT INTO accounts (channel, external_id, display) VALUES ('agent','local','agents') RETURNING id`,
@@ -126,7 +135,10 @@ describe("0004_tasks_approvals", () => {
       `INSERT INTO digests (kind, for_date, body) VALUES ('morning','2026-09-20','brief')`,
     );
     await expect(
-      query(pool, `INSERT INTO digests (kind, for_date, body) VALUES ('morning','2026-09-20','dup')`),
+      query(
+        pool,
+        `INSERT INTO digests (kind, for_date, body) VALUES ('morning','2026-09-20','dup')`,
+      ),
     ).rejects.toThrow(/digests_uq/);
   });
 });

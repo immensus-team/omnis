@@ -77,7 +77,7 @@ describe("audit.record", () => {
       target_table: "threads",
       target_id: thr.id,
     });
-    await query(pool, `DELETE FROM threads WHERE id = $1`, [thr.id]);
+    await query(pool, "DELETE FROM threads WHERE id = $1", [thr.id]);
 
     const row = await one<{ target_id: string }>(
       pool,
@@ -89,12 +89,12 @@ describe("audit.record", () => {
   it("cannot be edited or deleted", async () => {
     const row = await one<{ seq: string }>(
       pool,
-      `SELECT seq::text AS seq FROM audit_log ORDER BY seq DESC LIMIT 1`,
+      "SELECT seq::text AS seq FROM audit_log ORDER BY seq DESC LIMIT 1",
     );
     await expect(
       query(pool, `UPDATE audit_log SET actor='hacker' WHERE seq=$1`, [row.seq]),
     ).rejects.toThrow(/append-only/);
-    await expect(query(pool, `DELETE FROM audit_log WHERE seq=$1`, [row.seq])).rejects.toThrow(
+    await expect(query(pool, "DELETE FROM audit_log WHERE seq=$1", [row.seq])).rejects.toThrow(
       /append-only/,
     );
   });
