@@ -86,3 +86,4 @@ export {
   type ScanOptions,
 } from "./ingest/local-mini.js";
 export { createLocalMacbookProvider, type BridgeCall } from "./ingest/local-macbook.js";
+export { createDriveProvider, DRIVE_TEXT_MIME, type DriveFetch } from "./ingest/drive.js";

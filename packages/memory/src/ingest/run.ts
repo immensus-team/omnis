@@ -95,6 +95,10 @@ export async function runIngest(
           for await (const doc of p.list({ pool, logger, cursor })) {
             if (doc.nextCursor !== undefined) cursor = doc.nextCursor;
 
+            // 커서만 옮기는 신호 문서(Drive 베이스라인 등)는 저장하지 않는다.
+            if (doc.source_ref.startsWith("__") && doc.text === null && doc.deleted !== true)
+              continue;
+
             // A4 §10.2: 경로가 걸리면 파일을 열지 않고 건너뛴다.
             if (isDenied(doc.source_ref)) {
               logger.debug("ingest denied by path", { kind, source_ref: doc.source_ref });
