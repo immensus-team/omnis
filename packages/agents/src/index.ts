@@ -17,3 +17,11 @@ export {
   scanInjection,
   wrapData,
 } from "./context/normalize.js";
+export {
+  buildContext,
+  setContextBudget,
+  CONTEXT_INPUT_BUDGET_TOKENS,
+  type ContextRequest,
+  type DataBlock,
+  type AssembledContext,
+} from "./context/assemble.js";
