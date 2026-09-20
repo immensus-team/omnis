@@ -1,7 +1,7 @@
 /** A3 §6: 5-field cron, TZ=Asia/Seoul. Asia/Seoul은 DST가 없으므로 고정 +9h로 환산한다.
  *  ponytail: 분 단위 선형 스캔(366일 상한). 잡 실행 직후 한 번만 부르므로 비용이 문제되지 않는다.
  *  DST가 있는 타임존이 필요해지면 Intl.DateTimeFormat 기반 환산으로 갈아끼운다. */
-const SEOUL_OFFSET_MS = 9 * 60 * 60 * 1000;
+export const SEOUL_OFFSET_MS = 9 * 60 * 60 * 1000;
 const MINUTE_MS = 60_000;
 
 function parseField(spec: string, min: number, max: number): Set<number> {

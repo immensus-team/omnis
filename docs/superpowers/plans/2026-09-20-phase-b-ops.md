@@ -240,7 +240,6 @@ cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B16: W
 - RUNBOOK.md에 회전 절차 추가
 
 Implemented-by: Claude Haiku
-
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
 
@@ -447,7 +446,6 @@ cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B34: T
 - TAILSCALE-ACL.md: Postgres/Ollama를 dst에 안 넣는 이유 + Funnel 상시 OFF 근거
 
 Implemented-by: Claude Sonnet
-
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
 
@@ -700,7 +698,6 @@ cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B41: �
 - LaunchAgent com.omnis.backup(03:00), backup/restore-drills.md 로그 파일 신설
 
 Implemented-by: Claude Sonnet
-
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
 
@@ -1009,7 +1006,6 @@ cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B42: h
 - newsyslog.d/omnis.conf: 30일 보관 + 600 권한
 
 Implemented-by: Claude Sonnet
-
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
 
@@ -1208,7 +1204,6 @@ cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B43: �
 - RUNBOOK.md 상태 확인 섹션에 명령 추가
 
 Implemented-by: Claude Haiku
-
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
 
@@ -1544,7 +1539,6 @@ cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B44: �
 - 마이그레이션 없음: cost_report_monthly seed는 W0 스키마 번들의 0012_jobs_phase_b.sql이 갖는다(교차 리뷰 M1)
 
 Implemented-by: Claude Sonnet
-
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
 
