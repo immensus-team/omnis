@@ -73,3 +73,16 @@ export {
   type Register,
 } from "./draft/register.js";
 export { SELF_CHECK_ITEMS, selfCheck, type SelfCheckCtx } from "./draft/selfcheck.js";
+export {
+  DELEGATION_DAILY_CAP,
+  DELEGATION_THREAD_CAP_24H,
+  MACBOOK_OFFLINE_MS,
+  extractHints,
+  hostHealth,
+  pickRuntime,
+  routeByRule,
+  type DelegationHints,
+  type DelegationRuntime,
+  type HostHealth,
+  type Routing,
+} from "./delegate/route.js";
