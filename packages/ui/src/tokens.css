@@ -18,6 +18,10 @@
   --bg-base: var(--gray-000);
   --bg-elevated: oklch(0.97 0.002 260);
   --bg-overlay: color-mix(in oklch, var(--gray-000) 78%, transparent);
+  /* US-D01: 유리 표면 위의 호버/누름 상태. 유리(--bg-overlay, L≈0.988)보다 밝은 색을 얹으면
+     명도차가 0.1%대라 상태가 사라진다 — 유리 위에서는 어둡게 간다. 텍스트색을 옅게 깔아
+     라이트/다크가 같은 한 줄로 따라온다(다크는 --text-primary가 밝은 색이라 자동으로 뒤집힌다). */
+  --state-hover: color-mix(in oklch, var(--text-primary) 6%, transparent);
   --border-hairline: oklch(0 0 0 / 0.08);
   --border-hairline-strong: oklch(0 0 0 / 0.14);
   --text-primary: oklch(0.2 0.006 260);

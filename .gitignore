@@ -26,3 +26,5 @@ tools/e2e/.tmp/
 tools/e2e/.playwright/
 ops/mini/env.sh
 tools/auth-kit/accounts.local.json
+# 스크린샷용 일회성 Playwright 헬퍼(커밋 대상 아님 — 산출물은 docs/design/screens/만 커밋한다).
+tools/e2e/.shoot.*

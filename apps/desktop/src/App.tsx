@@ -62,9 +62,14 @@ function Shell() {
   // 새 백엔드 호출이 필요 없다: Thread.tsx가 archived_at을 읽는 것과 같은 쿼리 모양이다.
   // 선택이 없으면 빈 문자열로 질의한다(빈 결과) — 훅 개수를 조건부로 바꿀 수 없어서다.
   const [selectedThreadRows] = useQuery(zero.query.threads.where("id", "=", open?.threadId ?? ""));
-  const selectedThreadSummary =
-    (selectedThreadRows as unknown as { meta?: { summary?: string } | null }[])[0]?.meta?.summary ??
-    null;
+  const selectedThread = (
+    selectedThreadRows as unknown as {
+      title?: string | null;
+      meta?: { summary?: string } | null;
+    }[]
+  )[0];
+  const selectedThreadSummary = selectedThread?.meta?.summary ?? null;
+  const selectedThreadTitle = selectedThread?.title ?? null;
 
   // U1 채널 레일: 연결된 계정의 채널을 중복 없이, 처음 등장한 순서대로.
   const connectedChannels = useMemo(() => {
@@ -111,6 +116,7 @@ function Shell() {
           actions={actions}
           threadSelected={open !== null}
           threadSummary={selectedThreadSummary}
+          threadTitle={selectedThreadTitle}
         />
         <Inbox onOpen={setOpen} channelFilter={railChannel} />
       </div>

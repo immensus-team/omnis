@@ -128,10 +128,11 @@ body {
   position: relative;
 }
 
-/* US-D01: kinso의 그라데이션 스트로크(padding-box 채움 + border-box 스트로크 2겹 트릭)는
-   그대로 두고 채움색만 유리로 바꾼다 — 이전엔 `var(--bg-base)`(불투명) + `backdrop-filter: none`
-   이라 .glass-surface의 blur가 아예 꺼져 있었다. 이제 채움색은 --bg-overlay(= .glass-surface가
-   쓰는 바로 그 토큰)라 투명도 축소 사용자 폴백까지 자동으로 같이 간다(tokens.css).
+/* US-D01: 채움은 .glass-surface(--bg-overlay + blur)가 그대로 맡고, 여기선 모양만 준다.
+   예전의 "padding-box 채움 + border-box 그라데이션" 2겹 트릭은 버렸다 — 채움이 불투명일 때만
+   성립하는 트릭이라, 채움을 유리(78%)로 바꾼 순간 border-box 레이어가 22% 비쳐서 그라데이션이
+   1.5px 스트로크가 아니라 필 전체(~820px)를 물들였다. DESIGN-DIRECTION은 "포커스 시 그라데이션
+   스트로크"다(장식 워시가 아니다) — 그래서 스트로크는 아래 ::after 링 하나가 전담한다.
    box-shadow는 지웠다 — .glass-surface의 --shadow-glass가 이미 표면을 띄운다.
    position+z-index: backdrop-filter가 스태킹 컨텍스트를 만들어서, 모델 메뉴(안쪽)는 자기 z-index로는
    패널(z 5) 위로 못 올라온다 — pill 자체가 패널 위에 서야 메뉴가 레퍼런스처럼 패널을 덮는다. */
@@ -142,16 +143,31 @@ body {
   height: 44px;
   padding: 0 16px;
   border-radius: 999px;
-  border: 1.5px solid transparent;
-  background: linear-gradient(var(--bg-overlay), var(--bg-overlay)) padding-box,
-    linear-gradient(var(--border-hairline), var(--border-hairline)) border-box;
   position: relative;
   z-index: 6;
 }
 
-.ask-bar__pill:focus-within {
-  background: linear-gradient(var(--bg-overlay), var(--bg-overlay)) padding-box, var(--ask-gradient)
-    border-box;
+/* 둥근 모서리를 따라가는 그라데이션 링. border-image는 border-radius를 못 따라가고 outline은
+   그라데이션을 못 받는다 — 마스크로 안쪽을 도려낸 1.5px 테두리가 남는 방법이다.
+   inset: -1px로 .glass-surface의 1px 헤어라인 자리를 그대로 덮는다(선이 두 겹으로 겹치지 않게). */
+.ask-bar__pill::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 999px;
+  padding: 1.5px;
+  background: var(--ask-gradient);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-spring);
+  pointer-events: none;
+}
+
+.ask-bar__pill:focus-within::after {
+  opacity: 1;
 }
 
 .ask-bar__orb {
@@ -179,7 +195,8 @@ body {
   white-space: nowrap;
 }
 
-.ask-bar__attach {
+/* 컴포저 아이콘 버튼(@ 멘션 + 첨부) — 레퍼런스에서 둘은 같은 크기·같은 무게로 나란히 선다. */
+.ask-bar__composer-button {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -193,12 +210,14 @@ body {
   cursor: pointer;
 }
 
-.ask-bar__attach:not(:disabled):hover {
-  background: var(--bg-elevated);
+.ask-bar__composer-button:not(:disabled):hover {
+  background: var(--state-hover);
+  color: var(--text-primary);
 }
 
-.ask-bar__attach:disabled {
-  opacity: 0.4;
+/* 비활성은 opacity 0.55가 바닥이다(hallmark slop-test) — 더 흐리면 "고장난 UI"로 읽힌다. */
+.ask-bar__composer-button:disabled {
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -217,7 +236,7 @@ body {
   border: 0;
   border-radius: 999px;
   padding: 4px 8px;
-  background: color-mix(in oklch, var(--bg-base) 70%, transparent);
+  background: var(--bg-elevated);
   color: var(--text-secondary);
   font: inherit;
   font-size: 12px;
@@ -274,7 +293,9 @@ body {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  right: 0;
+  /* 레퍼런스의 패널은 바 전체 폭을 먹는 드롭다운이 아니라 오브 아래에 선 카드다 —
+     1440px에서 바 전체로 늘리면 4.4:1 빈 밴드가 된다. */
+  width: min(420px, 100%);
   z-index: 5;
   display: flex;
   flex-direction: column;
@@ -284,7 +305,7 @@ body {
   /* 명령 목록 탭이 길어질 수 있다 — 패널이 뷰포트를 넘기지 않게 여기서 자른다. */
   max-height: min(60vh, 420px);
   overflow-y: auto;
-  transform-origin: top center;
+  transform-origin: top left;
   /* 스프링 등장(240ms, --ease-spring). 별도 reduced-motion 블록이 필요 없다: tokens.css가
      reduce에서 --dur-panel을 0ms로 낮추므로 애니메이션이 즉시 끝 상태로 떨어진다. */
   animation: ask-panel-in var(--dur-panel) var(--ease-spring);
@@ -298,6 +319,24 @@ body {
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* 나간 길로 되돌아온다(apple-design §7 spatial consistency): 들어온 경로를 그대로 뒤집는다.
+   CommandPalette가 --dur-panel 동안 패널을 DOM에 붙들어 둔다(useClosingSpring). */
+.ask-panel--closing {
+  animation: ask-panel-out var(--dur-panel) var(--ease-spring) forwards;
+  pointer-events: none;
+}
+
+@keyframes ask-panel-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
   }
 }
 
@@ -325,14 +364,18 @@ body {
   cursor: pointer;
 }
 
+/* 유리(--bg-overlay = --gray-000 78%, L≈0.988) 위에 --bg-base(L 0.99)를 더 얹으면 명도차가
+   0.15%라 상태가 아예 안 보인다. 유리 위의 상태는 밝히는 게 아니라 어둡게 한다 —
+   채움은 --bg-elevated(L 0.97), 호버는 --state-hover(텍스트색 6%). 둘 다 이미 있는 토큰이다. */
 .ask-panel__tabs button[aria-pressed="true"] {
-  background: color-mix(in oklch, var(--bg-base) 72%, transparent);
+  background: var(--bg-elevated);
   color: var(--text-primary);
   font-weight: 600;
 }
 
 .ask-panel__tabs button:not([aria-pressed="true"]):hover {
-  background: color-mix(in oklch, var(--bg-base) 40%, transparent);
+  background: var(--state-hover);
+  color: var(--text-primary);
 }
 
 .ask-panel__close {
@@ -350,7 +393,7 @@ body {
 }
 
 .ask-panel__close:hover {
-  background: color-mix(in oklch, var(--bg-base) 60%, transparent);
+  background: var(--state-hover);
   color: var(--text-primary);
 }
 
@@ -377,13 +420,27 @@ body {
 }
 
 .ask-panel__action:not(:disabled):hover {
-  background: color-mix(in oklch, var(--bg-base) 65%, transparent);
+  background: var(--state-hover);
 }
 
-/* Phase B 미배선 액션은 "누를 수 있는 척"하지 않는다 — 흐리게 + 금지 커서. */
+/* Phase B 미배선 액션은 "누를 수 있는 척"하지 않는다 — 금지 커서 + disabled + 오른쪽 태그.
+   흐리기는 0.55가 바닥이다(hallmark slop-test): 더 내리면 "게이트된 기능"이 아니라
+   "지워진 화면"으로 읽힌다. */
 .ask-panel__action:disabled {
-  opacity: 0.42;
+  opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* 행이 왼쪽 15%만 쓰고 끝나지 않게 — 왜 못 누르는지를 행의 오른쪽 끝에서 말한다. */
+.ask-panel__tag {
+  margin-left: auto;
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  letter-spacing: 0;
 }
 
 .ask-panel__action svg {
@@ -391,17 +448,33 @@ body {
   color: var(--text-secondary);
 }
 
-.ask-panel__summary {
-  margin: 6px 0 0;
-  padding: 9px 10px;
-  border-radius: 10px;
-  background: color-mix(in oklch, var(--bg-base) 72%, transparent);
+/* 패널이 무엇을 대상으로 일하는지 먼저 말하는 줄 — 레퍼런스의 대화 영역 자리다. */
+.ask-panel__context {
+  margin: 0 0 8px;
+  padding: 10px 10px 11px;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+}
+
+.ask-panel__context-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  /* 긴 제목이 패널을 늘리지 않는다(420px 고정 폭). */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ask-panel__context-body {
+  margin: 3px 0 0;
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.5;
 }
 
-.ask-panel__summary--empty {
+.ask-panel__context-body--muted {
   color: var(--text-tertiary);
 }
 

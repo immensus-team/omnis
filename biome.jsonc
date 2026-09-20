@@ -1,7 +1,17 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  "files": { "ignore": ["**/dist/**", "**/node_modules/**", ".omc/**", "tools/spikes/**"] },
+  // .claude/skills/** 는 벤더링한 OSS 스킬(템플릿/픽스처 포함)이다 — 우리 코드가 아니고
+  // 그 안의 tsconfig 템플릿·픽스처가 `pnpm lint`를 136개 에러로 막고 있었다(353f0a7부터).
+  "files": {
+    "ignore": [
+      "**/dist/**",
+      "**/node_modules/**",
+      ".omc/**",
+      "tools/spikes/**",
+      ".claude/skills/**"
+    ]
+  },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
   "linter": { "enabled": true, "rules": { "recommended": true } },
   "javascript": { "formatter": { "quoteStyle": "double", "semicolons": "always" } }

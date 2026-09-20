@@ -3,8 +3,8 @@
 // 환경과 셋업(jest-dom matchers + afterEach(cleanup))을 파일 자체가 선언한다.
 import "./setup";
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CommandPalette, type PaletteAction, groupBy } from "../src/components/command-palette";
 import {
   ASK_MODEL_STORAGE_KEY,
@@ -157,5 +157,66 @@ describe('CommandPalette mode="inline" 모델 선택기 영속성 (US-D01)', () 
     render(<CommandPalette mode="inline" open onOpenChange={vi.fn()} actions={[]} />);
 
     expect(screen.getByRole("button", { name: askModelLabel(FLASH_ID) })).toBeInTheDocument();
+  });
+});
+
+const askInput = () => screen.getByPlaceholderText("Start typing to ask or search");
+
+describe('CommandPalette mode="inline" 타이핑 경로 (US-D01 회귀)', () => {
+  const actions: PaletteAction[] = [
+    { id: "go-inbox", name: "Go to Inbox", group: "이동", perform: vi.fn() },
+  ];
+
+  it("typing reaches the cmdk list without clicking the 명령 tab", () => {
+    render(<CommandPalette mode="inline" open onOpenChange={vi.fn()} actions={actions} />);
+    // 타이핑 전에는 제안 탭 — 명령 목록은 아직 없다.
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+
+    fireEvent.change(askInput(), { target: { value: "Inbox" } });
+
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    expect(screen.getByText("Go to Inbox")).toBeInTheDocument();
+  });
+
+  it('a leading ">" also lands on the 명령 tab', () => {
+    render(<CommandPalette mode="inline" open onOpenChange={vi.fn()} actions={actions} />);
+    fireEvent.change(askInput(), { target: { value: ">" } });
+    expect(screen.getByRole("button", { name: "명령" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("clearing the query returns to the 제안 tab", () => {
+    render(<CommandPalette mode="inline" open onOpenChange={vi.fn()} actions={actions} />);
+    fireEvent.change(askInput(), { target: { value: "Inbox" } });
+    fireEvent.change(askInput(), { target: { value: "" } });
+    expect(screen.getByRole("button", { name: "답장 초안 작성" })).toBeInTheDocument();
+  });
+});
+
+describe('CommandPalette mode="inline" @ 멘션 어포던스 (US-D01)', () => {
+  it("is present before any @ is typed and inserts one into the input", () => {
+    render(<CommandPalette mode="inline" open onOpenChange={vi.fn()} actions={[]} />);
+    expect(screen.queryByText("@ 멘션")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "멘션 추가" }));
+
+    expect(askInput()).toHaveValue("@");
+    expect(screen.getByText("@ 멘션")).toBeInTheDocument();
+  });
+});
+
+describe('CommandPalette mode="inline" 닫힘 스프링 (US-D01)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("keeps the panel mounted for one --dur-panel so the close animation can play", () => {
+    vi.useFakeTimers();
+    const { rerender } = render(
+      <CommandPalette mode="inline" open onOpenChange={vi.fn()} actions={[]} />,
+    );
+    rerender(<CommandPalette mode="inline" open={false} onOpenChange={vi.fn()} actions={[]} />);
+
+    expect(screen.getByRole("dialog", { name: "AI 패널" })).toHaveClass("ask-panel--closing");
+
+    act(() => vi.advanceTimersByTime(240));
+    expect(screen.queryByRole("dialog", { name: "AI 패널" })).not.toBeInTheDocument();
   });
 });

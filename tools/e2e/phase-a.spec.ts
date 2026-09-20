@@ -225,12 +225,20 @@ test("Phase A seeded smoke", async ({ page }) => {
     return "pending → decided";
   });
 
-  await check("A9 ⌘K opens the command palette", async () => {
+  // US-D01: ⌘K는 별도 모달 팔레트가 아니라 ask 바의 플로팅 AI 패널을 연다(App.tsx 참조) —
+  // 같은 액션 목록을 두 표면에 띄우지 않기로 한 결정이라 여기서 보는 표면도 바뀌었다.
+  // 명령 목록은 모달의 "검색 또는 명령…"이 아니라 바에 타이핑하면 패널 안에 나온다.
+  await check("A9 ⌘K opens the floating AI panel and types into the command list", async () => {
     await page.keyboard.press("Meta+k");
-    await expect(page.getByPlaceholder("검색 또는 명령…")).toBeVisible();
+    const panel = page.getByRole("dialog", { name: "AI 패널" });
+    await expect(panel).toBeVisible();
+    await page.keyboard.type("Inbox");
+    await expect(panel.getByText("Inbox로 이동")).toBeVisible();
+    return "panel + cmdk list reachable by typing";
   });
   await shot(page, "06-command-palette.png");
   await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "AI 패널" })).toBeHidden();
 
   // US-A36: 보관은 승인 게이트를 타지 않는 로컬 상태 전이다 — UI에서 사라지는 것과 허브가
   // 실제로 threads.archived_at + audit_log를 쓴 것을 둘 다 본다(UI만 보면 낙관적 갱신에 속는다).

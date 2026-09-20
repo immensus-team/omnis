@@ -48,3 +48,54 @@
 - **진짜 "멀티톤" 브랜드 마크는 하나도 없다**: react-icons(simple-icons 소스)가 브랜드당 SVG path
   1개 + 단색이라, kinso 레퍼런스의 진짜 4색 Gmail 로고 같은 건 이 라이브러리로는 못 낸다. 태스크가
   허용한 대로(멀티톤이 없으면 단색 글리프) 처리했다 — 새 SVG를 손으로 그리진 않았다.
+
+## US-D01 재작업 — 유리 위 위계·포커스 스트로크·플로팅 패널 (2026-09-20, attempt 2)
+
+리뷰가 잡은 블로킹 5건을 근본 원인에서 고쳤다. 스크린샷: `screens/inbox-glass.png`,
+`screens/ai-panel.png`, `screens/ai-panel-commands.png`.
+
+1. **유리 위의 상태는 밝히는 게 아니라 어둡게 한다.** 새로 넣은 상태 레이어가 전부
+   `color-mix(in oklch, var(--bg-base) N%, transparent)`였다 — 유리(`--bg-overlay` = `--gray-000`
+   78%, L≈0.988) 위에 L 0.99를 얹은 것이라 명도차가 0.15%, 즉 안 보였다(선택 탭·호버·요약 배경
+   전부). 채움은 `--bg-elevated`(L 0.97, 약 12배 대비), 호버는 새 토큰 `--state-hover`
+   (`color-mix(in oklch, var(--text-primary) 6%, transparent)`)로 통일했다. `--state-hover`를
+   토큰으로 올린 이유: 같은 값이 5곳에 필요했고, 텍스트색 기반이라 다크에서도 한 줄로 뒤집힌다.
+   이미 있던 `[cmdk-item][data-selected]`도 `--bg-elevated`를 쓰고 있어 결이 맞는다.
+2. **포커스 그라데이션이 스트로크로 돌아왔다.** "padding-box 채움 + border-box 그라데이션" 2겹
+   트릭은 채움이 불투명할 때만 성립한다 — 채움을 유리(78%)로 바꾼 순간 border-box 레이어가 22%
+   비쳐 그라데이션이 1.5px 테두리가 아니라 ~820px 필 전체를 물들였다(anti-slop #3 장식 그라데이션).
+   채움은 `.glass-surface`에 그대로 맡기고, 스트로크는 마스크로 안쪽을 도려낸 `::after` 링 하나가
+   전담한다. `border-image`는 `border-radius`를 못 따라가고 `outline`은 그라데이션을 못 받아서
+   둥근 필에 남는 방법이 이것뿐이다.
+3. **타이핑이 막다른 길이 아니다.** 패널이 항상 "제안" 탭에서 열리고 `Command.List`는 "명령"
+   탭에서만 렌더돼서, 바에 타이핑하면 cmdk가 필터링은 하는데 화면엔 아무것도 안 나왔다(US-D01 이전
+   인라인 팔레트의 회귀). 탭을 입력에서 파생시켰다: 빈 입력=제안, 비면 아닌 입력=명령(">"도 여기
+   걸린다), 탭을 직접 누르면 그 선택이 다음 타이핑까지 유지된다. 회귀 테스트 3개 추가.
+4. **비활성 신호 바닥은 0.55다**(hallmark slop-test:111). 0.42/0.40이던 Phase B 액션과 첨부
+   버튼을 0.55로 올리고, 행 오른쪽 끝에 "Phase B" 태그를 붙였다 — 왜 못 누르는지가 보인다.
+5. **패널 비례.** 바 전체 폭(~820px)으로 늘어난 4.4:1 빈 밴드를 420px 카드로 좁혀 오브 아래에
+   앵커시키고, 레퍼런스의 대화 영역 자리에 실제 컨텍스트(스레드 제목 + 상태/요약)를 넣었다.
+   `transform-origin`도 `top center` → `top left`로 옮겨 앵커와 맞췄다.
+6. **닫기도 스프링이다.** `{open && <AskPanel/>}`은 동기 언마운트라 240ms 등장만 있고 퇴장은 하드
+   컷이었다. `useClosingSpring`이 `--dur-panel` 동안 패널을 DOM에 붙들고 `.ask-panel--closing`이
+   등장 경로를 그대로 뒤집어 재생한다(apple-design §7 spatial consistency). reduced-motion에서는
+   `--dur-panel`이 0ms라 JS 타이머도 `matchMedia`로 0으로 맞춘다.
+7. **@ 는 상시 버튼이다.** 이전엔 `query.includes("@")`일 때만 칩이 나타나서, 이미 "@"를 칠 줄
+   아는 사람에게만 보이는 어포던스였다(아무것도 못 가르친다). 레퍼런스처럼 첨부 아이콘 옆에 상시
+   버튼을 두고, 누르면 입력에 "@"를 꽂는다. 칩은 그 위에 그대로 뜬다.
+
+### 검증 메모
+
+- **anti-slop #11(모바일 4사이즈 가로 스크롤)은 이 셸에 해당하지 않는다.** 실측했다:
+  320/375/414px에서는 가로 스크롤이 나고 ask 바 입력이 0폭으로 접힌다. 다만
+  `apps/desktop/src-tauri/tauri.conf.json`이 `minWidth: 1024`라 그 폭에 도달할 수 없다.
+  실제 도달 가능한 1024/1280/1440px에서는(상세 패널 연 가장 넓은 레이아웃) 가로 스크롤 없음을
+  Playwright로 확인했다. 웹 배포(`@omnis/web`)가 이 셸을 쓰게 되면 그때 다시 봐야 한다.
+- `biome.jsonc`에 `.claude/skills/**`를 ignore로 넣었다 — 벤더링한 OSS 스킬의 tsconfig 템플릿과
+  픽스처가 `pnpm lint`를 136개 에러로 막고 있었다(353f0a7부터, 이 스토리와 무관한 선행 문제).
+- **⌘K 경로가 깨져 있었다(이 브랜치가 들여온 회귀, e2e가 잡았다).** US-D01이 ⌘K를 모달 팔레트에서
+  ask 패널로 옮기면서 `tools/e2e/phase-a.spec.ts`의 A9(모달 placeholder "검색 또는 명령…")는 그대로
+  둬서 실패했고, 더 나쁘게는 ⌘K가 패널을 열기만 하고 입력에 포커스를 주지 않아 Escape도 타이핑도
+  안 먹었다(패널이 열린 채 목록 클릭을 막아 A-archive/G5까지 연쇄 실패). 열릴 때 입력을 포커스하고
+  (`onFocus`는 이미 열려 있으면 상태를 다시 건드리지 않는다), A9을 새 표면 기준으로 다시 썼다:
+  ⌘K → AI 패널 → 타이핑 → 명령 목록 → Escape로 닫힘. `pnpm e2e:phase-a` 2패스 38/38 PASS.

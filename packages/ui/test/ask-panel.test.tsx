@@ -11,6 +11,8 @@ const panel = (threadSelected: boolean, summary: string | null) => (
   <AskPanel commands={null} threadSelected={threadSelected} summary={summary} onClose={vi.fn()} />
 );
 
+const tab = (name: string) => screen.getByRole("button", { name });
+
 const summarize = () => screen.getByRole("button", { name: "이 대화 요약" });
 
 describe("AskPanel 제안 액션 (US-D01)", () => {
@@ -48,5 +50,102 @@ describe("AskPanel 요약 표시 (US-D01)", () => {
     fireEvent.click(summarize());
 
     expect(screen.getByText("아직 요약 없음")).toBeInTheDocument();
+  });
+});
+
+describe("AskPanel 탭 전환 (US-D01 회귀: 타이핑이 막다른 길이 되면 안 된다)", () => {
+  it("shows 제안 while the ask bar query is empty", () => {
+    render(
+      <AskPanel
+        commands={<p>명령 목록</p>}
+        threadSelected
+        summary={null}
+        query=""
+        onClose={vi.fn()}
+      />,
+    );
+    expect(tab("제안")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText("명령 목록")).toBeNull();
+  });
+
+  it("auto-switches to 명령 as soon as the query is non-empty", () => {
+    const { rerender } = render(
+      <AskPanel
+        commands={<p>명령 목록</p>}
+        threadSelected
+        summary={null}
+        query=""
+        onClose={vi.fn()}
+      />,
+    );
+    rerender(
+      <AskPanel
+        commands={<p>명령 목록</p>}
+        threadSelected
+        summary={null}
+        query=">"
+        onClose={vi.fn()}
+      />,
+    );
+    expect(tab("명령")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("명령 목록")).toBeInTheDocument();
+  });
+
+  it("falls back to 제안 when the query clears again", () => {
+    const { rerender } = render(
+      <AskPanel
+        commands={<p>명령 목록</p>}
+        threadSelected
+        summary={null}
+        query="go"
+        onClose={vi.fn()}
+      />,
+    );
+    rerender(
+      <AskPanel
+        commands={<p>명령 목록</p>}
+        threadSelected
+        summary={null}
+        query=""
+        onClose={vi.fn()}
+      />,
+    );
+    expect(tab("제안")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("lets an explicit tab click win over the query-derived tab", () => {
+    render(
+      <AskPanel
+        commands={<p>명령 목록</p>}
+        threadSelected
+        summary={null}
+        query="go"
+        onClose={vi.fn()}
+      />,
+    );
+    expect(tab("명령")).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(tab("제안"));
+    expect(tab("제안")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText("명령 목록")).toBeNull();
+  });
+});
+
+describe("AskPanel 컨텍스트 줄 (US-D01)", () => {
+  it("names the selected thread so the actions have a visible target", () => {
+    render(
+      <AskPanel
+        commands={null}
+        threadSelected
+        threadTitle="omnis launch sync"
+        summary={null}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("omnis launch sync")).toBeInTheDocument();
+  });
+
+  it("says so when nothing is selected", () => {
+    render(panel(false, null));
+    expect(screen.getByText("선택된 스레드 없음")).toBeInTheDocument();
   });
 });
