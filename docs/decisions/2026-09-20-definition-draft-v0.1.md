@@ -1,120 +1,120 @@
-# omnis — 제품 정의 초안 v0.1
+# omnis — Product Definition Draft v0.1
 
-작성: Fable, 2026-09-20. 상태: 리서치 스윕 결과 반영 전 초안. 리서치와 무관하게 확정 가능한 부분만 담았고, §10은 리서치 후 결정한다.
+Author: Fable, 2026-09-20. Status: draft before the research sweep results are incorporated. It contains only what can be settled independently of research; §10 will be decided after research.
 
-## 0. 한 줄 정의
+## 0. One-line definition
 
-omnis는 나에게 오는 모든 것(사람의 메시지, 일정, 에이전트의 진행과 결과)을 하나의 인박스로 모으고, 나의 컨텍스트를 가진 에이전트들이 먼저 일하고 나는 결정만 하게 만드는 개인 운영 시스템이다.
+omnis is a personal operating system that gathers everything coming to me (people's messages, the calendar, agent progress and results) into a single inbox, and makes agents holding my context work first so that I only make decisions.
 
-## 1. 문제
+## 1. Problem
 
-- 연락 채널 7개(Slack, KakaoTalk, Gmail, Outlook, Telegram, LinkedIn, WhatsApp)와 에이전트 4종(Claude, Codex, DeepSeek, Hermes)과 캘린더가 각각 다른 앱, 다른 기기, 다른 컨텍스트에 흩어져 있다.
-- API가 없는 채널(KakaoTalk, LinkedIn)은 기기 1대에 묶여 있어 맥북과 아이폰에서 동시에 볼 수 없다.
-- 에이전트 세션은 터미널과 채팅창에 갇혀 있어 "내 일"의 일부로 보이지 않는다. 어느 기기의 어느 에이전트가 무엇을 하고 있는지 한눈에 알 수 없다.
-- 나에 대한 컨텍스트(누구와 무슨 약속, 어떤 프로젝트가 어디까지)가 내 머리에만 있어서 답장, 팔로업, 투두를 매번 손으로 잇는다.
+- Seven contact channels (Slack, KakaoTalk, Gmail, Outlook, Telegram, LinkedIn, WhatsApp), four kinds of agents (Claude, Codex, DeepSeek, Hermes), and the calendar are scattered across different apps, different devices, and different contexts.
+- Channels without APIs (KakaoTalk, LinkedIn) are tied to a single device, so they cannot be viewed from a MacBook and an iPhone at the same time.
+- Agent sessions are trapped in terminals and chat windows, so they do not appear as part of "my work." There is no way to tell at a glance which agent on which device is doing what.
+- The context about me (what commitments I have with whom, how far along which project is) lives only in my head, so I stitch together replies, follow-ups, and todos by hand every time.
 
-## 2. 테제
+## 2. Theses
 
-1. **Everything is an inbox.** 사람의 메시지든 에이전트의 진행 상황이든, 나의 주의(attention)를 요구하는 모든 것은 같은 큐에 놓인다. 에이전트 세션은 "참여자 중 하나가 에이전트인 스레드"일 뿐이다.
-2. **Context is the product.** 인박스는 표면이고 진짜 자산은 나에 대한 통합 컨텍스트(메모리)다. 모든 기능은 이 메모리에서 읽고 이 메모리에 쓴다. 메모리는 인박스뿐 아니라 캘린더, 로컬 파일, Drive, GitHub에서도 채워진다.
-3. **Agents act first, I decide.** 기본값은 "에이전트가 분류, 초안, 투두, 위임을 먼저 해 두고 나는 승인, 수정, 거절만 한다"이다. 단, 바깥으로 나가는 행동(전송, 일정 확정)은 반드시 내 승인 게이트를 지난다.
+1. **Everything is an inbox.** Whether it is a message from a person or an agent's progress, everything that demands my attention goes into the same queue. An agent session is just "a thread where one of the participants is an agent."
+2. **Context is the product.** The inbox is the surface; the real asset is the unified context (memory) about me. Every feature reads from this memory and writes to it. Memory is filled not only from the inbox but also from the calendar, local files, Drive, and GitHub.
+3. **Agents act first, I decide.** The default is "agents do the classification, drafting, todos, and delegation first, and I only approve, edit, or reject." However, actions that go outside (sending, confirming a schedule) must always pass through my approval gate.
 
-## 3. 사용자와 성공 기준
+## 3. Users and success criteria
 
-- v1 사용자: Logan 1인. 파운더, 채널 7개, 에이전트 4종, 기기 3대(맥미니 허브, 맥북, 아이폰).
-- v2 사용자: 같은 프로파일의 파운더와 오퍼레이터. standalone 배포(허브 없이 맥북 + 아이폰)가 되는 시점.
+- v1 user: Logan alone. Founder, 7 channels, 4 kinds of agents, 3 devices (Mac mini hub, MacBook, iPhone).
+- v2 users: founders and operators with the same profile. The point at which standalone deployment (MacBook + iPhone without a hub) works.
 
-성공 기준(측정 가능한 것만, 수치는 첫 달 측정 후 조정):
+Success criteria (only what is measurable; numbers to be adjusted after the first month of measurement):
 
-| 지표 | 목표 |
+| Metric | Target |
 |---|---|
-| 아침 브리핑 커버리지 | 그날 실제로 처리한 항목 중 브리핑에 이미 있던 비율 ≥ 80% |
-| 초안 채택률 | 전송된 답장 중 에이전트 초안에서 출발한 비율 ≥ 50% |
-| 무수정 전송률 | 초안을 고치지 않고 보낸 비율 ≥ 20% |
-| 놓친 팔로업 | 미팅 후 48시간 내 팔로업 미발송 건수 0 |
-| 원 채널 앱 직접 열기 | KakaoTalk, LinkedIn 제외 주 5회 이하 |
-| 월 LLM 비용 | 상한선 고정(리서치 후 수치), 초과 시 자동으로 저가 티어 강등 |
+| Morning briefing coverage | Of the items actually handled that day, the share that were already in the briefing ≥ 80% |
+| Draft adoption rate | Of the replies sent, the share that started from an agent draft ≥ 50% |
+| Unedited send rate | Share sent without editing the draft ≥ 20% |
+| Missed follow-ups | Zero follow-ups left unsent within 48 hours after a meeting |
+| Opening the source channel app directly | 5 times a week or fewer, excluding KakaoTalk and LinkedIn |
+| Monthly LLM cost | Fixed ceiling (number after research); on overrun, automatic downgrade to a cheaper tier |
 
-## 4. 구조와 구조에서 도출한 목표
+## 4. Architecture and goals derived from it
 
-### 구조: 커널 + 4개 층
+### Architecture: kernel + 4 layers
 
-- **L0 Kernel**: append-only 이벤트 로그(모든 인바운드, 아웃바운드, 에이전트 이벤트), 스케줄러(브리핑, 다이제스트, 팔로업 타이머), 권한과 승인 게이트, 감사 로그, 기기 간 세션 라우팅. 허브가 맥미니든 맥북 앱 안이든 같은 코드.
-- **L1 Adapters**: 채널과 에이전트를 같은 Item 스키마로 정규화한다. 어댑터마다 능력(read, write, realtime, history, media)을 선언하고 UI는 능력에 맞춰 보여준다. API 채널(Slack, Gmail, Outlook, Telegram, WhatsApp, Calendar)과 캡처 채널(KakaoTalk, LinkedIn)과 에이전트 채널(Claude Code, Codex, DeepSeek, Hermes)이 모두 여기 속한다.
-- **L2 Context**: 인박스, 캘린더, 로컬 파일, Drive, GitHub에서 사람, 조직, 프로젝트, 약속, 결정, 선호를 추출해 시간성(as-of)을 가진 메모리로 통합한다. 모든 에이전트가 같은 메모리를 읽고 쓴다.
-- **L3 Agents**: 분류(work/personal, 토픽, 사람 라벨), 답장 초안, 투두 추출과 리마인드, 위임(어느 기기의 어느 에이전트에게), 브리핑과 다이제스트, 미팅 후 팔로업, 노트 라우팅.
-- **L4 Surfaces**: 맥 앱과 아이폰 앱. 인박스, 에이전트 세션, 투두, Network, 노트, 다이제스트가 같은 UI 문법 안에 있다.
+- **L0 Kernel**: append-only event log (all inbound, outbound, and agent events), scheduler (briefing, digest, follow-up timers), permissions and approval gate, audit log, cross-device session routing. The same code whether the hub is the Mac mini or inside the MacBook app.
+- **L1 Adapters**: normalize channels and agents into the same Item schema. Each adapter declares its capabilities (read, write, realtime, history, media) and the UI shows things according to those capabilities. API channels (Slack, Gmail, Outlook, Telegram, WhatsApp, Calendar), capture channels (KakaoTalk, LinkedIn), and agent channels (Claude Code, Codex, DeepSeek, Hermes) all belong here.
+- **L2 Context**: extract people, organizations, projects, commitments, decisions, and preferences from the inbox, calendar, local files, Drive, and GitHub, and unify them into memory with temporality (as-of). All agents read from and write to the same memory.
+- **L3 Agents**: classification (work/personal, topic, person labels), reply drafting, todo extraction and reminders, delegation (to which agent on which device), briefing and digest, post-meeting follow-up, note routing.
+- **L4 Surfaces**: the Mac app and the iPhone app. Inbox, agent sessions, todos, Network, notes, and digest live within the same UI grammar.
 
-### 목표
+### Goals
 
-| # | 목표 | 층 | 판정 기준 |
+| # | Goal | Layer | Acceptance criteria |
 |---|---|---|---|
-| G1 | 모든 채널이 실시간으로 하나의 큐에 들어온다 | L0, L1 | API 채널 지연 5초 이하, 캡처 채널 60초 이하 |
-| G2 | 어디서든 컨트롤한다. 읽음, 답장, 아카이브가 원 채널에 반영된다 | L1 | 채널별 write-back 범위가 명시되고 UI가 그 범위를 정직하게 보여줌 |
-| G3 | 하나의 컨텍스트. 사람, 프로젝트, 약속, 결정이 메모리에 쌓이고 모든 에이전트가 같은 메모리를 본다 | L2 | 어떤 에이전트에게 물어도 같은 사실을 같은 시점 기준으로 답함 |
-| G4 | 에이전트가 먼저 일한다. 초안, 투두, 라벨, 위임이 내가 보기 전에 준비되어 있고 승인 게이트를 지킨다 | L3 | 승인 없는 외부 전송 0건, 초안 준비 시간 인바운드 후 60초 이내 |
-| G5 | 한 화면. 인박스와 에이전트 세션을 같은 문법으로, Apple-native하게, 맥과 아이폰이 실시간 동기화 | L4 | 기기 간 상태 반영 2초 이내 |
-| G6 | standalone 가능. 허브와 클라이언트의 경계가 프로세스 경계가 아니라 모듈 경계 | L0 | 허브를 맥북 앱 안에서 띄워도 아이폰이 그대로 동기화됨 |
-| G7 | 비용. 저가 모델 우선 라우팅, 캐시, 로컬 모델, 월 상한 | L3 | 상한 초과 시 자동 강등, 월 리포트 |
-| G8 | 안전. 인박스 내용은 신뢰할 수 없는 입력이고, 외부 전송은 승인이며, 모든 에이전트 행동은 감사 로그에 남는다 | L0 | prompt injection 테스트 세트 통과, 감사 로그 누락 0 |
+| G1 | Every channel enters a single queue in real time | L0, L1 | API channel latency ≤ 5 s, capture channel ≤ 60 s |
+| G2 | Control from anywhere. Read, reply, and archive are reflected in the source channel | L1 | Write-back scope per channel is specified and the UI shows that scope honestly |
+| G3 | One context. People, projects, commitments, and decisions accumulate in memory and every agent sees the same memory | L2 | No matter which agent you ask, it answers with the same facts as of the same point in time |
+| G4 | Agents work first. Drafts, todos, labels, and delegation are ready before I look, and the approval gate is respected | L3 | Zero external sends without approval; draft ready within 60 s of inbound |
+| G5 | One screen. Inbox and agent sessions in the same grammar, Apple-native, Mac and iPhone synced in real time | L4 | Cross-device state reflection within 2 s |
+| G6 | Standalone-capable. The boundary between hub and client is a module boundary, not a process boundary | L0 | Launching the hub inside the MacBook app still syncs the iPhone as-is |
+| G7 | Cost. Cheap-model-first routing, caching, local models, monthly ceiling | L3 | Automatic downgrade on ceiling overrun, monthly report |
+| G8 | Safety. Inbox content is untrusted input, external sends require approval, and every agent action is recorded in the audit log | L0 | Passes the prompt injection test set, zero missing audit log entries |
 
-## 5. 비목표 (v1)
+## 5. Non-goals (v1)
 
-- 팀과 멀티유저 협업. 이 영역은 buzz가 이미 하고 있고 omnis는 1인의 운영 시스템이다.
-- 원 채널 앱의 완전 대체. 통화, 스티커, 대용량 미디어 같은 채널 고유 기능은 원 앱으로 넘긴다.
-- 이메일 클라이언트의 풀 기능(규칙 엔진, 폴더 관리). triage와 답장에 집중한다.
-- 자체 모델 학습. 라우팅과 프롬프트로 해결한다.
+- Team and multi-user collaboration. buzz already does this area, and omnis is a one-person operating system.
+- Full replacement of source channel apps. Channel-specific features such as calls, stickers, and large media are handed off to the source app.
+- The full feature set of an email client (rules engine, folder management). Focus on triage and replies.
+- Training our own models. Solve it with routing and prompts.
 
-## 6. 핵심 객체 (초안)
+## 6. Core objects (draft)
 
-| 객체 | 정의 |
+| Object | Definition |
 |---|---|
-| Account | 채널의 로그인 단위. Slack 워크스페이스 하나, Gmail 계정 하나 |
-| Channel | 어댑터 종류와 능력 선언 |
-| Thread | 대화 단위. 사람과의 대화, 이메일 스레드, 에이전트 세션이 모두 Thread |
-| Item | Thread 안의 한 단위. 메시지, 이메일, 캘린더 이벤트, 에이전트 턴, 시스템 이벤트 |
-| Person / Org | 사람과 조직. 여러 채널의 신원을 하나로 묶고 라벨과 관계 상태를 가짐 |
-| Label | work/personal, 토픽, 우선순위. 자동 부여 + 수동 교정 |
-| Task | 에이전트나 내가 만든 할 일. 출처 Item, 담당(나 또는 특정 에이전트), 상태 |
-| AgentSession | 어느 기기의 어느 에이전트 런타임에 붙은 Thread |
-| Draft | 특정 Thread에 대한 답장 초안. 근거(어떤 메모리와 Item을 썼는지) 포함 |
-| Action | 외부로 나가는 행동. 승인 상태(pending, approved, sent, rejected) |
-| Note | 내가 던진 짧은 메모. 라우팅 결과(어느 Thread, 어느 Person)를 가짐 |
-| Memory | 시간성을 가진 사실. 출처, as-of, 신뢰도 |
-| Digest | 아침 브리핑, 밤 아카이브 요약 |
+| Account | A login unit for a channel. One Slack workspace, one Gmail account |
+| Channel | Adapter type and capability declaration |
+| Thread | Conversation unit. A conversation with a person, an email thread, and an agent session are all Threads |
+| Item | A single unit within a Thread. A message, an email, a calendar event, an agent turn, a system event |
+| Person / Org | People and organizations. Unifies identities across channels into one and carries labels and relationship state |
+| Label | work/personal, topic, priority. Auto-assigned + manual correction |
+| Task | A to-do created by an agent or by me. Source Item, assignee (me or a specific agent), state |
+| AgentSession | A Thread attached to an agent runtime on a given device |
+| Draft | A reply draft for a specific Thread. Includes the rationale (which memory and Items were used) |
+| Action | An action going outside. Approval state (pending, approved, sent, rejected) |
+| Note | A short note I toss in. Has a routing result (which Thread, which Person) |
+| Memory | A fact with temporality. Source, as-of, confidence |
+| Digest | Morning briefing, evening archive summary |
 
-## 7. 핵심 시나리오
+## 7. Key scenarios
 
-- **S1 아침 06:30**: 브리핑 한 장. 오늘 일정, 밤새 들어온 것 우선순위순, 대기 중 초안, 어제 아카이브 요약. 한 화면에서 승인, 수정, 스누즈.
-- **S2 실시간**: 카카오로 파트너가 "내일 2시 가능?"을 보낸다. 캘린더를 확인한 초안과 푸시가 아이폰에 온다. 승인하면 맥미니가 카카오로 전송하고 캘린더에 hold를 만든다.
-- **S3 위임**: 이메일로 "지난 분기 데이터 정리해 주세요"가 온다. 에이전트가 Task를 만들고, 맥북의 로컬 파일이 필요하다고 판단해 맥북의 Codex 세션에 위임한다. 진행이 인박스 스레드로 보이고, 결과를 첨부한 답장 초안이 대기한다.
-- **S4 미팅 후**: 캘린더 이벤트가 끝난다. 참석자가 Network에 갱신되고, 팔로업 초안이 준비된다(초면이면 소개 형식). 내가 노트 한 줄을 던지면 그 사람과 그 스레드에 반영된다.
-- **S5 밤 22:00**: 오늘 자동 아카이브된 것들의 요약. 잘못 묻힌 것은 한 번에 되살린다.
+- **S1 06:30 in the morning**: A one-page briefing. Today's schedule, what came in overnight in priority order, drafts waiting for approval, yesterday's archive summary. Approve, edit, and snooze from a single screen.
+- **S2 real time**: A partner sends "Can you do 2 PM tomorrow?" on KakaoTalk. A draft that checked the calendar and a push notification arrive on the iPhone. On approval, the Mac mini sends it to KakaoTalk and creates a hold on the calendar.
+- **S3 delegation**: "Please organize last quarter's data" arrives by email. The agent creates a Task and, judging that local files on the MacBook are needed, delegates to the Codex session on the MacBook. Progress shows up in the inbox thread, and a reply draft with the results attached waits for approval.
+- **S4 after a meeting**: A calendar event ends. Attendees are updated in Network, and a follow-up draft is prepared (an introduction format if it is a first meeting). When I toss in a one-line note, it is reflected on that person and that thread.
+- **S5 22:00 at night**: A summary of what was auto-archived today. Anything buried by mistake is restored in one go.
 
-## 8. 설계 원칙
+## 8. Design principles
 
-- Greenfield. 맥미니의 기존 세팅(Hermes 구성, omh, buzz 릴레이)에 의존하지 않는다. omnis가 그 전부를 대체한다.
-- Hub-agnostic. 허브는 지금 맥미니, 나중엔 맥북 앱 안의 프로세스. 같은 코드가 돈다.
-- 어댑터는 능력을 선언하고 UI는 그 능력만 약속한다. 못 하는 것을 되는 척하지 않는다.
-- Egress는 기본 승인제. 사람이나 채널별로 자율 전송을 열 수는 있지만 기본값은 승인이다.
-- 인박스 내용은 신뢰할 수 없는 입력이다. 에이전트 지시와 데이터를 분리한다.
-- Cheap-first. 분류와 라벨은 로컬 또는 최저가 모델, 초안은 중간 티어, 판단이 필요한 위임만 상위 티어.
-- Local-first data. 내 데이터는 내 기기에 있고 클라우드는 모델 호출에만 쓴다.
-- Apple-native UI 문법. 맥은 키보드 우선, 아이폰은 한 손 조작 우선.
+- Greenfield. Does not depend on the Mac mini's existing setup (Hermes configuration, omh, buzz relay). omnis replaces all of it.
+- Hub-agnostic. The hub is the Mac mini now, and later a process inside the MacBook app. The same code runs.
+- Adapters declare capabilities and the UI promises only those capabilities. It does not pretend to do what it cannot.
+- Egress is approval-based by default. Autonomous sending can be opened per person or per channel, but the default is approval.
+- Inbox content is untrusted input. Agent instructions and data are separated.
+- Cheap-first. Classification and labeling use a local or cheapest model, drafting a mid tier, and only delegation that requires judgment the upper tier.
+- Local-first data. My data lives on my devices and the cloud is used only for model calls.
+- Apple-native UI grammar. Keyboard-first on Mac, one-handed operation first on iPhone.
 
-## 9. 단계 (리서치 후 조정)
+## 9. Phases (adjusted after research)
 
-- Phase A: Kernel + 인박스 코어. API 채널 2개 + 에이전트 세션 1종 + 맥 클라이언트.
-- Phase B: 메모리 + 초안 + 브리핑과 다이제스트 + 아이폰.
-- Phase C: KakaoTalk, LinkedIn 캡처 + 투두와 위임 + Network + 노트 라우팅.
-- Phase D: standalone(허브 내장) + 배포.
+- Phase A: Kernel + inbox core. 2 API channels + 1 kind of agent session + Mac client.
+- Phase B: Memory + drafts + briefing and digest + iPhone.
+- Phase C: KakaoTalk and LinkedIn capture + todos and delegation + Network + note routing.
+- Phase D: standalone (embedded hub) + distribution.
 
-## 10. 리서치 후 결정할 것
+## 10. To be decided after research
 
-1. 채팅 채널 집계 레이어: Beeper 로컬 API, mautrix 셀프호스트, 자체 어댑터 중 무엇을 쓰나.
-2. 에이전트 세션 버스: 자체 버스를 설계한다. buzz(Nostr + ACP)와 Hermes의 omh는 아이디어 참고용일 뿐 기반이 아니다. 맥미니의 현재 세팅은 전부 omnis로 대체된다(Logan 결정, 2026-09-20).
-3. 메모리: 어떤 OSS를 쓰나. Hermes 메모리와의 공유는 고려하지 않는다.
-4. 하네스: Vercel AI SDK 위에 무엇을 얹나(durable execution, 스케줄러).
-5. 클라이언트와 동기화: Tauri, PWA, Swift 중 무엇이며 sync 엔진은 무엇인가.
-6. 모델 정책과 월 비용.
-7. KakaoTalk, LinkedIn 캡처 경로와 계정 정지 리스크.
+1. Chat channel aggregation layer: whether to use the Beeper local API, self-hosted mautrix, or our own adapters.
+2. Agent session bus: design our own bus. buzz (Nostr + ACP) and Hermes's omh are references for ideas only, not a foundation. The Mac mini's current setup is entirely replaced by omnis (Logan's decision, 2026-09-20).
+3. Memory: which OSS to use. Sharing with Hermes memory is not considered.
+4. Harness: what to layer on top of the Vercel AI SDK (durable execution, scheduler).
+5. Client and sync: Tauri, PWA, or Swift, and what the sync engine is.
+6. Model policy and monthly cost.
+7. KakaoTalk and LinkedIn capture paths and account suspension risk.

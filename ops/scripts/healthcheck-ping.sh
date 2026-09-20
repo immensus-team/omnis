@@ -1,5 +1,5 @@
 #!/bin/bash
-# US-B42: healthchecks.io 15종 ping + ntfy critical/warning + items(kind=system) 이중 노출(A6 §8).
+# US-B42: 15 healthchecks.io pings + ntfy critical/warning + dual exposure to items(kind=system) (A6 §8).
 set -euo pipefail
 
 ACCOUNT="281932556+jinhologankim@users.noreply.github.com"
@@ -8,8 +8,9 @@ kc() { security find-generic-password -s "$1" -a "$ACCOUNT" -w 2>/dev/null; }
 NTFY_URL="${OMNIS_NTFY_URL:-http://127.0.0.1:2586}"
 DATABASE_URL="${DATABASE_URL:-postgres://vigor@127.0.0.1:5432/omnis}"
 
-# slug|check_cmd|tier(critical|warning) — A6 §8 표 그대로. check_cmd는 성공하면 exit 0.
-# check_cmd 자체가 '|'(파이프)를 품으므로 `IFS='|' read`로 자르면 안 된다 — 양 끝에서 깎는다(parse_job).
+# slug|check_cmd|tier(critical|warning) — exactly the A6 §8 table. check_cmd exits 0 on success.
+# check_cmd itself contains '|' (pipes), so it must not be split with `IFS='|' read` — trim it from
+# both ends instead (parse_job).
 JOBS=(
   "omnis-hub|curl -fsS -m 5 http://127.0.0.1:8787/health|critical"
   "omnis-postgres|psql \"\$DATABASE_URL\" -Atc 'select 1' | grep -q 1|critical"
@@ -28,7 +29,7 @@ JOBS=(
   "omnis-tailscale-serve|bash \"\$(dirname \"\$0\")/../mini/tailscale-serve.sh\" --check|critical"
 )
 
-# slug는 첫 필드, tier는 마지막 필드, 나머지 전부가 cmd다(cmd 안의 파이프를 보존한다).
+# slug is the first field, tier is the last field, and everything in between is the cmd (preserving pipes inside the cmd).
 parse_job() {
   job_slug="${1%%|*}"
   job_tier="${1##*|}"
@@ -40,8 +41,9 @@ post_ntfy() {
   curl -fsS -m 10 -H "Title: $title" -d "$msg" "$NTFY_URL/$topic" >/dev/null 2>&1 || true
 }
 
-# A6 §8 "모든 critical/warning은 ntfy와 별개로 items(kind=system)에도 노출". thread_id/account_id가
-# NOT NULL이라 'system'/'infra' 계정·스레드를 없으면 만들고(ON CONFLICT) 그 위에 item을 쌓는다.
+# A6 §8: "every critical/warning is exposed to items(kind=system) as well as to ntfy". thread_id/account_id
+# are NOT NULL, so create the 'system'/'infra' account and thread if they are missing (ON CONFLICT) and
+# stack the item on top of them.
 post_system_item() {
   local subject="$1" body="$2"
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q >/dev/null <<SQL
@@ -69,7 +71,7 @@ run_check() {
   fi
   [ -n "$hc_uuid" ] && curl -fsS -m 10 --retry 3 "https://hc-ping.com/$hc_uuid/fail" >/dev/null 2>&1 || true
   post_ntfy "omnis-$tier" "$slug failed" "check failed: $cmd"
-  post_system_item "$slug 실패" "healthcheck '$slug' 실패 ($tier)"
+  post_system_item "$slug failed" "healthcheck '$slug' failed ($tier)"
   echo "FAIL: $slug" >&2
   return 1
 }

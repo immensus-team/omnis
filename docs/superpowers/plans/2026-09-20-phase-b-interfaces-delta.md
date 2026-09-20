@@ -1,58 +1,58 @@
-# Phase B 인터페이스 계약 — 델타 (2026-09-20)
+# Phase B interface contract — delta (2026-09-20)
 
-`2026-09-20-phase-a-interfaces.md`에 **더해지는 것만** 적는다. Phase A 계약의 항목은 전부 그대로 유효하고, 여기서 다시 쓰지 않는다. 5개 Phase B 계획 문서가 서로 다른 이름을 쓰지 않도록 **이름과 시그니처만** 고정한다 — 설계 논의는 없고 근거는 부록에 있다. 여기 적힌 식별자는 계획 작성자가 **그대로 복사**한다.
+This records **only what is added to** `2026-09-20-phase-a-interfaces.md`. Every item in the Phase A contract stays valid as written and is not restated here. So that the five Phase B plan documents do not use different names, it pins down **names and signatures only** — there is no design discussion, and the rationale is in the appendix. Plan authors **copy verbatim** the identifiers written here.
 
-스토리 ID는 `2026-09-20-phase-b-backlog.md`(US-B01~B44)를 가리킨다.
-
----
-
-## 0. 부록 충돌 판정 (각 1줄)
-
-Phase A 계약 §0의 10건은 그대로 유효하다. Phase B가 새로 가르는 것:
-
-> **개정 (2026-09-20, 교차 리뷰)** — `2026-09-20-phase-b-plans-review.md`의 M1~M11을 이 문서에 반영했다. 바뀐 절: §1(루트 스크립트 단일 오너), §2.1(`isDenied`/`DENY_PATTERNS` 정의 이관), §3(`@omnis/memory` 신규 9심볼), §4(`LoopId`·`TriggerContext`·`decide?`·`runLoopSpec`·`LoopKernel`/`LoopLogger`·`writeSystemItem` 추가, `startLoops` 시그니처 교정, `ingestLoop` 삭제), §5(`cost.last_state`), §6(W0 스키마 번들), §7(`GET /transcript` 재배정, `POST /notes/:id/route` 추가), §9(환경변수 2·Keychain 4), §11(W0 행). 계획 문서 본문 수정(M12~M14)은 각 계획 저자 몫이다.
-
-1. **mem0-ts 커스텀 VectorStore**(A3-D12 본문) vs **직접 구현**(A3-D12 폴백) → **폴백이 정본**(백로그 B-D1, `mem0ai@3.2.0` 실측: `MemoryConfig.vectorStore`가 provider 문자열 + `VectorStoreFactory` 정적 팩토리라 인스턴스 주입 슬롯이 없고, 번들 `PGVector`가 자기 테이블을 만든다). S-A3-1 = **FAIL**, `@omnis/memory`가 `public.memories`에 직접 붙는다.
-2. self-model 파일 경로: A3 §5 표 `~/.omnis/memory/*.md` vs A4 §13.2 `~/omnis/self-model/` → **`~/.omnis/self-model/`**(A6 §9의 `omnis.*` 점 스킴과 `~/.omnis/` 홈 규약에 맞춘다. `OMNIS_SELF_MODEL_DIR`로 덮어쓴다).
-3. `notes` 라우팅 컬럼: A4 §8이 부르는 `notes.routed_to` vs A3 `routed_to_thread_id`/`routed_to_person_id`/`route_state` → **A3의 3컬럼**(A3가 스키마 오너).
-4. 자동 보관 시각: `threads.archived_at`(A5 §3.8 되살리기 배너) vs `items.meta.archived_by.at`(A4 §9.3 undo 기준) → **둘 다 쓴다**. 스레드 배너는 `threads.archived_at`, item 단위 undo 창은 `meta.archived_by.at`. 컬럼 승격은 열린 항목(백로그 §6-3).
-5. 설정 저장소: 부록 어디에도 없음 → **`settings` kv 테이블 1개**(백로그 B-D2, 이 문서 §5의 `0009`).
-6. Web Push 알림 종류: A5 §4.4 "Digest 진입 푸시 1종" vs A4 §3.6 3등급 → **A4 §3.6이 알림 정책 오너**. A5의 "1종"은 Digest 진입 푸시가 1종이라는 뜻이고 초안 3등급은 폰에도 그대로 적용된다.
-7. 아바타: A5 §3.6 "아바타/이니셜" → **이니셜만**(백로그 B-D3). `persons.avatar_url` 컬럼을 만들지 않는다.
+Story IDs refer to `2026-09-20-phase-b-backlog.md` (US-B01~B44).
 
 ---
 
-## 1. 패키지 추가·변경
+## 0. Appendix conflict rulings (one line each)
 
-| 패키지명 | 경로 | 의존(이 외 금지) | Phase B 스토리 |
+The 10 items in Phase A contract §0 remain valid as-is. What Phase B newly decides:
+
+> **Revision (2026-09-20, cross review)** — M1~M11 from `2026-09-20-phase-b-plans-review.md` have been folded into this document. Sections changed: §1 (single owner for root scripts), §2.1 (`isDenied`/`DENY_PATTERNS` definition relocated), §3 (`@omnis/memory` 9 new symbols), §4 (`LoopId`·`TriggerContext`·`decide?`·`runLoopSpec`·`LoopKernel`/`LoopLogger`·`writeSystemItem` added, `startLoops` signature corrected, `ingestLoop` removed), §5 (`cost.last_state`), §6 (W0 schema bundle), §7 (`GET /transcript` reassigned, `POST /notes/:id/route` added), §9 (2 environment variables · 4 Keychain items), §11 (W0 row). Body edits to the plan documents (M12~M14) are up to each plan author.
+
+1. **mem0-ts custom VectorStore** (body of A3-D12) vs **direct implementation** (A3-D12 fallback) → **the fallback is the source of truth** (backlog B-D1, measured against `mem0ai@3.2.0`: `MemoryConfig.vectorStore` is a provider string plus a static `VectorStoreFactory` factory, so there is no slot for injecting an instance, and the bundled `PGVector` creates its own table). S-A3-1 = **FAIL**; `@omnis/memory` attaches directly to `public.memories`.
+2. self-model file path: the A3 §5 table's `~/.omnis/memory/*.md` vs A4 §13.2's `~/omnis/self-model/` → **`~/.omnis/self-model/`** (aligns with the `omnis.*` dotted scheme in A6 §9 and the `~/.omnis/` home convention. Overridden by `OMNIS_SELF_MODEL_DIR`).
+3. `notes` routing columns: `notes.routed_to` as called for by A4 §8 vs A3's `routed_to_thread_id`/`routed_to_person_id`/`route_state` → **A3's 3 columns** (A3 owns the schema).
+4. Auto-archive timestamp: `threads.archived_at` (A5 §3.8 restore banner) vs `items.meta.archived_by.at` (A4 §9.3 undo basis) → **use both**. The thread banner uses `threads.archived_at`; the item-level undo window uses `meta.archived_by.at`. Promoting it to a column is an open item (backlog §6-3).
+5. Settings storage: found in no appendix → **one `settings` kv table** (backlog B-D2, `0009` in §5 of this document).
+6. Web Push notification kinds: A5 §4.4 "1 kind of digest-entry push" vs A4 §3.6's 3 tiers → **A4 §3.6 owns notification policy**. A5's "1 kind" means there is one kind of digest-entry push, and the 3 draft tiers apply on the phone unchanged.
+7. Avatar: A5 §3.6 "avatar/initials" → **initials only** (backlog B-D3). No `persons.avatar_url` column is created.
+
+---
+
+## 1. Packages added and changed
+
+| Package | Path | Dependencies (nothing else) | Phase B story |
 |---|---|---|---|
 | `@omnis/memory` | `packages/memory` | `@omnis/db`, `@omnis/protocol`, `ai`, `pg` | B01, B02, B04, B08~B12 |
 | `@omnis/adapter-outlook` | `packages/adapters/outlook` | `@omnis/protocol` | B37 |
 | `@omnis/adapter-telegram` | `packages/adapters/telegram` | `@omnis/protocol` | B38 |
-| `@omnis/web` | `apps/web` | `@omnis/ui`, `@omnis/protocol`, `@omnis/kernel`(`/zero` 서브패스만) | B35, B36 |
+| `@omnis/web` | `apps/web` | `@omnis/ui`, `@omnis/protocol`, `@omnis/kernel` (`/zero` subpath only) | B35, B36 |
 
-**변경되는 의존**:
-- `@omnis/agents` → `@omnis/protocol`, `@omnis/memory`, `ai`, `pg`를 의존한다(Phase A 계약 §1의 "`@omnis/memory` 제거, Phase A 미사용" 각주는 여기서 해제된다). `@omnis/db`는 계속 의존하지 않는다 — `configureAgents({pool})`로 주입받는 규칙 유지.
-- `@omnis/kernel` → 변화 없음(`@omnis/db`, `@omnis/protocol`).
-- `apps/hub` → `@omnis/memory`, `@omnis/adapter-outlook`, `@omnis/adapter-telegram` 추가.
+**Changed dependencies**:
+- `@omnis/agents` → depends on `@omnis/protocol`, `@omnis/memory`, `ai`, `pg` (the Phase A contract §1 footnote "remove `@omnis/memory`, unused in Phase A" is lifted here). `@omnis/db` is still not a dependency — the rule that it is injected via `configureAgents({pool})` stands.
+- `@omnis/kernel` → unchanged (`@omnis/db`, `@omnis/protocol`).
+- `apps/hub` → adds `@omnis/memory`, `@omnis/adapter-outlook`, `@omnis/adapter-telegram`.
 
-**새 버전 핀**: `web-push 3.6.7`(허브 발송) · `mtcute 0.29.x`(Telegram 사이드카) · `@microsoft/microsoft-graph-client 3.0.7`(Outlook) · `vite-plugin-pwa 0.21.x`(`apps/web`). 나머지 핀은 Phase A 계약 §2 그대로. **`mem0ai`는 의존에 넣지 않는다**(§0-1).
+**New version pins**: `web-push 3.6.7` (hub sending) · `mtcute 0.29.x` (Telegram sidecar) · `@microsoft/microsoft-graph-client 3.0.7` (Outlook) · `vite-plugin-pwa 0.21.x` (`apps/web`). All other pins are as in Phase A contract §2. **`mem0ai` is not added as a dependency** (§0-1).
 
-**새 루트 스크립트**(오너 = memory-ingestion 계획 Task 1이 **5개를 한 번에** 넣는다. 다른 계획은 이 `scripts` 블록을 다시 건드리지 않는다 — agents 계획이 `eval:archive`를 재추가하던 스텝은 삭제한다. 가리키는 파일은 각 소유 계획이 따로 만든다):
+**New root scripts** (owner = memory-ingestion plan Task 1 adds **all five at once**. Other plans do not touch this `scripts` block again — delete the step where the agents plan re-added `eval:archive`. The files they point at are created separately by each owning plan):
 
-| 목적 | 명령 |
+| Purpose | Command |
 |---|---|
-| memory recall 평가 | `pnpm eval:memory` = `tsx tools/eval/memory-recall.ts` |
-| 초안 평가 | `pnpm eval:draft` = `tsx tools/eval/draft.ts` |
-| 자동 보관 평가 | `pnpm eval:archive` = `tsx tools/eval/auto-archive.ts` |
+| memory recall evaluation | `pnpm eval:memory` = `tsx tools/eval/memory-recall.ts` |
+| draft evaluation | `pnpm eval:draft` = `tsx tools/eval/draft.ts` |
+| auto-archive evaluation | `pnpm eval:archive` = `tsx tools/eval/auto-archive.ts` |
 | Phase B e2e | `pnpm e2e:phase-b` = `tsx tools/e2e/run.ts --phase b` |
-| PWA 빌드 | `pnpm web:build` = `pnpm --filter @omnis/web build` |
+| PWA build | `pnpm web:build` = `pnpm --filter @omnis/web build` |
 
 ---
 
-## 2. `@omnis/protocol` 추가 exports
+## 2. `@omnis/protocol` additional exports
 
-파일: `src/ingest.ts`(2.1), `src/search.ts`(2.2), `src/bridge.ts`(수정, 2.3). 전부 zod + `z.infer`.
+Files: `src/ingest.ts` (2.1), `src/search.ts` (2.2), `src/bridge.ts` (modified, 2.3). All zod + `z.infer`.
 
 ### 2.1 ingest RPC (A2 §3.2)
 
@@ -69,7 +69,7 @@ export const IngestScanResult = z.object({
 });
 export const IngestReadParams = z.object({
   path: z.string(),
-  max_bytes: z.number().int().positive().default(1_048_576),   // 기본 1MB (A2 §3.2)
+  max_bytes: z.number().int().positive().default(1_048_576),   // default 1MB (A2 §3.2)
 });
 export const IngestReadResult = z.object({
   path: z.string(), mtime: z.string().datetime(), bytes: z.number().int(),
@@ -81,16 +81,16 @@ export const MemoryKind = z.enum(["fact","preference","commitment","event","summ
 export type MemorySourceKind = z.infer<typeof MemorySourceKind>;
 export type MemoryKind = z.infer<typeof MemoryKind>;
 
-// A4 §10.2 하드 제외. 여기(protocol)가 정의 오너다 — `apps/local-agent`는 `@omnis/protocol`만
-// 의존하는데 `ingest.scan`/`ingest.read`가 허브와 **같은 목록**으로 경로를 거부해야 한다.
-// `@omnis/memory`는 이 둘을 re-export만 한다(§3).
+// A4 §10.2 hard exclusion. protocol is the definition owner here — `apps/local-agent` depends on `@omnis/protocol`
+// only, yet `ingest.scan`/`ingest.read` must reject paths with the **same list** as the hub.
+// `@omnis/memory` only re-exports these two (§3).
 export const DENY_PATTERNS: readonly RegExp[];
-export function isDenied(path: string): boolean;   // allowlist보다 먼저, 내용은 보지 않는다
+export function isDenied(path: string): boolean;   // before the allowlist, contents are not inspected
 ```
 
-`HUB_METHODS`에 `"ingest.scan"`, `"ingest.read"`를 추가한다(Phase A는 미구현이었다). 경로 거부는 기존 `BridgeError` 코드 `-32005`를 그대로 쓴다.
+Add `"ingest.scan"` and `"ingest.read"` to `HUB_METHODS` (they were unimplemented in Phase A). Path rejection reuses the existing `BridgeError` code `-32005` as-is.
 
-### 2.2 통합 검색 (A4 §14.4)
+### 2.2 Unified search (A4 §14.4)
 
 ```ts
 export const SearchHitKind = z.enum(["person","thread","item","memory"]);
@@ -113,12 +113,12 @@ export const SearchGroup = z.object({
 });
 export const SearchResponse = z.object({
   q: z.string(), took_ms: z.number().int(),
-  groups: z.array(SearchGroup),   // 순서 고정: people, threads, items, memories
+  groups: z.array(SearchGroup),   // fixed order: people, threads, items, memories
   truncated: z.boolean(),
 });
 ```
 
-### 2.3 알림·푸시
+### 2.3 Notification and push
 
 ```ts
 export const NotifyTier = z.enum(["immediate","batched","silent"]);   // A4 §3.6
@@ -130,24 +130,24 @@ export const PushSubscription = z.object({
 export const PushPayload = z.object({
   kind: z.enum(["draft","approval","vip","briefing","digest","followup","adapter_down"]),
   title: z.string().max(80),
-  body: z.string().max(80),          // 본문은 첫 80자만 (A4 §3.6 프라이버시 원칙)
-  deep_link: z.string(),             // omnis://thread/{id} 등
-  approval_id: z.string().uuid().optional(),   // 있으면 알림에 Approve 액션이 붙는다
+  body: z.string().max(80),          // body carries only the first 80 chars (A4 §3.6 privacy principle)
+  deep_link: z.string(),             // omnis://thread/{id} and similar
+  approval_id: z.string().uuid().optional(),   // when present, an Approve action is attached to the notification
 });
 ```
 
 ---
 
-## 3. `@omnis/memory` exports (신규 패키지)
+## 3. `@omnis/memory` exports (new package)
 
 ```ts
 // src/embed.ts — T0, Ollama nomic-embed-text-v1.5, 768d
 export const EMBED_MODEL = "nomic-embed-text-v1.5";
 export const EMBED_DIMS = 768;
-export function embed(texts: readonly string[]): Promise<(number[] | null)[]>;  // 실패분은 null
+export function embed(texts: readonly string[]): Promise<(number[] | null)[]>;  // failures as null
 export function toVectorLiteral(v: number[]): string;                            // "[0.1,0.2,…]"
 
-// src/store.ts — public.memories 직접 소유 (B-D1)
+// src/store.ts — owns public.memories directly (B-D1)
 export interface MemoryInput {
   content: string; kind: MemoryKind; scope: Scope;
   source_kind: MemorySourceKind; source_ref?: string;
@@ -161,7 +161,7 @@ export interface MemoryRow extends MemoryInput {
 export function upsertMemory(pool: Pool, m: MemoryInput): Promise<string>;
 export function invalidateBySource(pool: Pool, source_kind: MemorySourceKind, source_ref: string, at?: Date): Promise<number>;
 export function supersede(pool: Pool, oldId: string, newId: string): Promise<void>;
-export function reembedNulls(pool: Pool, limit?: number): Promise<number>;        // embedding IS NULL 재시도
+export function reembedNulls(pool: Pool, limit?: number): Promise<number>;        // retry where embedding IS NULL
 
 // src/search.ts
 export interface MemoryHit { memory_id: string; content: string; score: number;
@@ -173,7 +173,7 @@ export function searchMemories(pool: Pool, q: { query: string; k?: number; kinds
 export interface EntityInput { type: "person"|"org"|"project"|"commitment"|"decision"|"topic";
   name: string; person_id?: string; attributes?: Record<string, unknown>;
   valid_from: string; valid_until?: string; }
-export function upsertEntity(pool: Pool, e: EntityInput): Promise<string>;   // live 충돌 시 기존 row invalidate 후 새 row
+export function upsertEntity(pool: Pool, e: EntityInput): Promise<string>;   // on live conflict, invalidate the existing row and insert a new one
 export function assertRelation(pool: Pool, r: { from_entity_id: string; to_entity_id: string; type: string;
   attributes?: Record<string, unknown>; source_item_id?: string; confidence?: number;
   valid_from: string; valid_until?: string }): Promise<string>;
@@ -191,10 +191,10 @@ export function invalidateSnapshotCache(): void;
 
 // src/ingest/*.ts
 export interface Chunk { text: string; ord: number; source_ref: string; meta: Record<string, unknown>; }
-export function chunkDocument(text: string): Chunk[];      // 500~800 토큰, 오버랩 100
-export function chunkCode(path: string, text: string): Chunk[];   // 함수/클래스 경계
-// isDenied/DENY_PATTERNS는 `@omnis/protocol`(src/ingest.ts, §2.1)에 정의하고 `@omnis/memory`가 re-export한다.
-// `apps/local-agent`가 `@omnis/protocol`만 의존하면서 같은 목록을 써야 하기 때문이다(A2 §3.2 경로 거부).
+export function chunkDocument(text: string): Chunk[];      // 500~800 tokens, 100 overlap
+export function chunkCode(path: string, text: string): Chunk[];   // function/class boundaries
+// isDenied/DENY_PATTERNS are defined in `@omnis/protocol` (src/ingest.ts, §2.1) and re-exported by `@omnis/memory`.
+// That is because `apps/local-agent` depends only on `@omnis/protocol` while having to use the same list (A2 §3.2 path rejection).
 export { isDenied, DENY_PATTERNS } from "@omnis/protocol";
 export interface IngestSource { id: string; source_kind: MemorySourceKind; source_ref: string;
   cursor: Record<string, unknown>; last_ok_at: string | null; fail_count: number; last_error: string | null; }
@@ -203,38 +203,38 @@ export function runIngest(deps: { pool: Pool; logger: Logger; kind: MemorySource
 export class MemoryEmbedError extends Error {}
 export class IngestDeniedError extends Error {}
 
-// --- memory-ingestion 계획이 고정한 것(계약에 없어 새로 더한다) ---
-export function estimateTokens(s: string): number;            // §12.3 상한 검사와 §1.3 절삭이 같은 추정기를 쓴다
+// --- pinned by the memory-ingestion plan (not in the contract, so added new) ---
+export function estimateTokens(s: string): number;            // the §12.3 cap check and the §1.3 truncation use the same estimator
 export interface EntityRow { id: string; type: EntityInput["type"]; name: string;
   person_id: string | null; attributes: Record<string, unknown>;
   valid_from: string; valid_until: string | null; recorded_at: string; invalidated_at: string | null; }
-export function ensureSelfModelRepo(): Promise<void>;         // US-B02 "레포 초기화"
-export function overCapWarning(snap: SelfModelSnapshot): string | null;   // 상한 초과 시 시스템 Item 문구
+export function ensureSelfModelRepo(): Promise<void>;         // US-B02 "repo initialization"
+export function overCapWarning(snap: SelfModelSnapshot): string | null;   // system Item text when over cap
 export interface IngestDoc { source_ref: string; text: string; meta: Record<string, unknown>; }
 export interface IngestProvider { kind: MemorySourceKind;
   list(cursor: Record<string, unknown>): Promise<{ docs: IngestDoc[]; cursor: Record<string, unknown> }>; }
-export function registerIngestProvider(p: IngestProvider): void;   // runIngest(deps)에 소스 슬롯이 없어서 레지스트리로 꽂는다
+export function registerIngestProvider(p: IngestProvider): void;   // runIngest(deps) has no source slot, so providers are plugged in via a registry
 export function resetIngestProviders(): void;
 export type Extractor = (chunk: Chunk) => Promise<unknown>;
-export function setExtractor(e: Extractor): void;             // provider SDK 격리 유지(§1 의존 규칙)
+export function setExtractor(e: Extractor): void;             // keeps the provider SDK isolated (§1 dependency rule)
 export function createT1Extractor(model: unknown): Extractor;
 export function parseExtractOutput(raw: unknown): { memories: MemoryInput[]; entities: EntityInput[] };
-export function chunkCalendarEvent(ev: unknown): Chunk[];     // 1이벤트 = 1청크 (A4 §10.3)
+export function chunkCalendarEvent(e: CalendarChunkInput): Chunk;  // 1 event = 1 chunk (A4 §10.3)
 export function writeIngestSystemItem(pool: Pool, msg: string): Promise<void>;
 export const DEAD_LETTER_THRESHOLD: 3;                        // A4 §10.5
 ```
 
 ---
 
-## 4. `@omnis/agents` 추가 exports
+## 4. `@omnis/agents` additional exports
 
 ```ts
 // src/loop/spec.ts (A4 §1.1~§1.2)
-// LoopId는 `@omnis/agents`가 **새로** export한다 — Phase A 계약에는 `RecordRunInput.loop`의
-// 인라인 유니온만 있고 이름 붙은 타입이 없었다. 값은 그 9개와 글자 그대로 같다.
+// LoopId is **newly** exported by `@omnis/agents` — the Phase A contract had `RecordRunInput.loop`
+// only as an inline union, with no named type. Its values are literally those same 9.
 export type LoopId = "classify"|"draft"|"task"|"delegate"|"digest"|"followup"|"note_route"|"auto_archive"|"ingest";
 export type LoopKind = "reactive" | "deliberate";
-// A4 §1.2가 루프에 넘기는 트리거 문맥. 델타 v1에서 빠져 있었다(agents 계획 Task 1이 오너).
+// The trigger context A4 §1.2 passes to a loop. It was missing from delta v1 (the agents plan Task 1 is the owner).
 export interface TriggerContext { loop: LoopId; run_id: string; traceId: string | null;
   firedAt: Date; payload: Record<string, unknown>; }
 export interface LoopTrigger { kind: "event"|"schedule"|"manual"; on?: string; where?: string; cron?: string; debounceMs?: number; }
@@ -243,8 +243,8 @@ export interface LoopSpec<TOut> {
   id: LoopId; kind: LoopKind; trigger: LoopTrigger;
   palette: ReadonlyArray<ToolName>; budget: LoopBudget; tier: "T0"|"T1"|"T2";
   outputSchema: z.ZodType<TOut>;
-  /** 모델 없는 T0 선판정. A4 §9.2(자동 보관 ①③④ SQL)·§2.2(분류 3단)가 요구한다.
-   *  false를 돌려주면 모델을 깨우지 않고 루프가 끝난다. 선택 필드라 기존 구현을 깨지 않는다. */
+  /** Model-free T0 pre-check. Required by A4 §9.2 (auto-archive ①③④ SQL)·§2.2 (classification 3-stage).
+   *  Returning false ends the loop without waking the model. It is an optional field, so it does not break existing implementations. */
   decide?(ctx: TriggerContext): Promise<boolean>;
   assemble(ctx: TriggerContext): Promise<AssembledContext>;
   apply(result: LoopResult<TOut>, ctx: TriggerContext): Promise<void>;
@@ -253,18 +253,18 @@ export interface LoopResult<T> { loop: LoopId; run_id: string; output: T; confid
   rationale: string; escalate: boolean; injection_flags: string[]; unresolved: string[]; }
 export function registerLoop<T>(spec: LoopSpec<T>): void;
 export function runLoop(id: LoopId, ctx: TriggerContext): Promise<LoopResult<unknown>>;
-/** 레지스트리를 타지 않는 하위 진입점. `morningDigestLoop`/`nightlyDigestLoop`이 `LoopId`
- *  `'digest'` 하나를 공유해 `registerLoop` 키가 충돌하기 때문에 이 둘은 여기로 부른다. */
+/** Lower-level entry point that does not go through the registry. `morningDigestLoop`/`nightlyDigestLoop` share the single `LoopId`
+ *  `'digest'`, so their `registerLoop` keys collide — that is why these two are called here. */
 export function runLoopSpec<T>(spec: LoopSpec<T>, ctx: TriggerContext): Promise<LoopResult<T>>;
-/** `@omnis/agents`는 `@omnis/kernel`을 의존하지 않는다(§1). `Kernel`/`Logger`가 구조적으로
- *  대입되는 최소 인터페이스만 받는다 — 델타 v1의 `{kernel: Kernel; logger: Logger}`는 §1 위반이었다. */
+/** `@omnis/agents` does not depend on `@omnis/kernel` (§1). It accepts only the minimal interface that `Kernel`/`Logger`
+ *  are structurally assignable to — delta v1's `{kernel: Kernel; logger: Logger}` violated §1. */
 export interface LoopKernel { events: { on(...a: unknown[]): unknown; emit(...a: unknown[]): unknown };
   scheduler: { register(name: string, cron: string, fn: () => Promise<void>): void }; }
 export interface LoopLogger { info(msg: string, meta?: unknown): void; warn(msg: string, meta?: unknown): void;
   error(msg: string, meta?: unknown): void; }
 export function startLoops(deps: { kernel: LoopKernel; logger: LoopLogger }): () => void;
-/** A4 §1.6·§9·§12.4가 반복하는 "시스템 Item으로 인박스에 남긴다"의 단일 구현.
- *  커널 쪽 4줄 INSERT(`apps/hub/src/archive.ts`)는 의도된 중복이다. */
+/** The single implementation of "leave it in the inbox as a system Item", repeated throughout A4 §1.6·§9·§12.4.
+ *  The 4-line INSERT on the kernel side (`apps/hub/src/archive.ts`) is intentional duplication. */
 export function writeSystemItem(pool: Pool, body: string, meta?: Record<string, unknown>): Promise<string>;
 export class LoopBudgetError extends Error {}
 export class PhantomToolError extends Error {}
@@ -284,7 +284,7 @@ export interface AssembledContext { cachedPrefix: string; volatile: DataBlock[];
 export function buildContext(req: ContextRequest): Promise<AssembledContext>;
 
 // src/context/normalize.ts (A4 §1.4·§11.1)
-export function normalizeExternal(text: string, nonce: string): string;   // NFKC·zero-width·HTML·base64·URL·8000자 절단
+export function normalizeExternal(text: string, nonce: string): string;   // NFKC·zero-width·HTML·base64·URL·8000-char truncation
 export function wrapData(text: string, attrs: { nonce: string; source: string; thread?: string; asOf: string }): string;
 export function newNonce(): string;                                        // 16 hex
 export const INJECTION_FLAGS: readonly string[];   // instruction_override | credential_request | exfil_link | phantom_tool | tag_escape
@@ -297,12 +297,12 @@ export const PHANTOM_TOOLS: readonly string[];   // send_message, send_email, re
                                                  // calendar_update, run_agent, exec, read_file, http_fetch, read_secret
 export function toolRegistry(palette: readonly ToolName[]): ToolSet;       // ai@7 ToolSet
 
-// src/context/* 보조 (memory-ingestion 계획 Task 11·12가 고정)
-export function scanInjection(text: string): string[];        // INJECTION_FLAGS 부분집합. normalizeExternal이 문자열만 돌려주므로 별도
+// src/context/* helpers (pinned by memory-ingestion plan Tasks 11 and 12)
+export function scanInjection(text: string): string[];        // subset of INJECTION_FLAGS. Separate because normalizeExternal returns only a string
 export function setContextBudget(n: number): void;
 export const CONTEXT_INPUT_BUDGET_TOKENS: 12000;
 
-// src/loops/*.ts — 루프 하나당 하나, 전부 LoopSpec을 default export 하지 않고 이름으로 export
+// src/loops/*.ts — one per loop; none of them default-exports its LoopSpec, all are exported by name
 export const draftLoop: LoopSpec<DraftOutput>;
 export const taskLoop: LoopSpec<TaskOutput>;
 export const delegateLoop: LoopSpec<DelegateOutput>;
@@ -311,8 +311,8 @@ export const noteRouteLoop: LoopSpec<RouteOutput>;
 export const followupLoop: LoopSpec<FollowupOutput>;
 export const morningDigestLoop: LoopSpec<MorningBriefing>;
 export const nightlyDigestLoop: LoopSpec<NightlyDigest>;
-// `ingestLoop`은 삭제했다 — 어느 계획도 만들지 않고, L9의 실제 진입점은 `@omnis/memory`의
-// `runIngest(deps)`를 허브 cron 핸들러가 직접 부르는 것이다(§3, memory-ingestion Task 17).
+// `ingestLoop` has been removed — no plan creates it, and L9's real entry point is `@omnis/memory`'s
+// `runIngest(deps)`, called directly by the hub cron handler (§3, memory-ingestion Task 17).
 
 // src/draft/*.ts (A4 §3)
 export type Register = "formal_ko"|"polite_ko"|"casual_ko"|"formal_en"|"casual_en";
@@ -325,12 +325,12 @@ export function selfCheck(draft: string, ctx: SelfCheckCtx): { passed: boolean; 
 export interface DelegationHints { needs_paths: string[]; needs_channel_session: boolean;
   needs_always_on: boolean; est_minutes: number | null; repo: string | null; }
 export interface Routing { host: HostId; runtime?: RuntimeKind; rule_id: string; }
-export function extractHints(text: string): DelegationHints;               // 정규식, LLM 아님
+export function extractHints(text: string): DelegationHints;               // regex, not an LLM
 export function routeByRule(h: DelegationHints, hosts: HostHealth): Routing | null;
 export const DELEGATION_DAILY_CAP: 5;
 export const DELEGATION_THREAD_CAP_24H: 2;
 
-// src/digest/rank.ts (A4 §6.3) — 랭킹은 산술이다
+// src/digest/rank.ts (A4 §6.3) — ranking is arithmetic
 export function rankBriefItems(rows: BriefCandidate[], now: Date): BriefItem[];
 export interface MorningBriefing { greeting: string; sections: BriefSection[]; one_liner: string; }
 export interface NightlyDigest { headline: string; auto_archived: DigestGroup[];
@@ -342,7 +342,7 @@ export interface DigestGroup { reason: string; count: number; samples: BriefItem
 
 ---
 
-## 5. `@omnis/kernel` 추가 exports
+## 5. `@omnis/kernel` additional exports
 
 ```ts
 // src/identity.ts (A3 §10) — US-B03
@@ -350,18 +350,18 @@ export function handleNorm(channel: Channel, raw: string, roomExternalId?: strin
 export function resolvePerson(c: PoolClient, channel: Channel, handle: string, display: string): Promise<{ person_id: string; created: boolean }>;
 export function mergePersons(pool: Pool, from: string, to: string, actor: string): Promise<void>;
 export function splitIdentity(pool: Pool, identityId: string, toPersonId: string | null, actor: string): Promise<void>;
-export function initialsFor(displayName: string): string;     // B-D3, avatar_url 없음
+export function initialsFor(displayName: string): string;     // B-D3, no avatar_url
 
 // src/settings.ts (B-D2) — US-B33
 export type SettingKey =
-  | "cost.cap_usd" | "cost.reserve_ratio" | "cost.last_state"   // last_state는 내부 키 — Settings 화면에 노출하지 않는다
+  | "cost.cap_usd" | "cost.reserve_ratio" | "cost.last_state"   // last_state is an internal key — not exposed on the Settings screen
   | "notify.quiet_hours" | "notify.vip_override"
   | "archive.t1_confidence_min" | "archive.enabled"
   | "ingest.local_roots.mini" | "ingest.local_roots.macbook" | "ingest.drive_folders" | "ingest.github_repos"
   | "autonomy.rules" | "kakao.send_enabled_at";
 export function getSetting<T>(pool: Pool, key: SettingKey, fallback: T): Promise<T>;
-export function setSetting(pool: Pool, key: SettingKey, value: unknown, actor: string): Promise<void>;  // audit_log 필수
-export const SETTING_DEFAULTS: Readonly<Record<SettingKey, unknown>>;   // allowlist 3종은 전부 [] (빈 값)
+export function setSetting(pool: Pool, key: SettingKey, value: unknown, actor: string): Promise<void>;  // audit_log required
+export const SETTING_DEFAULTS: Readonly<Record<SettingKey, unknown>>;   // all 3 allowlist kinds are [] (empty)
 
 // src/cost/governor.ts (A4 §12.4) — US-B14
 export type CostState = "normal" | "warn" | "degraded" | "reserve_only" | "frozen";
@@ -390,122 +390,122 @@ export interface ArchivedByMeta { rule_ids: string[]; reason: string; tier: "T0"
 
 // src/adapter-health.ts — US-B40
 export function recordAdapterHealth(pool: Pool, channel: Channel, ok: boolean, error?: string): Promise<void>;
-// 연속 실패 임계 초과 시 accounts.state='broken' + items(kind='system') + ntfy (A6 §8 이중 노출)
+// when the consecutive-failure threshold is exceeded: accounts.state='broken' + items(kind='system') + ntfy (A6 §8 dual exposure)
 ```
 
-`Kernel` 인터페이스에 추가되는 필드: `settings`, `cost`, `notifier`, `identity`. `createKernel(deps)`의 `KernelDeps`에 `vapid?: VapidKeys`가 붙는다(없으면 Web Push 발송만 비활성, 나머지는 정상 동작).
+Fields added to the `Kernel` interface: `settings`, `cost`, `notifier`, `identity`. `KernelDeps` for `createKernel(deps)` gains `vapid?: VapidKeys` (when absent, only Web Push sending is disabled; everything else behaves normally).
 
 ---
 
-## 6. `@omnis/db` — 마이그레이션 0009~0013
+## 6. `@omnis/db` — migrations 0009~0013
 
-**Phase A 계약 §4의 "8파일이 v1 테이블 전체" 문장은 Phase B에서 5파일이 더해지는 것으로 갱신된다**(A3 §8도 같이 고쳐야 한다 — 백로그 §6-2).
+**The Phase A contract §4 sentence "8 files is the entire v1 table set" is updated in Phase B to add 5 more files** (A3 §8 must be fixed the same way — backlog §6-2).
 
-**오너십 (2026-09-20 교차 리뷰에서 바뀐 것, M1~M3):** `0009`·`0011`·`0012`·`0013`은 **웨이브 0 스키마 번들**이다 — 한 워크트리에서 한 커밋으로, `packages/kernel/src/settings.ts`(§5의 `getSetting`/`setSetting`/`SETTING_DEFAULTS`)와 같이 낸다. 이유:
-- `0012`를 agents 계획(Task 7)과 channels 계획(Task 5)이 **각자 다른 내용으로** 만들고 있었다(agents판에만 `cost_daily` 뷰가 있다). 마이그레이션 러너는 이미 적용된 파일의 sha256이 바뀌면 throw하므로(계약 §4) 병렬 워크트리에서 나눠 가질 수 없다.
-- `settings`(B33, surfaces)를 B09·B11·B14가 먼저 소비하고 B33은 다시 B09/B11/B14/B18에 의존해 **순환**이었다. `push_subscriptions`(B36)와 B17도 같은 형태였다.
-번들을 먼저 머지하면 셋 다 사라진다. **다른 계획은 `packages/db/migrations/`에 파일을 만들지 않는다** — 예외는 memory-ingestion의 `0010` 하나. ops 계획의 `0014_cost_report_job.sql`은 이 규칙에서 불필요해지므로 삭제한다.
+**Ownership (changed in the 2026-09-20 cross review, M1~M3):** `0009`·`0011`·`0012`·`0013` are the **wave 0 schema bundle** — one worktree, one commit, shipped together with `packages/kernel/src/settings.ts` (the `getSetting`/`setSetting`/`SETTING_DEFAULTS` from §5). Reasons:
+- The agents plan (Task 7) and the channels plan (Task 5) were each creating `0012` with **different contents** (only the agents version has the `cost_daily` view). The migration runner throws when the sha256 of an already-applied file changes (contract §4), so parallel worktrees cannot split it between them.
+- B09·B11·B14 consume `settings` (B33, surfaces) first, and B33 in turn depends on B09/B11/B14/B18 — a **circular dependency**. `push_subscriptions` (B36) and B17 had the same shape.
+Merging the bundle first makes all three disappear. **Other plans do not create files under `packages/db/migrations/`** — the single exception is memory-ingestion's `0010`. The ops plan's `0014_cost_report_job.sql` becomes unnecessary under this rule, so it is deleted.
 
-| 파일 | 만드는 것 | 스토리 |
+| File | What it creates | Story |
 |---|---|---|
-| `0009_settings.sql`(W0) | `settings(key text PRIMARY KEY, value jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())` + `SETTING_DEFAULTS` seed + `omnis_control` NOTIFY 트리거(`{"settings":"<key>"}`) | B33 |
+| `0009_settings.sql`(W0) | `settings(key text PRIMARY KEY, value jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())` + `SETTING_DEFAULTS` seed + `omnis_control` NOTIFY trigger (`{"settings":"<key>"}`) | B33 |
 | `0010_ingest_sources.sql` | `ingest_sources(id uuid PK, source_kind text NOT NULL, source_ref text NOT NULL, cursor jsonb NOT NULL DEFAULT '{}', last_ok_at timestamptz, fail_count int NOT NULL DEFAULT 0, last_error text, UNIQUE(source_kind, source_ref))` | B08 |
 | `0011_push_subscriptions.sql`(W0) | `push_subscriptions(id uuid PK, endpoint text UNIQUE NOT NULL, p256dh text NOT NULL, auth text NOT NULL, ua text, created_at timestamptz NOT NULL DEFAULT now(), last_ok_at timestamptz, fail_count int NOT NULL DEFAULT 0)` | B36 |
-| `0012_jobs_phase_b.sql`(W0) | `jobs` seed 4건 추가(§8 표) + `CREATE VIEW cost_daily`(agents 계획 Task 7 본문의 뷰 정의를 그대로 쓴다) | B14, B15, B37, B44가 **소비만** 한다 |
-| `0013_publication_phase_b.sql`(W0) | `ALTER PUBLICATION zero_omnis ADD TABLE settings;` — `ingest_sources`·`push_subscriptions`는 **추가하지 않는다** | B33 |
+| `0012_jobs_phase_b.sql`(W0) | adds 4 `jobs` seeds (§8 table) + `CREATE VIEW cost_daily` (uses the view definition in the agents plan Task 7 body verbatim) | B14, B15, B37, B44 **consume only** |
+| `0013_publication_phase_b.sql`(W0) | `ALTER PUBLICATION zero_omnis ADD TABLE settings;` — `ingest_sources` and `push_subscriptions` are **not added** | B33 |
 
-- **새 NOTIFY 채널은 없다.** `settings` 변경은 기존 `omnis_control`에 `{"settings":"<key>"}`를 실어 허브 캐시를 무효화한다. `NOTIFY_CHANNELS`는 7개 그대로.
-- **기존 마이그레이션은 건드리지 않는다.** `accounts_channel_ck`는 이미 `outlook`·`telegram`을 포함한다(0002 실측) — 새 마이그레이션 불필요.
-- `memories`/`entities`/`relations`/`tasks`/`notes`/`digests`/`persons`는 **컬럼 변경 없음**. Phase B가 요구하는 값은 전부 기존 컬럼과 `items.meta`/`threads.meta`로 표현된다.
+- **There is no new NOTIFY channel.** A `settings` change carries `{"settings":"<key>"}` on the existing `omnis_control` to invalidate the hub cache. `NOTIFY_CHANNELS` stays at 7.
+- **Existing migrations are not touched.** `accounts_channel_ck` already includes `outlook` and `telegram` (measured in 0002) — no new migration needed.
+- `memories`/`entities`/`relations`/`tasks`/`notes`/`digests`/`persons` have **no column changes**. Every value Phase B requires is expressed with existing columns and `items.meta`/`threads.meta`.
 
 ---
 
-## 7. 허브 HTTP 라우트 추가
+## 7. Hub HTTP routes added
 
-Phase A 계약 §5의 표에 더해진다. 전부 `127.0.0.1:8787` bind, Tailscale Serve `/api/` 마운트, `application/json`.
+Added to the table in Phase A contract §5. All bind to `127.0.0.1:8787`, mount under Tailscale Serve `/api/`, and use `application/json`.
 
-| 메서드·경로 | body | 응답 | 스토리 |
+| Method and path | body | Response | Story |
 |---|---|---|---|
 | `GET /search?q&k&scope&since` | — | `SearchResponse` (§2.2) | B26 |
-| `GET /memory/search?q&k&kinds` | — | `{ results: MemoryHit[] }` (A3 §7의 예고된 경로) | B26 |
-| `GET /transcript/:session_id?last_n` | — | `SessionSummary` (A3 §7) | ~~B39~~ → **surfaces 계획 Task 11**(2026-09-20 교차 리뷰 M8에서 재배정, 해당 태스크가 작성됨). channels 계획의 US-B39 산출물은 `apps/local-agent/src/bridges/hermes.ts` 하나뿐이라 이 허브 라우트를 구현하지 않는다 |
+| `GET /memory/search?q&k&kinds` | — | `{ results: MemoryHit[] }` (the path foreshadowed in A3 §7) | B26 |
+| `GET /transcript/:session_id?last_n` | — | `SessionSummary` (A3 §7) | ~~B39~~ → **surfaces plan Task 11** (reassigned in M8 of the 2026-09-20 cross review; that task has been written). The channels plan's US-B39 deliverable is only `apps/local-agent/src/bridges/hermes.ts`, so it does not implement this hub route |
 | `GET /settings` | — | `{ settings: Record<SettingKey, unknown> }` | B33 |
-| `PUT /settings/:key` | `{ value: unknown }` | `{ key, value }` — `audit_log` 필수 | B33 |
+| `PUT /settings/:key` | `{ value: unknown }` | `{ key, value }` — `audit_log` required | B33 |
 | `POST /items/:id/unarchive` | — | `{ id, status: "received" }` | B32 |
 | `POST /digests/:id/undo` | `{ undo_token: string }` | `{ restored: number }` | B32 |
-| `GET /push/vapid-public-key` | — | `{ key: string }` (비밀 미설정 시 503) | B36 |
+| `GET /push/vapid-public-key` | — | `{ key: string }` (503 when the secret is unset) | B36 |
 | `POST /push/subscribe` | `PushSubscription` (§2.3) | `{ id: string }` | B36 |
 | `DELETE /push/subscribe` | `{ endpoint: string }` | `{ removed: boolean }` | B36 |
-| `POST /approvals/:id/decide` | (기존) | (기존) — **Web Push `Approve` 액션이 이 경로를 그대로 쓴다.** 새 경로를 만들지 않는다 | B36 |
+| `POST /approvals/:id/decide` | (existing) | (existing) — **the Web Push `Approve` action uses this path as-is.** No new path is created | B36 |
 | `GET /cost` | — | `{ state: CostState, mtdUsd, capUsd, reserveUsd, policy: Policy }` | B33 |
-| `POST /notes/:id/route` | `{ accept: boolean; thread_id?: string; person_id?: string }` | `{ route_state: string }` — L7 제안의 수락/거절. 델타 v1에 없던 라우트다 | B31 |
+| `POST /notes/:id/route` | `{ accept: boolean; thread_id?: string; person_id?: string }` | `{ route_state: string }` — accept/reject of an L7 proposal. This route was not in delta v1 | B31 |
 
-`GET /` 및 정적 자산: Tailscale Serve가 `apps/web` 빌드 산출물을 서빙한다(허브 프로세스가 아니라 `tailscale serve --bg --https=443 / localhost:5173/`, A6 §3). 허브는 API만 낸다.
+`GET /` and static assets: Tailscale Serve serves the `apps/web` build output (not the hub process — `tailscale serve --bg --https=443 / localhost:5173/`, A6 §3). The hub exposes the API only.
 
 ---
 
-## 8. 잡(cron) 추가
+## 8. Jobs (cron) added
 
-A4 §6.1 표가 정본인 10건 + A3 §6 인프라 6건은 **이미 `0006_kernel.sql`에 seed되어 있다**(실측). Phase B가 더하는 것만:
+The 10 items in the A4 §6.1 table (the source of truth) plus the 6 infrastructure items in A3 §6 are **already seeded in `0006_kernel.sql`** (measured). Only what Phase B adds:
 
-| 잡 이름 | cron (TZ=Asia/Seoul) | 하는 일 | 소유 | 스토리 |
+| Job name | cron (TZ=Asia/Seoul) | What it does | Owner | Story |
 |---|---|---|---|---|
-| `cost_daily` | `5 0 * * *` | `agent_runs` → `cost_daily` 집계 + `CostState` 전이 감지 | A4 §12.4 | B14 |
-| `push_batch` | `0 9,12,15,18 * * *` | 묶음 등급 알림을 "초안 N건 준비됨" 1건으로 발송 | A4 §3.6 | B15 |
-| `outlook_delta_poll` | `*/5 * * * *` | Graph delta 폴링(webhook 전 단계) | A1 §2.4 | B37 |
-| `cost_report_monthly` | `10 0 1 * *` | 월간 리포트 → `digests.metrics` | A4 §12.4 | B44 |
+| `cost_daily` | `5 0 * * *` | `agent_runs` → `cost_daily` aggregation + `CostState` transition detection | A4 §12.4 | B14 |
+| `push_batch` | `0 9,12,15,18 * * *` | sends batched-tier notifications as a single "N drafts ready" message | A4 §3.6 | B15 |
+| `outlook_delta_poll` | `*/5 * * * *` | Graph delta polling (the stage before webhook) | A1 §2.4 | B37 |
+| `cost_report_monthly` | `10 0 1 * *` | monthly report → `digests.metrics` | A4 §12.4 | B44 |
 
-**기존 잡에 핸들러가 붙는 것**(seed는 이미 있고 Phase B가 구현을 채운다): `morning_digest`(B23), `nightly_digest`(B24), `memory_consolidate`(B24), `auto_archive_sweep`(B18), `task_remind`(B19), `network_inactive_sweep`(B22), `self_model_weekly`(B25), `drive_poll`(B11, 맥북 `ingest.scan` 동승 B10), `github_poll`(B11), `eval_weekly`(B12), `token_refresh`/`gmail_rewatch`/`graph_sub_renew`(B40).
+**Handlers attached to existing jobs** (the seeds already exist and Phase B fills in the implementations): `morning_digest`(B23), `nightly_digest`(B24), `memory_consolidate`(B24), `auto_archive_sweep`(B18), `task_remind`(B19), `network_inactive_sweep`(B22), `self_model_weekly`(B25), `drive_poll`(B11, riding along with the MacBook `ingest.scan` B10), `github_poll`(B11), `eval_weekly`(B12), `token_refresh`/`gmail_rewatch`/`graph_sub_renew`(B40).
 
-백업(`pg_dump`·restic)과 healthcheck ping은 **`jobs` 테이블이 아니라 launchd**다(A6 §1·§4 소유, B41·B42).
+Backups (`pg_dump`·restic) and healthcheck pings are **launchd, not the `jobs` table** (owned by A6 §1·§4, B41·B42).
 
 ---
 
-## 9. 환경변수 · Keychain 추가
+## 9. Environment variables · Keychain additions
 
-**환경변수**(Phase A 계약 §9에 더함, 전부 `OMNIS_` 접두 + 대문자 스네이크):
+**Environment variables** (added to Phase A contract §9; all `OMNIS_`-prefixed + upper snake case):
 
-| 이름 | 기본값 | 쓰는 곳 |
+| Name | Default | Used by |
 |---|---|---|
-| `OMNIS_SELF_MODEL_DIR` | `~/.omnis/self-model` | `@omnis/memory` self-model 로더 (§0-2) |
+| `OMNIS_SELF_MODEL_DIR` | `~/.omnis/self-model` | `@omnis/memory` self-model loader (§0-2) |
 | `OMNIS_OLLAMA_EMBED_MODEL` | `nomic-embed-text-v1.5` | `@omnis/memory` embed |
-| `OMNIS_ANTHROPIC_API_KEY` | — | T2(Claude Sonnet 5) + Message Batches. 없으면 T2 경로가 스킵되고 시스템 Item이 뜬다 |
-| `OMNIS_WEBPUSH_VAPID_PUBLIC` / `OMNIS_WEBPUSH_VAPID_PRIVATE` | — | 허브 Web Push 발송. 미설정 시 `/push/*`가 503 |
-| `OMNIS_WEBPUSH_SUBJECT` | `mailto:281932556+jinhologankim@users.noreply.github.com` | VAPID `sub` 클레임 |
-| `OMNIS_WEB_PORT` | `5173` | `apps/web` dev·정적 서빙 포트(A6 §3의 serve 대상) |
-| `OMNIS_GITHUB_TOKEN` | — | GitHub ETag 폴링(PAT, App은 S-A4-6) |
+| `OMNIS_ANTHROPIC_API_KEY` | — | T2 (Claude Sonnet 5) + Message Batches. Without it the T2 path is skipped and a system Item appears |
+| `OMNIS_WEBPUSH_VAPID_PUBLIC` / `OMNIS_WEBPUSH_VAPID_PRIVATE` | — | hub Web Push sending. When unset, `/push/*` returns 503 |
+| `OMNIS_WEBPUSH_SUBJECT` | `mailto:281932556+jinhologankim@users.noreply.github.com` | VAPID `sub` claim |
+| `OMNIS_WEB_PORT` | `5173` | `apps/web` dev and static-serving port (the serve target in A6 §3) |
+| `OMNIS_GITHUB_TOKEN` | — | GitHub ETag polling (PAT; the App is S-A4-6) |
 | `OMNIS_OUTLOOK_CLIENT_ID` / `OMNIS_OUTLOOK_TENANT` | — / `common` | Outlook OAuth |
-| `OMNIS_TELEGRAM_API_ID` / `OMNIS_TELEGRAM_API_HASH` | — | mtcute. **로그·에러 메시지에 절대 넣지 않는다** |
-| `HERMES_BASE_URL` | `http://127.0.0.1:8642` | Phase A 계약에 이미 있음 — Phase B가 처음 쓴다 |
-| `OMNIS_OPENROUTER_API_KEY` | — | 동기 T2(`anthropic/claude-sonnet-5`)와 T1 추출. 새 SDK 핀을 피하려고 동기 T2는 OpenRouter, Batch API만 Anthropic 직접 `fetch`다 — `agent_runs.provider`가 동기 T2에서 `openrouter`로 기록되는 것을 US-B44 리포트가 감안해야 한다. 빈 값이면 해당 경로가 스킵된다(B-D5 테스트 폴백) |
-| `OMNIS_NTFY_URL` | `http://127.0.0.1:2586` | self-hosted ntfy. 토픽은 `omnis-critical`/`omnis-warning` 2종(A6 §8). `@omnis/kernel`의 `sendNtfy`(channels)와 `ops/scripts/healthcheck-ping.sh`(ops)가 같은 값을 쓴다 |
+| `OMNIS_TELEGRAM_API_ID` / `OMNIS_TELEGRAM_API_HASH` | — | mtcute. **never put these in logs or error messages** |
+| `HERMES_BASE_URL` | `http://127.0.0.1:8642` | already in the Phase A contract — Phase B is the first to use it |
+| `OMNIS_OPENROUTER_API_KEY` | — | synchronous T2 (`anthropic/claude-sonnet-5`) and T1 extraction. To avoid a new SDK pin, synchronous T2 goes through OpenRouter and only the Batch API uses a direct Anthropic `fetch` — the US-B44 report must account for `agent_runs.provider` being recorded as `openrouter` on synchronous T2. An empty value skips that path (B-D5 test fallback) |
+| `OMNIS_NTFY_URL` | `http://127.0.0.1:2586` | self-hosted ntfy. Two topics, `omnis-critical`/`omnis-warning` (A6 §8). `@omnis/kernel`'s `sendNtfy` (channels) and `ops/scripts/healthcheck-ping.sh` (ops) use the same value |
 
-**Keychain 항목**(A6 §9 점 스킴 `omnis.<service>.<kind>`, account = `281932556+jinhologankim@users.noreply.github.com`):
+**Keychain entries** (A6 §9 dotted scheme `omnis.<service>.<kind>`, account = `281932556+jinhologankim@users.noreply.github.com`):
 
-`omnis.webpush.vapid_private` · `omnis.webpush.vapid_public` · `omnis.anthropic.api_key` · `omnis.github.pat` · `omnis.outlook.<upn>` · `omnis.telegram.session_key` · `omnis.hermes.api_key.mini` · `omnis.hermes.api_key.macbook`(뒤 둘은 Phase A 계약 §8에 이미 예약되어 있다). `omnis.openrouter.api_key`(동기 T2·T1 추출) · `omnis.healthchecks.<slug>`(체크 15종 ping UUID) · `omnis.restic.repo_password` · `omnis.b2.app_key`(백업, US-B41). DeepSeek 키는 기존 `deepseek-api` 항목을 그대로 읽는다(A6 §9 기존 자산 재사용 규칙).
-
----
-
-## 10. Zero 복제 범위 변경
-
-| 테이블 | 복제 | 왜 |
-|---|---|---|
-| `settings` | **포함**(`0013`) | Settings 화면과 PWA가 값을 읽는다. 쓰기는 허브 `PUT /settings/:key`만 |
-| `ingest_sources` | 제외 | 폴링 커서. 클라이언트가 쓸 일이 없다 |
-| `push_subscriptions` | 제외 | 엔드포인트·키는 서버만 |
-| `memories`·`entities`·`relations` | **제외 유지** | A3 §7 그대로. 768d × 다수 row를 폰에 밀지 않는다 — `GET /search`·`GET /memory/search`가 유일 경로 |
-| `items`(컬럼 리스트) | **변경 없음** | `meta`가 이미 포함이라 `meta.archived_by`·`meta.pending`이 그대로 내려간다 |
-| `persons` | **변경 없음** | 이니셜은 `display_name`에서 계산한다(B-D3) |
-
-`ZERO_TABLES`에 `"settings"` 1개가 추가되고 `assertZeroPublication`이 그 차이를 부팅에서 잡는다. **권한 규칙**: `settings`는 `row.select`만 — Phase A 편차(모든 복제 테이블 읽기 전용, 쓰기는 허브 HTTP)를 Phase B도 그대로 유지한다. `zero:deploy-permissions`를 `0013` 적용 후 다시 돌리지 않으면 zero-cache가 한 행도 내려보내지 않는다.
+`omnis.webpush.vapid_private` · `omnis.webpush.vapid_public` · `omnis.anthropic.api_key` · `omnis.github.pat` · `omnis.outlook.<upn>` · `omnis.telegram.session_key` · `omnis.hermes.api_key.mini` · `omnis.hermes.api_key.macbook` (the last two are already reserved in Phase A contract §8). `omnis.openrouter.api_key`(synchronous T2 and T1 extraction) · `omnis.healthchecks.<slug>`(ping UUIDs for 15 checks) · `omnis.restic.repo_password` · `omnis.b2.app_key`(backups, US-B41). The DeepSeek key reads the existing `deepseek-api` entry as-is (A6 §9 reuse-existing-assets rule).
 
 ---
 
-## 11. 스토리 → 계획 파일 → 심볼
+## 10. Zero replication scope changes
 
-| 스토리 | 계획 파일 | 이 문서가 고정한 심볼 |
+| Table | Replication | Why |
 |---|---|---|
-| US-B01, B08~B12 | `…-phase-b-memory-ingestion.md` | §3 전부 (`embed`/`upsertMemory`/`searchMemories`/`invalidateBySource`/`chunk*`/`isDenied`/`runIngest`) |
+| `settings` | **included**(`0013`) | The Settings screen and the PWA read the values. Writes happen only through the hub's `PUT /settings/:key` |
+| `ingest_sources` | excluded | Polling cursor. The client never has a reason to write it |
+| `push_subscriptions` | excluded | Endpoint and keys are server-only |
+| `memories`·`entities`·`relations` | **still excluded** | As in A3 §7. 768d × many rows are not pushed to the phone — `GET /search` and `GET /memory/search` are the only paths |
+| `items`(column list) | **unchanged** | `meta` is already included, so `meta.archived_by`·`meta.pending` flow down as-is |
+| `persons` | **unchanged** | Initials are computed from `display_name` (B-D3) |
+
+One entry, `"settings"`, is added to `ZERO_TABLES`, and `assertZeroPublication` catches that difference at boot. **Permission rule**: `settings` gets `row.select` only — Phase B keeps the Phase A deviation (every replicated table read-only, writes over hub HTTP) exactly as it is. Unless `zero:deploy-permissions` is re-run after `0013` is applied, zero-cache will not send down a single row.
+
+---
+
+## 11. Story → plan file → symbols
+
+| Story | Plan file | Symbols pinned by this document |
+|---|---|---|
+| US-B01, B08~B12 | `…-phase-b-memory-ingestion.md` | all of §3 (`embed`/`upsertMemory`/`searchMemories`/`invalidateBySource`/`chunk*`/`isDenied`/`runIngest`) |
 | US-B02 | 〃 | §3 `loadSelfModel`/`applySelfModelPatch`/`SELF_MODEL_TOKEN_CAPS` |
 | US-B03 | 〃 | §5 `handleNorm`/`resolvePerson`/`mergePersons`/`splitIdentity`/`initialsFor` |
 | US-B04 | 〃 | §3 `upsertEntity`/`assertRelation`/`asOf` |
@@ -520,22 +520,22 @@ A4 §6.1 표가 정본인 10건 + A3 §6 인프라 6건은 **이미 `0006_kernel
 | US-B23, B24 | 〃 | §4 `MorningBriefing`/`NightlyDigest`/`DigestGroup`/`rankBriefItems` |
 | US-B25 | 〃 | §3 `applySelfModelPatch`, §4 `propose_self_model_patch` |
 | US-B26, B27 | `…-phase-b-surfaces.md` | §2.2 `SearchResponse`/`SearchHit`, §7 `GET /search`·`GET /memory/search` |
-| US-B28~B32 | 〃 | §7 `POST /items/:id/unarchive`·`POST /digests/:id/undo`, §4 digest 타입 |
+| US-B28~B32 | 〃 | §7 `POST /items/:id/unarchive`·`POST /digests/:id/undo`, §4 digest types |
 | US-B33 | 〃 | §5 `SettingKey`/`getSetting`/`setSetting`/`SETTING_DEFAULTS`, §6 `0009`, §7 `/settings`·`/cost` |
 | US-B35, B36 | 〃 | §1 `@omnis/web`, §2.3 `PushSubscription`, §6 `0011`, §7 `/push/*` |
-| US-B37, B38 | `…-phase-b-channels.md` | §1 어댑터 패키지 2종, §8 `outlook_delta_poll` |
-| US-B39 | 〃 | Phase A 계약 §8의 HTTP형 `[[runtime]]` 블록(`kind="hermes"`, `session_header_mode="hermes_v1"`) |
+| US-B37, B38 | `…-phase-b-channels.md` | §1 the 2 adapter packages, §8 `outlook_delta_poll` |
+| US-B39 | 〃 | the HTTP-form `[[runtime]]` block in Phase A contract §8 (`kind="hermes"`, `session_header_mode="hermes_v1"`) |
 | US-B40 | 〃 | §5 `recordAdapterHealth` |
-| US-B45 | 〃 | 신규 심볼 없음 — §3.2 `Adapter`/`AuthRef`(Phase A 계약)와 `createHubServer({adapters})`(이미 있는 선택 인자)를 실제로 채운다. `apps/hub/src/adapters.ts`가 `AdapterFactories`/`buildAdapters`/`startAdapterLoops`를 새로 export한다 |
-| US-B16, B34, B41~B44 | `…-phase-b-ops.md` | §9 Keychain·환경변수, §8 `cost_report_monthly`. **`0014_cost_report_job.sql`은 만들지 않는다** — §6 W0 번들의 `0012`가 이 seed를 이미 갖는다 |
-| (스키마 선행) | **웨이브 0 번들** — 어느 계획 문서에도 속하지 않는 단일 커밋 | §6의 `0009`·`0011`·`0012`·`0013` + §5 `packages/kernel/src/settings.ts`. B09·B11·B14·B15·B17·B33·B36·B37·B44가 전부 이것을 기다린다 |
+| US-B45 | 〃 | no new symbols — it actually fills in §3.2 `Adapter`/`AuthRef` (Phase A contract) and `createHubServer({adapters})` (an optional argument that already exists). `apps/hub/src/adapters.ts` newly exports `AdapterFactories`/`buildAdapters`/`startAdapterLoops` |
+| US-B16, B34, B41~B44 | `…-phase-b-ops.md` | §9 Keychain and environment variables, §8 `cost_report_monthly`. **`0014_cost_report_job.sql` is not created** — `0012` in the §6 W0 bundle already carries this seed |
+| (schema prerequisite) | **wave 0 bundle** — a single commit that belongs to no plan document | the `0009`·`0011`·`0012`·`0013` from §6 + `packages/kernel/src/settings.ts` from §5. B09·B11·B14·B15·B17·B33·B36·B37·B44 all wait on it |
 
 ---
 
-## 12. 공통 규약 변경
+## 12. Shared convention changes
 
-- **로그**: Phase A §9 그대로. `@omnis/memory`의 `pkg` 값은 `"@omnis/memory"`. 임베딩 벡터·파일 내용·푸시 엔드포인트는 **어떤 키에도 넣지 않는다**.
-- **에러 클래스**: Phase A의 7종에 `MemoryEmbedError`·`IngestDeniedError`(`@omnis/memory`), `PhantomToolError`(`@omnis/agents`)가 더해진다. 전부 `name`을 클래스명과 같게 둔다.
-- **어댑터 계약 테스트 픽스처**: Outlook·Telegram도 Phase A와 같은 배치(`packages/adapters/<channel>/fixtures/<scenario>.json`). 최소 시나리오는 Phase A의 5종 + Telegram은 `edited_message.json`·`deleted_message.json` 추가(A1 §1.7).
-- **브랜치·커밋**: Phase A 그대로. 제목은 `US-B05: 컨텍스트 조립기와 data 정규화`, 본문에 acceptance criteria + `Implemented-by: …`, 마지막 줄 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
-- **의도된 중복 유지**: `createLogger`·`readKeychainSecret`는 계속 각자 갖는다. `@omnis/memory`도 `@omnis/kernel`의 `Logger` **타입만** 쓰고 구현은 자기 것을 쓴다(패키지 의존 규칙 §1).
+- **Logging**: as in Phase A §9. `@omnis/memory`'s `pkg` value is `"@omnis/memory"`. Embedding vectors, file contents and push endpoints are **never put in any key**.
+- **Error classes**: the 7 from Phase A gain `MemoryEmbedError` and `IngestDeniedError` (`@omnis/memory`), plus `PhantomToolError` (`@omnis/agents`). All keep `name` equal to the class name.
+- **Adapter contract test fixtures**: Outlook and Telegram use the same layout as Phase A (`packages/adapters/<channel>/fixtures/<scenario>.json`). The minimum scenarios are Phase A's 5, plus `edited_message.json` and `deleted_message.json` for Telegram (A1 §1.7).
+- **Branch and commit**: as in Phase A. The title is `US-B05: context assembler and data normalization`, the body carries acceptance criteria + `Implemented-by: …`, and the last line is `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
+- **Intentional duplication kept**: `createLogger` and `readKeychainSecret` stay per-package. `@omnis/memory` likewise uses only the `Logger` **type** from `@omnis/kernel` and keeps its own implementation (package dependency rule §1).

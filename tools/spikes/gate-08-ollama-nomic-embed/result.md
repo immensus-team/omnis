@@ -1,15 +1,15 @@
-# Gate ⑧: Ollama nomic-embed 처리량
+# Gate ⑧: Ollama nomic-embed throughput
 
-- **질문**: `nomic-embed-text-v1.5`로 1,000개 인박스 문장 샘플을 임베딩하는 데 120초 이내, p95 300ms 이내가 나오는가(A6 §11.1 수치화 + §11.3 "하루 ~2,000건 유입을 실시간 지연 없이 소화" 절차).
-- **소유 부록**: A6 (§6 Ollama, §11.1·§11.3)
-- **Owner**: agent(unattended)
-- **Host**: mini — 계획서 Task 4 헤더는 `Host: macbook`이라 적었지만 A6 §6이 "nomic-embed는 미니 전용, `OLLAMA_HOST=127.0.0.1`로 바인딩해 hub를 통해서만 호출"이라고 못박고 있고, 실제로 이 워크트리를 실행 중인 맥북에는 Ollama가 설치되어 있지 않다(`which ollama` → not found, `curl 127.0.0.1:11434` → connection refused). 미니(`ssh <hub-user>@<hub-host>`)에는 `ollama 0.34.2` + `nomic-embed-text:latest`가 이미 떠 있다. 그래서 벤치마크는 미니에서 직접(loopback) 돌렸다 — 이게 프로덕션 토폴로지(허브+Ollama가 미니에 동거, loopback 호출)와도 일치한다.
-- **실행일**: 2026-09-20 (최초 측정: `tools/spikes/_probes/2026-09-20-cli-probes.md` "Gate ⑧ evidence"; 본 태스크에서 계획서 원문 그대로의 `bench.ts`/`sample-sentences.txt`를 만들어 미니에 복사해 재확인)
-- **결과(Pass/Fail)**: **PASS**
-- **측정치/근거**:
-  - 본 태스크 재확인(`bench.ts`를 `scp`로 `/tmp/gate-08-bench`에 복사, `npx tsx bench.ts` 실행, 이후 삭제): `total_s=16.3 p95_ms=17.1 n=1000`.
-  - Pass 기준(A6 §11.1): 1,000문장 ≤120s → **16.3s PASS**; p95 ≤300ms → **17.1ms PASS**.
-  - 최초 프로브 측정(`_probes/2026-09-20-cli-probes.md`, 배치 스크립트 `embed-bench.py`, stdlib only): `total_1000_s=9.1, single_call_ms_p95=11, dim=768`. 두 측정 모두 큰 여유로 PASS — 본 태스크의 1문장씩 순차 `fetch` 스크립트(계획서 원문)가 배치 스크립트보다 느리지만(16.3s vs 9.1s) 여전히 기준의 1/7 수준.
-  - 임베딩 차원 768은 미니 `ollama list` 응답의 `embedding_length: 768`로 확인(A3 `vector(768)`과 일치, 프로브 파일에 기록됨).
-- **decided_by**: Fable(에이전트, 본 태스크 재확인) + 이전 측정은 2026-09-20 프로브 세션
-- **비고**: T0 로컬 임베딩은 미니에서만 돈다(A6 §6 "맥북 오프로딩 규칙"은 3B 초과/2GB 초과 모델에만 해당 — nomic-embed 274MB는 해당 없음). Fail-fallback 규칙(오프피크 이동 또는 맥북 오프로드)은 발동하지 않는다. `bench.ts`를 리포에 committed 상태로 유지하되, 맥북에서 직접 돌리면 `ECONNREFUSED 127.0.0.1:11434`로 실패한다는 점(Ollama가 맥북에 없음)을 알고 있을 것 — 실행 시에는 스크립트를 미니로 복사해 돌리거나 SSH 터널을 사용한다.
+- **Question**: Does embedding a 1,000-sentence inbox sample with `nomic-embed-text-v1.5` finish within 120 seconds at p95 ≤300ms (A6 §11.1 quantification + §11.3 procedure, "absorb ~2,000 incoming items per day with no real-time latency")?
+- **Owning appendix**: A6 (§6 Ollama, §11.1·§11.3)
+- **Owner**: agent (unattended)
+- **Host**: mini — the plan's Task 4 header says `Host: macbook`, but A6 §6 pins it down: "nomic-embed is mini-only; bind it with `OLLAMA_HOST=127.0.0.1` so it is called only through the hub." In fact the macbook running this worktree does not have Ollama installed (`which ollama` → not found, `curl 127.0.0.1:11434` → connection refused). On the mini (`ssh <hub-user>@<hub-host>`), `ollama 0.34.2` + `nomic-embed-text:latest` are already up. So the benchmark was run directly on the mini (loopback) — which also matches the production topology (hub + Ollama co-located on the mini, called over loopback).
+- **Run date**: 2026-09-20 (initial measurement: `tools/spikes/_probes/2026-09-20-cli-probes.md` "Gate ⑧ evidence"; re-confirmed in this task by building `bench.ts`/`sample-sentences.txt` exactly as the plan specifies and copying them to the mini)
+- **Result (Pass/Fail)**: **PASS**
+- **Measurements/Evidence**:
+  - Re-confirmation in this task (`bench.ts` copied to `/tmp/gate-08-bench` via `scp`, `npx tsx bench.ts` run, then deleted): `total_s=16.3 p95_ms=17.1 n=1000`.
+  - Pass criteria (A6 §11.1): 1,000 sentences ≤120s → **16.3s PASS**; p95 ≤300ms → **17.1ms PASS**.
+  - Initial probe measurement (`_probes/2026-09-20-cli-probes.md`, batch script `embed-bench.py`, stdlib only): `total_1000_s=9.1, single_call_ms_p95=11, dim=768`. Both measurements PASS with wide margin — this task's one-sentence-at-a-time sequential `fetch` script (the plan's original) is slower than the batch script (16.3s vs 9.1s) but still only about 1/7 of the threshold.
+  - Embedding dimension 768 was confirmed from the mini's `ollama list` response (`embedding_length: 768`), matching A3's `vector(768)` (recorded in the probe file).
+- **decided_by**: Fable (agent, this task's re-confirmation); the earlier measurement is from the 2026-09-20 probe session
+- **Notes**: T0 local embedding runs only on the mini (A6 §6's "macbook offloading rule" applies only to models over 3B or over 2GB — nomic-embed at 274MB is not covered). The fail-fallback rule (move to off-peak, or offload to the macbook) is not triggered. Keep `bench.ts` committed in the repo, but be aware that running it directly on the macbook fails with `ECONNREFUSED 127.0.0.1:11434` (Ollama is not installed there) — to run it, copy the script to the mini or use an SSH tunnel.

@@ -6,6 +6,7 @@
     { "path": "../../packages/agents" },
     { "path": "../../packages/db" },
     { "path": "../../packages/kernel" },
+    { "path": "../../packages/memory" },
     { "path": "../../packages/protocol" }
   ]
 }

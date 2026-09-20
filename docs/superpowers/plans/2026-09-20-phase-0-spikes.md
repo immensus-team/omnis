@@ -1,86 +1,86 @@
-# Phase 0 스파이크 Implementation Plan
+# Phase 0 Spikes Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 마스터 §16이 "통과 전 Phase A 착수 금지"로 못박은 14개 게이트(①~⑭)와 US-A00 스캐폴드, 그리고 A7-D4/A7-D5가 요구하는 자체 스파이크(Tauri UI 테스트 도구, worktrunk CLI 확정) 전부를 `tools/spikes/`에 실행 가능한 스크립트 + `result.md`로 남겨, Phase A 착수 가부를 하나의 결정표로 판정한다.
+**Goal:** Leave all 14 gates (①~⑭) that master §16 pinned down as "no Phase A kickoff before they pass", plus the US-A00 scaffold and the self-spikes A7-D4/A7-D5 call for (the Tauri UI testing tool and the worktrunk CLI confirmation), as runnable scripts + `result.md` under `tools/spikes/`, and decide whether Phase A may start with a single decision table.
 
-**Architecture:** `tools/spikes/`는 워크스페이스 빌드 그래프 밖이다(A7 §1) — 어떤 `packages/*`도 이 폴더를 import하지 않고, 이 폴더의 스크립트도 `packages/*`를 import하지 않는다(존재하지 않기 때문이기도 하다: US-A01 이후에야 `@omnis/db` 등이 생긴다). 각 게이트는 독립된 `tools/spikes/<slug>/`에 자기완결 스크립트(필요하면 자체 `package.json`)와 `result.md`를 갖는다. 14개 게이트 중 7개(⑥⑦⑧⑪⑫⑬⑭)는 맥북에서 사람 개입 없이 도는 unattended 스파이크이고, 7개(①②③④⑤⑨⑩)는 OAuth 동의, GUI 권한 승인, QR 페어링처럼 Logan의 손이 필요한 assisted 스파이크다 — 이 문서는 unattended를 먼저 두고 assisted를 뒤에 둔다.
+**Architecture:** `tools/spikes/` lives outside the workspace build graph (A7 §1) — no `packages/*` imports this folder, and scripts in this folder do not import `packages/*` either (partly because they do not exist yet: `@omnis/db` and friends only appear after US-A01). Each gate lives in its own `tools/spikes/<slug>/` with a self-contained script (plus its own `package.json` when needed) and a `result.md`. Of the 14 gates, 7 (⑥⑦⑧⑪⑫⑬⑭) are unattended spikes that run on the MacBook without human intervention, and 7 (①②③④⑤⑨⑩) are assisted spikes that need Logan's hands (OAuth consent, GUI permission approval, QR pairing) — this document puts unattended first and assisted second.
 
-**Tech Stack:** Node 22, TypeScript 5(strict), `pg` 8.x, `@rocicorp/zero` 1.9.0(맥북에 설치 확인됨, `tools/spikes/_probes/2026-09-20-cli-probes.md`), Postgres 17 + pgvector(로컬 네이티브, `brew install postgresql@17`), Ollama 0.34.2(로컬), Codex CLI(`codex-cli` 0.155.1, `rust-v0.155.1` 핀), Claude Code CLI 2.1.274, `worktrunk`(brew) 0.78.0, `sops` 3.13.3 + `age` 1.3.2, `@tauri-apps/cli` 2.11.5, `tauri-driver` + WebdriverIO(A7-D4 기본 가정, 버전은 Task 17에서 설치 시 고정).
+**Tech Stack:** Node 22, TypeScript 5 (strict), `pg` 8.x, `@rocicorp/zero` 1.9.0 (confirmed installed on the MacBook, `tools/spikes/_probes/2026-09-20-cli-probes.md`), Postgres 17 + pgvector (local native, `brew install postgresql@17`), Ollama 0.34.2 (local), Codex CLI (`codex-cli` 0.155.1, pinned to `rust-v0.155.1`), Claude Code CLI 2.1.274, `worktrunk` (brew) 0.78.0, `sops` 3.13.3 + `age` 1.3.2, `@tauri-apps/cli` 2.11.5, `tauri-driver` + WebdriverIO (the A7-D4 default assumption; the version is pinned at install time in Task 17).
 
-**Spec:** `/Users/logankim/AI-Workspaces/omnis/docs/spec/00-omnis-design.md` §16(Phase 0), §8(채널 매트릭스), §4.2(배치 토폴로지) + 부록 `A6-ops-infra.md` §11(스파이크 절차·pass 기준의 정본), `A1-channel-adapters.md` §4(채널 스파이크 A1-①~⑤), `A2-agent-session-bridge.md` §4.1·§4.2·§7.1·§8.3(S-A2-1·2), `A3-data-schema.md` §7·§14(S-A3-2), `A7-dev-process.md` §3·§7(US-A00, A7-D4·A7-D5) + 계약: `docs/superpowers/plans/2026-09-20-phase-a-interfaces.md`.
+**Spec:** `/Users/logankim/AI-Workspaces/omnis/docs/spec/00-omnis-design.md` §16 (Phase 0), §8 (channel matrix), §4.2 (deployment topology) + appendices `A6-ops-infra.md` §11 (the canonical source for spike procedure and pass criteria), `A1-channel-adapters.md` §4 (channel spikes A1-①~⑤), `A2-agent-session-bridge.md` §4.1/§4.2/§7.1/§8.3 (S-A2-1/2), `A3-data-schema.md` §7/§14 (S-A3-2), `A7-dev-process.md` §3/§7 (US-A00, A7-D4/A7-D5) + contract: `docs/superpowers/plans/2026-09-20-phase-a-interfaces.md`.
 
 ## Global Constraints
 
 - Node 22 + pnpm workspaces.
-- TypeScript strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`(A7 §1).
-- Postgres 17(A3).
-- 허브는 `127.0.0.1:8787`에만 bind한다(마스터 §4.2) — Phase 0 스파이크가 로컬 Postgres/Zero를 띄울 때도 이 포트 규약을 어기지 않는다(8642는 Hermes 전용).
-- 마이그레이션은 append-only 파일 `packages/db/migrations/000N_<name>.sql` + 추적 테이블 `_omnis_migrations`(A3 §8) — 이 규칙은 Phase A부터 적용되며, Phase 0 스파이크는 `packages/db`가 아직 없으므로 자체 스크래치 DDL만 쓰고 이 경로를 건드리지 않는다.
-- 비가역 tool(`send`/`delete`/`delegate`/`calendar_write`)은 승인 게이트(US-A07)가 생기기 전에는 어떤 자율 루프에도 연결하지 않는다(A7 §7 공통 금지) — 스파이크 ①②의 "테스트 이벤트/메시지 1건 발송"은 Logan이 손으로 트리거하는 수동 검증이지 자율 루프의 egress가 아니므로 이 금지와 충돌하지 않는다.
-- 테스트를 삭제하거나 스킵해서 통과시키지 않는다.
-- provider SDK는 해당 어댑터 패키지 안에서만 쓴다 — Phase 0에는 어댑터 패키지가 없으므로 각 게이트 스크립트는 자기 디렉터리 안에서만 provider 클라이언트를 import한다(다른 `tools/spikes/<slug>`를 import하지 않는다).
-- Keychain 아이템 명명은 A1 규칙 `omnis.<channel>.<kind>.<external_id>`(브리지 토큰은 `omnis.bridge.token.<host>`)를 그대로 따른다.
-- 스토리 티어는 A7 §4 배정표를 따르고, DeepSeek diff는 반드시 Sonnet 이상이 리뷰한다(이 계획의 태스크는 전부 Haiku/Sonnet이라 DeepSeek 위임 대상이 없다).
-- 커밋 메시지 마지막 줄은 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`으로 끝낸다(A7 §6의 실행 모델 표기 규칙 — 이 계획의 태스크는 Fable이 인터랙티브로 실행한다).
+- TypeScript strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` (A7 §1).
+- Postgres 17 (A3).
+- The hub binds only to `127.0.0.1:8787` (master §4.2) — even when a Phase 0 spike brings up a local Postgres/Zero, it does not violate this port convention (8642 is reserved for Hermes).
+- Migrations are append-only files `packages/db/migrations/000N_<name>.sql` plus a tracking table `_omnis_migrations` (A3 §8) — this rule applies from Phase A onward; Phase 0 spikes have no `packages/db` yet, so they use their own scratch DDL only and never touch this path.
+- Irreversible tools (`send`/`delete`/`delegate`/`calendar_write`) are not wired into any autonomous loop before the approval gate (US-A07) exists (the A7 §7 common prohibitions) — the "send one test event/message" step of spikes ① and ② is manual verification triggered by Logan's own hand, not an autonomous loop's egress, so it does not conflict with this prohibition.
+- Never delete or skip a test to make it pass.
+- Provider SDKs are used only inside their adapter package — Phase 0 has no adapter packages, so each gate script imports its provider client only within its own directory (it does not import another `tools/spikes/<slug>`).
+- Keychain item naming follows A1's rule `omnis.<channel>.<kind>.<external_id>` as-is (bridge tokens use `omnis.bridge.token.<host>`).
+- Story tiers follow the A7 §4 assignment table, and DeepSeek diffs must be reviewed by Sonnet or above (every task in this plan is Haiku/Sonnet, so there is nothing to delegate to DeepSeek).
+- The last line of a commit message ends with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` (the execution-model notation rule of A7 §6 — the tasks in this plan are executed interactively by Fable).
 
 ---
 
-### Task 1: Phase 0 스파이크 스캐폴드 (US-A00, tier: Haiku)
+### Task 1: Phase 0 spike scaffold (US-A00, tier: Haiku)
 
-**목표(A7 §7 원문)**: Phase 0 스파이크 스캐폴드: 마스터 §16의 게이트 14개(①~⑭) 각각에 `tools/spikes/<question-slug>/` 폴더 + 스크립트 자리 + `result.md` 템플릿(pass/fail, 근거, 날짜) 생성. 워크스페이스 빌드 그래프 밖(§1).
-**산출물(A7 §7 원문)**: `tools/spikes/*/result.md`(14개, 미기입 템플릿).
-**검증 명령(A7 §7 원문, US-A00 fix)**: `find tools/spikes -maxdepth 1 -mindepth 1 -type d ! -name _probes` 결과 14줄.
-**티어**: Haiku.
+**Goal (A7 §7 verbatim)**: Phase 0 spike scaffold: for each of the 14 gates in master §16 (①~⑭), create a `tools/spikes/<question-slug>/` folder + script slot + `result.md` template (pass/fail, evidence, date). Outside the workspace build graph (§1).
+**Deliverable (A7 §7 verbatim)**: `tools/spikes/*/result.md` (14 files, unfilled templates).
+**Verification command (A7 §7 verbatim, US-A00 fix)**: `find tools/spikes -maxdepth 1 -mindepth 1 -type d ! -name _probes` returns 14 lines.
+**Tier**: Haiku.
 
-**주의(리포 현재 상태와의 불일치)**: 이 레포에는 이미 `tools/spikes/_probes/2026-09-20-cli-probes.md`가 존재한다(Fable이 게이트 ⑦⑪⑫⑭를 위해 미리 캡처해 둔 CLI 증거 — Task 8·9·10·16에서 그대로 재사용한다). `_probes`는 14개 게이트 중 하나가 아니므로 지우지 않는다. 그 결과 A7 §7의 검증 명령을 문자 그대로 돌리면 15줄이 나온다 — 이 계획에서는 검증 명령을 `find tools/spikes -maxdepth 1 -mindepth 1 -type d ! -name _probes`로 조정해 14를 확인한다(카운트 대상에서 `_probes`만 제외, 나머지는 A7 §7과 동일).
+**Note (mismatch with the repo's current state)**: This repo already contains `tools/spikes/_probes/2026-09-20-cli-probes.md` (CLI evidence Fable captured ahead of time for gates ⑦⑪⑫⑭ — Tasks 8, 9, 10 and 16 reuse it as-is). `_probes` is not one of the 14 gates, so it is not deleted. As a result, running A7 §7's verification command literally yields 15 lines — this plan adjusts the verification command to `find tools/spikes -maxdepth 1 -mindepth 1 -type d ! -name _probes` to confirm 14 (only `_probes` is excluded from the count; everything else is identical to A7 §7).
 
 **Files:**
 - Create: `tools/spikes/gate-01-calendar-funnel/result.md`, `tools/spikes/gate-02-beeper-whatsapp/result.md`, `tools/spikes/gate-03-filevault-autologin/result.md`, `tools/spikes/gate-04-kmsg-read/result.md`, `tools/spikes/gate-05-tailscale-serve-iphone/result.md`, `tools/spikes/gate-06-zero-postgres/result.md`, `tools/spikes/gate-07-codex-appserver/result.md`, `tools/spikes/gate-08-ollama-nomic-embed/result.md`, `tools/spikes/gate-09-slack-socket-mode/result.md`, `tools/spikes/gate-10-gmail-watch-pubsub/result.md`, `tools/spikes/gate-11-claude-bare-hooks/result.md`, `tools/spikes/gate-12-permission-mode-mapping/result.md`, `tools/spikes/gate-13-zero-column-types/result.md`, `tools/spikes/gate-14-worktrunk-dryrun/result.md`.
-- Test: 없음(스캐폴드 자체는 로직이 없다 — 검증은 `find` 명령 하나).
+- Test: none (the scaffold itself has no logic — verification is a single `find` command).
 
-**Interfaces:** Consumes: 없음(리프 태스크, `packages/*`가 아직 없다). Produces: 없음(내보내는 심볼 없음 — 폴더와 마크다운 템플릿뿐).
+**Interfaces:** Consumes: none (leaf task, `packages/*` does not exist yet). Produces: none (no exported symbols — only folders and markdown templates).
 
-1. `docs/spec/00-omnis-design.md` §16과 `docs/spec/A6-ops-infra.md` §11.1의 14개 게이트 표를 읽고 번호·이름을 확인한다.
-2. 14개 디렉터리를 만들고 각각에 아래 템플릿 그대로 `result.md`를 쓴다(예시는 `gate-01-calendar-funnel`, 나머지 13개는 `<gate-slug>`와 `<gate-name>`만 바꿔 반복한다 — 파일 하나하나 실제로 생성한다):
+1. Read the 14-gate table in `docs/spec/00-omnis-design.md` §16 and `docs/spec/A6-ops-infra.md` §11.1, and confirm the numbers and names.
+2. Create the 14 directories and write `result.md` into each one using the template below verbatim (the example is `gate-01-calendar-funnel`; repeat for the other 13 changing only `<gate-slug>` and `<gate-name>` — actually create each file one by one):
 
 ```markdown
 # Gate: <gate-name>
 
-- **질문**: <이 스파이크가 답하는 한 문장 질문>
-- **소유 부록**: <A6 | A1 | A2 | A3 | A7>
+- **Question**: <the one-sentence question this spike answers>
+- **Owning appendix**: <A6 | A1 | A2 | A3 | A7>
 - **Owner**: <agent | Logan>
 - **Host**: <macbook | mini>
-- **실행일**: 
-- **결과(Pass/Fail)**: 
-- **측정치/근거**: 
+- **Run date**: 
+- **Result (Pass/Fail)**: 
+- **Measurements/evidence**: 
 - **decided_by**: 
-- **비고**: 
+- **Notes**: 
 ```
 
-3. `tools/spikes/gate-01-calendar-funnel/result.md`는 실제로 다음 내용으로 채운다(다른 13개는 2번의 빈 템플릿 그대로 두고, 각 게이트를 다루는 Task 2~15가 채운다 — Task 1은 뼈대만):
+3. Fill `tools/spikes/gate-01-calendar-funnel/result.md` with the following content for real (leave the other 13 as the empty template from step 2; Tasks 2–15, covering each gate, fill them in — Task 1 only lays the skeleton):
 
 ```markdown
 # Gate ①: Calendar events.watch via Funnel
 
-- **질문**: Google Calendar events.watch push 알림이 Tailscale Funnel 경유로 1분 이내 도착하는가
-- **소유 부록**: A6(§11.3)
+- **Question**: Does a Google Calendar events.watch push notification arrive within 1 minute through Tailscale Funnel
+- **Owning appendix**: A6 (§11.3)
 - **Owner**: Logan
 - **Host**: mini
-- **실행일**: 
-- **결과(Pass/Fail)**: 
-- **측정치/근거**: 
+- **Run date**: 
+- **Result (Pass/Fail)**: 
+- **Measurements/evidence**: 
 - **decided_by**: 
-- **비고**: 
+- **Notes**: 
 ```
 
-4. `find tools/spikes -maxdepth 1 -mindepth 1 -type d ! -name _probes | wc -l`를 실행해 `14`가 출력되는지 확인한다(PASS 텍스트: `14`). `_probes`를 포함한 원래 A7 §7 명령(`find tools/spikes -maxdepth 1 -mindepth 1 -type d`)은 `15`가 나오는 것이 이 레포의 정상 상태임을 커밋 메시지 본문에 한 줄로 남긴다.
+4. Run `find tools/spikes -maxdepth 1 -mindepth 1 -type d ! -name _probes | wc -l` and confirm it prints `14` (PASS text: `14`). In the commit message body, leave a one-line note that the original A7 §7 command (which includes `_probes`, `find tools/spikes -maxdepth 1 -mindepth 1 -type d`) printing `15` is the normal state of this repo.
 5. `git add tools/spikes && git commit -m "$(cat <<'EOF'
-US-A00: Phase 0 스파이크 스캐폴드 14개 생성
+US-A00: create the 14 Phase 0 spike scaffolds
 
-- 게이트 ①~⑭ 각각에 tools/spikes/<slug>/result.md 템플릿 생성
-- 검증: find tools/spikes -maxdepth 1 -mindepth 1 -type d ! -name _probes | wc -l → 14
-- 기존 tools/spikes/_probes(게이트 ⑦⑪⑫⑭ 사전 증거)는 보존, 카운트에서만 제외
+- Create a tools/spikes/<slug>/result.md template for each of gates ①~⑭
+- Verify: find tools/spikes -maxdepth 1 -mindepth 1 -type d ! -name _probes | wc -l → 14
+- Keep the existing tools/spikes/_probes (pre-captured evidence for gates ⑦⑪⑫⑭), excluded from the count only
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
@@ -88,25 +88,25 @@ EOF
 
 ---
 
-## 순서 A — Unattended 게이트 (Fable/agent가 무인으로 돌린다)
+## Order A — Unattended gates (Fable/agent runs them without supervision)
 
-### Task 2: Gate ⑥ — Zero + Postgres 반영 지연 (A6 소유, tier: Sonnet)
+### Task 2: Gate ⑥ — Zero + Postgres replication latency (owned by A6, tier: Sonnet)
 
-**질문**: 로컬 Postgres 17(pgvector) + zero-cache를 붙였을 때, 한 row INSERT부터 Zero 클라이언트 구독이 그 변경을 받기까지의 시간이 G5(≤2초)를 만족하는가.
-**Owner**: agent(unattended) — OAuth·GUI 권한 불필요, 전부 로컬 프로세스.
-**Host**: macbook(M5 Max 64GB — 미니 배치는 Phase A `apps/hub`가 결정할 문제고, Phase 0은 개발 머신에서 먼저 확인한다).
-**Pass 기준(A6 §11.3 원문)**: "zero-cache 정상 기동 + 변경 반영 2초 이내(G5)".
-**Fail → 결정 규칙(A6 §11.3 원문)**: "PowerSync(마스터 D7 폴백, 단 자체호스팅 시 MongoDB 필요 이슈 인지)".
+**Question**: With a local Postgres 17 (pgvector) plus zero-cache attached, does the time from a single row INSERT until the Zero client subscription receives that change satisfy G5 (≤2s)?
+**Owner**: agent (unattended) — no OAuth or GUI permissions needed, everything is a local process.
+**Host**: macbook (M5 Max 64GB — where to deploy on the mini is a question for Phase A's `apps/hub`; Phase 0 verifies on the development machine first).
+**Pass criteria (A6 §11.3 verbatim)**: "zero-cache starts up cleanly + changes replicate within 2 seconds (G5)".
+**Fail → decision rule (A6 §11.3 verbatim)**: "PowerSync (master D7 fallback, but be aware of the MongoDB requirement when self-hosting)".
 
 **Files:**
 - Create: `tools/spikes/gate-06-zero-postgres/package.json`, `tools/spikes/gate-06-zero-postgres/schema.ts`, `tools/spikes/gate-06-zero-postgres/setup.sql`, `tools/spikes/gate-06-zero-postgres/measure.ts`.
-- Modify: `tools/spikes/gate-06-zero-postgres/result.md`(Task 1이 만든 빈 템플릿을 채운다).
+- Modify: `tools/spikes/gate-06-zero-postgres/result.md` (fill in the empty template Task 1 created).
 
-**Interfaces:** Consumes: `@rocicorp/zero`(npm, `Zero` 클라이언트 클래스, `createSchema`/`table`/`column` — Task 1이 아니라 npm 패키지에서 온다. `@omnis/kernel`의 `zeroSchema`(계약 §7)는 아직 없다 — Phase A US-A21이 정식 스키마를 만들기 전까지 이 스파이크는 자체 최소 스키마를 쓴다). Produces: 없음(스파이크는 라이브러리가 아니다).
+**Interfaces:** Consumes: `@rocicorp/zero` (npm; the `Zero` client class and `createSchema`/`table`/`column` come from the npm package, not from Task 1. `@omnis/kernel`'s `zeroSchema` (contract §7) does not exist yet — until Phase A US-A21 creates the official schema, this spike uses its own minimal schema). Produces: none (a spike is not a library).
 
-1. `docs/spec/A6-ops-infra.md` §5(zero-cache 배치·권한)와 §11.3 ⑥행을 읽는다.
-2. 전용 스크래치 DB를 만든다: `createdb omnis_spike_zero && psql omnis_spike_zero -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"`.
-3. `tools/spikes/gate-06-zero-postgres/setup.sql`을 쓴다(최소 스키마, 실제 omnis DDL은 Phase A US-A02가 만든다 — 여기서 흉내내지 않는다):
+1. Read `docs/spec/A6-ops-infra.md` §5 (zero-cache deployment and permissions) and the ⑥ row of §11.3.
+2. Create a dedicated scratch DB: `createdb omnis_spike_zero && psql omnis_spike_zero -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"`.
+3. Write `tools/spikes/gate-06-zero-postgres/setup.sql` (a minimal schema; the real omnis DDL comes from Phase A US-A02 — it is not imitated here):
 
 ```sql
 CREATE TABLE IF NOT EXISTS probe_events (
@@ -117,8 +117,8 @@ CREATE TABLE IF NOT EXISTS probe_events (
 ALTER SYSTEM SET wal_level = 'logical';
 ```
 
-4. `psql omnis_spike_zero -f setup.sql`을 실행하고, `wal_level`이 바뀌면 로컬 Postgres를 재시작한다(`brew services restart postgresql@17`).
-5. `tools/spikes/gate-06-zero-postgres/schema.ts`를 쓴다:
+4. Run `psql omnis_spike_zero -f setup.sql`, and if `wal_level` changed, restart the local Postgres (`brew services restart postgresql@17`).
+5. Write `tools/spikes/gate-06-zero-postgres/schema.ts`:
 
 ```ts
 import { createSchema, table, string, timestamp } from "@rocicorp/zero";
@@ -131,7 +131,7 @@ export const schema = createSchema({ tables: [probeEvents] });
 export type Schema = typeof schema;
 ```
 
-6. `tools/spikes/gate-06-zero-postgres/package.json`을 쓴다:
+6. Write `tools/spikes/gate-06-zero-postgres/package.json`:
 
 ```json
 {
@@ -142,8 +142,8 @@ export type Schema = typeof schema;
 }
 ```
 
-7. `zero-cache`를 이 스파이크 전용 설정으로 기동한다: `ZERO_UPSTREAM_DB=postgres://localhost/omnis_spike_zero ZERO_CVR_DB=postgres://localhost/omnis_spike_zero ZERO_REPLICA_FILE=/tmp/omnis-spike-zero.db npx zero-cache-dev -p schema.ts`.
-8. `tools/spikes/gate-06-zero-postgres/measure.ts`를 쓴다(Zero 클라이언트로 구독을 열고, 별도 `psql` INSERT 시각과 클라이언트가 새 row를 받은 시각의 차이를 측정한다):
+7. Start `zero-cache` with settings dedicated to this spike: `ZERO_UPSTREAM_DB=postgres://localhost/omnis_spike_zero ZERO_CVR_DB=postgres://localhost/omnis_spike_zero ZERO_REPLICA_FILE=/tmp/omnis-spike-zero.db npx zero-cache-dev -p schema.ts`.
+8. Write `tools/spikes/gate-06-zero-postgres/measure.ts` (open a subscription with the Zero client and measure the difference between the timestamp of the separate `psql` INSERT and the timestamp the client received the new row):
 
 ```ts
 import { Zero } from "@rocicorp/zero";
@@ -169,36 +169,36 @@ console.log(`latency_ms=${(t1 - t0).toFixed(1)}`);
 process.exit(t1 - t0 <= 2000 ? 0 : 1);
 ```
 
-9. `cd tools/spikes/gate-06-zero-postgres && pnpm install && npx tsx measure.ts`를 실행한다. PASS 조건: `latency_ms=` 값이 2000 이하이고 프로세스 exit code 0.
-10. `result.md`에 실행일·Pass/Fail·`latency_ms` 실측치·decided_by(`agent`)를 채워 넣는다.
+9. Run `cd tools/spikes/gate-06-zero-postgres && pnpm install && npx tsx measure.ts`. PASS condition: the `latency_ms=` value is 2000 or less and the process exit code is 0.
+10. Fill `result.md` with the run date, Pass/Fail, the measured `latency_ms`, and decided_by (`agent`).
 11. `git add tools/spikes/gate-06-zero-postgres && git commit -m "$(cat <<'EOF'
-gate-06: Zero+Postgres 반영 지연 스파이크
+gate-06: Zero+Postgres replication latency spike
 
-- probe_events 스크래치 테이블 + zero-cache + Zero 클라이언트 구독으로 INSERT→구독 반영 시간 측정
-- Pass 기준(A6 §11.3): 반영 ≤2초(G5)
+- Measure INSERT→subscription delivery time with a probe_events scratch table + zero-cache + a Zero client subscription
+- Pass criteria (A6 §11.3): replication ≤2s (G5)
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
 )"`
 
-### Task 3: Gate ⑦ — Codex app-server 버전 핀 + 1턴 왕복 (A6 소유, A2 §4.2 절차, tier: Sonnet)
+### Task 3: Gate ⑦ — Codex app-server version pin + one-turn round trip (owned by A6, procedure in A2 §4.2, tier: Sonnet)
 
-**질문**: `codex app-server`를 `rust-v0.155.1`로 고정 실행하고 JSON-RPC로 1턴을 요청했을 때 프로토콜 에러 없이 `item/started`~`item/completed`까지 완주하는가.
-**Owner**: agent(unattended) — Codex CLI는 이미 로그인된 상태(기존 구독)라 새 OAuth 동의가 필요 없다.
+**Question**: When `codex app-server` is run pinned to `rust-v0.155.1` and one turn is requested over JSON-RPC, does it run to completion from `item/started` through `item/completed` with no protocol errors?
+**Owner**: agent (unattended) — the Codex CLI is already logged in (existing subscription), so no new OAuth consent is needed.
 **Host**: macbook.
-**Pass 기준(A6 §11.3 원문)**: "프로토콜 에러 없이 1턴 완주".
-**Fail → 결정 규칙(A6 §11.3 원문)**: "버전 재핀 + capabilities 기반 feature detection으로 우회(마스터 §9)".
+**Pass criteria (A6 §11.3 verbatim)**: "one turn runs to completion with no protocol errors".
+**Fail → decision rule (A6 §11.3 verbatim)**: "re-pin the version + work around it with capabilities-based feature detection (master §9)".
 
 **Files:**
-- Create: `tools/spikes/gate-07-codex-appserver/run.ts`, `tools/spikes/gate-07-codex-appserver/schema/`(생성된 JSON 스키마 번들 출력 디렉터리).
+- Create: `tools/spikes/gate-07-codex-appserver/run.ts`, `tools/spikes/gate-07-codex-appserver/schema/` (output directory for the generated JSON schema bundle).
 - Modify: `tools/spikes/gate-07-codex-appserver/result.md`.
 
-**Interfaces:** Consumes: `tools/spikes/_probes/2026-09-20-cli-probes.md`(이미 확보된 `codex app-server generate-json-schema` 명령과 codex-cli 0.155.1 버전 증거). Produces: 없음.
+**Interfaces:** Consumes: `tools/spikes/_probes/2026-09-20-cli-probes.md` (the already-captured `codex app-server generate-json-schema` command and evidence of codex-cli 0.155.1). Produces: none.
 
-1. `tools/spikes/_probes/2026-09-20-cli-probes.md`를 읽는다 — `codex codex-cli 0.155.1`이 이미 설치돼 있고 `codex app-server generate-json-schema --out <DIR>`이 유효한 명령임을 확인한다.
-2. `codex --version`을 실행해 `codex-cli 0.155.1`(핀 `rust-v0.155.1`, A2 §2.1 macOS TOML 예시와 동일)과 일치하는지 확인한다. 불일치하면 `degraded` 시나리오로 5번에서 기록한다.
-3. `mkdir -p tools/spikes/gate-07-codex-appserver/schema && codex app-server generate-json-schema --out tools/spikes/gate-07-codex-appserver/schema`를 실행해 프로토콜 스키마 번들을 뽑는다 — 이 번들은 Phase A US-A19(`apps/local-agent/src/bridges/codex.ts`)가 타입을 맞출 때 그대로 쓴다.
-4. `tools/spikes/gate-07-codex-appserver/run.ts`를 쓴다(스키마에서 "새 턴을 시작하는" 요청 메서드를 찾아 그 메서드로 1턴을 보내고, A2 §4.2 표의 이벤트 이름(`item/started`, `item/completed`, `turn.completed`)이 실제로 오는지 확인한다):
+1. Read `tools/spikes/_probes/2026-09-20-cli-probes.md` — confirm that `codex codex-cli 0.155.1` is already installed and that `codex app-server generate-json-schema --out <DIR>` is a valid command.
+2. Run `codex --version` and confirm it matches `codex-cli 0.155.1` (pinned to `rust-v0.155.1`, the same as the macOS TOML example in A2 §2.1). If it does not match, record it as the `degraded` scenario in step 5.
+3. Run `mkdir -p tools/spikes/gate-07-codex-appserver/schema && codex app-server generate-json-schema --out tools/spikes/gate-07-codex-appserver/schema` to extract the protocol schema bundle — Phase A US-A19 (`apps/local-agent/src/bridges/codex.ts`) uses this bundle as-is when aligning types.
+4. Write `tools/spikes/gate-07-codex-appserver/run.ts` (find the request method that "starts a new turn" in the schema, send one turn with that method, and check whether the event names from the A2 §4.2 table (`item/started`, `item/completed`, `turn.completed`) actually arrive):
 
 ```ts
 import { spawn } from "node:child_process";
@@ -249,42 +249,42 @@ setTimeout(() => {
 }, 30000);
 ```
 
-5. `cd tools/spikes/gate-07-codex-appserver && npx tsx run.ts | tee run.log`를 실행한다. PASS 조건: `gate7_pass=true`와 exit code 0. 스키마에서 turn-start 메서드를 자동으로 못 찾으면(위 `throw` 발생) `schema/` 디렉터리를 손으로 읽어 정확한 메서드명을 `run.ts`의 정규식에 추가하고 재실행한다 — 이건 스파이크의 목적 그 자체(정확한 프로토콜 표면 확정)이므로 `result.md` 비고에 실제로 찾은 메서드명을 남긴다.
-6. `result.md`를 채운다: 측정치 칸에 실제로 관측된 메서드명과 이벤트 시퀀스를 적는다.
+5. Run `cd tools/spikes/gate-07-codex-appserver && npx tsx run.ts | tee run.log`. PASS condition: `gate7_pass=true` and exit code 0. If the turn-start method cannot be found automatically in the schema (the `throw` above fires), read the `schema/` directory by hand, add the exact method name to the regex in `run.ts`, and re-run — this is the point of the spike itself (pinning the exact protocol surface), so record the method name actually found in the `result.md` notes.
+6. Fill in `result.md`: write the actually observed method name and event sequence in the measurements field.
 7. `git add tools/spikes/gate-07-codex-appserver && git commit -m "$(cat <<'EOF'
-gate-07: Codex app-server 버전 핀 + 1턴 JSON-RPC 왕복 스파이크
+gate-07: Codex app-server version pin + one-turn JSON-RPC round-trip spike
 
-- codex-cli 0.155.1(rust-v0.155.1 핀) 확인, generate-json-schema로 프로토콜 스키마 번들 추출
-- 1턴 요청→item/started~item/completed~turn.completed 수신 확인
-- Pass 기준(A6 §11.3): 프로토콜 에러 없이 1턴 완주
+- Confirm codex-cli 0.155.1 (pinned to rust-v0.155.1), extract the protocol schema bundle with generate-json-schema
+- Confirm a one-turn request receives item/started~item/completed~turn.completed
+- Pass criteria (A6 §11.3): one turn runs to completion with no protocol errors
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
 )"`
 
-### Task 4: Gate ⑧ — Ollama nomic-embed 처리량 (A6 소유, tier: Sonnet)
+### Task 4: Gate ⑧ — Ollama nomic-embed throughput (owned by A6, tier: Sonnet)
 
-**질문**: `nomic-embed-text-v1.5`로 1,000개 인박스 문장 샘플을 임베딩하는 데 120초 이내, p95 300ms 이내가 나오는가(A6 §11.1 수치화 + §11.3 "하루 ~2,000건 유입을 실시간 지연 없이 소화" 절차).
-**Owner**: agent(unattended) — 전부 로컬 추론.
+**Question**: Does embedding a 1,000-sentence inbox sample with `nomic-embed-text-v1.5` finish within 120 seconds with a p95 within 300ms (the A6 §11.1 quantified numbers + the §11.3 procedure "absorb ~2,000 incoming items per day with no real-time latency")?
+**Owner**: agent (unattended) — all local inference.
 **Host**: macbook.
-**Pass 기준(A6 §11.3 원문 + §11.1 수치)**: "하루 추정 ~2,000건 유입을 실시간 지연 없이 소화할 처리량 확인"(§11.3) — 이를 §11.1이 준 구체 수치 "1,000문장 ≤120s, p95 ≤300ms"로 판정한다.
-**Fail → 결정 규칙(A6 §11.3 원문)**: "배치를 야간 오프피크로 이동(마스터 §14 KST 19시 이후 오프피크 원칙과 결합) 또는 맥북으로 오프로드".
+**Pass criteria (A6 §11.3 verbatim + §11.1 numbers)**: "confirm the throughput to absorb an estimated ~2,000 incoming items per day with no real-time latency" (§11.3) — judged against the concrete numbers §11.1 provides: "1,000 sentences ≤120s, p95 ≤300ms".
+**Fail → decision rule (A6 §11.3 verbatim)**: "move the batch to the nightly off-peak window (combined with the master §14 off-peak principle of after 19:00 KST) or offload it to the MacBook".
 
 **Files:**
 - Create: `tools/spikes/gate-08-ollama-nomic-embed/sample-sentences.txt`, `tools/spikes/gate-08-ollama-nomic-embed/bench.ts`.
 - Modify: `tools/spikes/gate-08-ollama-nomic-embed/result.md`.
 
-**Interfaces:** Consumes: 없음(Ollama HTTP API `127.0.0.1:11434`만). Produces: 없음.
+**Interfaces:** Consumes: none (only the Ollama HTTP API at `127.0.0.1:11434`). Produces: none.
 
-1. `docs/spec/A6-ops-infra.md` §6(Ollama)·§11.1·§11.3 ⑧행을 읽는다.
-2. `ollama pull nomic-embed-text` 로 모델을 받는다(모델명 `nomic-embed-text`, 마스터 D6·D10이 확정한 `nomic-embed-text-v1.5`의 Ollama 태그).
-3. `tools/spikes/gate-08-ollama-nomic-embed/sample-sentences.txt`에 1,000줄을 생성한다(실제 인박스 텍스트가 아직 없으므로 문장 길이 분포를 흉내낸 합성 문장을 쓴다):
+1. Read `docs/spec/A6-ops-infra.md` §6 (Ollama), §11.1 and the ⑧ row of §11.3.
+2. Pull the model with `ollama pull nomic-embed-text` (model name `nomic-embed-text`, the Ollama tag for `nomic-embed-text-v1.5`, which master D6/D10 settled on).
+3. Generate 1,000 lines into `tools/spikes/gate-08-ollama-nomic-embed/sample-sentences.txt` (real inbox text does not exist yet, so use synthetic sentences that mimic the sentence-length distribution):
 
 ```bash
-node -e "for (let i = 0; i < 1000; i++) console.log(\`omnis 스파이크 샘플 문장 \${i}: 회의 일정 재조율 요청과 첨부 파일 확인 부탁드립니다.\`)" > sample-sentences.txt
+node -e "for (let i = 0; i < 1000; i++) console.log(\`omnis spike sample sentence \${i}: please review the meeting reschedule request and the attached file.\`)" > sample-sentences.txt
 ```
 
-4. `tools/spikes/gate-08-ollama-nomic-embed/bench.ts`를 쓴다:
+4. Write `tools/spikes/gate-08-ollama-nomic-embed/bench.ts`:
 
 ```ts
 import { readFileSync } from "node:fs";
@@ -314,27 +314,27 @@ console.log(`total_s=${totalS.toFixed(1)} p95_ms=${p95.toFixed(1)} n=${lines.len
 process.exit(totalS <= 120 && p95 <= 300 ? 0 : 1);
 ```
 
-5. `cd tools/spikes/gate-08-ollama-nomic-embed && npx tsx bench.ts`를 실행한다. PASS 조건: `total_s <= 120`이고 `p95_ms <= 300`.
-6. `result.md`에 `total_s`/`p95_ms`/`n` 실측치를 채운다.
+5. Run `cd tools/spikes/gate-08-ollama-nomic-embed && npx tsx bench.ts`. PASS condition: `total_s <= 120` and `p95_ms <= 300`.
+6. Fill the measured `total_s`/`p95_ms`/`n` into `result.md`.
 7. `git add tools/spikes/gate-08-ollama-nomic-embed && git commit -m "$(cat <<'EOF'
-gate-08: Ollama nomic-embed 처리량 스파이크
+gate-08: Ollama nomic-embed throughput spike
 
-- 1,000문장 배치 임베딩, 총 소요시간과 p95 레이턴시 측정
-- Pass 기준: 1,000문장 ≤120s, p95 ≤300ms(A6 §11.1), "하루 ~2,000건 실시간 소화"(A6 §11.3)
+- Batch-embed 1,000 sentences, measure total elapsed time and p95 latency
+- Pass criteria: 1,000 sentences ≤120s, p95 ≤300ms (A6 §11.1), "absorb ~2,000 items/day in real time" (A6 §11.3)
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
 )"`
 
-### Task 5: Gate ⑪ — `claude -p --bare` hook 주입 (S-A2-1, A2 §4.1 소유, tier: Sonnet)
+### Task 5: Gate ⑪ — `claude -p --bare` hook injection (S-A2-1, owned by A2 §4.1, tier: Sonnet)
 
-**질문**: `-p --bare` 조합에서 `--settings`로 omnis 자체 hook 설정을 명시 주입했을 때, `PreToolUse` hook이 실제로 발동해 승인 게이트(브리지의 유닉스 소켓 호출)로 이어지는가 — 그리고 그때 대상 레포 자신의 `.claude/settings.json` project hook은 안 뜨는가(2026-09-20 `plans-review.md` §2 fix).
-**Owner**: agent(unattended) — Claude Code는 기존 구독 로그인 상태.
+**Question**: In the `-p --bare` combination, when omnis's own hook settings are explicitly injected via `--settings`, does the `PreToolUse` hook actually fire and lead into the approval gate (the bridge's Unix socket call) — and does the target repo's own `.claude/settings.json` project hook stay silent in that case (2026-09-20 `plans-review.md` §2 fix)?
+**Owner**: agent (unattended) — Claude Code is logged in with the existing subscription.
 **Host**: macbook.
-**Pass 기준(A6 §11.1/§16 원문, A2 §8.3, plans-review §2로 정밀화)**: mode (a)·(b) 중 **최소 하나**에서 omnis `PreToolUse` hook은 뜨고 project hook은 안 뜬다(`omnis_hook_fired=true` AND `project_hook_fired=false`).
-**Fail → 결정 규칙**: A2 §4.1이 이미 명시한 대로 — 두 모드 모두 위 조건을 못 채우면(omnis hook이 아예 안 뜨거나, 뜨는 모드마다 project hook도 같이 떠서 격리가 안 되면) delegated 런에서 `PreToolUse` 기반 승인 승격 경로를 포기하고, 브리지가 각 tool_use 이벤트를 직접 가로채 승인으로 승격하는 폴링 방식으로 낮춘다(A2 §4.1 hooks 문단의 대안 경로). **결정 결과는 마스터 `docs/spec/00-omnis-design.md` §19 Q13**(대기 중인 질문표, "게이트 ⑪이 결정")에 반영한다 — 이 플랜은 마스터 문서 자체를 고치지 않으므로 `result.md`의 `decided_by`에 Q13 반영 여부만 기록하고, 실제 §19 갱신은 Phase A 착수 전 Logan 확인 항목으로 넘긴다.
+**Pass criteria (A6 §11.1/§16 verbatim, refined by A2 §8.3 and plans-review §2)**: in **at least one** of mode (a)/(b), the omnis `PreToolUse` hook fires and the project hook does not (`omnis_hook_fired=true` AND `project_hook_fired=false`).
+**Fail → decision rule**: As A2 §4.1 already specifies — if neither mode satisfies the condition above (the omnis hook never fires at all, or every mode that fires it also fires the project hook so isolation fails), abandon the `PreToolUse`-based approval-promotion path in delegated runs and fall back to a polling approach where the bridge intercepts each tool_use event directly and promotes it to an approval (the alternative path in the hooks paragraph of A2 §4.1). **The decision outcome feeds into master `docs/spec/00-omnis-design.md` §19 Q13** (the pending-questions table, "decided by gate ⑪") — this plan does not edit the master document itself, so record only whether Q13 was reflected in `result.md`'s `decided_by`, and hand the actual §19 update to Logan as a confirmation item before Phase A starts.
 
-**전제(`tools/spikes/_probes/2026-09-20-cli-probes.md` "Findings that change gate ⑪" 1·2번, 원문 그대로)**:
+**Premise (items 1 and 2 of "Findings that change gate ⑪" in `tools/spikes/_probes/2026-09-20-cli-probes.md`, verbatim)**:
 > 1. `--bare` skips hooks, CLAUDE.md auto-discovery, plugins, keychain reads. Context can still be supplied explicitly via `--settings`, `--mcp-config`, `--add-dir`, `--system-prompt[-file]`. Whether hooks declared inside a `--settings` file are honored under `--bare` is UNVERIFIED and is the core of gate ⑪.
 > 2. **Under `--bare`, Anthropic auth is strictly `ANTHROPIC_API_KEY` or `apiKeyHelper` via `--settings`; OAuth and Keychain are never read.** Consequence: a delegated Claude Code run with `--bare` cannot use the Claude subscription (T3) and bills per token on an API key. This contradicts A2-D11's assumption that delegated runs ride the subscription binary. Gate ⑪ must therefore test BOTH modes:
 >    - (a) `--bare` + omnis hooks via `--settings` + `ANTHROPIC_API_KEY` → cost = API (T2-class pricing).
@@ -345,15 +345,15 @@ EOF
 - Create: `tools/spikes/gate-11-claude-bare-hooks/hooks-settings.json`, `tools/spikes/gate-11-claude-bare-hooks/hook-receiver.mjs`, `tools/spikes/gate-11-claude-bare-hooks/project-hook.mjs`, `tools/spikes/gate-11-claude-bare-hooks/run.sh`.
 - Modify: `tools/spikes/gate-11-claude-bare-hooks/result.md`.
 
-**Interfaces:** Consumes: `tools/spikes/_probes/2026-09-20-cli-probes.md`(위 전제 1·2번, verbatim). Produces: 없음.
+**Interfaces:** Consumes: `tools/spikes/_probes/2026-09-20-cli-probes.md` (premise items 1 and 2 above, verbatim). Produces: none.
 
-1. 위 전제(전제 블록)를 읽는다 — 특히 2번(“`--bare` 아래에서는 OAuth/Keychain이 아니라 `ANTHROPIC_API_KEY`만 읽힌다”)은 A2-D11의 "delegated 런은 구독 바이너리를 그대로 탄다"는 가정과 충돌하므로, 이 태스크의 실행 결과와 별개로 `result.md` 비고에 그대로 옮겨 적는다(A2-D11 재검토는 이 플랜의 범위 밖이고 Phase A 착수 전 Logan에게 에스컬레이션할 항목이다).
-2. `tools/spikes/gate-11-claude-bare-hooks/hook-receiver.mjs`를 쓴다(유닉스 소켓 대신 이 스파이크는 stdout으로 "승인 게이트가 떴다"를 증명한다 — 실제 유닉스 소켓 브리지는 Phase A `apps/local-agent`가 만든다. 이것이 **omnis 자체 hook**, `--settings`로 명시 주입되는 쪽이다):
+1. Read the premise above (the premise block) — item 2 in particular ("under `--bare`, only `ANTHROPIC_API_KEY` is read, not OAuth/Keychain") conflicts with A2-D11's assumption that "delegated runs ride the subscription binary as-is", so copy it verbatim into the `result.md` notes independently of this task's execution result (revisiting A2-D11 is out of scope for this plan and is an item to escalate to Logan before Phase A starts).
+2. Write `tools/spikes/gate-11-claude-bare-hooks/hook-receiver.mjs` (instead of a Unix socket, this spike proves "the approval gate fired" via stdout — the real Unix socket bridge is built by Phase A's `apps/local-agent`. This is the **omnis's own hook**, the one explicitly injected via `--settings`):
 
 ```js
 #!/usr/bin/env node
-// PreToolUse hook: stdin으로 { tool_name, tool_input, ... } JSON을 받아 exit code 2로 "차단"하면
-// Claude Code가 이를 승인 필요로 취급한다(hook 표면 자체 확인이 목적이라 실제 브리지 소켓은 흉내만 낸다).
+// PreToolUse hook: reads { tool_name, tool_input, ... } JSON from stdin; exiting with code 2 to "block"
+// makes Claude Code treat it as requiring approval (the goal is to verify the hook surface itself, so the real bridge socket is only stubbed).
 let raw = "";
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
@@ -363,22 +363,22 @@ process.stdin.on("end", () => {
 });
 ```
 
-3. `tools/spikes/gate-11-claude-bare-hooks/project-hook.mjs`를 쓴다(대상 레포가 **자기 것으로** 갖고 있는 hook을 흉내낸다 — 전제 2번의 "fresh worktree cwd with a repo that has its own `.claude/settings.json` hook"을 재현하는 fixture 쪽이다. omnis hook과 구분되는 별도 마커를 찍는다):
+3. Write `tools/spikes/gate-11-claude-bare-hooks/project-hook.mjs` (mimics a hook the target repo has **as its own** — this is the fixture side that reproduces premise item 2's "fresh worktree cwd with a repo that has its own `.claude/settings.json` hook". It prints a marker distinct from the omnis hook):
 
 ```js
 #!/usr/bin/env node
-// project's own PreToolUse hook (fixture) — omnis hook과 별개의 마커로 "project hook이 떴는지"만 증명한다.
+// project's own PreToolUse hook (fixture) — a marker separate from the omnis hook, proving only whether the project hook fired.
 let raw = "";
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   const evt = JSON.parse(raw);
   console.error(`PROJECT_HOOK_FIRED tool=${evt.tool_name}`);
-  process.exit(0); // 0 = allow — 발동 여부만 증명하면 되고 이 hook이 실행을 막을 필요는 없다
+  process.exit(0); // 0 = allow — proving whether it fired is enough; this hook does not need to block execution
 });
 ```
 
 4. `chmod +x tools/spikes/gate-11-claude-bare-hooks/hook-receiver.mjs tools/spikes/gate-11-claude-bare-hooks/project-hook.mjs`.
-5. `tools/spikes/gate-11-claude-bare-hooks/hooks-settings.json`을 쓴다(omnis 쪽 `--settings` 주입 파일, 절대경로 없이도 두 모드 모두에서 통하도록 스크립트 경로는 run.sh가 `cd` 후 상대경로로 넘긴다):
+5. Write `tools/spikes/gate-11-claude-bare-hooks/hooks-settings.json` (the omnis-side `--settings` injection file; so that it works in both modes without absolute paths, run.sh `cd`s first and passes the script path as a relative one):
 
 ```json
 {
@@ -390,7 +390,7 @@ process.stdin.on("end", () => {
 }
 ```
 
-6. `tools/spikes/gate-11-claude-bare-hooks/run.sh`를 쓴다(전제 2번의 2가지 모드를 둘 다 시험하고, mode (b)는 project hook이 있는 **fresh worktree cwd**에서 돌려 project hook 발동 여부까지 같이 잰다):
+6. Write `tools/spikes/gate-11-claude-bare-hooks/run.sh` (exercise both modes from premise item 2; mode (b) runs in a **fresh worktree cwd** that has a project hook, so the project hook's firing is measured as well):
 
 ```bash
 #!/usr/bin/env bash
@@ -441,78 +441,78 @@ check "$GATE_DIR/mode-b.log" mode_b
 rm -rf "$FIXTURE_PARENT"
 ```
 
-7. `chmod +x tools/spikes/gate-11-claude-bare-hooks/run.sh && ./tools/spikes/gate-11-claude-bare-hooks/run.sh`를 실행한다. PASS 조건(2번 Pass 기준과 동일): mode (a)·(b) 중 최소 하나가 `omnis_hook_fired=true` AND `project_hook_fired=false`. 어느 모드도 이 조합을 못 내면 FAIL → Fail 결정 규칙(폴링 방식 강등)을 채택한다.
-8. `result.md`를 채운다: mode (a)/(b) 각각의 `omnis_hook_fired`/`project_hook_fired`, 어느 모드가 pass 조건을 만족했는지, `decided_by`에 "§19 Q13"을 적고, 1번에서 옮겨 적은 A2-D11 충돌 메모를 비고에 남긴다.
+7. Run `chmod +x tools/spikes/gate-11-claude-bare-hooks/run.sh && ./tools/spikes/gate-11-claude-bare-hooks/run.sh`. PASS condition (identical to the pass criteria in item 2): at least one of mode (a)/(b) yields `omnis_hook_fired=true` AND `project_hook_fired=false`. If no mode produces this combination, FAIL → adopt the Fail decision rule (downgrade to polling).
+8. Fill in `result.md`: the `omnis_hook_fired`/`project_hook_fired` values for mode (a)/(b) each, which mode satisfied the pass condition, "§19 Q13" in `decided_by`, and the A2-D11 conflict note copied in step 1 in the notes.
 9. `git add tools/spikes/gate-11-claude-bare-hooks && git commit -m "$(cat <<'EOF'
-gate-11: claude -p --bare hook 주입 + project hook 격리 스파이크 (S-A2-1)
+gate-11: claude -p --bare hook injection + project hook isolation spike (S-A2-1)
 
-- --settings로 PreToolUse hook을 명시 주입해 --bare/non-bare 두 모드에서 승인 게이트가 뜨는지 확인
-- mode (b)는 자체 .claude/settings.json hook을 가진 fresh worktree fixture cwd에서 실행해 project hook 발동 여부까지 측정
-- Pass 기준: 최소 한 모드에서 omnis hook은 뜨고 project hook은 안 뜸 — 결과는 master §19 Q13에 반영 대상으로 기록
-- _probes 발견(--bare는 OAuth/Keychain을 안 읽음, API 키만) → A2-D11 가정과 충돌, Logan 에스컬레이션 필요로 기록
+- Inject a PreToolUse hook explicitly via --settings and check whether the approval gate fires in both --bare and non-bare modes
+- mode (b) runs in a fresh worktree fixture cwd that has its own .claude/settings.json hook, measuring whether the project hook fires too
+- Pass criteria: in at least one mode the omnis hook fires and the project hook does not — record the result as an input to master §19 Q13
+- _probes finding (--bare reads no OAuth/Keychain, API key only) → conflicts with the A2-D11 assumption, recorded as needing Logan escalation
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
 )"`
 
-### Task 6: Gate ⑫ — `--permission-mode` ↔ profile 매핑 (S-A2-2, A2 §7.1 소유, tier: Sonnet)
+### Task 6: Gate ⑫ — `--permission-mode` ↔ profile mapping (S-A2-2, owned by A2 §7.1, tier: Sonnet)
 
-**질문**: `--permission-mode`의 실제 허용값 전수를 A2 §7.1의 3개 permission profile(`observe`/`workspace`/`trusted`)에 확정 매핑할 수 있는가.
-**Owner**: agent(unattended).
+**Question**: Can the full set of actual accepted values for `--permission-mode` be definitively mapped onto the three permission profiles in A2 §7.1 (`observe`/`workspace`/`trusted`)?
+**Owner**: agent (unattended).
 **Host**: macbook.
-**Pass 기준(A6 §11.1 원문)**: "3 profile 확정".
-**Fail → 결정 규칙**: 값이 3개 profile로 깔끔히 안 나뉘면(예: 어떤 모드도 완전한 read-only를 보장 못 하면) `observe` profile을 CLI 플래그가 아니라 네트워크 차단(§7.2, S-A2-6 폴백)으로 별도 강제하도록 A2 §7.1을 갱신 대상으로 표시한다(이 플랜은 A2 본문을 고치지 않는다 — 스파이크 결과만 남긴다).
+**Pass criteria (A6 §11.1 verbatim)**: "3 profiles confirmed".
+**Fail → decision rule**: If the values do not split cleanly into the three profiles (e.g. if no mode guarantees true read-only), mark A2 §7.1 as needing an update so that the `observe` profile is enforced separately by network blocking (§7.2, the S-A2-6 fallback) rather than by a CLI flag (this plan does not edit the A2 body — it only records the spike result).
 
 **Files:**
 - Modify: `tools/spikes/gate-12-permission-mode-mapping/result.md`.
 - Create: `tools/spikes/gate-12-permission-mode-mapping/mapping.md`.
 
-**Interfaces:** Consumes: `tools/spikes/_probes/2026-09-20-cli-probes.md`(`--permission-mode` choices: `acceptEdits`, `auto`, `bypassPermissions`, `manual`, `dontAsk`, `plan` — 이미 확보됨). Produces: 없음.
+**Interfaces:** Consumes: `tools/spikes/_probes/2026-09-20-cli-probes.md` (`--permission-mode` choices: `acceptEdits`, `auto`, `bypassPermissions`, `manual`, `dontAsk`, `plan` — already captured). Produces: none.
 
-1. `docs/spec/A2-agent-session-bridge.md` §7.1(permission profile 표)와 `tools/spikes/_probes/2026-09-20-cli-probes.md`의 "Findings ... gate ⑫" 3번 항목을 읽는다.
-2. `claude --help 2>&1 | grep -A2 "permission-mode"`를 실행해 `_probes` 파일의 6개 값(`acceptEdits`/`auto`/`bypassPermissions`/`manual`/`dontAsk`/`plan`)이 현재 설치본에서도 동일한지 재확인한다(버전 드리프트 체크).
-3. `tools/spikes/gate-12-permission-mode-mapping/mapping.md`를 쓴다(A2 §7.1 표를 실제 CLI 값으로 채운 확정판):
+1. Read `docs/spec/A2-agent-session-bridge.md` §7.1 (the permission profile table) and item 3 of "Findings ... gate ⑫" in `tools/spikes/_probes/2026-09-20-cli-probes.md`.
+2. Run `claude --help 2>&1 | grep -A2 "permission-mode"` to re-confirm that the six values in the `_probes` file (`acceptEdits`/`auto`/`bypassPermissions`/`manual`/`dontAsk`/`plan`) are still the same in the currently installed build (version-drift check).
+3. Write `tools/spikes/gate-12-permission-mode-mapping/mapping.md` (the confirmed version of the A2 §7.1 table filled in with the actual CLI values):
 
 ```markdown
-# permission-mode ↔ profile 확정 매핑 (gate-12, S-A2-2)
+# Confirmed permission-mode ↔ profile mapping (gate-12, S-A2-2)
 
-| profile (A2 §7.1) | `--permission-mode` | 근거 |
+| profile (A2 §7.1) | `--permission-mode` | Rationale |
 |---|---|---|
-| `observe` | `plan` | 파일 쓰기·도구 실행이 없는 읽기 전용 계획 모드. `inbox:*` 루프 전용(A2 §7.1) |
-| `workspace` | `manual` | cwd 하위 파일 쓰기 + 그 외 도구는 승인 프롬프트(hook 경유, gate-11) |
-| `trusted` | `bypassPermissions` | `origin:'human'`에서만, allowed_roots 내(A2 §7.1 "bypassPermissions는 trusted+origin:human에서만") |
+| `observe` | `plan` | Read-only planning mode with no file writes or tool execution. For `inbox:*` loops only (A2 §7.1) |
+| `workspace` | `manual` | Writes files under cwd; all other tools go through an approval prompt (via hooks, gate-11) |
+| `trusted` | `bypassPermissions` | Only with `origin:'human'`, within allowed_roots (A2 §7.1: "bypassPermissions only for trusted+origin:human") |
 
-미사용: `acceptEdits`(workspace보다 느슨하게 파일 편집을 자동 승인 — 어떤 profile에도 배정하지 않음, 승인 게이트 우회 소지), `auto`(런타임 기본 판단에 맡기는 모드라 세 profile 중 무엇에도 결정론적으로 대응 안 됨), `dontAsk`(trusted와 겹치나 bypassPermissions보다 의미가 불명확해 배제).
+Unused: `acceptEdits` (auto-approves file edits more loosely than workspace — assigned to no profile; risks bypassing the approval gate), `auto` (delegates to runtime judgment, so it maps deterministically to none of the three profiles), `dontAsk` (overlaps trusted but is less clearly defined than bypassPermissions, so it is excluded).
 ```
 
-4. `result.md`를 채운다: 결과=Pass(3개 profile이 모두 확정 매핑됨), 측정치 칸에 `mapping.md` 경로를 남긴다.
+4. Fill in `result.md`: Result = Pass (all three profiles definitively mapped), and leave the `mapping.md` path in the measurements field.
 5. `git add tools/spikes/gate-12-permission-mode-mapping && git commit -m "$(cat <<'EOF'
-gate-12: --permission-mode ↔ permission profile 확정 매핑 (S-A2-2)
+gate-12: confirmed --permission-mode ↔ permission profile mapping (S-A2-2)
 
-- observe→plan, workspace→manual, trusted→bypassPermissions로 확정
-- acceptEdits/auto/dontAsk는 사용하지 않음(근거는 mapping.md)
-- Pass 기준: 3 profile 확정
+- Confirmed observe→plan, workspace→manual, trusted→bypassPermissions
+- acceptEdits/auto/dontAsk left unused (rationale in mapping.md)
+- Pass criteria: 3 profiles confirmed
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
 )"`
 
-### Task 7: Gate ⑬ — Zero의 vector/tsvector/uuid[]/generated 컬럼 복제 (S-A3-2, A3 §7·§14 소유, tier: Sonnet)
+### Task 7: Gate ⑬ — Zero replication of vector/tsvector/uuid[]/generated columns (S-A3-2, owned by A3 §7/§14, tier: Sonnet)
 
-**질문**: Zero가 `vector`, `tsvector`(generated), `uuid[]` 컬럼이 섞인 테이블을 publication에 넣었을 때 정상 복제하고 클라이언트에서 쿼리할 수 있는가 — 안 되면 `items.search_tsv`를 어떻게 빼야 하는가.
-**Owner**: agent(unattended).
-**Host**: macbook(Task 2와 같은 로컬 Zero+Postgres 스택 재사용 가능하나, 독립 실행을 위해 별도 스크래치 DB를 쓴다).
-**Pass 기준(A6 §11.1 원문)**: "복제+쿼리 성공".
-**Fail → 결정 규칙(A3 §14 S-A3-2 원문)**: "`search_tsv`를 별도 테이블로 빼고 `participants`를 join 테이블로 정규화".
+**Question**: When a table mixing `vector`, `tsvector` (generated) and `uuid[]` columns is put into a publication, does Zero replicate it correctly and can the client query it — and if not, how must `items.search_tsv` be excluded?
+**Owner**: agent (unattended).
+**Host**: macbook (the same local Zero+Postgres stack as Task 2 could be reused, but a separate scratch DB is used so it runs independently).
+**Pass criteria (A6 §11.1 verbatim)**: "replication + query succeed".
+**Fail → decision rule (A3 §14 S-A3-2 verbatim)**: "move `search_tsv` into a separate table and normalize `participants` into a join table".
 
 **Files:**
 - Create: `tools/spikes/gate-13-zero-column-types/setup.sql`, `tools/spikes/gate-13-zero-column-types/schema.ts`, `tools/spikes/gate-13-zero-column-types/measure.ts`.
 - Modify: `tools/spikes/gate-13-zero-column-types/result.md`.
 
-**Interfaces:** Consumes: `@rocicorp/zero`(npm). Produces: 없음.
+**Interfaces:** Consumes: `@rocicorp/zero` (npm). Produces: none.
 
-1. `docs/spec/A3-data-schema.md` §7(Zero 동기화 범위)과 §14 S-A3-2·S-A3-6을 읽는다 — 실제 문제 컬럼은 `items.embedding vector(768)`(제외 대상이라 여기서 시험할 필요 없음), `items.search_tsv`(generated tsvector, 제외 대상이지만 "제외가 실제로 되는가"를 시험해야 함), `threads.participants uuid[]`(포함 대상, 실제로 복제되는지 시험해야 함).
-2. `tools/spikes/gate-13-zero-column-types/setup.sql`을 쓴다(A3 §2·§3의 실제 테이블을 복제하지 않고, 문제 컬럼 3종만 가진 최소 재현 테이블 두 개를 만든다):
+1. Read `docs/spec/A3-data-schema.md` §7 (Zero sync scope) and §14 S-A3-2/S-A3-6 — the columns actually at issue are `items.embedding vector(768)` (excluded, so no need to test it here), `items.search_tsv` (generated tsvector; excluded, but "does the exclusion really work" must be tested), and `threads.participants uuid[]` (included; whether it really replicates must be tested).
+2. Write `tools/spikes/gate-13-zero-column-types/setup.sql` (rather than replicating the real tables from A3 §2/§3, create two minimal reproduction tables carrying only the three problem column types):
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -534,14 +534,14 @@ CREATE TABLE probe_items (
 
 ALTER SYSTEM SET wal_level = 'logical';
 
--- items 쪽만 컬럼 리스트로 publication에 넣는다(A3 §7 DDL과 같은 패턴):
+-- Put only the items side into the publication with a column list (the same pattern as the A3 §7 DDL):
 CREATE PUBLICATION zero_spike_13 FOR TABLE
   probe_threads,
   probe_items (id, thread_id, body);
 ```
 
-3. `createdb omnis_spike_zero13 && psql omnis_spike_zero13 -f setup.sql && brew services restart postgresql@17`를 실행한다.
-4. `tools/spikes/gate-13-zero-column-types/schema.ts`를 쓴다(uuid[] 컬럼과 컬럼 리스트로 좁힌 `probe_items`만 선언 — `embedding`/`search_tsv`는 스키마에 아예 넣지 않는다. Zero 클라이언트 스키마 자체가 publication과 일치해야 하므로 이것이 "제외가 실제로 되는가"의 1차 확인이다):
+3. Run `createdb omnis_spike_zero13 && psql omnis_spike_zero13 -f setup.sql && brew services restart postgresql@17`.
+4. Write `tools/spikes/gate-13-zero-column-types/schema.ts` (declare the uuid[] column and only `probe_items` narrowed by a column list — `embedding`/`search_tsv` are not put into the schema at all. The Zero client schema itself must match the publication, so this is the first check of "does the exclusion really work"):
 
 ```ts
 import { createSchema, table, string, json } from "@rocicorp/zero";
@@ -557,8 +557,8 @@ export const probeItems = table("probe_items")
 export const schema = createSchema({ tables: [probeThreads, probeItems] });
 ```
 
-5. `ZERO_UPSTREAM_DB=postgres://localhost/omnis_spike_zero13 ZERO_CVR_DB=postgres://localhost/omnis_spike_zero13 ZERO_REPLICA_FILE=/tmp/omnis-spike-zero13.db npx zero-cache-dev -p schema.ts`로 zero-cache를 띄운다. 이 명령이 스키마를 거부하면(예: `uuid[]` → `json<string[]>()` 매핑을 zero-cache가 인식 못 하면) 콘솔 에러 메시지를 그대로 `result.md`에 옮긴다 — 이게 이 스파이크의 1차 산출물이다.
-6. `tools/spikes/gate-13-zero-column-types/measure.ts`를 쓴다:
+5. Bring up zero-cache with `ZERO_UPSTREAM_DB=postgres://localhost/omnis_spike_zero13 ZERO_CVR_DB=postgres://localhost/omnis_spike_zero13 ZERO_REPLICA_FILE=/tmp/omnis-spike-zero13.db npx zero-cache-dev -p schema.ts`. If this command rejects the schema (e.g. zero-cache does not recognize the `uuid[]` → `json<string[]>()` mapping), copy the console error message verbatim into `result.md` — that is this spike's primary artifact.
+6. Write `tools/spikes/gate-13-zero-column-types/measure.ts`:
 
 ```ts
 import { Zero } from "@rocicorp/zero";
@@ -588,35 +588,35 @@ console.log(`gate13_pass=${pass}`);
 process.exit(pass ? 0 : 1);
 ```
 
-7. `cd tools/spikes/gate-13-zero-column-types && pnpm add @rocicorp/zero pg && npx tsx measure.ts`를 실행한다. PASS 조건: `gate13_pass=true`(uuid[]가 배열로 복제되고, `embedding`/`search_tsv`를 스키마에 넣지 않아도 `probe_items` 쿼리가 정상 동작).
-8. `result.md`를 채운다: `uuid[]` 복제 성공 여부, publication 컬럼 리스트 문법(`items (id, thread_id, ...)`)이 zero-cache에서 실제로 받아들여졌는지를 각각 적는다.
+7. Run `cd tools/spikes/gate-13-zero-column-types && pnpm add @rocicorp/zero pg && npx tsx measure.ts`. PASS condition: `gate13_pass=true` (uuid[] replicates as an array, and querying `probe_items` works even without `embedding`/`search_tsv` in the schema).
+8. Fill in `result.md`: record separately whether `uuid[]` replicated successfully and whether the publication column-list syntax (`items (id, thread_id, ...)`) was actually accepted by zero-cache.
 9. `git add tools/spikes/gate-13-zero-column-types && git commit -m "$(cat <<'EOF'
-gate-13: Zero의 vector/tsvector/uuid[]/generated 컬럼 처리 스파이크 (S-A3-2)
+gate-13: spike on Zero's handling of vector/tsvector/uuid[]/generated columns (S-A3-2)
 
-- uuid[] 컬럼(threads.participants 재현) 복제·쿼리 확인
-- generated tsvector·vector 컬럼을 publication 컬럼 리스트로 제외하는 문법(S-A3-6) 검증
-- Pass 기준: 복제+쿼리 성공
+- Confirm replication and querying of a uuid[] column (reproducing threads.participants)
+- Verify the syntax that excludes generated tsvector/vector columns via a publication column list (S-A3-6)
+- Pass criteria: replication + query succeed
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
 )"`
 
-### Task 8: Gate ⑭ — worktrunk 드라이런 (A7-1, A7 §3 소유, tier: Sonnet)
+### Task 8: Gate ⑭ — worktrunk dry run (A7-1, owned by A7 §3, tier: Sonnet)
 
-**질문**: `worktrunk`로 워크트리 create/remove 왕복이 실제로 되는가(정확한 서브커맨드·플래그는 A7-D5가 UNVERIFIED로 남긴 것).
-**Owner**: agent(unattended).
-**Host**: macbook(`worktrunk` 0.78.0이 이미 설치돼 있음, `_probes` 파일).
-**Pass 기준(A6 §11.1 원문)**: "create/remove 왕복".
-**Fail → 결정 규칙**: A7-D5가 이미 정한 폴백 — worktrunk 대신 순수 `git worktree add`/`git worktree remove`로 낮추고 ralph 루프의 워크트리 격리 절차(A7 §3)를 그 명령으로 재작성 대상 표시(이 플랜은 A7 본문을 고치지 않는다).
+**Question**: Does a worktree create/remove round trip actually work with `worktrunk` (the exact subcommands and flags are what A7-D5 left UNVERIFIED)?
+**Owner**: agent (unattended).
+**Host**: macbook (`worktrunk` 0.78.0 is already installed, `_probes` file).
+**Pass criteria (A6 §11.1 verbatim)**: "create/remove round trip".
+**Fail → decision rule**: The fallback A7-D5 already specified — downgrade from worktrunk to plain `git worktree add`/`git worktree remove` and mark the ralph loop's worktree isolation procedure (A7 §3) as needing a rewrite around those commands (this plan does not edit the A7 body).
 
 **Files:**
 - Create: `tools/spikes/gate-14-worktrunk-dryrun/run.sh`.
 - Modify: `tools/spikes/gate-14-worktrunk-dryrun/result.md`.
 
-**Interfaces:** Consumes: `tools/spikes/_probes/2026-09-20-cli-probes.md`(worktrunk 0.78.0 설치 확인). Produces: 없음.
+**Interfaces:** Consumes: `tools/spikes/_probes/2026-09-20-cli-probes.md` (confirming worktrunk 0.78.0 is installed). Produces: none.
 
-1. `docs/spec/A7-dev-process.md` §3의 "worktrunk 워크트리 격리 절차" 문단을 읽는다 — 기본 가정 `worktrunk create <branch>` / `worktrunk remove <story-id>`.
-2. `tools/spikes/gate-14-worktrunk-dryrun/run.sh`를 쓴다(omnis 레포 자체가 아니라 스크래치 레포에 대고 드라이런한다 — 실제 작업 브랜치를 건드리지 않는다):
+1. Read the "worktrunk worktree isolation procedure" paragraph in `docs/spec/A7-dev-process.md` §3 — the default assumption is `worktrunk create <branch>` / `worktrunk remove <story-id>`.
+2. Write `tools/spikes/gate-14-worktrunk-dryrun/run.sh` (dry-run against a scratch repo, not the omnis repo itself — the real working branch is never touched):
 
 ```bash
 #!/usr/bin/env bash
@@ -642,14 +642,14 @@ test ! -d "$SCRATCH/.worktrees/gate-14-dryrun" \
 rm -rf "$SCRATCH"
 ```
 
-3. `chmod +x tools/spikes/gate-14-worktrunk-dryrun/run.sh && ./tools/spikes/gate-14-worktrunk-dryrun/run.sh 2>&1 | tee tools/spikes/gate-14-worktrunk-dryrun/run.log`을 실행한다. `worktrunk create`/`worktrunk remove`가 정확히 A7-D5의 가정과 다른 서브커맨드·경로를 쓰면(예: 워크트리가 `.worktrees/`가 아니라 다른 위치에 생기면) `--help` 출력을 보고 스크립트의 `test -d` 경로를 실제 경로로 고쳐 재실행한다.
-4. PASS 조건: `create_pass=true`와 `remove_pass=true` 둘 다.
-5. `result.md`를 채운다: 실제로 확인된 정확한 명령 형태(`worktrunk create <branch>` 그대로인지, 플래그가 붙는지)를 측정치 칸에 남긴다 — 이 값은 Task 16(worktrunk-cli-spike)이 그대로 이어받는다.
+3. Run `chmod +x tools/spikes/gate-14-worktrunk-dryrun/run.sh && ./tools/spikes/gate-14-worktrunk-dryrun/run.sh 2>&1 | tee tools/spikes/gate-14-worktrunk-dryrun/run.log`. If `worktrunk create`/`worktrunk remove` use subcommands or paths different from A7-D5's assumption (e.g. the worktree lands somewhere other than `.worktrees/`), read the `--help` output, fix the `test -d` paths in the script to the real paths, and re-run.
+4. PASS condition: both `create_pass=true` and `remove_pass=true`.
+5. Fill in `result.md`: record the exact command form actually confirmed (whether it is literally `worktrunk create <branch>` or takes flags) in the measurements field — Task 16 (worktrunk-cli-spike) inherits this value as-is.
 6. `git add tools/spikes/gate-14-worktrunk-dryrun && git commit -m "$(cat <<'EOF'
-gate-14: worktrunk create/remove 드라이런 (A7-1)
+gate-14: worktrunk create/remove dry run (A7-1)
 
-- 스크래치 레포에 대고 worktrunk create ralph/<id> → remove <id> 왕복 확인
-- Pass 기준: create/remove 왕복
+- Confirm the worktrunk create ralph/<id> → remove <id> round trip against a scratch repo
+- Pass criteria: create/remove round trip
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
@@ -657,65 +657,65 @@ EOF
 
 ---
 
-## 순서 B — Logan-assisted 게이트 (물리적 개입·OAuth 동의·GUI 권한 승인 필요)
+## Order B — Logan-assisted gates (require physical intervention, OAuth consent, GUI permission approval)
 
-### Task 9: Gate ③ — FileVault 켠 채 자동 로그인 (A6 소유, tier: Sonnet)
+### Task 9: Gate ③ — automatic login with FileVault on (owned by A6, tier: Sonnet)
 
-**질문**: 미니에서 FileVault를 켠 채로 자동 로그인이 재부팅 후 무개입으로 되는가.
-**Owner**: Logan — 미니의 로컬 로그인 화면 조작(자동 로그인 설정, FileVault 복구키 확인, 재부팅 관찰)은 원격 Screen Sharing으로도 재부팅 직후의 초기 화면을 볼 수 없는 구간이 있어 물리적 현장 확인이 최선이다. Fable은 Screen Sharing(`vnc://<mini-hostname>.ts.net`)으로 절차 안내와 사후 확인만 한다.
+**Question**: With FileVault enabled on the mini, does automatic login happen after a reboot with no intervention?
+**Owner**: Logan — manipulating the mini's local login screen (setting automatic login, checking the FileVault recovery key, watching the reboot) has a window where Screen Sharing cannot show the screen right after a reboot, so on-site verification is best. Fable only guides the procedure and does the follow-up check over Screen Sharing (`vnc://<mini-hostname>.ts.net`).
 **Host**: mini.
-**Pass 기준(A6 §11.3 원문)**: "수동 개입 없이 재부팅 후 로그인 세션 도달".
-**Fail → 결정 규칙(A6 §11.3·A6-D2 원문)**: "FileVault OFF + tailnet-only 노출 + 물리 보안 보완, Logan 승인 필수".
-**순서 규칙(A6-D2·§11.1)**: 이 스파이크는 §2 1번(자동 로그인 설정)보다 먼저 실행한다 — FileVault 여부가 자동 로그인 설정 자체에 영향을 준다.
+**Pass criteria (A6 §11.3 verbatim)**: "reach a login session after reboot with no manual intervention".
+**Fail → decision rule (A6 §11.3/A6-D2 verbatim)**: "FileVault OFF + tailnet-only exposure + compensating physical security; Logan's approval required".
+**Ordering rule (A6-D2/§11.1)**: Run this spike before §2 item 1 (setting up automatic login) — whether FileVault is on affects the automatic login setting itself.
 
 **Files:**
 - Create: `tools/spikes/gate-03-filevault-autologin/checklist.md`.
 - Modify: `tools/spikes/gate-03-filevault-autologin/result.md`.
 
-**Interfaces:** Consumes: 없음(순수 OS 설정 절차, 코드 없음). Produces: 없음.
+**Interfaces:** Consumes: none (a pure OS-configuration procedure, no code). Produces: none.
 
-1. `docs/spec/A6-ops-infra.md` §2(미니 OS 설정 절차, 특히 8번)와 §11.3 ③행을 읽는다.
-2. `tools/spikes/gate-03-filevault-autologin/checklist.md`를 쓴다(Logan이 미니 앞에서 그대로 따라갈 체크리스트 — 코드가 아니라 순서가 산출물이다):
+1. Read `docs/spec/A6-ops-infra.md` §2 (the mini OS setup procedure, item 8 in particular) and the ③ row of §11.3.
+2. Write `tools/spikes/gate-03-filevault-autologin/checklist.md` (a checklist Logan follows verbatim in front of the mini — the deliverable is the procedure, not code):
 
 ```markdown
-# Gate ③ 체크리스트 — FileVault ON + 자동 로그인 (미니, Logan 현장 작업)
+# Gate ③ checklist — FileVault ON + automatic login (mini, Logan on site)
 
-1. System Settings → Privacy & Security → FileVault → Turn On FileVault. 복구키를 안전한 곳(비밀번호 관리자)에 저장한다.
-2. 재시작 요구가 뜨면 재시작하고 디스크 암호화가 완료될 때까지 기다린다(`fdesetup status`로 진행률 확인 가능).
-3. System Settings → Users & Groups → Automatic login → `logan` 계정으로 설정 시도.
-4. 정상적으로 설정되면(FileVault ON 상태에서도 옵션이 막히지 않으면) 미니를 재부팅한다.
-5. 재부팅 직후 로그인 화면 없이 바로 GUI 세션(데스크톱)에 도달하는지 **직접 육안으로** 확인한다 — Screen Sharing은 로그인 후 화면만 보여줄 수 있어 이 단계는 반드시 물리적으로 확인한다.
-6. 4~5번을 총 2회 반복해 재현성을 확인한다(부팅마다 다를 수 있음).
+1. System Settings → Privacy & Security → FileVault → Turn On FileVault. Store the recovery key somewhere safe (a password manager).
+2. If prompted to restart, restart and wait until disk encryption finishes (progress can be checked with `fdesetup status`).
+3. System Settings → Users & Groups → Automatic login → try setting it to the `logan` account.
+4. If it configures successfully (i.e. the option is not blocked even with FileVault ON), reboot the mini.
+5. Right after the reboot, **visually confirm with your own eyes** that the GUI session (desktop) is reached directly without a login screen — Screen Sharing can only show the screen after login, so this step must be verified physically.
+6. Repeat steps 4–5 twice in total to confirm reproducibility (it may differ between boots).
 ```
 
-3. Logan이 위 체크리스트를 실행하는 동안 대기하고, 완료 보고를 받으면 `result.md`에 실행일·Pass/Fail·decided_by(`Logan`)를 적는다.
-4. Fail이면 A6-D2 규칙대로 즉시 FileVault를 OFF로 내리고 §3(네트워크)의 Tailscale ACL을 tailnet-only(Funnel 금지)로 좁히는 후속 작업이 필요함을 `result.md` 비고에 적고, 이 전환 자체는 Logan의 명시적 승인 문구를 받아 남긴다(승인 없이 이 플랜의 태스크가 스스로 FileVault를 끄지 않는다).
+3. Wait while Logan runs the checklist above, and once the completion report comes back, write the run date, Pass/Fail, and decided_by (`Logan`) into `result.md`.
+4. On Fail, note in the `result.md` notes that A6-D2 requires turning FileVault OFF immediately and narrowing the Tailscale ACL in §3 (network) to tailnet-only (no Funnel) as follow-up work, and obtain and record Logan's explicit approval wording for that transition itself (without approval, no task in this plan turns FileVault off on its own).
 5. `git add tools/spikes/gate-03-filevault-autologin && git commit -m "$(cat <<'EOF'
-gate-03: FileVault+자동 로그인 스파이크 체크리스트 및 결과 (Logan 현장 작업)
+gate-03: FileVault + automatic login spike checklist and result (Logan on site)
 
-- Pass 기준: 재부팅 후 무개입 GUI 세션 도달
-- Fail 시 A6-D2: FileVault OFF + tailnet-only + Logan 승인
+- Pass criteria: reach a GUI session after reboot with no intervention
+- On Fail, per A6-D2: FileVault OFF + tailnet-only + Logan's approval
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
 )"`
 
-### Task 10: Gate ④ — kmsg read on mini (A1-③, A1 §4 소유, tier: Sonnet)
+### Task 10: Gate ④ — kmsg read on the mini (A1-③, owned by A1 §4, tier: Sonnet)
 
-**질문**: `kmsg watch --json`이 미니에서 48시간 연속으로 KakaoTalk 메시지를 정상 JSON 이벤트로 내보내면서 Accessibility 권한 재요청이 0회인가.
-**Owner**: Logan — Accessibility 권한 프롬프트(System Settings → Privacy & Security → Accessibility)는 GUI 클릭이 필요하고 Screen Sharing으로 가능하지만 최초 승인은 물리적/원격 GUI 조작이 필수다.
+**Question**: Does `kmsg watch --json` on the mini emit KakaoTalk messages as well-formed JSON events for 48 consecutive hours while re-requesting Accessibility permission zero times?
+**Owner**: Logan — the Accessibility permission prompt (System Settings → Privacy & Security → Accessibility) requires a GUI click and can be done over Screen Sharing, but the initial approval requires physical or remote GUI manipulation.
 **Host**: mini.
-**Pass 기준(A1 §4 원문)**: "JSON에 최근 메시지 정상 출력, KakaoTalk.app 포커스 뺏기지 않음" / A6 §11.1 요약: "48h 연속, 권한 재요청 0".
-**Fail → 결정 규칙(A1 §4 원문)**: "Notification Center DB + Vision OCR 폴백 설계로 전환, KakaoTalk read 착수 지연을 Logan에게 보고".
+**Pass criteria (A1 §4 verbatim)**: "recent messages appear correctly in the JSON, KakaoTalk.app does not lose focus" / A6 §11.1 summary: "48h continuous, 0 permission re-requests".
+**Fail → decision rule (A1 §4 verbatim)**: "switch to the Notification Center DB + Vision OCR fallback design and report the delay in starting KakaoTalk read to Logan".
 
 **Files:**
 - Create: `tools/spikes/gate-04-kmsg-read/run.sh`, `tools/spikes/gate-04-kmsg-read/watch-48h.sh`.
 - Modify: `tools/spikes/gate-04-kmsg-read/result.md`.
 
-**Interfaces:** Consumes: 없음(kmsg CLI만). Produces: 없음.
+**Interfaces:** Consumes: none (only the kmsg CLI). Produces: none.
 
-1. `docs/spec/A1-channel-adapters.md` §4(A1-③ 행)와 §2.8(KakaoTalk 절)을 읽는다.
-2. `tools/spikes/gate-04-kmsg-read/run.sh`를 쓴다(설치 + 최초 1회 read 확인, Logan이 미니에서 실행):
+1. Read `docs/spec/A1-channel-adapters.md` §4 (the A1-③ row) and §2.8 (the KakaoTalk section).
+2. Write `tools/spikes/gate-04-kmsg-read/run.sh` (install + verify one read, run by Logan on the mini):
 
 ```bash
 #!/usr/bin/env bash
@@ -726,7 +726,7 @@ CHAT_ID=$(node -e "console.log(JSON.parse(require('fs').readFileSync('tools/spik
 kmsg read "$CHAT_ID" --background-safe --json | tee tools/spikes/gate-04-kmsg-read/first-read.json
 ```
 
-3. `tools/spikes/gate-04-kmsg-read/watch-48h.sh`를 쓴다(48시간 연속 관찰용 로그 수집 — 백그라운드 실행 후 이벤트 카운트와 에러를 집계):
+3. Write `tools/spikes/gate-04-kmsg-read/watch-48h.sh` (log collection for the 48-hour observation — run in the background, then aggregate event counts and errors):
 
 ```bash
 #!/usr/bin/env bash
@@ -737,35 +737,35 @@ echo $! > tools/spikes/gate-04-kmsg-read/watch.pid
 echo "started, pid=$(cat tools/spikes/gate-04-kmsg-read/watch.pid), log=$LOG"
 ```
 
-4. Logan이 미니에서 `run.sh`를 실행하고 System Settings의 Accessibility 권한 프롬프트에 Allow를 누른다(1회). 이어서 `watch-48h.sh`를 실행해 백그라운드로 48시간 켜둔다.
-5. 48시간 후 Logan(또는 Fable이 Screen Sharing으로) `wc -l tools/spikes/gate-04-kmsg-read/watch-48h.ndjson`과 `cat tools/spikes/gate-04-kmsg-read/watch-48h.err`을 확인한다. PASS 조건: `.err` 파일에 권한 재요청 관련 에러가 없고(`grep -i "accessibility\|permission" watch-48h.err`가 빈 결과), `.ndjson`에 최소 1건 이상의 실제 메시지 이벤트가 있다.
-6. `result.md`를 채운다: 48시간 시작/종료 시각, 총 이벤트 수, 권한 재요청 횟수(목표 0)를 적는다.
+4. Logan runs `run.sh` on the mini and clicks Allow on the Accessibility permission prompt in System Settings (once). Then run `watch-48h.sh` and leave it running in the background for 48 hours.
+5. After 48 hours, Logan (or Fable over Screen Sharing) checks `wc -l tools/spikes/gate-04-kmsg-read/watch-48h.ndjson` and `cat tools/spikes/gate-04-kmsg-read/watch-48h.err`. PASS condition: the `.err` file contains no permission re-request errors (`grep -i "accessibility\|permission" watch-48h.err` returns nothing) and the `.ndjson` contains at least one real message event.
+6. Fill in `result.md`: the 48-hour start/end timestamps, the total event count, and the permission re-request count (target 0).
 7. `git add tools/spikes/gate-04-kmsg-read && git commit -m "$(cat <<'EOF'
-gate-04: kmsg read on mini 48시간 관찰 스파이크 (A1-③, Logan 현장 작업)
+gate-04: kmsg read on the mini, 48-hour observation spike (A1-③, Logan on site)
 
-- kmsg watch --json 48시간 백그라운드 관찰, Accessibility 권한 재요청 횟수 카운트
-- Pass 기준: 48h 연속, 권한 재요청 0
+- Observe kmsg watch --json in the background for 48 hours, counting Accessibility permission re-requests
+- Pass criteria: 48h continuous, 0 permission re-requests
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
 )"`
 
-### Task 11: Gate ⑤ — Tailscale Serve HTTPS를 iPhone Safari에서 (A6 소유, tier: Sonnet)
+### Task 11: Gate ⑤ — Tailscale Serve HTTPS from iPhone Safari (owned by A6, tier: Sonnet)
 
-**질문**: `<mini-hostname>.ts.net`에 iPhone Safari로 접속했을 때 SSL 에러 없이 페이지가 뜨는가.
-**Owner**: Logan — 아이폰 실기기 Safari 테스트는 물리적 조작이 필요하다.
-**Host**: mini(서빙) + iPhone(테스트 클라이언트).
-**Pass 기준(A6 §11.3 원문)**: "SSL 에러 없이 페이지 로드".
-**Fail → 결정 규칙(A6 §11.3 원문)**: "MagicDNS 이름 재확인 → 그래도 실패 시 TailscaleKit 검증을 Phase D로 앞당김".
+**Question**: When connecting to `<mini-hostname>.ts.net` from iPhone Safari, does the page load with no SSL error?
+**Owner**: Logan — testing Safari on a physical iPhone requires hands-on manipulation.
+**Host**: mini (serving) + iPhone (test client).
+**Pass criteria (A6 §11.3 verbatim)**: "page loads with no SSL error".
+**Fail → decision rule (A6 §11.3 verbatim)**: "re-check the MagicDNS name → if it still fails, move TailscaleKit validation forward into Phase D".
 
 **Files:**
 - Create: `tools/spikes/gate-05-tailscale-serve-iphone/setup.sh`, `tools/spikes/gate-05-tailscale-serve-iphone/checklist.md`.
 - Modify: `tools/spikes/gate-05-tailscale-serve-iphone/result.md`.
 
-**Interfaces:** Consumes: 없음. Produces: 없음.
+**Interfaces:** Consumes: none. Produces: none.
 
-1. `docs/spec/A6-ops-infra.md` §3(네트워크, Tailscale Serve·MagicDNS·Funnel 문단)과 §11.3 ⑤행을 읽는다.
-2. `tools/spikes/gate-05-tailscale-serve-iphone/setup.sh`를 쓴다(미니에서 최소한의 정적 페이지를 Serve로 노출한다 — 아직 `apps/web`이 없으므로 `python3 -m http.server`로 흉내낸다):
+1. Read `docs/spec/A6-ops-infra.md` §3 (the network section: Tailscale Serve, MagicDNS, Funnel) and the ⑤ row of §11.3.
+2. Write `tools/spikes/gate-05-tailscale-serve-iphone/setup.sh` (expose a minimal static page via Serve on the mini — `apps/web` does not exist yet, so `python3 -m http.server` stands in for it):
 
 ```bash
 #!/usr/bin/env bash
@@ -777,46 +777,46 @@ echo "serve status:"
 tailscale serve status
 ```
 
-3. `tools/spikes/gate-05-tailscale-serve-iphone/checklist.md`를 쓴다:
+3. Write `tools/spikes/gate-05-tailscale-serve-iphone/checklist.md`:
 
 ```markdown
-# Gate ⑤ 체크리스트 — Tailscale Serve HTTPS @ iPhone Safari (Logan)
+# Gate ⑤ checklist — Tailscale Serve HTTPS @ iPhone Safari (Logan)
 
-1. 미니에서 `setup.sh` 실행(위 명령, Fable이 Screen Sharing으로 대신 실행 가능 — GUI 권한이 필요 없는 CLI 단계라 unattended 대행 가능. 다만 아이폰 쪽 확인만 Logan이 한다).
-2. 아이폰 Settings → 설치된 프로파일/VPN 확인: DoH(DNS-over-HTTPS) 앱이나 private-DNS 프로파일이 있으면 임시로 끈다(A6 §3의 알려진 원인).
-3. 아이폰 Safari에서 `https://<mini-hostname>.ts.net` 접속.
-4. SSL 경고 없이 "omnis gate-05 ok" 페이지가 뜨는지 확인.
-5. 3번이 실패하면 MagicDNS가 켜져 있는지(Tailscale 앱 → Settings) 재확인 후 재시도.
+1. Run `setup.sh` on the mini (the command above; Fable can run it instead over Screen Sharing — it is a CLI step needing no GUI permissions, so it can be delegated unattended. Only the iPhone-side check is Logan's).
+2. On the iPhone, check Settings → installed profiles/VPN: if a DoH (DNS-over-HTTPS) app or a private-DNS profile is present, turn it off temporarily (a known cause noted in A6 §3).
+3. Open `https://<mini-hostname>.ts.net` in iPhone Safari.
+4. Confirm the "omnis gate-05 ok" page appears with no SSL warning.
+5. If step 3 fails, re-check that MagicDNS is enabled (Tailscale app → Settings) and retry.
 ```
 
-4. Logan이 iPhone에서 3~5번을 수행하고 결과를 보고하면 `result.md`에 채운다: SSL 에러 여부, DoH 앱 유무, 재시도 필요했는지.
-5. 스파이크 종료 후 `sudo tailscale serve --https=443 off`(또는 `tailscale serve reset`)로 임시 정적 서버 노출을 내린다 — 이건 본 스파이크가 Zero/hub의 실제 경로가 아니라 흉내낸 것이므로 상시로 켜두지 않는다.
+4. Logan performs steps 3–5 on the iPhone and reports the result, then fill in `result.md`: whether there was an SSL error, whether a DoH app was present, and whether a retry was needed.
+5. After the spike ends, tear down the temporary static-server exposure with `sudo tailscale serve --https=443 off` (or `tailscale serve reset`) — this spike stubbed the path rather than using Zero/hub's real one, so it is not left running permanently.
 6. `git add tools/spikes/gate-05-tailscale-serve-iphone && git commit -m "$(cat <<'EOF'
-gate-05: Tailscale Serve HTTPS @ iPhone Safari 스파이크 (Logan 확인)
+gate-05: Tailscale Serve HTTPS @ iPhone Safari spike (Logan verification)
 
-- 미니에 임시 정적 페이지를 Serve로 노출, 아이폰 Safari에서 SSL 에러 없이 로드되는지 확인
-- Pass 기준: SSL 에러 0
+- Expose a temporary static page via Serve on the mini and check that it loads in iPhone Safari with no SSL error
+- Pass criteria: 0 SSL errors
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
 )"`
 
-### Task 12: Gate ⑨ — Slack Socket Mode 1턴 왕복 (A1-④, A1 §4 소유, tier: Sonnet)
+### Task 12: Gate ⑨ — Slack Socket Mode one-turn round trip (A1-④, owned by A1 §4, tier: Sonnet)
 
-**질문**: Slack 앱을 Socket Mode로 만들고 WS 연결 후 테스트 DM을 보냈을 때 5초 이내(G1)에 이벤트를 수신하는가.
-**Owner**: Logan — Slack workspace에 새 앱을 만들고 설치(admin 승인)하는 것은 Slack UI에서 Logan 계정으로 해야 한다.
-**Host**: macbook(Socket Mode WS 클라이언트는 GUI가 필요 없어 개발 머신에서 수신 확인).
-**Pass 기준(A1 §4 원문)**: "5초 이내 이벤트 수신(G1)".
-**Fail → 결정 규칙(A1 §4 원문)**: "Events API(공인 endpoint, Funnel 경유) 대안 검토 — Phase A 지연 가능".
+**Question**: After creating a Slack app in Socket Mode and connecting over WS, does sending a test DM yield an event within 5 seconds (G1)?
+**Owner**: Logan — creating and installing a new app in the Slack workspace (admin approval) must be done in the Slack UI under Logan's account.
+**Host**: macbook (the Socket Mode WS client needs no GUI, so receipt is verified on the development machine).
+**Pass criteria (A1 §4 verbatim)**: "event received within 5 seconds (G1)".
+**Fail → decision rule (A1 §4 verbatim)**: "consider the Events API alternative (public endpoint, via Funnel) — Phase A may slip".
 
 **Files:**
 - Create: `tools/spikes/gate-09-slack-socket-mode/manifest.yaml`, `tools/spikes/gate-09-slack-socket-mode/listen.ts`, `tools/spikes/gate-09-slack-socket-mode/checklist.md`.
 - Modify: `tools/spikes/gate-09-slack-socket-mode/result.md`.
 
-**Interfaces:** Consumes: `@slack/socket-mode`(npm, Slack 공식 SDK — provider SDK는 A1 채널 스파이크 안에서만 쓴다는 제약을 그대로 지킨다). Produces: 없음.
+**Interfaces:** Consumes: `@slack/socket-mode` (npm, Slack's official SDK — this keeps the constraint that provider SDKs are used only inside A1 channel spikes). Produces: none.
 
-1. `docs/spec/A1-channel-adapters.md` §2.1(Slack)과 §4(A1-④ 행)를 읽는다.
-2. `tools/spikes/gate-09-slack-socket-mode/manifest.yaml`을 쓴다(Slack App manifest, Logan이 api.slack.com/apps → Create from manifest로 그대로 붙여넣는다):
+1. Read `docs/spec/A1-channel-adapters.md` §2.1 (Slack) and §4 (the A1-④ row).
+2. Write `tools/spikes/gate-09-slack-socket-mode/manifest.yaml` (a Slack app manifest; Logan pastes it verbatim at api.slack.com/apps → Create from manifest):
 
 ```yaml
 display_information:
@@ -833,19 +833,19 @@ settings:
     bot_events: ["message.channels", "message.im"]
 ```
 
-3. `tools/spikes/gate-09-slack-socket-mode/checklist.md`를 쓴다:
+3. Write `tools/spikes/gate-09-slack-socket-mode/checklist.md`:
 
 ```markdown
-# Gate ⑨ 체크리스트 (Logan)
+# Gate ⑨ checklist (Logan)
 
-1. https://api.slack.com/apps → Create New App → From an app manifest → `manifest.yaml` 붙여넣기.
-2. OAuth & Permissions에서 워크스페이스에 설치(admin 승인), `xoxb-...` 토큰 확보.
-3. Basic Information → App-Level Tokens에서 `connections:write` scope로 `xapp-...` 토큰 발급.
-4. 두 토큰을 `security add-generic-password -s omnis.slack.xoxb.gate09 -a 281932556+jinhologankim@users.noreply.github.com -w '<xoxb>'`, `omnis.slack.xapp.gate09`로 Keychain에 저장(A1 명명 규칙, 프로덕션 재사용 아님 — 스파이크 전용 임시 앱).
-5. `listen.ts` 실행 후 아무 DM 채널에서 테스트 메시지 1건 전송.
+1. https://api.slack.com/apps → Create New App → From an app manifest → paste `manifest.yaml`.
+2. Install it into the workspace under OAuth & Permissions (admin approval) and obtain the `xoxb-...` token.
+3. Issue an `xapp-...` token with the `connections:write` scope under Basic Information → App-Level Tokens.
+4. Store both tokens in the Keychain as `security add-generic-password -s omnis.slack.xoxb.gate09 -a 281932556+jinhologankim@users.noreply.github.com -w '<xoxb>'` and `omnis.slack.xapp.gate09` (A1 naming rule; this is not a production app reused later — a spike-only throwaway app).
+5. After running `listen.ts`, send one test message from any DM channel.
 ```
 
-4. `tools/spikes/gate-09-slack-socket-mode/listen.ts`를 쓴다:
+4. Write `tools/spikes/gate-09-slack-socket-mode/listen.ts`:
 
 ```ts
 import { SocketModeClient } from "@slack/socket-mode";
@@ -868,45 +868,45 @@ console.log("socket mode connected, waiting for a test DM...");
 setTimeout(() => process.exit(0), 60000);
 ```
 
-5. `cd tools/spikes/gate-09-slack-socket-mode && pnpm add @slack/socket-mode && npx tsx listen.ts`를 실행한 채로 Logan이 테스트 DM을 보낸다. 콘솔에 찍힌 `received_at_ms`와 메시지 전송 시각(Slack 클라이언트 화면의 타임스탬프)의 차이를 5초 기준과 비교한다.
-6. `result.md`를 채운다.
+5. With `cd tools/spikes/gate-09-slack-socket-mode && pnpm add @slack/socket-mode && npx tsx listen.ts` running, Logan sends a test DM. Compare the difference between the `received_at_ms` printed to the console and the message send time (the timestamp shown in the Slack client) against the 5-second criterion.
+6. Fill in `result.md`.
 7. `git add tools/spikes/gate-09-slack-socket-mode && git commit -m "$(cat <<'EOF'
-gate-09: Slack Socket Mode 1턴 왕복 스파이크 (A1-④, Logan 앱 설치)
+gate-09: Slack Socket Mode one-turn round-trip spike (A1-④, Logan installs the app)
 
-- Socket Mode WS 연결 후 테스트 DM 수신 지연 측정
-- Pass 기준: 5초 이내 이벤트 수신(G1)
+- Measure test-DM receipt latency after connecting over Socket Mode WS
+- Pass criteria: event received within 5 seconds (G1)
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
 )"`
 
-### Task 13: Gate ⑩ — Gmail watch + Pub/Sub pull 왕복 (A1-⑤, A1 §4 소유, tier: Sonnet)
+### Task 13: Gate ⑩ — Gmail watch + Pub/Sub pull round trip (A1-⑤, owned by A1 §4, tier: Sonnet)
 
-**질문**: `users.watch()`로 Gmail push를 Pub/Sub에 걸었을 때 테스트 메일 발송 후 `historyId`가 pull subscription으로 실제 수신되는가.
-**Owner**: Logan — Google Cloud 프로젝트 생성/과금 연결과 OAuth 동의 화면 승인은 Logan 계정으로 해야 한다.
+**Question**: After wiring Gmail push into Pub/Sub via `users.watch()`, is the `historyId` actually received on the pull subscription after a test email is sent?
+**Owner**: Logan — creating the Google Cloud project, linking billing, and approving the OAuth consent screen must be done under Logan's account.
 **Host**: macbook.
-**Pass 기준(A1 §4 원문)**: "pull subscription으로 `historyId` 수신".
-**Fail → 결정 규칙(A1 §4 원문)**: "`history.list` 1분 폴링으로 폴백(이미 §2.2에 폴백으로 명시된 경로, 기능 손실 없음)".
+**Pass criteria (A1 §4 verbatim)**: "`historyId` received on the pull subscription".
+**Fail → decision rule (A1 §4 verbatim)**: "fall back to 1-minute `history.list` polling (the path §2.2 already lists as the fallback; no loss of functionality)".
 
 **Files:**
 - Create: `tools/spikes/gate-10-gmail-watch-pubsub/checklist.md`, `tools/spikes/gate-10-gmail-watch-pubsub/watch-and-pull.ts`.
 - Modify: `tools/spikes/gate-10-gmail-watch-pubsub/result.md`.
 
-**Interfaces:** Consumes: `googleapis`(npm, `google-auth-library`). Produces: 없음.
+**Interfaces:** Consumes: `googleapis` (npm, `google-auth-library`). Produces: none.
 
-1. `docs/spec/A1-channel-adapters.md` §2.2(Gmail)와 §4(A1-⑤ 행)를 읽는다.
-2. `tools/spikes/gate-10-gmail-watch-pubsub/checklist.md`를 쓴다:
+1. Read `docs/spec/A1-channel-adapters.md` §2.2 (Gmail) and §4 (the A1-⑤ row).
+2. Write `tools/spikes/gate-10-gmail-watch-pubsub/checklist.md`:
 
 ```markdown
-# Gate ⑩ 체크리스트 (Logan)
+# Gate ⑩ checklist (Logan)
 
 1. `gcloud pubsub topics create omnis-gmail-spike`
 2. `gcloud pubsub subscriptions create omnis-gmail-spike-sub --topic omnis-gmail-spike`
-3. Gmail API OAuth consent(Logan 계정, gmail.readonly scope)로 최초 1회 브라우저 동의 → 토큰을 `~/.omnis-spike/gmail-token.json`에 저장(스파이크 전용 임시 경로, 프로덕션 Keychain 규칙과 무관).
-4. Pub/Sub 토픽에 Gmail push 발행 권한 부여: `gcloud pubsub topics add-iam-policy-binding omnis-gmail-spike --member=serviceAccount:gmail-api-push@system.gserviceaccount.com --role=roles/pubsub.publisher`
+3. Do the one-time browser consent for Gmail API OAuth (Logan's account, gmail.readonly scope) → save the token to `~/.omnis-spike/gmail-token.json` (a spike-only temporary path, unrelated to the production Keychain rules).
+4. Grant the Gmail push publishing permission on the Pub/Sub topic: `gcloud pubsub topics add-iam-policy-binding omnis-gmail-spike --member=serviceAccount:gmail-api-push@system.gserviceaccount.com --role=roles/pubsub.publisher`
 ```
 
-3. `tools/spikes/gate-10-gmail-watch-pubsub/watch-and-pull.ts`를 쓴다:
+3. Write `tools/spikes/gate-10-gmail-watch-pubsub/watch-and-pull.ts`:
 
 ```ts
 import { google } from "googleapis";
@@ -923,7 +923,7 @@ const watchRes = await gmail.users.watch({
   requestBody: { topicName: "projects/<PROJECT_ID>/topics/omnis-gmail-spike" },
 });
 console.log("watch historyId:", watchRes.data.historyId);
-console.log("이제 아무 계정에서 이 Gmail 주소로 테스트 메일을 1통 보내세요...");
+console.log("Now send one test email to this Gmail address from any account...");
 
 const deadline = Date.now() + 120000;
 while (Date.now() < deadline) {
@@ -944,34 +944,34 @@ console.log("gate10_pass=false (timeout)");
 process.exit(1);
 ```
 
-4. `<PROJECT_ID>`를 Logan의 실제 GCP 프로젝트 ID로 바꾸고 `cd tools/spikes/gate-10-gmail-watch-pubsub && pnpm add googleapis && npx tsx watch-and-pull.ts`를 실행한 채로 Logan이 테스트 메일을 보낸다.
-5. `result.md`를 채운다: `watch()`가 준 초기 `historyId`, pull로 받은 payload, 왕복 소요 시간.
+4. Replace `<PROJECT_ID>` with Logan's actual GCP project ID, then with `cd tools/spikes/gate-10-gmail-watch-pubsub && pnpm add googleapis && npx tsx watch-and-pull.ts` running, Logan sends a test email.
+5. Fill in `result.md`: the initial `historyId` returned by `watch()`, the payload received via pull, and the round-trip duration.
 6. `git add tools/spikes/gate-10-gmail-watch-pubsub && git commit -m "$(cat <<'EOF'
-gate-10: Gmail watch + Pub/Sub pull 왕복 스파이크 (A1-⑤, Logan OAuth 동의)
+gate-10: Gmail watch + Pub/Sub pull round-trip spike (A1-⑤, Logan's OAuth consent)
 
-- users.watch() 등록 후 테스트 메일 발송, pull subscription으로 historyId 수신 확인
-- Pass 기준: pull subscription으로 historyId 수신
+- Register users.watch(), send a test email, and confirm historyId receipt on the pull subscription
+- Pass criteria: historyId received on the pull subscription
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
 )"`
 
-### Task 14: Gate ① — Calendar `events.watch` via Funnel (A6 소유, tier: Sonnet)
+### Task 14: Gate ① — Calendar `events.watch` via Funnel (owned by A6, tier: Sonnet)
 
-**질문**: Tailscale Funnel로 노출한 webhook URL에 Google Calendar `events.watch`를 등록했을 때, 실제 일정 변경 후 1분 이내 알림이 오는가.
-**Owner**: Logan — Calendar API OAuth 동의(Logan 캘린더 접근)와 Funnel을 여는/닫는 판단(공인 인터넷 노출이므로 A6 §3 "원칙적으로 안 쓴다"는 방침의 예외)은 Logan이 최종 확인한다. Fable이 명령을 준비하고 Screen Sharing으로 같이 실행할 수 있다.
-**Host**: mini(Funnel은 허브가 배치될 미니에서 연다, A6 §3).
-**Pass 기준(A6 §11.3 원문)**: "webhook이 이벤트 변경 후 1분 이내 도착".
-**Fail → 결정 규칙(A6 §11.3 원문)**: "`events.list` + syncToken 폴링 1~5분(마스터 §8에 이미 기본 경로로 명시)".
+**Question**: After registering a Google Calendar `events.watch` against a webhook URL exposed via Tailscale Funnel, does a notification arrive within 1 minute of a real calendar change?
+**Owner**: Logan — the Calendar API OAuth consent (access to Logan's calendar) and the decision to open/close Funnel (public internet exposure, an exception to A6 §3's "in principle, don't use it" policy) are finally confirmed by Logan. Fable prepares the commands and can run them together over Screen Sharing.
+**Host**: mini (Funnel is opened on the mini where the hub will be deployed, A6 §3).
+**Pass criteria (A6 §11.3 verbatim)**: "the webhook arrives within 1 minute of an event change".
+**Fail → decision rule (A6 §11.3 verbatim)**: "`events.list` + syncToken polling every 1–5 minutes (already listed as the default path in master §8)".
 
 **Files:**
 - Create: `tools/spikes/gate-01-calendar-funnel/checklist.md`, `tools/spikes/gate-01-calendar-funnel/webhook-receiver.ts`.
-- Modify: `tools/spikes/gate-01-calendar-funnel/result.md`(Task 1이 이미 기본값을 채워둔 것을 실제 결과로 갱신).
+- Modify: `tools/spikes/gate-01-calendar-funnel/result.md` (update the defaults Task 1 pre-filled with the real results).
 
-**Interfaces:** Consumes: `googleapis`(npm). Produces: 없음.
+**Interfaces:** Consumes: `googleapis` (npm). Produces: none.
 
-1. `docs/spec/A6-ops-infra.md` §3(Funnel 문단)과 §11.3 ①행, `docs/spec/A1-channel-adapters.md` §4(A1-① 행)를 읽는다.
-2. `tools/spikes/gate-01-calendar-funnel/webhook-receiver.ts`를 쓴다(Google이 `validationToken` 핸드셰이크와 이후 POST 알림을 이 엔드포인트로 보낸다):
+1. Read `docs/spec/A6-ops-infra.md` §3 (the Funnel paragraph) and the ① row of §11.3, plus `docs/spec/A1-channel-adapters.md` §4 (the A1-① row).
+2. Write `tools/spikes/gate-01-calendar-funnel/webhook-receiver.ts` (Google sends the `validationToken` handshake and subsequent POST notifications to this endpoint):
 
 ```ts
 import { createServer } from "node:http";
@@ -986,60 +986,60 @@ const server = createServer((req, res) => {
 server.listen(8788, () => console.log("gate-01 webhook receiver on :8788"));
 ```
 
-3. `tools/spikes/gate-01-calendar-funnel/checklist.md`를 쓴다:
+3. Write `tools/spikes/gate-01-calendar-funnel/checklist.md`:
 
 ```markdown
-# Gate ① 체크리스트 (미니, Logan 확인)
+# Gate ① checklist (mini, Logan verification)
 
-1. `npx tsx tools/spikes/gate-01-calendar-funnel/webhook-receiver.ts &`로 로컬 8788 포트에 리시버를 띄운다.
-2. `sudo tailscale funnel --bg 443 8788`로 Funnel을 연다(원칙적으로 상시 사용 금지 — 이 스파이크 동안만).
-3. Google Calendar API에 OAuth 동의(Logan 캘린더, calendar scope)로 최초 1회 인증.
-4. `POST https://www.googleapis.com/calendar/v3/calendars/primary/events/watch`를 `{ id: <uuid>, type: "web_hook", address: "https://<mini-hostname>.ts.net" }`로 호출(Funnel이 443을 8788로 넘기므로 address는 tailnet 도메인 루트).
-5. Google Calendar에서 아무 일정이나 수정/생성한다.
-6. 웹훅 리시버 로그에 POST 요청이 1분 이내 찍히는지 확인한다.
-7. **스파이크 종료 즉시(pass든 fail이든) `sudo tailscale funnel 443 off`로 Funnel을 끈다.**
+1. Start the receiver on local port 8788 with `npx tsx tools/spikes/gate-01-calendar-funnel/webhook-receiver.ts &`.
+2. Open Funnel with `sudo tailscale funnel --bg 443 8788` (in principle never left on permanently — only for the duration of this spike).
+3. Do the one-time OAuth consent for the Google Calendar API (Logan's calendar, calendar scope).
+4. Call `POST https://www.googleapis.com/calendar/v3/calendars/primary/events/watch` with `{ id: <uuid>, type: "web_hook", address: "https://<mini-hostname>.ts.net" }` (Funnel forwards 443 to 8788, so address is the tailnet domain root).
+5. Modify or create any event in Google Calendar.
+6. Confirm a POST request appears in the webhook receiver log within 1 minute.
+7. **As soon as the spike ends (pass or fail), turn Funnel off with `sudo tailscale funnel 443 off`.**
 ```
 
-4. Logan이 실행하고 결과를 보고하면 `result.md`를 갱신한다.
+4. Logan runs it and reports the result; then update `result.md`.
 5. `git add tools/spikes/gate-01-calendar-funnel && git commit -m "$(cat <<'EOF'
-gate-01: Calendar events.watch via Funnel 스파이크 (A6 §11.3, Logan OAuth 동의)
+gate-01: Calendar events.watch via Funnel spike (A6 §11.3, Logan's OAuth consent)
 
-- Funnel로 노출한 webhook에 events.watch 등록, 일정 변경 후 알림 도착 시간 측정
-- Pass 기준: webhook이 이벤트 변경 후 1분 이내 도착
-- 스파이크 종료 후 Funnel은 반드시 끈다(A6 §3 "원칙적으로 안 쓴다")
+- Register events.watch against a Funnel-exposed webhook and measure notification arrival time after a calendar change
+- Pass criteria: the webhook arrives within 1 minute of an event change
+- Turn Funnel off after the spike ends (A6 §3 "in principle, don't use it")
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
 )"`
 
-### Task 15: Gate ② — Beeper 토큰 발급 + WhatsApp 부번호 send (A6 소유, tier: Sonnet)
+### Task 15: Gate ② — Beeper token issuance + WhatsApp secondary-number send (owned by A6, tier: Sonnet)
 
-**질문**: Beeper Desktop에 부번호로 QR 페어링한 뒤 로컬 REST API로 토큰을 발급받고 테스트 메시지를 보낼 수 있는가, 그리고 24시간 내 계정 제재 신호가 없는가.
-**Owner**: Logan — Beeper Desktop 설치·QR 페어링(부번호가 든 실물/보조 휴대폰으로 QR 스캔)은 전적으로 물리적 조작이다.
-**Host**: mini(master 토폴로지: Beeper Desktop LaunchAgent는 미니에서 돈다).
-**Pass 기준(A6 §11.3 원문)**: "토큰 발급 성공 + 발송 성공 + 24시간 내 계정 제재 신호 없음".
-**Fail → 결정 규칙(A6 §11.3·마스터 D4 원문)**: "whatsmeow Go 사이드카(마스터 D4 폴백)".
+**Question**: After QR-pairing a secondary number with Beeper Desktop, can a token be obtained from the local REST API and a test message sent — and is there no account-sanction signal within 24 hours?
+**Owner**: Logan — installing Beeper Desktop and QR pairing (scanning the QR with the physical/secondary phone holding the secondary number) is entirely hands-on work.
+**Host**: mini (per the master topology: the Beeper Desktop LaunchAgent runs on the mini).
+**Pass criteria (A6 §11.3 verbatim)**: "token issued successfully + send succeeded + no account-sanction signal within 24 hours".
+**Fail → decision rule (A6 §11.3/master D4 verbatim)**: "the whatsmeow Go sidecar (master D4 fallback)".
 
 **Files:**
 - Create: `tools/spikes/gate-02-beeper-whatsapp/checklist.md`, `tools/spikes/gate-02-beeper-whatsapp/send-test.ts`.
 - Modify: `tools/spikes/gate-02-beeper-whatsapp/result.md`.
 
-**Interfaces:** Consumes: 없음(Beeper 로컬 REST API를 `fetch`로 직접 호출, provider SDK 없음). Produces: 없음.
+**Interfaces:** Consumes: none (the Beeper local REST API is called directly with `fetch`; no provider SDK). Produces: none.
 
-1. `docs/spec/A1-channel-adapters.md` §2.6(WhatsApp — Beeper)과 §4(A1-② 행), `docs/spec/00-omnis-design.md` §19 Q2("부번호 파일럿 먼저")를 읽는다.
-2. `tools/spikes/gate-02-beeper-whatsapp/checklist.md`를 쓴다:
+1. Read `docs/spec/A1-channel-adapters.md` §2.6 (WhatsApp — Beeper) and §4 (the A1-② row), plus `docs/spec/00-omnis-design.md` §19 Q2 ("secondary-number pilot first").
+2. Write `tools/spikes/gate-02-beeper-whatsapp/checklist.md`:
 
 ```markdown
-# Gate ② 체크리스트 (미니, Logan 현장 작업)
+# Gate ② checklist (mini, Logan on site)
 
-1. 미니에 Beeper Desktop 설치, WhatsApp 부번호(Q2 기본값 — 실사용 번호 아님)로 QR 페어링.
-2. Beeper Settings → Integrations에서 로컬 REST API 토큰 발급.
-3. `security add-generic-password -s omnis.beeper.token -a 281932556+jinhologankim@users.noreply.github.com -w '<token>'`로 Keychain에 저장(A6 §9 명명 규칙).
-4. `send-test.ts`로 부번호 자신 또는 테스트 상대에게 메시지 1건 발송.
-5. 24시간 동안 부번호 계정이 정상 동작하는지(로그인 풀림·경고 메시지 없는지) 관찰.
+1. Install Beeper Desktop on the mini and QR-pair the WhatsApp secondary number (the Q2 default — not a number in real use).
+2. Issue a local REST API token under Beeper Settings → Integrations.
+3. Store it in the Keychain with `security add-generic-password -s omnis.beeper.token -a 281932556+jinhologankim@users.noreply.github.com -w '<token>'` (A6 §9 naming rule).
+4. Send one message with `send-test.ts` to the secondary number itself or to a test counterpart.
+5. Watch for 24 hours whether the secondary-number account keeps working normally (no logout, no warning messages).
 ```
 
-3. `tools/spikes/gate-02-beeper-whatsapp/send-test.ts`를 쓴다:
+3. Write `tools/spikes/gate-02-beeper-whatsapp/send-test.ts`:
 
 ```ts
 import { execSync } from "node:child_process";
@@ -1062,13 +1062,13 @@ console.log(await res.text());
 process.exit(res.ok ? 0 : 1);
 ```
 
-4. Logan이 체크리스트대로 진행하고 `npx tsx tools/spikes/gate-02-beeper-whatsapp/send-test.ts <chatID>`를 실행한다. PASS 조건: `status=200`이고 상대 단말에서 수신 확인.
-5. 24시간 후 계정 상태를 재확인하고 `result.md`에 토큰 발급 성공 여부, 발송 성공 여부, 24시간 후 제재 신호 유무를 채운다.
+4. Logan follows the checklist and runs `npx tsx tools/spikes/gate-02-beeper-whatsapp/send-test.ts <chatID>`. PASS condition: `status=200` and receipt confirmed on the other device.
+5. After 24 hours, re-check the account state and fill `result.md` with whether the token was issued, whether the send succeeded, and whether there was any sanction signal after 24 hours.
 6. `git add tools/spikes/gate-02-beeper-whatsapp && git commit -m "$(cat <<'EOF'
-gate-02: Beeper 토큰 발급 + WhatsApp 부번호 send 스파이크 (Logan QR 페어링)
+gate-02: Beeper token issuance + WhatsApp secondary-number send spike (Logan QR pairing)
 
-- Beeper 로컬 REST API로 부번호에서 테스트 메시지 1건 발송, 24시간 계정 상태 관찰
-- Pass 기준: 토큰 발급 성공 + 발송 성공 + 24시간 내 계정 제재 신호 없음
+- Send one test message from the secondary number via the Beeper local REST API and watch the account state for 24 hours
+- Pass criteria: token issued successfully + send succeeded + no account-sanction signal within 24 hours
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
@@ -1076,65 +1076,65 @@ EOF
 
 ---
 
-## 순서 C — A7-D4/A7-D5 자체 스파이크 (14개 게이트 외 추가 2개)
+## Order C — A7-D4/A7-D5 self-spikes (2 additional spikes beyond the 14 gates)
 
-### Task 16: worktrunk CLI 확정 절차 문서화 (A7-D5 자체 스파이크, tier: Sonnet)
+### Task 16: Document the confirmed worktrunk CLI procedure (A7-D5 self-spike, tier: Sonnet)
 
-**질문**: ralph 루프가 스토리마다 실제로 실행할 정확한 worktrunk 명령 형태(플래그 포함)는 무엇인가 — Task 8(gate-14)의 dry-run PASS 결과를 ralph 루프가 그대로 재사용할 수 있는 확정 절차로 옮긴다.
-**Owner**: agent(unattended) — Task 8이 이미 물리적/OAuth 개입 없이 확보한 결과를 문서화하는 후속 작업이라 사람 개입이 필요 없다.
+**Question**: What is the exact worktrunk command form (including flags) the ralph loop will actually run per story — carry the dry-run PASS result of Task 8 (gate-14) over into a confirmed procedure the ralph loop can reuse as-is.
+**Owner**: agent (unattended) — a follow-up task documenting a result Task 8 already obtained without physical or OAuth intervention, so no human involvement is needed.
 **Host**: macbook.
-**Pass 기준**: A7 §3의 "worktrunk 워크트리 격리 절차" 문단이 참조할 수 있는 확정 명령 형태 문서 1개(`confirmed-usage.md`)가 Task 8의 `result.md`와 일치.
-**Fail → 결정 규칙**: Task 8이 fail이면 이 태스크는 실행하지 않는다(선행 태스크 없이는 확정할 내용이 없다) — 대신 A7 §3의 `git worktree add`/`git worktree remove` 폴백 명령을 `confirmed-usage.md`에 기록한다.
+**Pass criteria**: One document of confirmed command forms (`confirmed-usage.md`) that the "worktrunk worktree isolation procedure" paragraph in A7 §3 can reference, matching Task 8's `result.md`.
+**Fail → decision rule**: If Task 8 fails, do not run this task (there is nothing to confirm without the prerequisite) — instead record the `git worktree add`/`git worktree remove` fallback commands from A7 §3 in `confirmed-usage.md`.
 
 **Files:**
 - Create: `tools/spikes/worktrunk-cli/confirmed-usage.md`.
-- Test: 없음(문서 태스크, `tools/spikes/gate-14-worktrunk-dryrun/result.md`와의 일치를 셸 명령으로 확인).
+- Test: none (a documentation task; consistency with `tools/spikes/gate-14-worktrunk-dryrun/result.md` is checked with a shell command).
 
-**Interfaces:** Consumes: `tools/spikes/gate-14-worktrunk-dryrun/result.md`(Task 8 산출물 — 이 플랜 안의 앞선 태스크). Produces: 없음.
+**Interfaces:** Consumes: `tools/spikes/gate-14-worktrunk-dryrun/result.md` (Task 8's artifact — an earlier task in this plan). Produces: none.
 
-1. `tools/spikes/gate-14-worktrunk-dryrun/result.md`와 `run.log`를 읽는다.
+1. Read `tools/spikes/gate-14-worktrunk-dryrun/result.md` and `run.log`.
 2. `mkdir -p tools/spikes/worktrunk-cli`.
-3. `tools/spikes/worktrunk-cli/confirmed-usage.md`를 쓴다(Task 8에서 실제로 관측된 정확한 명령 형태를 옮긴다 — Task 8이 A7-D5 기본 가정 그대로 PASS했다고 가정한 기본 문서화, fail이었다면 2번의 대안 형태로 교체):
+3. Write `tools/spikes/worktrunk-cli/confirmed-usage.md` (carry over the exact command form actually observed in Task 8 — the default documentation assuming Task 8 passed exactly as A7-D5 assumes; if it failed, replace with the alternative form in item 2):
 
 ```markdown
-# worktrunk 확정 사용법 (A7-D5, gate-14 dry-run 근거)
+# Confirmed worktrunk usage (A7-D5, based on the gate-14 dry run)
 
-- 워크트리 생성: `worktrunk create ralph/<story-id>` → `omnis/.worktrees/<story-id>`에 생성됨(gate-14 확인).
-- 워크트리 제거: `worktrunk remove <story-id>`.
-- ralph 루프(A7 §3)의 "스토리 착수 직전" 단계는 이 두 명령을 그대로 쓴다. A7-D5의 "UNVERIFIED — 스파이크" 표기는 이 문서로 해소된다.
-- 재현 증거: `tools/spikes/gate-14-worktrunk-dryrun/result.md`, `run.log`.
+- Create a worktree: `worktrunk create ralph/<story-id>` → created at `omnis/.worktrees/<story-id>` (confirmed by gate-14).
+- Remove a worktree: `worktrunk remove <story-id>`.
+- The "immediately before starting a story" step of the ralph loop (A7 §3) uses these two commands as-is. This document resolves A7-D5's "UNVERIFIED — spike" marker.
+- Reproduction evidence: `tools/spikes/gate-14-worktrunk-dryrun/result.md`, `run.log`.
 ```
 
-4. `grep -q "Pass" tools/spikes/gate-14-worktrunk-dryrun/result.md && echo "gate14_was_pass=true" || echo "gate14_was_pass=false"`로 Task 8 결과와의 일치를 확인한다(Task 8이 fail이었다면 3번 문서를 `git worktree add <path> -b ralph/<story-id>` / `git worktree remove <path>` 형태로 다시 쓴다).
+4. Confirm consistency with Task 8's result via `grep -q "Pass" tools/spikes/gate-14-worktrunk-dryrun/result.md && echo "gate14_was_pass=true" || echo "gate14_was_pass=false"` (if Task 8 failed, rewrite the item-3 document in the form `git worktree add <path> -b ralph/<story-id>` / `git worktree remove <path>`).
 5. `git add tools/spikes/worktrunk-cli && git commit -m "$(cat <<'EOF'
-worktrunk-cli-spike: A7-D5 worktrunk CLI 확정 절차 문서화
+worktrunk-cli-spike: document the confirmed A7-D5 worktrunk CLI procedure
 
-- gate-14 dry-run 결과를 ralph 루프가 참조할 confirmed-usage.md로 정리
-- A7-D5 "UNVERIFIED — 스파이크" 표기 해소
+- Turn the gate-14 dry-run result into confirmed-usage.md for the ralph loop to reference
+- Resolve A7-D5's "UNVERIFIED — spike" marker
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
 )"`
 
-### Task 17: Tauri UI 테스트 도구 반나절 스파이크 (A7-D4·A7-2, tier: Sonnet)
+### Task 17: Half-day spike on the Tauri UI testing tool (A7-D4/A7-2, tier: Sonnet)
 
-**범위(M14, `2026-09-20-plans-review.md` §1)**: 컴포넌트 단위 테스트 도구는 이미 `2026-09-20-phase-a-desktop.md`가 vitest + `@testing-library/react` + jsdom으로 확정했다(그 플랜의 `packages/ui/vitest.config.ts`·`apps/desktop/vitest.config.ts`, `@testing-library/react` 의존성 참조) — 이 태스크는 그 결정을 재검토하지 않는다. Task 17이 답하는 질문은 오직 **e2e 스모크**(vitest+jsdom으로는 낼 수 없는, 실제로 빌드된 Tauri 바이너리를 띄워 진짜 WebDriver로 클릭하는 테스트) 하나뿐이며, `tauri-driver`로 그게 가능한지만 확정한다.
-**질문**: `tauri-driver` + WebdriverIO 조합이 실제로 Tauri 2 앱의 e2e UI 스모크(빌드된 바이너리 기준 — 컴포넌트 단위 테스트가 아니다)를 돌릴 수 있는가(A7-D4의 "UNVERIFIED — 스파이크" 기본 가정 검증).
-**Owner**: agent(unattended) — 로컬 스크래치 Tauri 앱에 대한 빌드·테스트라 GUI 클릭이나 OAuth가 필요 없다(창이 뜨긴 하지만 WebDriver가 자동 조작한다).
+**Scope (M14, `2026-09-20-plans-review.md` §1)**: The component-level testing tool is already settled by `2026-09-20-phase-a-desktop.md` as vitest + `@testing-library/react` + jsdom (see that plan's `packages/ui/vitest.config.ts`, `apps/desktop/vitest.config.ts`, and the `@testing-library/react` dependency) — this task does not revisit that decision. Task 17 answers exactly one question: **e2e smoke** (a test that vitest+jsdom cannot produce — launching the actually built Tauri binary and clicking with a real WebDriver), and it only confirms whether `tauri-driver` makes that possible.
+**Question**: Can the `tauri-driver` + WebdriverIO combination actually run an e2e UI smoke against a Tauri 2 app (against the built binary — not a component-level test) (validating A7-D4's "UNVERIFIED — spike" default assumption)?
+**Owner**: agent (unattended) — building and testing against a local scratch Tauri app needs no GUI clicks or OAuth (a window does appear, but the WebDriver drives it automatically).
 **Host**: macbook.
-**Pass 기준(A7-D4 원문)**: 명시적 수치는 없음 — "확정"이 목표다. 이 태스크는 "`tauri-driver` 세션이 열리고 WebdriverIO가 스크래치 앱의 버튼 클릭 1건을 성공시킨다"를 pass 기준으로 삼는다(A7-D4가 요구하는 최소 확정 단위).
-**Fail → 결정 규칙(M14 수정)**: `tauri-driver`가 세션을 못 열면(알려진 리스크 — Tauri의 WebDriver 경로는 Linux(WebKitWebDriver)/Windows(msedgedriver) 중심이고 macOS 공식 지원이 없다) e2e 스모크는 **웹 빌드 대상 Playwright**로 대체한다(`apps/desktop`을 Tauri 런타임 없이 `vite build`한 순수 웹 번들을 띄워 Playwright로 조작 — US-A25 이후 태스크가 이 스크립트를 만든다). 컴포넌트 단위 테스트는 이 실패와 무관하게 계속 vitest+RTL+jsdom(`phase-a-desktop.md`)을 쓴다 — "vitest 유닛으로만 대체"가 아니라 "e2e 계층만 Playwright로 대체"다.
+**Pass criteria (A7-D4 verbatim)**: No explicit numbers — the goal is "confirmation". This task takes "a `tauri-driver` session opens and WebdriverIO lands one button click in the scratch app" as its pass criteria (the minimum unit of confirmation A7-D4 asks for).
+**Fail → decision rule (M14 revision)**: If `tauri-driver` cannot open a session (a known risk — Tauri's WebDriver path centers on Linux (WebKitWebDriver)/Windows (msedgedriver) with no official macOS support), replace the e2e smoke with **Playwright against the web build** (serve the pure web bundle from `vite build` of `apps/desktop` without the Tauri runtime and drive it with Playwright — a task after US-A25 writes this script). Component-level tests keep using vitest+RTL+jsdom (`phase-a-desktop.md`) regardless of this failure — it is "replace only the e2e layer with Playwright", not "replace it with vitest units alone".
 
 **Files:**
-- Create: `tools/spikes/tauri-ui-test/scratch-app/`(임시 Tauri hello-world, `packages/*`/`apps/*`가 아니다), `tools/spikes/tauri-ui-test/wdio.conf.ts`, `tools/spikes/tauri-ui-test/smoke.test.ts`.
-- Create: `tools/spikes/tauri-ui-test/result.md`(Task 1 스캐폴드 대상이 아니므로 이 태스크가 처음 만든다).
+- Create: `tools/spikes/tauri-ui-test/scratch-app/` (a throwaway Tauri hello-world, not `packages/*`/`apps/*`), `tools/spikes/tauri-ui-test/wdio.conf.ts`, `tools/spikes/tauri-ui-test/smoke.test.ts`.
+- Create: `tools/spikes/tauri-ui-test/result.md` (not part of the Task 1 scaffold, so this task creates it first).
 
-**Interfaces:** Consumes: `@tauri-apps/cli` 2.11.5(이미 설치됨, `_probes` 파일), `tauri-driver`(cargo), `webdriverio`(npm). Produces: 없음.
+**Interfaces:** Consumes: `@tauri-apps/cli` 2.11.5 (already installed, `_probes` file), `tauri-driver` (cargo), `webdriverio` (npm). Produces: none.
 
-1. `docs/spec/A7-dev-process.md` A7-D4(§0 결정표)와 §5("UI 스모크")를 읽는다.
-2. `cd tools/spikes/tauri-ui-test && npx create-tauri-app@latest scratch-app --template vanilla --manager pnpm --yes`로 최소 Tauri 앱을 만든다(이 앱은 버릴 코드다 — `apps/desktop`과 무관, US-A25가 실제 앱을 다시 만든다).
-3. `cargo install tauri-driver`로 드라이버를 설치한다(A7-D4 기본 가정).
-4. `tools/spikes/tauri-ui-test/wdio.conf.ts`를 쓴다:
+1. Read `docs/spec/A7-dev-process.md` A7-D4 (the §0 decision table) and §5 ("UI smoke").
+2. Create a minimal Tauri app with `cd tools/spikes/tauri-ui-test && npx create-tauri-app@latest scratch-app --template vanilla --manager pnpm --yes` (this app is throwaway code — unrelated to `apps/desktop`; US-A25 builds the real app).
+3. Install the driver with `cargo install tauri-driver` (the A7-D4 default assumption).
+4. Write `tools/spikes/tauri-ui-test/wdio.conf.ts`:
 
 ```ts
 import { spawn, type ChildProcess } from "node:child_process";
@@ -1162,7 +1162,7 @@ export const config: WebdriverIO.Config = {
 };
 ```
 
-5. `tools/spikes/tauri-ui-test/smoke.test.ts`를 쓴다(Tauri 기본 템플릿의 "Greet" 버튼을 클릭하고 응답 텍스트가 바뀌는지 확인 — vanilla 템플릿의 실제 DOM id는 `greet-input`/`greet-button`/`greet-msg`다):
+5. Write `tools/spikes/tauri-ui-test/smoke.test.ts` (click the "Greet" button of the default Tauri template and check that the response text changes — the vanilla template's actual DOM ids are `greet-input`/`greet-button`/`greet-msg`):
 
 ```ts
 import { expect } from "@wdio/globals";
@@ -1179,29 +1179,29 @@ describe("gate: tauri-driver + webdriverio smoke", () => {
 });
 ```
 
-6. `cd tools/spikes/tauri-ui-test/scratch-app && pnpm tauri build --debug`로 릴리스 바이너리를 만들고(wdio.conf.ts의 경로와 맞춰 `--debug`면 `target/debug/scratch-app`로 경로를 조정한다), `cd .. && pnpm add -D webdriverio @wdio/cli @wdio/mocha-framework @wdio/local-runner && npx wdio run wdio.conf.ts`를 실행한다.
-7. PASS 조건: WebdriverIO 세션이 정상 종료되고 `smoke.test.ts`의 assertion이 통과(exit code 0). 실패하면(예: `tauri-driver`가 macOS를 공식 지원하지 않아 세션이 안 열리면 — Tauri의 WebDriver 경로는 Linux(WebKitWebDriver)/Windows(msedgedriver) 중심이라는 게 알려진 리스크) 에러 메시지를 그대로 `result.md`에 옮기고 A7-D4 폴백(vitest 유닛 + 수동 QA)을 채택 결정으로 기록한다.
-8. `tools/spikes/tauri-ui-test/result.md`를 새로 쓴다(다른 게이트와 같은 템플릿, Task 1의 14개에는 없었으므로 여기서 직접 만든다):
+6. Build the release binary with `cd tools/spikes/tauri-ui-test/scratch-app && pnpm tauri build --debug` (adjust the path to `target/debug/scratch-app` under `--debug` so it matches wdio.conf.ts), then run `cd .. && pnpm add -D webdriverio @wdio/cli @wdio/mocha-framework @wdio/local-runner && npx wdio run wdio.conf.ts`.
+7. PASS condition: the WebdriverIO session shuts down cleanly and the assertion in `smoke.test.ts` passes (exit code 0). On failure (e.g. the session will not open because `tauri-driver` has no official macOS support — the known risk that Tauri's WebDriver path centers on Linux (WebKitWebDriver)/Windows (msedgedriver)), copy the error message verbatim into `result.md` and record the A7-D4 fallback (vitest units + manual QA) as the adopted decision.
+8. Write `tools/spikes/tauri-ui-test/result.md` from scratch (the same template as the other gates; it was not among Task 1's 14, so it is created here):
 
 ```markdown
-# Spike: Tauri UI 테스트 도구 (A7-D4, A7-2)
+# Spike: Tauri UI testing tool (A7-D4, A7-2)
 
-- **질문**: tauri-driver + WebdriverIO로 Tauri 2 앱 UI 스모크가 되는가
-- **소유 부록**: A7(A7-D4)
+- **Question**: Does tauri-driver + WebdriverIO work for a Tauri 2 app UI smoke
+- **Owning appendix**: A7 (A7-D4)
 - **Owner**: agent
 - **Host**: macbook
-- **실행일**: 
-- **결과(Pass/Fail)**: 
-- **측정치/근거**: 
+- **Run date**: 
+- **Result (Pass/Fail)**: 
+- **Measurements/evidence**: 
 - **decided_by**: 
-- **비고**: 
+- **Notes**: 
 ```
 
 9. `git add tools/spikes/tauri-ui-test && git commit -m "$(cat <<'EOF'
-tauri-ui-test-spike: tauri-driver + WebdriverIO 확정 스파이크 (A7-D4)
+tauri-ui-test-spike: tauri-driver + WebdriverIO confirmation spike (A7-D4)
 
-- 스크래치 Tauri vanilla 앱에 버튼 클릭 WebdriverIO 스모크 1건 실행(e2e 계층 전용 — 컴포넌트 테스트는 phase-a-desktop.md의 vitest+RTL+jsdom이 이미 확정)
-- Pass 시 apps/desktop(US-A25 이후)의 e2e 스모크 도구로 확정, Fail 시 웹 빌드 대상 Playwright로 대체(M14)
+- Run one button-click WebdriverIO smoke against a scratch Tauri vanilla app (e2e layer only — component tests are already settled as vitest+RTL+jsdom in phase-a-desktop.md)
+- On Pass, confirm it as the e2e smoke tool for apps/desktop (after US-A25); on Fail, replace it with Playwright against the web build (M14)
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
@@ -1209,20 +1209,20 @@ EOF
 
 ---
 
-## 완료 기준
+## Done criteria
 
-`tools/spikes/gate-01-calendar-funnel/result.md` ~ `gate-14-worktrunk-dryrun/result.md` 14개 전부와 `worktrunk-cli/confirmed-usage.md`, `tauri-ui-test/result.md`가 채워지고, 14개 게이트가 전부 Pass(또는 A6-D2/D4류의 승인된 폴백으로 대체)여야 마스터 §16의 "14개 게이트의 pass/fail이 결정표를 채움" 종료 기준을 만족하고 Phase A(`2026-09-20-phase-a-kernel-and-db.md` 등)에 착수할 수 있다. `A6-ops-infra.md` §11.1의 "결과 기록표(빈 양식)"도 이 14개 `result.md`의 값으로 옮겨 채운다(A6 문서 자체를 고치는 것은 이 플랜의 범위 밖이다).
+All 14 files from `tools/spikes/gate-01-calendar-funnel/result.md` through `gate-14-worktrunk-dryrun/result.md`, plus `worktrunk-cli/confirmed-usage.md` and `tauri-ui-test/result.md`, must be filled in, and all 14 gates must Pass (or be replaced by an approved fallback such as A6-D2/D4) before master §16's exit criterion "the pass/fail of the 14 gates fills in the decision table" is satisfied and Phase A (`2026-09-20-phase-a-kernel-and-db.md` and others) can start. The "result record table (blank form)" in `A6-ops-infra.md` §11.1 is also filled by copying the values from these 14 `result.md` files (editing the A6 document itself is out of scope for this plan).
 
-## Self-review 기록
+## Self-review log
 
-1. **스토리 커버리지**: US-A00(Task 1), 게이트 ①(Task 14) ②(Task 15) ③(Task 9) ④(Task 10) ⑤(Task 11) ⑥(Task 2) ⑦(Task 3) ⑧(Task 4) ⑨(Task 12) ⑩(Task 13) ⑪(Task 5) ⑫(Task 6) ⑬(Task 7) ⑭(Task 8) — 14개 전부 태스크 1개씩 매핑됨. 계약(`2026-09-20-phase-a-interfaces.md` §10)이 요구한 `worktrunk-cli-spike`(Task 16)·`tauri-ui-test-spike`(Task 17)도 포함.
-2. **금지 패턴 grep**: `TBD`, `TODO`, `implement later`, `add appropriate error handling`, `handle edge cases`, `similar to Task` — 전부 0건(각 게이트의 코드는 실제 스크립트이고, `result.md` 빈 칸은 A6 §11.3 "결과 기록표(빈 양식)"과 같은 실행 후 기입용 데이터 템플릿이지 구현 회피가 아니다).
-3. **심볼 검증**: 이 플랜은 `packages/*`가 아직 없는 Phase 0을 다루므로 계약(§3~§8)의 `@omnis/*` export를 하나도 소비하지 않는다(의도된 것 — A7 §1 "tools/spikes는 워크스페이스 빌드 그래프 밖"). 소비하는 심볼은 전부 npm 패키지(`@rocicorp/zero`, `googleapis`, `@slack/socket-mode`, `webdriverio`)이거나 이 플랜 안의 앞선 태스크 산출물(Task 16이 Task 8의 `result.md`를 읽는 것 하나뿐)이다.
+1. **Story coverage**: US-A00 (Task 1), gates ① (Task 14) ② (Task 15) ③ (Task 9) ④ (Task 10) ⑤ (Task 11) ⑥ (Task 2) ⑦ (Task 3) ⑧ (Task 4) ⑨ (Task 12) ⑩ (Task 13) ⑪ (Task 5) ⑫ (Task 6) ⑬ (Task 7) ⑭ (Task 8) — all 14 map to exactly one task each. Also includes `worktrunk-cli-spike` (Task 16) and `tauri-ui-test-spike` (Task 17) as required by the contract (`2026-09-20-phase-a-interfaces.md` §10).
+2. **Banned-pattern grep**: `TBD`, `TODO`, `implement later`, `add appropriate error handling`, `handle edge cases`, `similar to Task` — all zero hits (each gate's code is a real script, and the blank fields in `result.md` are a data template to fill in after execution, like A6 §11.3's "result record table (blank form)", not an evasion of implementation).
+3. **Symbol validation**: This plan covers Phase 0, where `packages/*` does not exist yet, so it consumes none of the contract's (§3–§8) `@omnis/*` exports (intentional — A7 §1 "tools/spikes sits outside the workspace build graph"). Every symbol it consumes is either an npm package (`@rocicorp/zero`, `googleapis`, `@slack/socket-mode`, `webdriverio`) or the output of an earlier task in this plan (only one: Task 16 reading Task 8's `result.md`).
 
-## 수정 이력 (2026-09-20, cross-plan review)
+## Change log (2026-09-20, cross-plan review)
 
-- **M14 / Task 17**: `tauri-driver`+WebdriverIO 범위를 e2e 전용으로 축소 — 컴포넌트 테스트는 `phase-a-desktop.md`의 vitest+RTL+jsdom로 이미 확정된 것으로 명시하고, Fail 결정 규칙을 "vitest 유닛+수동 QA"에서 "웹 빌드 대상 Playwright"로 교체했다.
-- **게이트 ⑪ / Task 5**: `_probes` "Findings that change gate ⑪" 1·2번을 원문 그대로 전제 블록에 인용하고, mode (b)를 자체 `.claude/settings.json` project hook을 가진 fresh worktree fixture cwd에서 실행하도록 재작성해 project hook 발동 여부를 실측하며, pass 기준을 "최소 한 모드에서 omnis hook 발동 AND project hook 미발동"으로 정밀화하고 결정 결과를 마스터 §19 Q13에 반영하도록 명시했다.
-- **게이트 ⑫ / Task 6**: 검토 — `--permission-mode` 리터럴 6종(no `default`)과 observe→plan / workspace→manual / trusted→bypassPermissions 매핑이 이미 반영돼 있어 추가 수정 없음.
-- **게이트 ⑦ / Task 3**: 검토 — `codex app-server generate-json-schema --out <dir>`로 스키마를 벤더링한 뒤 turn-start 메서드를 스키마에서 찾고 런타임 조회 폴백(수동 정규식 보정)을 유지하는 절차가 이미 반영돼 있어 추가 수정 없음.
-- **US-A00 / Task 1**: 검증 명령을 `find tools/spikes -maxdepth 1 -mindepth 1 -type d | grep -v '/_probes$' | wc -l`에서 `find tools/spikes -maxdepth 1 -mindepth 1 -type d ! -name _probes`(+`| wc -l`)로 교체(본문 3곳 + 커밋 메시지 1곳).
+- **M14 / Task 17**: Narrowed the `tauri-driver`+WebdriverIO scope to e2e only — stated that component tests are already settled as vitest+RTL+jsdom in `phase-a-desktop.md`, and replaced the Fail decision rule from "vitest units + manual QA" with "Playwright against the web build".
+- **Gate ⑪ / Task 5**: Quoted items 1 and 2 of `_probes`'s "Findings that change gate ⑪" verbatim in the premise block, rewrote mode (b) to run in a fresh worktree fixture cwd with its own `.claude/settings.json` project hook so the project hook's firing is measured, refined the pass criteria to "in at least one mode the omnis hook fires AND the project hook does not", and specified that the decision outcome is reflected in master §19 Q13.
+- **Gate ⑫ / Task 6**: Reviewed — the six `--permission-mode` literals (no `default`) and the observe→plan / workspace→manual / trusted→bypassPermissions mapping are already in place, so no further changes.
+- **Gate ⑦ / Task 3**: Reviewed — the procedure of vendoring the schema via `codex app-server generate-json-schema --out <dir>`, then finding the turn-start method in the schema while keeping a runtime-lookup fallback (manual regex correction) is already in place, so no further changes.
+- **US-A00 / Task 1**: Replaced the verification command from `find tools/spikes -maxdepth 1 -mindepth 1 -type d | grep -v '/_probes$' | wc -l` with `find tools/spikes -maxdepth 1 -mindepth 1 -type d ! -name _probes` (+`| wc -l`) (3 places in the body + 1 in the commit message).

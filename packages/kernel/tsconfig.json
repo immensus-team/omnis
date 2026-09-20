@@ -2,5 +2,5 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "rootDir": "src", "outDir": "dist" },
   "include": ["src"],
-  "references": [{ "path": "../db" }, { "path": "../protocol" }]
+  "references": [{ "path": "../db" }, { "path": "../memory" }, { "path": "../protocol" }]
 }

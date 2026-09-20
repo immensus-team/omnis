@@ -2,54 +2,54 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** `@omnis/protocol`의 zod 계약(NormalizedItem/Adapter/Capabilities)을 코드로 확정하고, 그 계약 위에 Slack·Gmail·Google Calendar 세 채널 어댑터를 fixture-replay 계약 테스트와 함께 구현한다.
+**Goal:** Lock down the `@omnis/protocol` zod contract (NormalizedItem/Adapter/Capabilities) in code, and implement the Slack, Gmail, and Google Calendar channel adapters on top of that contract together with fixture-replay contract tests.
 
-**Architecture:** `packages/protocol`은 다른 내부 패키지를 import하지 않는 리프 패키지로, zod 스키마와 `Adapter`/`AuthRef`/`AdapterError` 같은 순수 타입만 export한다. 세 어댑터 패키지(`packages/adapters/{slack,gmail,google-calendar}`)는 각각 `@omnis/protocol`에만 의존하고 서로를 import하지 않으며, raw 페이로드 → `NormalizedItem[]` 변환을 `normalize()`라는 순수 함수로 `Adapter` 객체와 분리해 export해 네트워크 없이 fixture로 검증할 수 있게 한다. `send()`는 실제 채널 API를 호출하지 않고 주입 가능한 mock sink만 호출한다 — 승인 게이트(US-A07, 커널 플랜)가 없는 동안 비가역 전송을 막기 위함이다.
+**Architecture:** `packages/protocol` is a leaf package that imports no other internal package, and exports only zod schemas and pure types such as `Adapter`/`AuthRef`/`AdapterError`. The three adapter packages (`packages/adapters/{slack,gmail,google-calendar}`) each depend only on `@omnis/protocol` and never import one another; each one exports the raw payload → `NormalizedItem[]` conversion as a pure function named `normalize()`, kept separate from the `Adapter` object so it can be verified with fixtures and no network. `send()` never calls a real channel API and calls only an injectable mock sink — this prevents irreversible sends while the approval gate (US-A07, kernel plan) does not exist yet.
 
-**Tech Stack:** TypeScript 5.6.3(strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`) · zod ^3.24.1(오너 `@omnis/protocol`, 어느 패키지도 zod 4를 쓰지 않는다) · vitest 2.1.9 · Biome 1.9.x · `@slack/socket-mode` ^2.0.5 · `@slack/web-api` ^7.9.3 · `googleapis` ^161.0.0 · Node 22 · pnpm workspaces. 버전 핀 출처: `2026-09-20-phase-a-interfaces.md` §2(FIXED).
+**Tech Stack:** TypeScript 5.6.3 (strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`) · zod ^3.24.1 (owner `@omnis/protocol`; no package uses zod 4) · vitest 2.1.9 · Biome 1.9.x · `@slack/socket-mode` ^2.0.5 · `@slack/web-api` ^7.9.3 · `googleapis` ^161.0.0 · Node 22 · pnpm workspaces. Version pin sources: `2026-09-20-phase-a-interfaces.md` §2 (FIXED).
 
-**Spec:** `/Users/logankim/AI-Workspaces/omnis/docs/spec/00-omnis-design.md` §8 + `/Users/logankim/AI-Workspaces/omnis/docs/spec/A1-channel-adapters.md`(전체) + `/Users/logankim/AI-Workspaces/omnis/docs/spec/A3-data-schema.md` §2(items/threads/accounts) + `/Users/logankim/AI-Workspaces/omnis/docs/superpowers/plans/2026-09-20-phase-a-interfaces.md` §1·§2·§3·§9(패키지 이름, 툴체인, protocol exports, 공통 규약 — FIXED).
+**Spec:** `/Users/logankim/AI-Workspaces/omnis/docs/spec/00-omnis-design.md` §8 + `/Users/logankim/AI-Workspaces/omnis/docs/spec/A1-channel-adapters.md` (entire) + `/Users/logankim/AI-Workspaces/omnis/docs/spec/A3-data-schema.md` §2 (items/threads/accounts) + `/Users/logankim/AI-Workspaces/omnis/docs/superpowers/plans/2026-09-20-phase-a-interfaces.md` §1·§2·§3·§9 (package names, toolchain, protocol exports, shared conventions — FIXED).
 
 ## Global Constraints
 
 - Node 22 + pnpm workspaces(A7 §1~2).
-- TypeScript strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`, 루트 `tsconfig.base.json`(A7 §1).
-- Postgres 17(A3) — 이 플랜은 DB에 손대지 않는다(어댑터는 `packages/kernel`을 import하지 않는다, A7 §1).
-- 허브는 `127.0.0.1:8787`에만 bind(master §4.2) — 이 플랜의 어댑터는 허브 프로세스에 아직 배선되지 않는다.
-- 마이그레이션은 append-only `packages/db/migrations/000N_<name>.sql` + 추적 테이블 `_omnis_migrations`(A3 §8) — 이 플랜은 마이그레이션을 만들지 않는다.
-- 승인 게이트(US-A07)가 없는 동안 `send`/`delete`/`calendar_write`/`delegate` 같은 비가역 tool을 kernel에 직접 연결하지 않는다(A7 §7 공통 금지) — 모든 `send()`는 mock sink만 호출한다.
-- provider SDK(`@slack/*`, `googleapis`)는 그 어댑터 패키지 안에서만 import한다(A7 §7 공통 금지, §1 의존 규칙).
-- 테스트를 삭제·스킵해서 통과시키지 않는다.
-- Keychain 항목명은 A1 §1.3 규약(`omnis.<channel>.<kind>.<external_id>`) + interfaces.md §9 FIXED 예외: Google 계열(`gmail`/`gcal`)은 `omnis.gmail.<email>` 1항목을 공유(`<kind>` 생략), Slack은 `omnis.slack.xoxb.<team_id>`(account=`<team_id>`)와 `…​.app` 2항목(`xoxp` 아님).
-- 스토리 티어는 A7 §4: US-A11(Task 2·3) = Sonnet, US-A11 Task 1(타입 스캐폴드) = DeepSeek, US-A12~A14 = Sonnet, US-A15 = DeepSeek(리뷰 Sonnet+).
-- 커밋(interfaces.md §9, kernel-and-db 플랜과 동일 규칙): 브랜치 `ralph/<story-id>`, 워크트리 `omnis/.worktrees/<story-id>`. 스토리당 원자 커밋 1개, 제목 형식 `<story-id>: <한 줄 요약>`(A7 §6), 본문에 충족한 acceptance criteria 목록, 마지막 줄은 스토리 티어에 맞는 `Co-Authored-By: Claude <tier> <noreply@anthropic.com>`(Sonnet 태스크는 `Claude Sonnet`) 또는 `Co-Authored-By: DeepSeek V4.1 Flash <noreply@deepseek.com>` — `fable`은 A7-D6이 헤드리스 개발 루프에서 배제하므로 쓰지 않는다(계약 §9는 default를 정하지 않으며 이 항목이 정본이다).
+- TypeScript strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`, root `tsconfig.base.json` (A7 §1).
+- Postgres 17 (A3) — this plan does not touch the DB (the adapters do not import `packages/kernel`, A7 §1).
+- The hub binds only to `127.0.0.1:8787` (master §4.2) — the adapters in this plan are not yet wired into the hub process.
+- Migrations are append-only `packages/db/migrations/000N_<name>.sql` plus the tracking table `_omnis_migrations` (A3 §8) — this plan does not create migrations.
+- While the approval gate (US-A07) does not exist, do not connect irreversible tools such as `send`/`delete`/`calendar_write`/`delegate` directly to the kernel (A7 §7 shared prohibition) — every `send()` calls only a mock sink.
+- Provider SDKs (`@slack/*`, `googleapis`) are imported only inside their own adapter package (A7 §7 shared prohibition, §1 dependency rules).
+- Never make tests pass by deleting or skipping them.
+- Keychain item names follow the A1 §1.3 convention (`omnis.<channel>.<kind>.<external_id>`) plus the interfaces.md §9 FIXED exception: the Google family (`gmail`/`gcal`) shares a single `omnis.gmail.<email>` item (`<kind>` omitted), while Slack uses two items — `omnis.slack.xoxb.<team_id>` (account=`<team_id>`) and `…​.app` (not `xoxp`).
+- Story tiers follow A7 §4: US-A11 (Task 2·3) = Sonnet, US-A11 Task 1 (type scaffold) = DeepSeek, US-A12~A14 = Sonnet, US-A15 = DeepSeek (review Sonnet+).
+- Commits (interfaces.md §9, same rules as the kernel-and-db plan): branch `ralph/<story-id>`, worktree `omnis/.worktrees/<story-id>`. Exactly one atomic commit per story, subject format `<story-id>: <one-line summary>` (A7 §6), body listing the acceptance criteria that were met, and a final line matching the story tier: `Co-Authored-By: Claude <tier> <noreply@anthropic.com>` (for Sonnet tasks, `Claude Sonnet`) or `Co-Authored-By: DeepSeek V4.1 Flash <noreply@deepseek.com>` — never use `fable`, because A7-D6 excludes it from the headless development loop (contract §9 sets no default, and this item is the authoritative source).
 
 ---
 
-### Task 1: `@omnis/protocol` 스캐폴드 + 값 집합·브랜디드 타입 (US-A11, tier: DeepSeek)
+### Task 1: `@omnis/protocol` scaffold + value sets and branded types (US-A11, tier: DeepSeek)
 
-**US-A11 산출물(A7 §7):** `packages/protocol` — `NormalizedItem`/`Adapter`/`Capabilities` zod 스키마. **검증 명령:** `pnpm --filter @omnis/protocol test`. **목표:** interfaces.md §3.1~3.3 계약을 코드로 확정.
+**US-A11 deliverable (A7 §7):** `packages/protocol` — `NormalizedItem`/`Adapter`/`Capabilities` zod schemas. **Verification command:** `pnpm --filter @omnis/protocol test`. **Goal:** Lock down the interfaces.md §3.1~3.3 contract in code.
 
 **Files:**
-- Verify only (does not create — 루트 파일 오너는 kernel-and-db Task 1): `pnpm-workspace.yaml`, `package.json`(root), `tsconfig.base.json`, `biome.jsonc`
+- Verify only (does not create — the root files are owned by kernel-and-db Task 1): `pnpm-workspace.yaml`, `package.json` (root), `tsconfig.base.json`, `biome.jsonc`
 - Create: `packages/protocol/package.json`, `packages/protocol/tsconfig.json`, `packages/protocol/vitest.config.ts`
 - Create: `packages/protocol/src/adapter.ts`
 - Test: `packages/protocol/test/enums.test.ts`
 
-**Interfaces:** Consumes: 없음(리프). Produces: `Channel`, `ThreadKind`, `ItemKind`, `ItemStatus`, `Scope`, `Sensitivity`, `HostId`, `RuntimeKind`(zod enum + `z.infer` 타입), `SessionKey`, `SessionId`(브랜디드 문자열 + zod 스키마) — 전부 interfaces.md §3.1 그대로.
+**Interfaces:** Consumes: none (leaf). Produces: `Channel`, `ThreadKind`, `ItemKind`, `ItemStatus`, `Scope`, `Sensitivity`, `HostId`, `RuntimeKind` (zod enum + `z.infer` types), `SessionKey`, `SessionId` (branded strings + zod schemas) — all exactly as in interfaces.md §3.1.
 
-**루트 스캐폴드는 이 태스크가 만들지 않는다.** 루트 `pnpm-workspace.yaml`/`package.json`/`tsconfig.base.json`/`biome.jsonc`의 오너는 `2026-09-20-phase-a-kernel-and-db.md` Task 1이다(interfaces.md §2, FIXED — plans-review.md M4). 이 태스크는 그 파일들의 존재를 `test -f`로만 확인한다. Wave 0에서 kernel-and-db Task 1과 이 태스크는 선행 없이 병렬로 도므로(plans-review.md §3), kernel Task 1이 아직 끝나지 않아 루트 파일이 없다면 **kernel-and-db Task 1(db-scaffold)을 먼저 실행하고 이 태스크를 재개한다.**
+**This task does not create the root scaffold.** The root `pnpm-workspace.yaml`/`package.json`/`tsconfig.base.json`/`biome.jsonc` are owned by `2026-09-20-phase-a-kernel-and-db.md` Task 1 (interfaces.md §2, FIXED — plans-review.md M4). This task only checks that those files exist, using `test -f`. In Wave 0, kernel-and-db Task 1 and this task run in parallel with no prerequisite (plans-review.md §3), so if kernel Task 1 has not finished yet and the root files are missing, **run kernel-and-db Task 1 (db-scaffold) first, then resume this task.**
 
-- [ ] 1. 루트 워크스페이스 파일이 있는지 확인만 한다(생성하지 않는다).
+- [ ] 1. Only verify that the root workspace files exist (do not create them).
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
   test -f pnpm-workspace.yaml && test -f package.json && test -f tsconfig.base.json && test -f biome.jsonc \
-    && echo "루트 스캐폴드 확인됨(kernel-and-db Task 1이 만든 것)" \
-    || { echo "루트 스캐폴드가 없다 — kernel-and-db Task 1(db-scaffold)을 먼저 실행한 뒤 이 태스크를 재개한다."; exit 1; }
+    && echo "root scaffold confirmed (created by kernel-and-db Task 1)" \
+    || { echo "root scaffold is missing — run kernel-and-db Task 1 (db-scaffold) first, then resume this task."; exit 1; }
   ```
 
-- [ ] 2. `packages/protocol` 패키지 스캐폴드를 만든다.
+- [ ] 2. Create the `packages/protocol` package scaffold.
 
   ```bash
   mkdir -p /Users/logankim/AI-Workspaces/omnis/packages/protocol/src
@@ -89,7 +89,7 @@
   EOF
   ```
 
-- [ ] 3. 실패하는 테스트를 작성한다: `packages/protocol/test/enums.test.ts`
+- [ ] 3. Write the failing test: `packages/protocol/test/enums.test.ts`
 
   ```ts
   import { describe, expect, it } from "vitest";
@@ -119,15 +119,15 @@
   });
   ```
 
-- [ ] 4. 테스트를 실행해 실패를 확인한다.
+- [ ] 4. Run the test and confirm it fails.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/protocol test
   ```
 
-  예상 실패: `Cannot find module '../src/adapter.js'` (아직 `src/adapter.ts`가 없으므로 — pnpm/node_modules가 없다면 먼저 `pnpm install`을 루트에서 1회 실행).
+  Expected failure: `Cannot find module '../src/adapter.js'` (because `src/adapter.ts` does not exist yet — if pnpm/node_modules is missing, run `pnpm install` once at the root first).
 
-- [ ] 5. 최소 구현을 작성한다: `packages/protocol/src/adapter.ts` (interfaces.md §3.1 그대로)
+- [ ] 5. Write the minimal implementation: `packages/protocol/src/adapter.ts` (exactly as in interfaces.md §3.1)
 
   ```ts
   import { z } from "zod";
@@ -168,25 +168,25 @@
   export const SessionId = z.string().min(1).transform((s) => s as SessionId);
   ```
 
-- [ ] 6. 테스트를 실행해 통과를 확인한다.
+- [ ] 6. Run the test and confirm it passes.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/protocol test
   ```
 
-  예상 출력: `Test Files  1 passed (1)` / `Tests  3 passed (3)`.
+  Expected output: `Test Files  1 passed (1)` / `Tests  3 passed (3)`.
 
-- [ ] 7. 커밋한다.
+- [ ] 7. Commit.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
   git add packages/protocol
   git commit -m "$(cat <<'EOF'
-  US-A11: protocol 값 집합·브랜디드 타입
+  US-A11: protocol value sets and branded types
 
-  - 루트 스캐폴드(pnpm-workspace.yaml/package.json/tsconfig.base.json/biome.jsonc)는 만들지 않는다 — 오너는 kernel-and-db Task 1(interfaces.md §2)
+  - Do not create the root scaffold (pnpm-workspace.yaml/package.json/tsconfig.base.json/biome.jsonc) — its owner is kernel-and-db Task 1 (interfaces.md §2)
   - packages/protocol: Channel/ThreadKind/ItemKind/ItemStatus/Scope/Sensitivity/HostId/RuntimeKind zod enum
-  - SessionKey/SessionId 브랜디드 타입 + 정규식 검증
+  - SessionKey/SessionId branded types + regex validation
 
   Co-Authored-By: DeepSeek V4.1 Flash <noreply@deepseek.com>
   EOF
@@ -201,9 +201,9 @@
 - Modify: `packages/protocol/src/adapter.ts`
 - Test: `packages/protocol/test/normalized.test.ts`
 
-**Interfaces:** Consumes: Task 1의 `Channel`, `ThreadKind`, `ItemKind`, `ItemStatus`(re-import는 안 함, 같은 파일). Produces: `Capabilities`, `ParticipantRef`, `NormalizedThread`, `Attachment`, `NormalizedItem`(interfaces.md §3.2 그대로).
+**Interfaces:** Consumes: Task 1's `Channel`, `ThreadKind`, `ItemKind`, `ItemStatus` (no re-import; same file). Produces: `Capabilities`, `ParticipantRef`, `NormalizedThread`, `Attachment`, `NormalizedItem` (exactly as in interfaces.md §3.2).
 
-- [ ] 1. 실패하는 테스트를 작성한다: `packages/protocol/test/normalized.test.ts`
+- [ ] 1. Write the failing test: `packages/protocol/test/normalized.test.ts`
 
   ```ts
   import { describe, expect, it } from "vitest";
@@ -248,15 +248,15 @@
   });
   ```
 
-- [ ] 2. 테스트를 실행해 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/protocol test
   ```
 
-  예상 실패: `does not provide an export named 'Capabilities'`.
+  Expected failure: `does not provide an export named 'Capabilities'`.
 
-- [ ] 3. `packages/protocol/src/adapter.ts` 끝에 아래를 추가한다(interfaces.md §3.2 그대로).
+- [ ] 3. Append the following to the end of `packages/protocol/src/adapter.ts` (exactly as in interfaces.md §3.2).
 
   ```ts
   export const Capabilities = z.object({
@@ -295,25 +295,25 @@
   export type NormalizedItem = z.infer<typeof NormalizedItem>;
   ```
 
-- [ ] 4. 테스트를 실행해 통과를 확인한다.
+- [ ] 4. Run the test and confirm it passes.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/protocol test
   ```
 
-  예상 출력: `Tests  6 passed (6)`(Task 1의 3개 + 이 태스크의 3개).
+  Expected output: `Tests  6 passed (6)` (Task 1's 3 plus this task's 3).
 
-- [ ] 5. 커밋한다.
+- [ ] 5. Commit.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
   git add packages/protocol
   git commit -m "$(cat <<'EOF'
-  US-A11: NormalizedThread/NormalizedItem/Capabilities zod 스키마
+  US-A11: NormalizedThread/NormalizedItem/Capabilities zod schemas
 
-  - Capabilities: read/write/realtime/history/media/markRead/typing/archive/delete 9필드
-  - NormalizedItem.status는 항상 literal 'received'(A1 §1.2)
-  - author.kind는 person|agent|system(A3 3컬럼 모델과 정렬, A1-D1)
+  - Capabilities: 9 fields — read/write/realtime/history/media/markRead/typing/archive/delete
+  - NormalizedItem.status is always the literal 'received' (A1 §1.2)
+  - author.kind is person|agent|system (aligned with the A3 3-column model, A1-D1)
 
   Co-Authored-By: Claude Sonnet <noreply@anthropic.com>
   EOF
@@ -322,16 +322,16 @@
 
 ---
 
-### Task 3: AdapterEvent / AuthRef / AdapterError / Health / Adapter 인터페이스 (US-A11, tier: Sonnet)
+### Task 3: AdapterEvent / AuthRef / AdapterError / Health / Adapter interfaces (US-A11, tier: Sonnet)
 
 **Files:**
 - Modify: `packages/protocol/src/adapter.ts`
 - Create: `packages/protocol/src/index.ts`
 - Test: `packages/protocol/test/adapter-error.test.ts`
 
-**Interfaces:** Consumes: Task 1·2의 `Channel`, `NormalizedItem`(같은 파일). Produces: `AdapterEvent`, `AuthRef`, `AdapterErrorKind`, `AdapterError`, `Health`, `ThreadRef`, `OutboundAttachment`, `Outbound`, `SendResult`, `Adapter`, `Normalize`, `IngestSink`(interfaces.md §3.3 그대로) — 세 어댑터 패키지가 전부 이 타입들에 의존한다.
+**Interfaces:** Consumes: Task 1·2's `Channel`, `NormalizedItem` (same file). Produces: `AdapterEvent`, `AuthRef`, `AdapterErrorKind`, `AdapterError`, `Health`, `ThreadRef`, `OutboundAttachment`, `Outbound`, `SendResult`, `Adapter`, `Normalize`, `IngestSink` (exactly as in interfaces.md §3.3) — all three adapter packages depend on these types.
 
-- [ ] 1. 실패하는 테스트를 작성한다: `packages/protocol/test/adapter-error.test.ts`
+- [ ] 1. Write the failing test: `packages/protocol/test/adapter-error.test.ts`
 
   ```ts
   import { describe, expect, it } from "vitest";
@@ -351,15 +351,15 @@
   });
   ```
 
-- [ ] 2. 테스트를 실행해 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/protocol test
   ```
 
-  예상 실패: `does not provide an export named 'AdapterError'`.
+  Expected failure: `does not provide an export named 'AdapterError'`.
 
-- [ ] 3. `packages/protocol/src/adapter.ts` 끝에 아래를 추가한다(interfaces.md §3.3 그대로).
+- [ ] 3. Append the following to the end of `packages/protocol/src/adapter.ts` (exactly as in interfaces.md §3.3).
 
   ```ts
   export const AdapterEvent = z.discriminatedUnion("kind", [
@@ -439,31 +439,31 @@
   export type IngestSink = (accountId: string, e: NormalizedItem | AdapterEvent) => Promise<void>;
   ```
 
-- [ ] 4. `packages/protocol/src/index.ts`를 만든다(재export).
+- [ ] 4. Create `packages/protocol/src/index.ts` (re-export).
 
   ```ts
   export * from "./adapter.js";
   ```
 
-- [ ] 5. 테스트를 실행해 통과를 확인한다.
+- [ ] 5. Run the test and confirm it passes.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/protocol test
   ```
 
-  예상 출력: `Tests  7 passed (7)`.
+  Expected output: `Tests  7 passed (7)`.
 
-- [ ] 6. 커밋한다.
+- [ ] 6. Commit.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
   git add packages/protocol
   git commit -m "$(cat <<'EOF'
-  US-A11: AdapterEvent/AuthRef/AdapterError/Health/Adapter 인터페이스 + index re-export
+  US-A11: AdapterEvent/AuthRef/AdapterError/Health/Adapter interfaces + index re-export
 
-  - AdapterError 6종 kind, name='AdapterError' 고정(A1 §1.4)
-  - Adapter 인터페이스: connect/disconnect?/backfill/subscribe/send/markRead?/archive?/health(A1 §1.6)
-  - Normalize/IngestSink 타입, packages/protocol/src/index.ts 재export
+  - AdapterError: 6 kinds, name fixed to 'AdapterError' (A1 §1.4)
+  - Adapter interface: connect/disconnect?/backfill/subscribe/send/markRead?/archive?/health (A1 §1.6)
+  - Normalize/IngestSink types, re-exported from packages/protocol/src/index.ts
 
   Co-Authored-By: Claude Sonnet <noreply@anthropic.com>
   EOF
@@ -472,20 +472,20 @@
 
 ---
 
-### Task 4: Slack 어댑터 — 패키지 스캐폴드 + Keychain + connect()/subscribe()/health() (US-A12, tier: Sonnet)
+### Task 4: Slack adapter — package scaffold + Keychain + connect()/subscribe()/health() (US-A12, tier: Sonnet)
 
-**US-A12 산출물(A7 §7):** `packages/adapters/slack/src/index.ts`. **검증 명령:** `pnpm --filter @omnis/adapter-slack test`. **목표:** Slack 어댑터: Socket Mode 연결 + backfill + realtime subscribe.
+**US-A12 deliverable (A7 §7):** `packages/adapters/slack/src/index.ts`. **Verification command:** `pnpm --filter @omnis/adapter-slack test`. **Goal:** Slack adapter: Socket Mode connection + backfill + realtime subscribe.
 
 **Files:**
 - Create: `packages/adapters/slack/package.json`, `packages/adapters/slack/tsconfig.json`, `packages/adapters/slack/vitest.config.ts`
 - Create: `packages/adapters/slack/src/keychain.ts`, `packages/adapters/slack/src/index.ts`
 - Test: `packages/adapters/slack/test/capabilities.test.ts`, `packages/adapters/slack/test/connect.test.ts`
 
-**Interfaces:** Consumes: `@omnis/protocol`의 `Adapter`, `AuthRef`, `AdapterError`, `Health`, `Capabilities`, `NormalizedItem`, `AdapterEvent`(Task 3). Produces: `CHANNEL`(`"slack"` 리터럴), `createSlackAdapter(deps?: SlackAdapterDeps): Adapter`, `readKeychainSecret(service, account, channel): Promise<string>`.
+**Interfaces:** Consumes: `Adapter`, `AuthRef`, `AdapterError`, `Health`, `Capabilities`, `NormalizedItem`, `AdapterEvent` from `@omnis/protocol` (Task 3). Produces: `CHANNEL` (`"slack"` literal), `createSlackAdapter(deps?: SlackAdapterDeps): Adapter`, `readKeychainSecret(service, account, channel): Promise<string>`.
 
-읽을 스펙: A1 §1.3(Keychain 명명), §2.1(Slack 상세: Socket Mode, `apps.connections.open`, write-back 표). **Keychain 항목명(interfaces.md §9, FIXED)**: bot 토큰은 `omnis.slack.xoxb.<team_id>`(account=`<team_id>`), app 토큰은 `omnis.slack.xoxb.<team_id>.app`(account=`<team_id>`, 같은 계정) 2항목 — `xoxp`가 아니다. 아래 `AuthRef` 예시·fixture는 전부 이 명명을 그대로 쓴다. **만들지 않을 것(YAGNI)**: `typing` indicator(capabilities에서 `false`로 선언하고 끝 — A1 §1.1이 선언 안 하면 UI가 안 그린다고 했으니 구현도 필요 없다), Events API 폴백 경로(A1 §4 A1-④의 fail 시 대안일 뿐 Phase A 범위 아님).
+Spec to read: A1 §1.3 (Keychain naming), §2.1 (Slack details: Socket Mode, `apps.connections.open`, write-back table). **Keychain item names (interfaces.md §9, FIXED)**: the bot token is `omnis.slack.xoxb.<team_id>` (account=`<team_id>`) and the app token is `omnis.slack.xoxb.<team_id>.app` (account=`<team_id>`, same account) — 2 items, not `xoxp`. Every `AuthRef` example and fixture below uses this naming verbatim. **Do not build (YAGNI)**: the `typing` indicator (just declare it `false` in capabilities and stop — A1 §1.1 says the UI does not render what is not declared, so no implementation is needed either), and the Events API fallback path (only a fallback if A1 §4 A1-④ fails; not in Phase A scope).
 
-- [ ] 1. 패키지 스캐폴드를 만든다.
+- [ ] 1. Create the package scaffold.
 
   ```bash
   mkdir -p /Users/logankim/AI-Workspaces/omnis/packages/adapters/slack/src
@@ -523,7 +523,7 @@
   EOF
   ```
 
-- [ ] 2. 실패하는 테스트를 작성한다: `packages/adapters/slack/test/capabilities.test.ts`
+- [ ] 2. Write the failing test: `packages/adapters/slack/test/capabilities.test.ts`
 
   ```ts
   import { describe, expect, it } from "vitest";
@@ -541,15 +541,15 @@
   });
   ```
 
-- [ ] 3. 테스트를 실행해 실패를 확인한다.
+- [ ] 3. Run the test and confirm it fails.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm install && pnpm --filter @omnis/adapter-slack test
   ```
 
-  예상 실패: `Cannot find module '../src/index.js'`.
+  Expected failure: `Cannot find module '../src/index.js'`.
 
-- [ ] 4. Keychain 래퍼를 작성한다: `packages/adapters/slack/src/keychain.ts` (macOS `security` CLI 래핑, A1 §1.3)
+- [ ] 4. Write the Keychain wrapper: `packages/adapters/slack/src/keychain.ts` (wraps the macOS `security` CLI, A1 §1.3)
 
   ```ts
   import { execFile } from "node:child_process";
@@ -558,8 +558,8 @@
 
   const execFileAsync = promisify(execFile);
 
-  /** `security find-generic-password -s <service> -a <account> -w` 로 시크릿 값을 읽는다.
-   *  값은 절대 로그로 찍지 않는다(A7 §9 로그 규약). */
+  /** Reads the secret value with `security find-generic-password -s <service> -a <account> -w`.
+   *  Never log the value (A7 §9 logging rules). */
   export async function readKeychainSecret(
     service: string,
     account: string,
@@ -580,7 +580,7 @@
   }
   ```
 
-- [ ] 5. `src/index.ts`에 `capabilities()`/`connect()`/`disconnect()`/`subscribe()`/`health()`를 작성한다. `backfill`/`send`/`markRead`/`archive`는 아직 미구현이므로 호출 시 `fatal_unsupported`를 던진다(Task 5·6이 채운다).
+- [ ] 5. In `src/index.ts`, write `capabilities()`/`connect()`/`disconnect()`/`subscribe()`/`health()`. `backfill`/`send`/`markRead`/`archive` are not implemented yet, so they throw `fatal_unsupported` when called (Task 5·6 fills them in).
 
   ```ts
   import { SocketModeClient } from "@slack/socket-mode";
@@ -688,15 +688,15 @@
   }
   ```
 
-- [ ] 6. 테스트를 실행해 통과를 확인한다.
+- [ ] 6. Run the test and confirm it passes.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/adapter-slack test
   ```
 
-  예상 출력: `Tests  1 passed (1)`.
+  Expected output: `Tests  1 passed (1)`.
 
-- [ ] 7. `connect()`가 `auth_expired`로 실패하는 경로를 검증하는 테스트를 추가한다: `packages/adapters/slack/test/connect.test.ts`
+- [ ] 7. Add a test that verifies the path where `connect()` fails with `auth_expired`: `packages/adapters/slack/test/connect.test.ts`
 
   ```ts
   import { describe, expect, it } from "vitest";
@@ -716,29 +716,29 @@
   });
   ```
 
-  이 테스트는 실제 macOS Keychain에 `omnis.slack.xoxb.T000UNKNOWN` 항목이 없다는 사실에 의존한다(CI/개발 머신 모두 해당 항목을 만들지 않으므로 항상 실패 경로를 탄다) — 네트워크 호출 없음.
+  This test relies on the fact that the real macOS Keychain has no `omnis.slack.xoxb.T000UNKNOWN` item (neither CI nor developer machines create it, so it always takes the failure path) — no network calls.
 
-- [ ] 8. 테스트를 실행해 통과를 확인한다.
+- [ ] 8. Run the test and confirm it passes.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/adapter-slack test
   ```
 
-  예상 출력: `Tests  2 passed (2)`.
+  Expected output: `Tests  2 passed (2)`.
 
-- [ ] 9. 커밋한다.
+- [ ] 9. Commit.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
   git add packages/adapters/slack
   git commit -m "$(cat <<'EOF'
-  US-A12: Slack 어댑터 스캐폴드 + Keychain + connect()/subscribe()/health()
+  US-A12: Slack adapter scaffold + Keychain + connect()/subscribe()/health()
 
-  - readKeychainSecret(): security CLI 래핑, 값은 로그에 남기지 않음(A1 §1.3)
-  - connect(): xoxb(WebClient)+app token(SocketModeClient) 둘 다 Keychain에서 읽음
-  - subscribe(): AsyncQueue 기반 AsyncIterable, connect()가 'connected' 이벤트를 큐에 씀
-  - capabilities(): typing=false, archive=false, delete=false(A1 §3 write-back 표)
-  - backfill()/send()는 아직 fatal_unsupported(Task 5·6에서 구현)
+  - readKeychainSecret(): wraps the security CLI, never leaves the value in logs (A1 §1.3)
+  - connect(): reads both the xoxb token (WebClient) and the app token (SocketModeClient) from Keychain
+  - subscribe(): AsyncIterable backed by AsyncQueue; connect() pushes a 'connected' event onto the queue
+  - capabilities(): typing=false, archive=false, delete=false (A1 §3 write-back table)
+  - backfill()/send() are still fatal_unsupported (implemented in Task 5·6)
 
   Co-Authored-By: Claude Sonnet <noreply@anthropic.com>
   EOF
@@ -747,17 +747,17 @@
 
 ---
 
-### Task 5: Slack 어댑터 — backfill() (US-A12, tier: Sonnet)
+### Task 5: Slack adapter — backfill() (US-A12, tier: Sonnet)
 
 **Files:**
 - Modify: `packages/adapters/slack/src/index.ts`
 - Test: `packages/adapters/slack/test/backfill.test.ts`
 
-**Interfaces:** Consumes: Task 4의 `CHANNEL`, `AsyncQueue`(내부), `@omnis/protocol`의 `AdapterError`. Produces: `backfill()` 구현(더 이상 `fatal_unsupported`를 던지지 않음), `SlackAdapterDeps.webClient` 주입 경로(이미 존재, backfill이 이제 실제로 사용).
+**Interfaces:** Consumes: Task 4's `CHANNEL`, `AsyncQueue` (internal), `AdapterError` from `@omnis/protocol`. Produces: a `backfill()` implementation (no longer throws `fatal_unsupported`) and the `SlackAdapterDeps.webClient` injection path (already exists; backfill now actually uses it).
 
-읽을 스펙: A1 §2.1 backfill 문단(`conversations.history`/`conversations.replies`, 최근 30일, 페이지네이션+백오프, `backfill_progress` 이벤트).
+Spec to read: A1 §2.1 backfill paragraph (`conversations.history`/`conversations.replies`, last 30 days, pagination + backoff, `backfill_progress` event).
 
-- [ ] 1. 실패하는 테스트를 작성한다: `packages/adapters/slack/test/backfill.test.ts`(mock WebClient 주입, 실 네트워크 없음)
+- [ ] 1. Write the failing test: `packages/adapters/slack/test/backfill.test.ts` (inject a mock WebClient, no real network)
 
   ```ts
   import { describe, expect, it, vi } from "vitest";
@@ -790,15 +790,15 @@
   });
   ```
 
-- [ ] 2. 테스트를 실행해 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/adapter-slack test
   ```
 
-  예상 실패: `expected [] to equal [ '1700000000.000100', '1700000100.000200' ]` (backfill이 아직 즉시 throw).
+  Expected failure: `expected [] to equal [ '1700000000.000100', '1700000100.000200' ]` (backfill still throws immediately).
 
-- [ ] 3. `src/index.ts`의 `backfill` 스텁을 아래로 교체한다(같은 파일, `channel:`/`capabilities:` 다음 위치 유지).
+- [ ] 3. Replace the `backfill` stub in `src/index.ts` with the following (same file, keeping it in the position after `channel:`/`capabilities:`).
 
   ```ts
       async *backfill(since?: Date): AsyncIterable<NormalizedItem> {
@@ -836,7 +836,7 @@
       },
   ```
 
-- [ ] 4. `normalize`가 아직 없으므로(Task 6에서 구현) 파일 끝에 임시 named export를 추가해 컴파일을 통과시킨다 — Task 6에서 이 스텁을 실제 구현으로 교체한다.
+- [ ] 4. `normalize` does not exist yet (implemented in Task 6), so add a temporary named export at the end of the file to make it compile — Task 6 replaces this stub with the real implementation.
 
   ```ts
   export function normalize(raw: unknown): NormalizedItem[] {
@@ -851,26 +851,26 @@
   }
   ```
 
-- [ ] 5. 테스트를 실행해 통과를 확인한다.
+- [ ] 5. Run the test and confirm it passes.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/adapter-slack test
   ```
 
-  예상 출력: `Tests  3 passed (3)`.
+  Expected output: `Tests  3 passed (3)`.
 
-- [ ] 6. 커밋한다.
+- [ ] 6. Commit.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
   git add packages/adapters/slack
   git commit -m "$(cat <<'EOF'
-  US-A12: Slack backfill() — conversations.history 페이지네이션 + rate-limit 매핑
+  US-A12: Slack backfill() — conversations.history pagination + rate-limit mapping
 
-  - cursor 기반 페이지네이션, since가 있으면 oldest로 변환
-  - ratelimited 응답을 AdapterError('retryable_rate_limit', retryAfterMs=retry_after*1000)로 매핑(A1 §1.4)
-  - 페이지마다 backfill_progress 이벤트를 subscribe() 큐에 push
-  - normalize()는 이 태스크에서 최소 스텁만(Task 6에서 thread_reply/attachment까지 완성)
+  - cursor-based pagination; when since is present, convert it to oldest
+  - map a ratelimited response to AdapterError('retryable_rate_limit', retryAfterMs=retry_after*1000) (A1 §1.4)
+  - push a backfill_progress event to the subscribe() queue on every page
+  - normalize() is only a minimal stub in this task (Task 6 completes thread_reply/attachment)
 
   Co-Authored-By: Claude Sonnet <noreply@anthropic.com>
   EOF
@@ -879,17 +879,17 @@
 
 ---
 
-### Task 6: Slack 어댑터 — normalize() 완성 + send()/markRead() mock sink (US-A12, tier: Sonnet)
+### Task 6: Slack adapter — complete normalize() + send()/markRead() mock sink (US-A12, tier: Sonnet)
 
 **Files:**
 - Modify: `packages/adapters/slack/src/index.ts`
 - Test: `packages/adapters/slack/test/normalize.test.ts`, `packages/adapters/slack/test/send.test.ts`
 
-**Interfaces:** Consumes: Task 3의 `Attachment`, `SendResult`, `Outbound`, `ThreadRef`. Produces: `normalize(raw: unknown): NormalizedItem[]`(완성판, thread_ts/attachment 처리), `mapApiError(raw: unknown): AdapterError`(fixture의 `rate_limited_response`/`auth_error_response` 시나리오가 검증할 별도 export — 계약 밖 심볼), `createSlackAdapter().send`(mock sink 경유).
+**Interfaces:** Consumes: Task 3's `Attachment`, `SendResult`, `Outbound`, `ThreadRef`. Produces: `normalize(raw: unknown): NormalizedItem[]` (the completed version, handling thread_ts/attachment), `mapApiError(raw: unknown): AdapterError` (a separate export verified by the fixture `rate_limited_response`/`auth_error_response` scenarios — a symbol outside the contract), `createSlackAdapter().send` (through the mock sink).
 
-읽을 스펙: A1 §2.1 thread/ID 매핑(`ts` vs `thread_ts`, `sourceHash`=`ts`), 미디어(다운로드 후 로컬 캐시), write-back(`chat.postMessage`는 **아직 안 붙인다** — "Do not wire send() to anything but a mock sink until the approval gate exists").
+Spec to read: A1 §2.1 thread/ID mapping (`ts` vs `thread_ts`, `sourceHash`=`ts`), media (download then local cache), write-back (`chat.postMessage` is **not wired up yet** — "Do not wire send() to anything but a mock sink until the approval gate exists").
 
-- [ ] 1. 실패하는 테스트를 작성한다: `packages/adapters/slack/test/normalize.test.ts`
+- [ ] 1. Write the failing test: `packages/adapters/slack/test/normalize.test.ts`
 
   ```ts
   import { describe, expect, it } from "vitest";
@@ -933,15 +933,15 @@
   });
   ```
 
-- [ ] 2. 테스트를 실행해 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/adapter-slack test
   ```
 
-  예상 실패: `threadExternalId`가 `""`(Task 5 스텁은 thread 매핑도 attachment 매핑도 하지 않음), attachment 테스트는 `attachments`가 `[]`로 나와 실패.
+  Expected failure: `threadExternalId` comes out as `""` (the Task 5 stub maps neither thread nor attachment), and the attachment test fails because `attachments` comes out as `[]`.
 
-- [ ] 3. `src/index.ts`의 `normalize` 스텁을 아래로 교체한다(A1 §2.1 thread/ID 매핑·미디어 규칙 그대로).
+- [ ] 3. Replace the `normalize` stub in `src/index.ts` with the following (exactly as in A1 §2.1 thread/ID mapping and media rules).
 
   ```ts
   interface SlackFile {
@@ -999,9 +999,9 @@
   }
   ```
 
-  `NormalizedItem`이 `threadMeta`를 선택 필드로 두므로 신규 thread가 아닌 일반 메시지는 `threadMeta`를 생략한다(A1-D1 "신규 thread거나 메타데이터 변경 시에만").
+  Because `NormalizedItem` makes `threadMeta` an optional field, a plain message that is not a new thread omits `threadMeta` (A1-D1 "only for a new thread or when metadata changed").
 
-- [ ] 4. `send`/`markRead` 스텁을 mock sink 버전으로 교체한다(`capabilities: () => CAPABILITIES,` 다음, `backfill` 앞).
+- [ ] 4. Replace the `send`/`markRead` stubs with the mock sink versions (after `capabilities: () => CAPABILITIES,` and before `backfill`).
 
   ```ts
   export interface SlackAdapterDeps {
@@ -1012,11 +1012,11 @@
   }
   ```
 
-  (기존 `SlackAdapterDeps` 선언을 이 필드가 추가된 버전으로 교체한다.) 그리고 `send`/`markRead` 구현:
+  (Replace the existing `SlackAdapterDeps` declaration with the version that adds this field.) And the `send`/`markRead` implementations:
 
   ```ts
-      // 승인 게이트(US-A07)가 아직 없다 — 실제 chat.postMessage는 절대 호출하지 않는다.
-      // deps.sink가 없으면 SendResult를 합성만 하는 기본 mock sink를 쓴다.
+      // The approval gate (US-A07) does not exist yet — never call the real chat.postMessage.
+      // If deps.sink is absent, use a default mock sink that only synthesizes a SendResult.
       async send(thread: ThreadRef, draft: Outbound): Promise<SendResult> {
         const sink = deps.sink ?? (async (): Promise<SendResult> => ({
           externalId: `mock-${now().getTime()}`, sentAt: now().toISOString(),
@@ -1030,9 +1030,9 @@
       },
   ```
 
-  `import type { Outbound, SendResult, ThreadRef } from "@omnis/protocol";`를 상단 import에 추가한다.
+  Add `import type { Outbound, SendResult, ThreadRef } from "@omnis/protocol";` to the top-level imports.
 
-- [ ] 5. `send()`가 mock sink만 호출하고 실제 Slack API를 절대 부르지 않음을 검증하는 테스트를 추가한다: `packages/adapters/slack/test/send.test.ts`
+- [ ] 5. Add a test verifying that `send()` calls only the mock sink and never the real Slack API: `packages/adapters/slack/test/send.test.ts`
 
   ```ts
   import { describe, expect, it, vi } from "vitest";
@@ -1059,26 +1059,26 @@
   });
   ```
 
-- [ ] 6. 테스트를 실행해 전부 통과를 확인한다.
+- [ ] 6. Run the test and confirm everything passes.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/adapter-slack test
   ```
 
-  예상 출력: `Tests  7 passed (7)`.
+  Expected output: `Tests  7 passed (7)`.
 
-- [ ] 7. 커밋한다.
+- [ ] 7. Commit.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
   git add packages/adapters/slack
   git commit -m "$(cat <<'EOF'
-  US-A12: Slack normalize() 완성(thread_ts/attachment) + send() mock sink 배선
+  US-A12: complete Slack normalize() (thread_ts/attachment) + wire send() to the mock sink
 
   - normalize(): channel→threadExternalId, ts→externalId/sourceHash, files→Attachment[]
   - mapApiError(): 429→retryable_rate_limit, 401→auth_expired|auth_revoked(A1 §1.4)
-  - send()는 deps.sink만 호출한다 — chat.postMessage는 승인 게이트(US-A07) 전까지 배선하지 않음
-  - markRead()는 conversations.mark 실제 호출(read 확인은 비가역 액션이 아님)
+  - send() calls only deps.sink — do not wire chat.postMessage before the approval gate (US-A07)
+  - markRead() really calls conversations.mark (marking read is not an irreversible action)
 
   Co-Authored-By: Claude Sonnet <noreply@anthropic.com>
   EOF
@@ -1087,20 +1087,20 @@
 
 ---
 
-### Task 7: Gmail 어댑터 — 패키지 스캐폴드 + OAuth + connect()/health() (US-A13, tier: Sonnet)
+### Task 7: Gmail adapter — package scaffold + OAuth + connect()/health() (US-A13, tier: Sonnet)
 
-**US-A13 산출물(A7 §7):** `packages/adapters/gmail/src/index.ts`. **검증 명령:** `pnpm --filter @omnis/adapter-gmail test`. **목표:** Gmail 어댑터(`users.watch`+Pub/Sub, OAuth, backfill).
+**US-A13 deliverable (A7 §7):** `packages/adapters/gmail/src/index.ts`. **Verification command:** `pnpm --filter @omnis/adapter-gmail test`. **Goal:** Gmail adapter (`users.watch`+Pub/Sub, OAuth, backfill).
 
 **Files:**
 - Create: `packages/adapters/gmail/package.json`, `packages/adapters/gmail/tsconfig.json`, `packages/adapters/gmail/vitest.config.ts`
 - Create: `packages/adapters/gmail/src/keychain.ts`, `packages/adapters/gmail/src/index.ts`
 - Test: `packages/adapters/gmail/test/capabilities.test.ts`
 
-**Interfaces:** Consumes: `@omnis/protocol`의 `Adapter`/`AuthRef`/`AdapterError`/`Capabilities`/`Health`(Task 3). Produces: `CHANNEL`(`"gmail"`), `createGmailAdapter(deps?: GmailAdapterDeps): Adapter`.
+**Interfaces:** Consumes: `Adapter`/`AuthRef`/`AdapterError`/`Capabilities`/`Health` from `@omnis/protocol` (Task 3). Produces: `CHANNEL` (`"gmail"`), `createGmailAdapter(deps?: GmailAdapterDeps): Adapter`.
 
-읽을 스펙: A1 §1.3(Gmail Keychain `omnis.gmail.<email>`), §2.2(OAuth Desktop client, refresh token, Production 게시 요구사항). **Keychain 항목명(interfaces.md §9, FIXED)**: Google 계열(`gmail`/`gcal`)은 `omnis.gmail.<email>` **1항목을 공유**하고 `<kind>` 세그먼트를 생략한다(일반형 `omnis.<channel>.<kind>.<external_id>`의 예외) — gcal 어댑터(Task 10)가 같은 `keychainService`를 재사용한다. 아래 `AuthRef` 예시·fixture는 전부 이 명명을 그대로 쓴다. **만들지 않을 것(YAGNI)**: OAuth consent 화면 자체(온보딩 UI는 US-A31, Phase A 후반 별도 플랜) — 이 어댑터는 이미 발급된 refresh token을 Keychain에서 읽기만 한다.
+Spec to read: A1 §1.3 (Gmail Keychain `omnis.gmail.<email>`), §2.2 (OAuth Desktop client, refresh token, Production publishing requirements). **Keychain item names (interfaces.md §9, FIXED)**: the Google family (`gmail`/`gcal`) **shares a single `omnis.gmail.<email>` item** and omits the `<kind>` segment (an exception to the general form `omnis.<channel>.<kind>.<external_id>`) — the gcal adapter (Task 10) reuses the same `keychainService`. Every `AuthRef` example and fixture below uses this naming verbatim. **Do not build (YAGNI)**: the OAuth consent screen itself (onboarding UI is US-A31, a separate plan later in Phase A) — this adapter only reads an already-issued refresh token from Keychain.
 
-- [ ] 1. 패키지 스캐폴드를 만든다.
+- [ ] 1. Create the package scaffold.
 
   ```bash
   mkdir -p /Users/logankim/AI-Workspaces/omnis/packages/adapters/gmail/src
@@ -1137,7 +1137,7 @@
   EOF
   ```
 
-- [ ] 2. 실패하는 테스트를 작성한다: `packages/adapters/gmail/test/capabilities.test.ts`
+- [ ] 2. Write the failing test: `packages/adapters/gmail/test/capabilities.test.ts`
 
   ```ts
   import { describe, expect, it } from "vitest";
@@ -1157,15 +1157,15 @@
   });
   ```
 
-- [ ] 3. 테스트를 실행해 실패를 확인한다.
+- [ ] 3. Run the test and confirm it fails.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm install && pnpm --filter @omnis/adapter-gmail test
   ```
 
-  예상 실패: `Cannot find module '../src/index.js'`.
+  Expected failure: `Cannot find module '../src/index.js'`.
 
-- [ ] 4. Keychain 래퍼를 작성한다: `packages/adapters/gmail/src/keychain.ts` (Slack Task 4와 동일 패턴, 채널만 다름 — 어댑터 패키지 간 import 금지라 복제한다)
+- [ ] 4. Write the Keychain wrapper: `packages/adapters/gmail/src/keychain.ts` (same pattern as Slack Task 4, only the channel differs — duplicated because importing between adapter packages is forbidden)
 
   ```ts
   import { execFile } from "node:child_process";
@@ -1194,7 +1194,7 @@
   }
   ```
 
-- [ ] 5. `src/index.ts`에 `capabilities()`/`connect()`/`disconnect()`/`health()`를 작성한다. `backfill`/`subscribe`/`send`/`markRead`/`archive`는 Task 8·9가 채운다.
+- [ ] 5. In `src/index.ts`, write `capabilities()`/`connect()`/`disconnect()`/`health()`. Task 8·9 fills in `backfill`/`subscribe`/`send`/`markRead`/`archive`.
 
   ```ts
   import { google } from "googleapis";
@@ -1271,9 +1271,9 @@
   }
   ```
 
-  Gmail Cloud 프로젝트의 OAuth client id/secret은 계정별 시크릿이 아니라 앱 레벨 시크릿이므로 `AuthRef`가 아니라 어댑터 생성 시 `deps`로 주입한다(A7 §9 "새 변수는 `OMNIS_` 접두" — 허브가 `OMNIS_GOOGLE_OAUTH_CLIENT_ID`/`OMNIS_GOOGLE_OAUTH_CLIENT_SECRET` 환경변수에서 읽어 넘기는 것은 `apps/hub` 배선 스토리(US-A10) 몫이고 이 플랜 범위 밖이다).
+  The Gmail Cloud project's OAuth client id/secret is an app-level secret, not a per-account secret, so it is injected through `deps` at adapter construction rather than through `AuthRef` (A7 §9 "new variables are prefixed `OMNIS_`" — having the hub read `OMNIS_GOOGLE_OAUTH_CLIENT_ID`/`OMNIS_GOOGLE_OAUTH_CLIENT_SECRET` from the environment and pass them in belongs to the `apps/hub` wiring story (US-A10) and is outside this plan's scope).
 
-- [ ] 6. `google-auth-library`를 명시적으로 devDependency에 추가한다(타입 전용 import를 위해, `googleapis`가 재export하는 타입만으로는 `import type`이 실패할 수 있음).
+- [ ] 6. Explicitly add `google-auth-library` to devDependencies (for type-only imports, since `import type` can fail with only the types re-exported by `googleapis`).
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
@@ -1287,27 +1287,27 @@
   pnpm install
   ```
 
-- [ ] 7. 테스트를 실행해 통과를 확인한다.
+- [ ] 7. Run the test and confirm it passes.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/adapter-gmail test
   ```
 
-  예상 출력: `Tests  1 passed (1)`.
+  Expected output: `Tests  1 passed (1)`.
 
-- [ ] 8. 커밋한다.
+- [ ] 8. Commit.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
   git add packages/adapters/gmail
   git commit -m "$(cat <<'EOF'
-  US-A13: Gmail 어댑터 스캐폴드 + OAuth2 refresh-token connect()/health()
+  US-A13: Gmail adapter scaffold + OAuth2 refresh-token connect()/health()
 
-  - Keychain omnis.gmail.<email>에서 refresh token을 읽어 OAuth2Client.setCredentials
-  - connect() 실패 시 auth_revoked(A1 §1.4, 자동 재시도 금지)
-  - capabilities(): send/markRead/archive 전부 true(A1 §3 Gmail 행)
-  - OAuth client id/secret은 AuthRef가 아니라 GmailAdapterDeps로 주입(앱 레벨 시크릿)
-  - backfill()/subscribe()/send()는 아직 fatal_unsupported(Task 8·9)
+  - Read the refresh token from Keychain omnis.gmail.<email> and call OAuth2Client.setCredentials
+  - auth_revoked on connect() failure (A1 §1.4, no automatic retry)
+  - capabilities(): send/markRead/archive all true (A1 §3 Gmail row)
+  - OAuth client id/secret injected via GmailAdapterDeps, not AuthRef (app-level secret)
+  - backfill()/subscribe()/send() are still fatal_unsupported (Task 8·9)
 
   Co-Authored-By: Claude Sonnet <noreply@anthropic.com>
   EOF
@@ -1316,17 +1316,17 @@
 
 ---
 
-### Task 8: Gmail 어댑터 — `users.watch` + Pub/Sub pull subscribe() + backfill() (US-A13, tier: Sonnet)
+### Task 8: Gmail adapter — `users.watch` + Pub/Sub pull subscribe() + backfill() (US-A13, tier: Sonnet)
 
 **Files:**
 - Modify: `packages/adapters/gmail/src/index.ts`
 - Test: `packages/adapters/gmail/test/backfill.test.ts`
 
-**Interfaces:** Consumes: Task 7의 `CHANNEL`, `GmailAdapterDeps`. Produces: `backfill()`, `subscribe()` 구현, `GmailAdapterDeps.pubsubSubscription`(pull 대상 구독 이름).
+**Interfaces:** Consumes: Task 7's `CHANNEL`, `GmailAdapterDeps`. Produces: a `backfill()` and `subscribe()` implementation, and `GmailAdapterDeps.pubsubSubscription` (the name of the subscription to pull from).
 
-읽을 스펙: A1 §2.2(`users.watch()`→Pub/Sub 토픽→**pull** subscription, 7일 만료, `history.list` diff, backfill 최근 30일).
+Spec to read: A1 §2.2 (`users.watch()`→Pub/Sub topic→**pull** subscription, 7-day expiry, `history.list` diff, backfill covering the last 30 days).
 
-- [ ] 1. 실패하는 테스트를 작성한다: `packages/adapters/gmail/test/backfill.test.ts`(mock Gmail client 주입)
+- [ ] 1. Write the failing test: `packages/adapters/gmail/test/backfill.test.ts` (inject a mock Gmail client)
 
   ```ts
   import { describe, expect, it, vi } from "vitest";
@@ -1367,15 +1367,15 @@
   });
   ```
 
-- [ ] 2. 테스트를 실행해 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/adapter-gmail test
   ```
 
-  예상 실패: `AdapterError: backfill not implemented until Task 8`.
+  Expected failure: `AdapterError: backfill not implemented until Task 8`.
 
-- [ ] 3. `GmailAdapterDeps`에 `gmailClient`/`pubsubClient`를 추가하고 `backfill`/`subscribe`를 구현한다. `src/index.ts` 상단 import에 `import type { gmail_v1, pubsub_v1 } from "googleapis";`를 추가하고, `GmailAdapterDeps`를 아래로 교체한다.
+- [ ] 3. Add `gmailClient`/`pubsubClient` to `GmailAdapterDeps` and implement `backfill`/`subscribe`. Add `import type { gmail_v1, pubsub_v1 } from "googleapis";` to the top-level imports of `src/index.ts`, and replace `GmailAdapterDeps` with the following.
 
   ```ts
   export interface GmailAdapterDeps {
@@ -1389,7 +1389,7 @@
   }
   ```
 
-  `backfill`/`subscribe` 스텁을 아래로 교체한다.
+  Replace the `backfill`/`subscribe` stubs with the following.
 
   ```ts
       async *backfill(since?: Date): AsyncIterable<NormalizedItem> {
@@ -1448,7 +1448,7 @@
       },
   ```
 
-- [ ] 4. `normalize`/`mapApiError`가 아직 없으므로(Task 9에서 완성) 파일 끝에 임시 스텁을 추가해 컴파일을 통과시킨다.
+- [ ] 4. `normalize`/`mapApiError` do not exist yet (completed in Task 9), so add temporary stubs at the end of the file to make it compile.
 
   ```ts
   export function normalize(raw: unknown): NormalizedItem[] {
@@ -1480,28 +1480,28 @@
   }
   ```
 
-  이 스텁의 `subject`는 `NormalizedItem` 스키마에 없는 필드다 — Task 9가 `subject`를 빼고 `body`에 합쳐 스키마를 맞춘다(지금은 `as unknown as NormalizedItem[]`로 타입만 우회해 컴파일과 이 태스크의 테스트를 통과시킨다).
+  The `subject` in this stub is a field that does not exist in the `NormalizedItem` schema — Task 9 drops `subject` and merges it into `body` to match the schema (for now, `as unknown as NormalizedItem[]` bypasses the type only, so compilation and this task's tests pass).
 
-- [ ] 5. 테스트를 실행해 통과를 확인한다.
+- [ ] 5. Run the test and confirm it passes.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/adapter-gmail test
   ```
 
-  예상 출력: `Tests  2 passed (2)`.
+  Expected output: `Tests  2 passed (2)`.
 
-- [ ] 6. 커밋한다.
+- [ ] 6. Commit.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
   git add packages/adapters/gmail
   git commit -m "$(cat <<'EOF'
-  US-A13: Gmail backfill()(messages.list 페이지네이션) + subscribe()(Pub/Sub pull)
+  US-A13: Gmail backfill() (messages.list pagination) + subscribe() (Pub/Sub pull)
 
   - backfill(): messages.list → messages.get(format=full) → normalize()
-  - subscribe(): projects.subscriptions.pull → 새 메시지 조회 → ack (A1 §2.2)
+  - subscribe(): projects.subscriptions.pull → fetch new messages → ack (A1 §2.2)
   - mapApiError(): HTTP 429→retryable_rate_limit, 401→auth_expired
-  - normalize()는 이 태스크에서 임시 스텁(Task 9가 스키마에 맞게 완성)
+  - normalize() is a temporary stub in this task (Task 9 completes it to match the schema)
 
   Co-Authored-By: Claude Sonnet <noreply@anthropic.com>
   EOF
@@ -1510,17 +1510,17 @@
 
 ---
 
-### Task 9: Gmail 어댑터 — normalize() 스키마 정합 + send()/markRead()/archive() mock (US-A13, tier: Sonnet)
+### Task 9: Gmail adapter — normalize() schema conformance + send()/markRead()/archive() mock (US-A13, tier: Sonnet)
 
 **Files:**
 - Modify: `packages/adapters/gmail/src/index.ts`
 - Test: `packages/adapters/gmail/test/normalize.test.ts`, `packages/adapters/gmail/test/send.test.ts`
 
-**Interfaces:** Consumes: Task 3의 `NormalizedItem`(zod 스키마 — `subject`는 필드로 없으므로 본문에 흡수). Produces: `normalize()` 완성판(스키마와 정확히 일치), `createGmailAdapter().send`/`.markRead`/`.archive`.
+**Interfaces:** Consumes: Task 3's `NormalizedItem` (the zod schema — `subject` is not a field, so it is absorbed into the body). Produces: the completed `normalize()` (matching the schema exactly), `createGmailAdapter().send`/`.markRead`/`.archive`.
 
-읽을 스펙: A1 §2.2 thread/ID 매핑(`threadId`, `messages.id`, `sourceHash`=`Message-Id`), write-back(send/markRead/archive 셋 다 지원, 단 이 플랜은 **send는 mock sink만**).
+Spec to read: A1 §2.2 thread/ID mapping (`threadId`, `messages.id`, `sourceHash`=`Message-Id`), write-back (send/markRead/archive are all supported, but this plan makes **send use only a mock sink**).
 
-- [ ] 1. 실패하는 테스트를 작성한다: `packages/adapters/gmail/test/normalize.test.ts`
+- [ ] 1. Write the failing test: `packages/adapters/gmail/test/normalize.test.ts`
 
   ```ts
   import { describe, expect, it } from "vitest";
@@ -1555,15 +1555,15 @@
   });
   ```
 
-- [ ] 2. 테스트를 실행해 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/adapter-gmail test
   ```
 
-  예상 실패: `sentAt`이 `new Date().toISOString()`(현재 시각)이라 `"2023-11-14T22:13:20.000Z"`와 불일치.
+  Expected failure: `sentAt` is `new Date().toISOString()` (the current time), so it does not match `"2023-11-14T22:13:20.000Z"`.
 
-- [ ] 3. `src/index.ts`의 `normalize` 스텁을 아래로 교체한다(Date 헤더 파싱 + subject를 body에 흡수).
+- [ ] 3. Replace the `normalize` stub in `src/index.ts` with the following (parse the Date header + absorb subject into body).
 
   ```ts
   function decodeGmailBody(data: string | undefined): string {
@@ -1601,9 +1601,9 @@
   }
   ```
 
-  (기존 `normalize`를 이걸로 완전히 교체 — `as unknown as NormalizedItem[]` 캐스팅을 제거한다.)
+  (Fully replace the existing `normalize` with this — removing the `as unknown as NormalizedItem[]` cast.)
 
-- [ ] 4. `send`/`markRead`/`archive` 스텁을 mock sink 버전으로 교체한다. `GmailAdapterDeps`에 `sink` 필드를 추가한다.
+- [ ] 4. Replace the `send`/`markRead`/`archive` stubs with the mock sink versions. Add a `sink` field to `GmailAdapterDeps`.
 
   ```ts
   export interface GmailAdapterDeps {
@@ -1619,7 +1619,7 @@
   ```
 
   ```ts
-      // 승인 게이트(US-A07) 전까지 실제 messages.send는 호출하지 않는다.
+      // Do not call the real messages.send before the approval gate (US-A07).
       async send(thread: ThreadRef, draft: Outbound): Promise<SendResult> {
         const sink = deps.sink ?? (async (): Promise<SendResult> => ({
           externalId: `mock-${now().getTime()}`, sentAt: now().toISOString(),
@@ -1650,9 +1650,9 @@
       },
   ```
 
-  상단 import에 `import type { Outbound, SendResult, ThreadRef } from "@omnis/protocol";`를 추가한다.
+  Add `import type { Outbound, SendResult, ThreadRef } from "@omnis/protocol";` to the top-level imports.
 
-- [ ] 5. `send()`가 mock sink만 호출함을 검증하는 테스트를 추가한다: `packages/adapters/gmail/test/send.test.ts`
+- [ ] 5. Add a test verifying that `send()` calls only the mock sink: `packages/adapters/gmail/test/send.test.ts`
 
   ```ts
   import { describe, expect, it, vi } from "vitest";
@@ -1679,25 +1679,25 @@
   });
   ```
 
-- [ ] 6. 테스트를 실행해 전부 통과를 확인한다.
+- [ ] 6. Run the test and confirm everything passes.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/adapter-gmail test
   ```
 
-  예상 출력: `Tests  4 passed (4)`.
+  Expected output: `Tests  4 passed (4)`.
 
-- [ ] 7. 커밋한다.
+- [ ] 7. Commit.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
   git add packages/adapters/gmail
   git commit -m "$(cat <<'EOF'
-  US-A13: Gmail normalize() 스키마 정합 + send()/markRead()/archive()
+  US-A13: Gmail normalize() schema conformance + send()/markRead()/archive()
 
-  - normalize(): Message-Id→sourceHash, threadId→threadExternalId, Subject는 body에 흡수(NormalizedItem에 subject 필드 없음)
-  - send()는 mock sink만 호출(messages.send 미배선, 승인 게이트 대기)
-  - markRead()는 UNREAD 라벨 제거, archive()는 INBOX 라벨 제거(둘 다 실제 API 호출 — 읽음/보관은 비가역 전송이 아님)
+  - normalize(): Message-Id→sourceHash, threadId→threadExternalId, Subject is absorbed into body (NormalizedItem has no subject field)
+  - send() calls only the mock sink (messages.send not wired; waiting on the approval gate)
+  - markRead() removes the UNREAD label, archive() removes the INBOX label (both really call the API — reading/archiving is not an irreversible send)
 
   Co-Authored-By: Claude Sonnet <noreply@anthropic.com>
   EOF
@@ -1706,20 +1706,20 @@
 
 ---
 
-### Task 10: Google Calendar 어댑터 — 패키지 스캐폴드 + connect() + syncToken subscribe() (US-A14, tier: Sonnet)
+### Task 10: Google Calendar adapter — package scaffold + connect() + syncToken subscribe() (US-A14, tier: Sonnet)
 
-**US-A14 산출물(A7 §7):** `packages/adapters/google-calendar/src/index.ts`. **검증 명령:** `pnpm --filter @omnis/adapter-google-calendar test`. **목표:** Google Calendar 어댑터(`events.list`+syncToken 폴링).
+**US-A14 deliverable (A7 §7):** `packages/adapters/google-calendar/src/index.ts`. **Verification command:** `pnpm --filter @omnis/adapter-google-calendar test`. **Goal:** Google Calendar adapter (`events.list` + syncToken polling).
 
 **Files:**
 - Create: `packages/adapters/google-calendar/package.json`, `packages/adapters/google-calendar/tsconfig.json`, `packages/adapters/google-calendar/vitest.config.ts`
 - Create: `packages/adapters/google-calendar/src/keychain.ts`, `packages/adapters/google-calendar/src/index.ts`
 - Test: `packages/adapters/google-calendar/test/capabilities.test.ts`, `packages/adapters/google-calendar/test/subscribe.test.ts`
 
-**Interfaces:** Consumes: `@omnis/protocol`의 `Adapter`/`AuthRef`/`AdapterError`/`Capabilities`/`Health`(Task 3). Produces: `CHANNEL`(`"gcal"` — interfaces.md §1 "디렉터리명 `google-calendar` ≠ `accounts.channel` 값 `gcal`"), `createGoogleCalendarAdapter(deps?): Adapter`.
+**Interfaces:** Consumes: `Adapter`/`AuthRef`/`AdapterError`/`Capabilities`/`Health` from `@omnis/protocol` (Task 3). Produces: `CHANNEL` (`"gcal"` — interfaces.md §1 "directory name `google-calendar` ≠ the `accounts.channel` value `gcal`"), `createGoogleCalendarAdapter(deps?): Adapter`.
 
-읽을 스펙: A1 §2.3(Gmail과 같은 Cloud 프로젝트·client 재사용, `events.list`+syncToken 1~5분 폴링, write는 승인 후에만). **디렉터리명과 채널 값이 다르다는 점(interfaces.md §1)을 반드시 지킨다.** **Keychain(interfaces.md §9, FIXED)**: 별도 항목을 만들지 않고 Gmail과 같은 `omnis.gmail.<email>`을 재사용한다(`channel:"gcal"`이면서 `keychainService`만 같다) — Task 7이 만든 `omnis.gmail.<email>` 1항목을 그대로 넘겨받는다는 뜻이며, `AuthRef.channel`이 `"gcal"`이어도 keychainService는 바뀌지 않는다.
+Spec to read: A1 §2.3 (reuses the same Cloud project and client as Gmail, `events.list` + syncToken polling every 1~5 minutes, write only after approval). **Be sure to honor the fact that the directory name and the channel value differ (interfaces.md §1).** **Keychain (interfaces.md §9, FIXED)**: do not create a separate item; reuse the same `omnis.gmail.<email>` as Gmail (`channel:"gcal"` while only `keychainService` is the same) — this means accepting the single `omnis.gmail.<email>` item created by Task 7 as-is, and keychainService does not change even when `AuthRef.channel` is `"gcal"`.
 
-- [ ] 1. 패키지 스캐폴드를 만든다.
+- [ ] 1. Create the package scaffold.
 
   ```bash
   mkdir -p /Users/logankim/AI-Workspaces/omnis/packages/adapters/google-calendar/src
@@ -1760,7 +1760,7 @@
      /Users/logankim/AI-Workspaces/omnis/packages/adapters/google-calendar/src/keychain.ts
   ```
 
-- [ ] 2. 실패하는 테스트를 작성한다: `packages/adapters/google-calendar/test/capabilities.test.ts`
+- [ ] 2. Write the failing test: `packages/adapters/google-calendar/test/capabilities.test.ts`
 
   ```ts
   import { describe, expect, it } from "vitest";
@@ -1782,15 +1782,15 @@
   });
   ```
 
-- [ ] 3. 테스트를 실행해 실패를 확인한다.
+- [ ] 3. Run the test and confirm it fails.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm install && pnpm --filter @omnis/adapter-google-calendar test
   ```
 
-  예상 실패: `Cannot find module '../src/index.js'`.
+  Expected failure: `Cannot find module '../src/index.js'`.
 
-- [ ] 4. `src/index.ts`를 작성한다: `capabilities()`/`connect()`(Gmail과 같은 Keychain 항목 재사용, A1 §2.3)/`disconnect()`/`health()`. `backfill`/`subscribe`/`send`는 스텁으로 둔다(Task 11이 채운다).
+- [ ] 4. Write `src/index.ts`: `capabilities()`/`connect()` (reusing the same Keychain item as Gmail, A1 §2.3)/`disconnect()`/`health()`. Leave `backfill`/`subscribe`/`send` as stubs (Task 11 fills them in).
 
   ```ts
   import { google } from "googleapis";
@@ -1830,8 +1830,8 @@
       capabilities: () => CAPABILITIES,
 
       async connect(auth: AuthRef): Promise<void> {
-        // A1 §2.3: Calendar는 Gmail과 같은 Cloud 프로젝트/client를 쓰므로
-        // auth.keychainService는 호출자가 omnis.gmail.<email>을 그대로 넘긴다(재사용).
+        // A1 §2.3: Calendar uses the same Cloud project/client as Gmail, so
+        // the caller passes omnis.gmail.<email> as auth.keychainService as-is (reuse).
         const refreshToken = await readKeychainSecret(auth.keychainService, auth.keychainAccount, CHANNEL);
         oauth = deps.oauthClient ?? new google.auth.OAuth2(deps.oauthClientId, deps.oauthClientSecret);
         oauth.setCredentials({ refresh_token: refreshToken });
@@ -1868,15 +1868,15 @@
   }
   ```
 
-- [ ] 5. 테스트를 실행해 `capabilities`/`CHANNEL` 검증 2개가 통과함을 확인한다.
+- [ ] 5. Run the test and confirm the 2 `capabilities`/`CHANNEL` checks pass.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/adapter-google-calendar test
   ```
 
-  예상 출력: `Tests  2 passed (2)`.
+  Expected output: `Tests  2 passed (2)`.
 
-- [ ] 6. `subscribe()`의 syncToken 폴링 루프를 검증하는 실패하는 테스트를 작성한다: `packages/adapters/google-calendar/test/subscribe.test.ts`
+- [ ] 6. Write a failing test that verifies the `subscribe()` syncToken polling loop: `packages/adapters/google-calendar/test/subscribe.test.ts`
 
   ```ts
   import { describe, expect, it, vi } from "vitest";
@@ -1917,15 +1917,15 @@
   });
   ```
 
-- [ ] 7. 테스트를 실행해 실패를 확인한다.
+- [ ] 7. Run the test and confirm it fails.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/adapter-google-calendar test
   ```
 
-  예상 실패: `AdapterError: subscribe not implemented until this task's next step`.
+  Expected failure: `AdapterError: subscribe not implemented until this task's next step`.
 
-- [ ] 8. `subscribe()` 스텁을 syncToken 폴링 구현으로 교체한다(A1 §2.3: `events.list` + `syncToken`, 만료(410) 시 풀 재동기화, 1~5분 간격 — 테스트에서는 `pollIntervalMs: 0`으로 즉시 재폴링).
+- [ ] 8. Replace the `subscribe()` stub with the syncToken polling implementation (A1 §2.3: `events.list` + `syncToken`, full resync on expiry (410), every 1~5 minutes — in the test, `pollIntervalMs: 0` repolls immediately).
 
   ```ts
       subscribe(): AsyncIterable<NormalizedItem | AdapterEvent> {
@@ -1957,7 +1957,7 @@
       },
   ```
 
-  `normalize`가 아직 없으므로(Task 11) 파일 끝에 임시 스텁을 추가한다.
+  `normalize` does not exist yet (Task 11), so add a temporary stub at the end of the file.
 
   ```ts
   export function normalize(raw: unknown): NormalizedItem[] {
@@ -1971,27 +1971,27 @@
   }
   ```
 
-- [ ] 9. 테스트를 실행해 통과를 확인한다.
+- [ ] 9. Run the test and confirm it passes.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/adapter-google-calendar test
   ```
 
-  예상 출력: `Tests  3 passed (3)`.
+  Expected output: `Tests  3 passed (3)`.
 
-- [ ] 10. 커밋한다.
+- [ ] 10. Commit.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
   git add packages/adapters/google-calendar
   git commit -m "$(cat <<'EOF'
-  US-A14: Google Calendar 어댑터 스캐폴드 + connect() + syncToken polling subscribe()
+  US-A14: Google Calendar adapter scaffold + connect() + syncToken polling subscribe()
 
-  - CHANNEL='gcal' (디렉터리명 google-calendar와 다름, interfaces.md §1 명시)
-  - connect(): Gmail과 같은 Cloud 프로젝트 client 재사용(A1 §2.3), Keychain 항목도 호출자가 omnis.gmail.<email>을 넘김
-  - subscribe(): events.list + syncToken 폴링, 410 Gone이면 syncToken을 버리고 풀 재동기화
-  - capabilities(): realtime=false(폴링), write=true지만 승인 후에만(A1 §3 R/W(hold))
-  - backfill()/send()는 아직 fatal_unsupported(Task 11)
+  - CHANNEL='gcal' (differs from the directory name google-calendar; stated in interfaces.md §1)
+  - connect(): reuses the same Cloud project client as Gmail (A1 §2.3); the caller also passes omnis.gmail.<email> as the Keychain item
+  - subscribe(): events.list + syncToken polling; on 410 Gone, discard the syncToken and do a full resync
+  - capabilities(): realtime=false (polling), write=true but only after approval (A1 §3 R/W(hold))
+  - backfill()/send() are still fatal_unsupported (Task 11)
 
   Co-Authored-By: Claude Sonnet <noreply@anthropic.com>
   EOF
@@ -2000,17 +2000,17 @@
 
 ---
 
-### Task 11: Google Calendar 어댑터 — backfill() + normalize() 완성 + send() mock (US-A14, tier: Sonnet)
+### Task 11: Google Calendar adapter — complete backfill() + normalize() + send() mock (US-A14, tier: Sonnet)
 
 **Files:**
 - Modify: `packages/adapters/google-calendar/src/index.ts`
 - Test: `packages/adapters/google-calendar/test/normalize.test.ts`, `packages/adapters/google-calendar/test/backfill.test.ts`
 
-**Interfaces:** Consumes: Task 3의 `NormalizedItem`(zod), `ThreadRef`/`Outbound`/`SendResult`. Produces: `normalize()` 완성판, `backfill()` 구현, `createGoogleCalendarAdapter().send`(mock sink).
+**Interfaces:** Consumes: Task 3's `NormalizedItem` (zod), `ThreadRef`/`Outbound`/`SendResult`. Produces: the completed `normalize()`, a `backfill()` implementation, `createGoogleCalendarAdapter().send` (mock sink).
 
-읽을 스펙: A1 §2.3 backfill(`events.list`, `timeMin`=이번 분기 시작, `timeMax`=+90일), thread/ID 매핑(`kind="calendar"`, `externalId`=event id). **미해결 사항(§14 self-review에서 open question으로 재기록)**: A3 §2.1(이 플랜의 필수 읽기 범위 밖)의 `calendar_events` 상세 테이블은 `attendees`/`end_at`/`recurrence` 같은 필드가 필요한데 `NormalizedItem`에는 그런 필드가 없다 — 이 태스크는 `NormalizedItem`만 만든다(A1 §1.2 계약 그대로), 그 detail 테이블을 누가 무엇으로 채우는지는 이 플랜 범위 밖이다.
+Spec to read: A1 §2.3 backfill (`events.list`, `timeMin`=start of this quarter, `timeMax`=+90 days), thread/ID mapping (`kind="calendar"`, `externalId`=event id). **Open item (re-recorded as an open question in the §14 self-review)**: the `calendar_events` detail table in A3 §2.1 (outside this plan's required reading range) needs fields such as `attendees`/`end_at`/`recurrence`, but `NormalizedItem` has no such fields — this task creates only `NormalizedItem` (exactly as in the A1 §1.2 contract), and who fills that detail table with what is outside this plan's scope.
 
-- [ ] 1. 실패하는 테스트를 작성한다: `packages/adapters/google-calendar/test/normalize.test.ts`
+- [ ] 1. Write the failing test: `packages/adapters/google-calendar/test/normalize.test.ts`
 
   ```ts
   import { describe, expect, it } from "vitest";
@@ -2041,15 +2041,15 @@
   });
   ```
 
-- [ ] 2. 테스트를 실행해 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/adapter-google-calendar test
   ```
 
-  예상 실패: `threadMeta`가 `undefined`(Task 10 스텁은 `threadMeta`를 채우지 않음).
+  Expected failure: `threadMeta` is `undefined` (the Task 10 stub does not populate `threadMeta`).
 
-- [ ] 3. `src/index.ts`의 `normalize` 스텁을 아래로 교체한다.
+- [ ] 3. Replace the `normalize` stub in `src/index.ts` with the following.
 
   ```ts
   interface GCalEvent {
@@ -2083,7 +2083,7 @@
   }
   ```
 
-- [ ] 4. `backfill`을 구현하고 `send`/`markRead`를 mock sink 버전으로 교체한다. `GoogleCalendarAdapterDeps`에 `sink` 필드를 추가한다.
+- [ ] 4. Implement `backfill` and replace `send`/`markRead` with the mock sink versions. Add a `sink` field to `GoogleCalendarAdapterDeps`.
 
   ```ts
   export interface GoogleCalendarAdapterDeps {
@@ -2122,7 +2122,7 @@
   ```
 
   ```ts
-      // 승인 게이트(US-A07) 전까지 events.insert/update는 절대 호출하지 않는다(A1 §2.3 "항상 pending_approvals를 거쳐").
+      // Never call events.insert/update before the approval gate (US-A07) (A1 §2.3 "always through pending_approvals").
       async send(thread: ThreadRef, draft: Outbound): Promise<SendResult> {
         const sink = deps.sink ?? (async (): Promise<SendResult> => ({
           externalId: `mock-${now().getTime()}`, sentAt: now().toISOString(),
@@ -2131,9 +2131,9 @@
       },
   ```
 
-  상단 import에 `import type { Outbound, SendResult, ThreadRef } from "@omnis/protocol";`를 추가한다.
+  Add `import type { Outbound, SendResult, ThreadRef } from "@omnis/protocol";` to the top-level imports.
 
-- [ ] 5. `send()`가 mock sink만 호출함을 검증하는 테스트를 추가한다: `packages/adapters/google-calendar/test/backfill.test.ts`에 이어서 작성(같은 파일, `describe` 블록 추가)
+- [ ] 5. Add a test verifying that `send()` calls only the mock sink: append it to `packages/adapters/google-calendar/test/backfill.test.ts` (same file, add a `describe` block)
 
   ```ts
   import { describe, expect, it, vi } from "vitest";
@@ -2176,25 +2176,25 @@
   });
   ```
 
-- [ ] 6. 테스트를 실행해 전부 통과를 확인한다.
+- [ ] 6. Run the test and confirm everything passes.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/adapter-google-calendar test
   ```
 
-  예상 출력: `Tests  7 passed (7)`(Task 10의 3개 + 이 태스크의 normalize 2개 + backfill/send 2개).
+  Expected output: `Tests  7 passed (7)` (Task 10's 3 + this task's 2 normalize + 2 backfill/send).
 
-- [ ] 7. 커밋한다.
+- [ ] 7. Commit.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
   git add packages/adapters/google-calendar
   git commit -m "$(cat <<'EOF'
-  US-A14: Google Calendar normalize() 완성(threadMeta) + backfill() + send() mock
+  US-A14: complete Google Calendar normalize() (threadMeta) + backfill() + send() mock
 
-  - normalize(): threadMeta.kind='calendar', attendees를 participants로 매핑, cancelled면 archivedAt 채움
-  - backfill(): timeMin=이번 분기 시작, timeMax=+90일(A1 §2.3)
-  - send()는 mock sink만 호출 — events.insert/update는 승인 게이트(US-A07) 전까지 미배선
+  - normalize(): threadMeta.kind='calendar', maps attendees to participants, fills archivedAt when cancelled
+  - backfill(): timeMin=start of this quarter, timeMax=+90 days (A1 §2.3)
+  - send() calls only the mock sink — events.insert/update not wired before the approval gate (US-A07)
 
   Co-Authored-By: Claude Sonnet <noreply@anthropic.com>
   EOF
@@ -2203,18 +2203,18 @@
 
 ---
 
-### Task 12: Slack fixture 세트 (US-A15, tier: DeepSeek, 리뷰 Sonnet+)
+### Task 12: Slack fixture set (US-A15, tier: DeepSeek, review Sonnet+)
 
-**US-A15 산출물(A7 §7):** `*/test/contract.test.ts`(3종). **검증 명령:** `pnpm test:contract`. **목표:** 어댑터 계약 테스트 3종(fixture 재생, A12~A14 각각).
+**US-A15 deliverable (A7 §7):** `*/test/contract.test.ts` (3 kinds). **Verification command:** `pnpm test:contract`. **Goal:** the three adapter contract tests (fixture replay, one each for A12~A14).
 
 **Files:**
 - Create: `packages/adapters/slack/fixtures/text_message.json`, `thread_reply.json`, `attachment.json`, `edited_message.json`, `deleted_message.json`, `rate_limited_response.json`, `auth_error_response.json`
 
-**Interfaces:** Consumes: Task 6의 `normalize(raw)`/`mapApiError(raw)`의 실제 동작(fixture의 `expected`는 그 함수들이 실제로 반환/throw하는 값과 바이트 단위로 같아야 한다). Produces: fixture JSON 7개(interfaces.md §9 최소 시나리오 + Slack 전용 `edited_message`/`deleted_message`).
+**Interfaces:** Consumes: the actual behavior of Task 6's `normalize(raw)`/`mapApiError(raw)` (the fixture `expected` must be byte-for-byte identical to what those functions actually return/throw). Produces: 7 fixture JSON files (interfaces.md §9 minimal scenarios + Slack-only `edited_message`/`deleted_message`).
 
-Slack은 edit/delete를 지원하는 채널이라 A1 §1.7이 두 시나리오를 추가로 요구한다. `edited_message`/`deleted_message`는 Slack Events API에서 `subtype: "message_changed"`/`"message_deleted"`로 온다 — 현재 `normalize()`(Task 6)는 일반 `message` 이벤트만 처리하므로 이 두 fixture의 `expected.items`는 빈 배열이다(서브타입 처리는 Phase A 범위 밖, YAGNI — v1 인박스는 편집을 별도 UI로 반영하지 않는다, A1에 그런 요구가 없다).
+Slack is a channel that supports edit/delete, so A1 §1.7 requires two additional scenarios. `edited_message`/`deleted_message` arrive from the Slack Events API as `subtype: "message_changed"`/`"message_deleted"` — the current `normalize()` (Task 6) handles only plain `message` events, so `expected.items` for these two fixtures is an empty array (subtype handling is outside Phase A scope, YAGNI — the v1 inbox does not surface edits in a separate UI, and A1 has no such requirement).
 
-- [ ] 1. `text_message.json`을 만든다.
+- [ ] 1. Create `text_message.json`.
 
   ```json
   {
@@ -2234,7 +2234,7 @@ Slack은 edit/delete를 지원하는 채널이라 A1 §1.7이 두 시나리오�
   }
   ```
 
-- [ ] 2. `thread_reply.json`을 만든다.
+- [ ] 2. Create `thread_reply.json`.
 
   ```json
   {
@@ -2254,7 +2254,7 @@ Slack은 edit/delete를 지원하는 채널이라 A1 §1.7이 두 시나리오�
   }
   ```
 
-- [ ] 3. `attachment.json`을 만든다.
+- [ ] 3. Create `attachment.json`.
 
   ```json
   {
@@ -2275,7 +2275,7 @@ Slack은 edit/delete를 지원하는 채널이라 A1 §1.7이 두 시나리오�
   }
   ```
 
-- [ ] 4. `edited_message.json`과 `deleted_message.json`을 만든다(Phase A는 서브타입을 처리하지 않으므로 `expected.items`는 `[]`).
+- [ ] 4. Create `edited_message.json` and `deleted_message.json` (Phase A does not handle subtypes, so `expected.items` is `[]`).
 
   ```bash
   cat > /Users/logankim/AI-Workspaces/omnis/packages/adapters/slack/fixtures/edited_message.json <<'EOF'
@@ -2300,7 +2300,7 @@ Slack은 edit/delete를 지원하는 채널이라 A1 §1.7이 두 시나리오�
   EOF
   ```
 
-- [ ] 5. `rate_limited_response.json`과 `auth_error_response.json`을 만든다(`normalize`가 아니라 Task 6의 `mapApiError`가 검증 대상 — `expected.errorKind`를 쓴다, Task 15의 harness가 이 필드를 읽는다).
+- [ ] 5. Create `rate_limited_response.json` and `auth_error_response.json` (the verification target is Task 6's `mapApiError`, not `normalize` — these use `expected.errorKind`, and the Task 15 harness reads this field).
 
   ```bash
   cat > /Users/logankim/AI-Workspaces/omnis/packages/adapters/slack/fixtures/rate_limited_response.json <<'EOF'
@@ -2319,7 +2319,7 @@ Slack은 edit/delete를 지원하는 채널이라 A1 §1.7이 두 시나리오�
   EOF
   ```
 
-- [ ] 6. 7개 파일이 모두 유효한 JSON인지 확인한다.
+- [ ] 6. Verify that all 7 files are valid JSON.
 
   ```bash
   for f in /Users/logankim/AI-Workspaces/omnis/packages/adapters/slack/fixtures/*.json; do
@@ -2327,19 +2327,19 @@ Slack은 edit/delete를 지원하는 채널이라 A1 §1.7이 두 시나리오�
   done
   ```
 
-  예상 출력: 7줄 모두 `OK`.
+  Expected output: all 7 lines print `OK`.
 
-- [ ] 7. 커밋한다.
+- [ ] 7. Commit.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
   git add packages/adapters/slack/fixtures
   git commit -m "$(cat <<'EOF'
-  US-A15: Slack fixture 세트 7종(text_message/thread_reply/attachment/edited/deleted/rate_limited/auth_error)
+  US-A15: Slack fixture set of 7 (text_message/thread_reply/attachment/edited/deleted/rate_limited/auth_error)
 
-  - text_message/thread_reply/attachment는 Task 6 normalize()의 실제 출력과 바이트 단위로 일치
-  - edited_message/deleted_message는 expected.items=[](Phase A는 서브타입 미처리, YAGNI)
-  - rate_limited_response/auth_error_response는 expected.errorKind로 mapApiError() 매핑을 검증(Task 15 harness)
+  - text_message/thread_reply/attachment match Task 6 normalize() output byte for byte
+  - edited_message/deleted_message have expected.items=[] (Phase A does not handle subtypes, YAGNI)
+  - rate_limited_response/auth_error_response verify mapApiError() mapping through expected.errorKind (Task 15 harness)
 
   Co-Authored-By: DeepSeek V4.1 Flash <noreply@deepseek.com>
   EOF
@@ -2348,14 +2348,14 @@ Slack은 edit/delete를 지원하는 채널이라 A1 §1.7이 두 시나리오�
 
 ---
 
-### Task 13: Gmail fixture 세트 (US-A15, tier: DeepSeek, 리뷰 Sonnet+)
+### Task 13: Gmail fixture set (US-A15, tier: DeepSeek, review Sonnet+)
 
 **Files:**
 - Create: `packages/adapters/gmail/fixtures/text_message.json`, `thread_reply.json`, `attachment.json`, `rate_limited_response.json`, `auth_error_response.json`
 
-**Interfaces:** Consumes: Task 9의 `normalize(raw)`/`mapApiError(cause)`. Produces: fixture JSON 5개.
+**Interfaces:** Consumes: Task 9's `normalize(raw)`/`mapApiError(cause)`. Produces: 5 fixture JSON files.
 
-- [ ] 1. `text_message.json`을 만든다(Gmail `users.messages.get` 리소스, Task 9와 동일 샘플).
+- [ ] 1. Create `text_message.json` (a Gmail `users.messages.get` resource, the same sample as Task 9).
 
   ```json
   {
@@ -2385,7 +2385,7 @@ Slack은 edit/delete를 지원하는 채널이라 A1 §1.7이 두 시나리오�
   }
   ```
 
-- [ ] 2. `thread_reply.json`을 만든다(같은 `threadId`, 새 `id`/`Message-Id`, `In-Reply-To` 헤더 추가 — 정규화 로직은 헤더를 안 쓰므로 결과는 독립 item).
+- [ ] 2. Create `thread_reply.json` (same `threadId`, new `id`/`Message-Id`, plus an `In-Reply-To` header — the normalization logic does not use the header, so the result is an independent item).
 
   ```json
   {
@@ -2416,9 +2416,9 @@ Slack은 edit/delete를 지원하는 채널이라 A1 §1.7이 두 시나리오�
   }
   ```
 
-  `"U291bmRzIGdvb2Qu"`는 `"Sounds good."`의 base64url이다(`node -e "console.log(Buffer.from('Sounds good.').toString('base64url'))"`로 검증됨).
+  `"U291bmRzIGdvb2Qu"` is the base64url of `"Sounds good."` (verified with `node -e "console.log(Buffer.from('Sounds good.').toString('base64url'))"`).
 
-- [ ] 3. `attachment.json`을 만든다. `normalize()`(Task 9)는 아직 `payload.parts`의 첨부를 읽지 않으므로(YAGNI — Phase A는 본문 텍스트 정규화까지만, 첨부 다운로드는 A1 §2.2 "개별 다운로드"가 별도 경로라 Item 정규화와 독립) `expected.attachments`는 `[]`다.
+- [ ] 3. Create `attachment.json`. `normalize()` (Task 9) does not yet read attachments from `payload.parts` (YAGNI — Phase A normalizes body text only; attachment download is a separate path per A1 §2.2 "individual download" and is independent of Item normalization), so `expected.attachments` is `[]`.
 
   ```json
   {
@@ -2449,9 +2449,9 @@ Slack은 edit/delete를 지원하는 채널이라 A1 §1.7이 두 시나리오�
   }
   ```
 
-  주의: 이 fixture의 `payload.body.data`는 top-level `multipart/mixed` 메시지에서 보통 비어 있다(실제 본문은 `parts[0]`에 있다) — 하지만 Task 9의 `normalize()`는 `r.payload?.body?.data`만 읽으므로 이 fixture에서도 그 필드만 디코드해 `expected.body`를 맞춘다("See attached slides."를 넣지 않고 `body.data`를 비워 `body`가 `"Subject: PoC slides\n\n"`로 끝나게 설계했다). multipart 본문 파싱(`parts[]` 순회)은 Phase A 범위 밖 — 열어둔 질문으로 `open_questions`에 남긴다.
+  Note: the `payload.body.data` of this fixture is usually empty for a top-level `multipart/mixed` message (the real body is in `parts[0]`) — but Task 9's `normalize()` reads only `r.payload?.body?.data`, so this fixture also decodes only that field to match `expected.body` (it is designed so that `body.data` is left empty instead of holding "See attached slides.", making `body` end up as `"Subject: PoC slides\n\n"`). Multipart body parsing (iterating `parts[]`) is outside Phase A scope — it is recorded as an open question in `open_questions`.
 
-- [ ] 4. `rate_limited_response.json`과 `auth_error_response.json`을 만든다(Task 9의 `mapApiError(cause)`가 받는 googleapis 에러 shape).
+- [ ] 4. Create `rate_limited_response.json` and `auth_error_response.json` (the googleapis error shape that Task 9's `mapApiError(cause)` receives).
 
   ```bash
   cat > /Users/logankim/AI-Workspaces/omnis/packages/adapters/gmail/fixtures/rate_limited_response.json <<'EOF'
@@ -2470,7 +2470,7 @@ Slack은 edit/delete를 지원하는 채널이라 A1 §1.7이 두 시나리오�
   EOF
   ```
 
-- [ ] 5. 5개 파일이 모두 유효한 JSON인지 확인한다.
+- [ ] 5. Verify that all 5 files are valid JSON.
 
   ```bash
   for f in /Users/logankim/AI-Workspaces/omnis/packages/adapters/gmail/fixtures/*.json; do
@@ -2478,18 +2478,18 @@ Slack은 edit/delete를 지원하는 채널이라 A1 §1.7이 두 시나리오�
   done
   ```
 
-  예상 출력: 5줄 모두 `OK`.
+  Expected output: all 5 lines print `OK`.
 
-- [ ] 6. 커밋한다.
+- [ ] 6. Commit.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
   git add packages/adapters/gmail/fixtures
   git commit -m "$(cat <<'EOF'
-  US-A15: Gmail fixture 세트 5종(text_message/thread_reply/attachment/rate_limited/auth_error)
+  US-A15: Gmail fixture set of 5 (text_message/thread_reply/attachment/rate_limited/auth_error)
 
-  - attachment 시나리오는 parts[] 첨부 파싱이 Phase A 범위 밖임을 명시(open question)
-  - rate_limited/auth_error는 googleapis 에러 shape({code,message})으로 mapApiError()를 검증
+  - the attachment scenario documents that parts[] attachment parsing is outside Phase A scope (open question)
+  - rate_limited/auth_error verify mapApiError() against the googleapis error shape ({code,message})
 
   Co-Authored-By: DeepSeek V4.1 Flash <noreply@deepseek.com>
   EOF
@@ -2498,16 +2498,16 @@ Slack은 edit/delete를 지원하는 채널이라 A1 §1.7이 두 시나리오�
 
 ---
 
-### Task 14: Google Calendar fixture 세트 (US-A15, tier: DeepSeek, 리뷰 Sonnet+)
+### Task 14: Google Calendar fixture set (US-A15, tier: DeepSeek, review Sonnet+)
 
 **Files:**
 - Create: `packages/adapters/google-calendar/fixtures/text_message.json`, `thread_reply.json`, `attachment.json`, `rate_limited_response.json`, `auth_error_response.json`
 
-**Interfaces:** Consumes: Task 11의 `normalize(raw)`. Produces: fixture JSON 5개.
+**Interfaces:** Consumes: Task 11's `normalize(raw)`. Produces: 5 fixture JSON files.
 
-Calendar에는 "메시지"/"스레드 답글" 개념이 없으므로 interfaces.md §9의 범용 시나리오 이름을 이벤트 의미로 맞춰 채운다: `text_message`=단일 확정 이벤트, `thread_reply`=참석자가 응답한 반복 인스턴스(같은 요일 다음 회차), `attachment`=Drive 링크 첨부가 있는 이벤트.
+Calendar has no concept of a "message"/"thread reply", so the generic scenario names from interfaces.md §9 are filled in with event semantics: `text_message`=a single confirmed event, `thread_reply`=a recurring instance the attendee responded to (the next occurrence on the same weekday), `attachment`=an event with a Drive link attachment.
 
-- [ ] 1. `text_message.json`을 만든다(Task 11 샘플과 동일한 단일 확정 이벤트).
+- [ ] 1. Create `text_message.json` (the same single confirmed event as the Task 11 sample).
 
   ```json
   {
@@ -2533,7 +2533,7 @@ Calendar에는 "메시지"/"스레드 답글" 개념이 없으므로 interfaces.
   }
   ```
 
-- [ ] 2. `thread_reply.json`을 만든다(다음 주 같은 반복 인스턴스 — 별도 event id이므로 별도 thread로 정규화된다, Calendar는 A1 §2.3상 event 단위가 곧 thread다).
+- [ ] 2. Create `thread_reply.json` (the same recurring instance the following week — a separate event id, so it normalizes to a separate thread; for Calendar, per A1 §2.3, the event unit is the thread).
 
   ```json
   {
@@ -2559,7 +2559,7 @@ Calendar에는 "메시지"/"스레드 답글" 개념이 없으므로 interfaces.
   }
   ```
 
-- [ ] 3. `attachment.json`을 만든다(Drive 링크 첨부 — A1 §2.3 "URL 그대로 보존, 별도 다운로드 안 함". `normalize()`는 Task 11 기준 `attachments`를 만들지 않으므로 `[]`).
+- [ ] 3. Create `attachment.json` (a Drive link attachment — A1 §2.3 "preserve the URL as-is, do not download separately". As of Task 11 `normalize()` does not create `attachments`, so `[]`).
 
   ```json
   {
@@ -2585,7 +2585,7 @@ Calendar에는 "메시지"/"스레드 답글" 개념이 없으므로 interfaces.
   }
   ```
 
-- [ ] 4. `rate_limited_response.json`과 `auth_error_response.json`을 만든다. Task 11까지는 `mapApiError`를 별도 export하지 않았으므로(backfill/subscribe 안에서 인라인으로 `AdapterError`를 던진다) 이 두 fixture는 `normalize()`가 아니라 **backfill()이 `events.list` 실패를 어떻게 매핑하는지**를 문서화하는 참고 자료로 남기고, `expected.errorKind`는 Task 10에서 이미 구현된 `subscribe()`의 410 처리와 짝을 맞춘 값을 적는다 — Task 15가 이 두 fixture용 계약 테스트에서 `subscribe()`용 `events.list` mock을 410으로 응답시켜 검증한다.
+- [ ] 4. Create `rate_limited_response.json` and `auth_error_response.json`. Up through Task 11 no separate `mapApiError` was exported (an `AdapterError` is thrown inline inside backfill/subscribe), so these two fixtures stay as reference material documenting **how backfill() maps an `events.list` failure** rather than anything `normalize()` does, and `expected.errorKind` records the value paired with the 410 handling of `subscribe()` already implemented in Task 10 — in the contract test for these two fixtures, Task 15 verifies them by making the `events.list` mock used by `subscribe()` respond with 410.
 
   ```bash
   cat > /Users/logankim/AI-Workspaces/omnis/packages/adapters/google-calendar/fixtures/rate_limited_response.json <<'EOF'
@@ -2604,9 +2604,9 @@ Calendar에는 "메시지"/"스레드 답글" 개념이 없으므로 interfaces.
   EOF
   ```
 
-  `errorKind`가 Slack/Gmail과 다르게 `retryable_network`/`auth_revoked`인 이유: Task 10·11의 Calendar 어댑터는 `mapApiError()`를 만들지 않았다(모든 `events.list` 실패를 `backfill()`에서 `retryable_network`로, `connect()` 실패를 `auth_revoked`로 던진다) — 이 fixture는 그 실제 동작과 맞춘 것이다. 세 채널의 에러 매핑 세분화 정도가 다른 것은 열어둔 질문으로 `open_questions`에 남긴다.
+  The reason `errorKind` is `retryable_network`/`auth_revoked` here, unlike Slack/Gmail: the Calendar adapter in Task 10·11 does not create a `mapApiError()` (it throws every `events.list` failure as `retryable_network` from `backfill()`, and a `connect()` failure as `auth_revoked`) — this fixture matches that actual behavior. The fact that the three channels differ in how finely they map errors is recorded as an open question in `open_questions`.
 
-- [ ] 5. 5개 파일이 모두 유효한 JSON인지 확인한다.
+- [ ] 5. Verify that all 5 files are valid JSON.
 
   ```bash
   for f in /Users/logankim/AI-Workspaces/omnis/packages/adapters/google-calendar/fixtures/*.json; do
@@ -2614,19 +2614,19 @@ Calendar에는 "메시지"/"스레드 답글" 개념이 없으므로 interfaces.
   done
   ```
 
-  예상 출력: 5줄 모두 `OK`.
+  Expected output: all 5 lines print `OK`.
 
-- [ ] 6. 커밋한다.
+- [ ] 6. Commit.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
   git add packages/adapters/google-calendar/fixtures
   git commit -m "$(cat <<'EOF'
-  US-A15: Google Calendar fixture 세트 5종(단일 이벤트/반복 인스턴스/첨부/rate_limited/auth_error)
+  US-A15: Google Calendar fixture set of 5 (single event/recurring instance/attachment/rate_limited/auth_error)
 
-  - text_message/thread_reply/attachment는 Task 11 normalize()의 실제 threadMeta 출력과 일치
-  - rate_limited/auth_error는 Calendar 어댑터가 mapApiError()를 따로 두지 않고 backfill()/connect()에서
-    바로 retryable_network/auth_revoked로 매핑하는 실제 동작을 기록
+  - text_message/thread_reply/attachment match the actual threadMeta output of Task 11 normalize()
+  - rate_limited/auth_error record the actual behavior where the Calendar adapter keeps no separate mapApiError() and instead maps directly
+    to retryable_network/auth_revoked in backfill()/connect()
 
   Co-Authored-By: DeepSeek V4.1 Flash <noreply@deepseek.com>
   EOF
@@ -2635,17 +2635,17 @@ Calendar에는 "메시지"/"스레드 답글" 개념이 없으므로 interfaces.
 
 ---
 
-### Task 15: 계약 테스트 하네스 — 3채널 `test/contract.test.ts` + `pnpm test:contract` 배선 (US-A15, tier: DeepSeek, 리뷰 Sonnet+)
+### Task 15: Contract test harness — 3-channel `test/contract.test.ts` + `pnpm test:contract` wiring (US-A15, tier: DeepSeek, review Sonnet+)
 
 **Files:**
 - Create: `packages/adapters/slack/test/contract.test.ts`, `packages/adapters/gmail/test/contract.test.ts`, `packages/adapters/google-calendar/test/contract.test.ts`
-- Verify only (does not create — 루트 파일 오너는 kernel-and-db Task 1): `vitest.workspace.ts`(root)
+- Verify only (does not create — the root files are owned by kernel-and-db Task 1): `vitest.workspace.ts` (root)
 
-**Interfaces:** Consumes: Task 6의 `normalize`/`mapApiError`(slack), Task 9의 `normalize`/`mapApiError`(gmail), Task 11의 `normalize`(google-calendar) + Task 10의 `subscribe`(calendar 에러 매핑 검증용) — 전부 Task 12~14의 fixture JSON. Produces: `pnpm test:contract`가 그린으로 끝나는 상태.
+**Interfaces:** Consumes: Task 6's `normalize`/`mapApiError` (slack), Task 9's `normalize`/`mapApiError` (gmail), Task 11's `normalize` (google-calendar) + Task 10's `subscribe` (for verifying calendar error mapping) — all with the fixture JSON from Task 12~14. Produces: a state where `pnpm test:contract` ends green.
 
-읽을 스펙: interfaces.md §2(`pnpm test:contract` = `vitest run --project contract`, vitest 프로젝트 이름 3종 고정) + §9(fixture 배치 규칙).
+Spec to read: interfaces.md §2 (`pnpm test:contract` = `vitest run --project contract`, with the three vitest project names fixed) + §9 (fixture placement rules).
 
-- [ ] 1. 실패하는 테스트를 작성한다: `packages/adapters/slack/test/contract.test.ts` — fixture 디렉터리를 순회해 `normalize`/`mapApiError`를 재생한다.
+- [ ] 1. Write the failing test: `packages/adapters/slack/test/contract.test.ts` — iterate the fixture directory and replay `normalize`/`mapApiError`.
 
   ```ts
   import { readdirSync, readFileSync } from "node:fs";
@@ -2678,7 +2678,7 @@ Calendar에는 "메시지"/"스레드 답글" 개념이 없으므로 interfaces.
   });
   ```
 
-- [ ] 2. Gmail과 Google Calendar에도 같은 패턴으로 만든다(Calendar는 `mapApiError`를 export하지 않으므로 에러 fixture는 `backfill()`/`connect()`를 직접 mock으로 호출해 검증한다).
+- [ ] 2. Create the same pattern for Gmail and Google Calendar (Calendar does not export `mapApiError`, so its error fixtures are verified by calling `backfill()`/`connect()` directly with mocks).
 
   ```bash
   cat > /Users/logankim/AI-Workspaces/omnis/packages/adapters/gmail/test/contract.test.ts <<'EOF'
@@ -2764,9 +2764,9 @@ Calendar에는 "메시지"/"스레드 답글" 개념이 없으므로 interfaces.
   EOF
   ```
 
-  `auth_revoked` 케이스는 Keychain을 실제로 읽으므로(`omnis.gmail.test@example.com` 항목은 존재하지 않는다) 먼저 `auth_expired`(Keychain 미발견)로 실패할 수 있다 — 이 fixture 의도는 "refresh token은 있지만 revoke됨"이므로 `oauthClient`를 직접 주입해 `readKeychainSecret` 단계를 우회해야 한다. 위 코드는 `oauthClient.getAccessToken`이 reject하는 경로만 taken하도록 `oauthClient`를 미리 주입했지만, `connect()`는 `oauthClient`가 주어져도 `readKeychainSecret`을 먼저 호출하므로 여전히 Keychain 조회가 먼저 실패한다 — 다음 스텝에서 이 gap을 고친다.
+  The `auth_revoked` case really reads the Keychain (the `omnis.gmail.test@example.com` item does not exist), so it can fail first with `auth_expired` (Keychain item not found) — this fixture intends "the refresh token exists but was revoked", so `oauthClient` must be injected directly to bypass the `readKeychainSecret` step. The code above injects `oauthClient` up front so that only the path where `oauthClient.getAccessToken` rejects is taken, but `connect()` calls `readKeychainSecret` first even when `oauthClient` is given, so the Keychain lookup still fails first — the next step fixes this gap.
 
-- [ ] 3. Task 10의 `connect()`를 수정해 `oauthClient`가 이미 주입돼 있으면 `readKeychainSecret` 호출을 건너뛰고 그 client를 그대로 쓰게 한다(테스트 주입 경로 정리, 프로덕션 경로는 영향 없음 — 여전히 매번 새로 만들 때는 Keychain을 읽는다). `packages/adapters/google-calendar/src/index.ts`의 `connect`를 아래로 교체한다.
+- [ ] 3. Modify Task 10's `connect()` so that when `oauthClient` is already injected it skips the `readKeychainSecret` call and uses that client as-is (cleanup of the test injection path; the production path is unaffected — it still reads the Keychain whenever it builds a new client each time). Replace `connect` in `packages/adapters/google-calendar/src/index.ts` with the following.
 
   ```ts
       async connect(auth: AuthRef): Promise<void> {
@@ -2788,18 +2788,18 @@ Calendar에는 "메시지"/"스레드 답글" 개념이 없으므로 interfaces.
       },
   ```
 
-- [ ] 4. 루트 `vitest.workspace.ts`는 이 태스크가 만들지 않는다 — 오너는 `2026-09-20-phase-a-kernel-and-db.md` Task 1이다(interfaces.md §2, FIXED — plans-review.md M4·M12). 존재와 `contract` 프로젝트 엔트리가 이 플랜이 필요로 하는 패턴을 덮는지만 확인한다.
+- [ ] 4. This task does not create the root `vitest.workspace.ts` — it is owned by `2026-09-20-phase-a-kernel-and-db.md` Task 1 (interfaces.md §2, FIXED — plans-review.md M4·M12). Only verify that it exists and that the `contract` project entry covers the pattern this plan needs.
 
   ```bash
   test -f /Users/logankim/AI-Workspaces/omnis/vitest.workspace.ts \
-    || { echo "vitest.workspace.ts가 없다 — kernel-and-db Task 1을 먼저 실행한다."; exit 1; }
+    || { echo "vitest.workspace.ts is missing — run kernel-and-db Task 1 first."; exit 1; }
   grep -q 'name: "contract"' /Users/logankim/AI-Workspaces/omnis/vitest.workspace.ts \
     && grep -q 'packages/adapters/\*/test/contract.test.ts' /Users/logankim/AI-Workspaces/omnis/vitest.workspace.ts \
-    && echo "contract 프로젝트 엔트리 확인됨" \
-    || { echo "vitest.workspace.ts의 contract 프로젝트가 packages/adapters/*/test/contract.test.ts를 포함하지 않는다 — kernel-and-db Task 1의 vitest.workspace.ts를 수정해야 한다(이 플랜 범위 밖, kernel 플랜 소유)."; exit 1; }
+    && echo "contract project entry confirmed" \
+    || { echo "the contract project in vitest.workspace.ts does not include packages/adapters/*/test/contract.test.ts — kernel-and-db Task 1's vitest.workspace.ts must be modified (outside this plan's scope, owned by the kernel plan)."; exit 1; }
   ```
 
-- [ ] 5. `test:contract` 실행 전, 전체 `pnpm --filter` 유닛 테스트가 여전히 그린인지 먼저 확인한다(회귀 없음 확인).
+- [ ] 5. Before running `test:contract`, first confirm that the full `pnpm --filter` unit test suite is still green (verify there is no regression).
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
@@ -2808,17 +2808,17 @@ Calendar에는 "메시지"/"스레드 답글" 개념이 없으므로 interfaces.
   pnpm --filter @omnis/adapter-google-calendar test
   ```
 
-  예상 출력: 세 패키지 모두 이전 태스크에서 확인한 테스트 수 그대로 통과(Slack 7, Gmail 4, Calendar 7) — `contract.test.ts`가 각 패키지의 `test/` 안에 있으므로 `pnpm --filter <name> test`(패키지 자신의 `vitest run`)도 이 시점부터 fixture 개수만큼 테스트가 늘어난다.
+  Expected output: all three packages pass with the same test counts confirmed in previous tasks (Slack 7, Gmail 4, Calendar 7) — because `contract.test.ts` lives inside each package's `test/`, `pnpm --filter <name> test` (the package's own `vitest run`) also gains as many tests as there are fixtures from this point on.
 
-- [ ] 6. `pnpm test:contract`를 루트에서 실행한다.
+- [ ] 6. Run `pnpm test:contract` at the root.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis && pnpm test:contract
   ```
 
-  예상 출력: `contract` 프로젝트 3개 테스트 파일 모두 통과 — Slack 7개 시나리오 + Gmail 5개 + Calendar 5개 = 17개 테스트 케이스, `Test Files  3 passed (3)` / `Tests  17 passed (17)`.
+  Expected output: all three test files in the `contract` project pass — Slack 7 scenarios + Gmail 5 + Calendar 5 = 17 test cases, `Test Files  3 passed (3)` / `Tests  17 passed (17)`.
 
-- [ ] 7. 커밋한다.
+- [ ] 7. Commit.
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
@@ -2827,12 +2827,12 @@ Calendar에는 "메시지"/"스레드 답글" 개념이 없으므로 interfaces.
           packages/adapters/google-calendar/test/contract.test.ts \
           packages/adapters/google-calendar/src/index.ts
   git commit -m "$(cat <<'EOF'
-  US-A15: 3채널 계약 테스트 하네스 + pnpm test:contract 배선
+  US-A15: 3-channel contract test harness + pnpm test:contract wiring
 
-  - test/contract.test.ts: fixtures/*.json을 순회해 normalize()/mapApiError()를 재생(A1 §1.7)
-  - Calendar connect()에 oauthClient 직접 주입 경로 추가(Keychain 조회를 우회해 auth_revoked 테스트 가능)
-  - 루트 vitest.workspace.ts는 만들지 않음(오너 = kernel-and-db Task 1, interfaces.md §2) — contract 프로젝트 엔트리 존재만 확인
-  - pnpm test:contract 그린 확인: Slack 7 + Gmail 5 + Calendar 5 = 17 테스트
+  - test/contract.test.ts: iterates fixtures/*.json and replays normalize()/mapApiError() (A1 §1.7)
+  - add a direct oauthClient injection path to Calendar connect() (bypasses the Keychain lookup so auth_revoked is testable)
+  - do not create the root vitest.workspace.ts (owner = kernel-and-db Task 1, interfaces.md §2) — only verify the contract project entry exists
+  - confirm pnpm test:contract is green: Slack 7 + Gmail 5 + Calendar 5 = 17 tests
 
   Co-Authored-By: DeepSeek V4.1 Flash <noreply@deepseek.com>
   EOF
@@ -2843,25 +2843,25 @@ Calendar에는 "메시지"/"스레드 답글" 개념이 없으므로 interfaces.
 
 ## Self-review
 
-1. **스토리 커버리지**: US-A11 → Task 1~3. US-A12 → Task 4~6. US-A13 → Task 7~9. US-A14 → Task 10~11. US-A15 → Task 12~15. 5개 스토리 전부 최소 1개 태스크에 매핑됨.
-2. **금지 패턴 grep**: `TBD`/`TODO`/`implement later`/`add appropriate error handling`/`handle edge cases`/`similar to Task` 문자열을 이 파일에서 검색해 0건 확인(아래 grep 실행 결과 참조 — 있었다면 이 섹션 작성 전에 고쳤다).
-3. **심볼 출처 확인**: 이 플랜이 consume하는 모든 심볼(`Channel`/`NormalizedItem`/`Adapter`/`AdapterError`/`Attachment`/`Capabilities`/`AuthRef`/`Health`/`ThreadRef`/`Outbound`/`SendResult`/`Normalize`)은 interfaces.md §3.1~3.3 계약에 이미 있거나, 이 플랜의 앞선 태스크(Task 1~3)가 정의한다(Task 6이 `Attachment`를 쓰므로 Task 4 import 목록에 `type Attachment`를 포함시켰다). produce하는 계약 밖 심볼(`createSlackAdapter`/`createGmailAdapter`/`createGoogleCalendarAdapter`/`normalize`/`mapApiError`/`readKeychainSecret`/`CHANNEL`/`*AdapterDeps`)은 전부 이 문서 안에서 먼저 정의된 뒤에만 다음 태스크가 소비한다 — 순방향 참조 없음.
+1. **Story coverage**: US-A11 → Task 1~3. US-A12 → Task 4~6. US-A13 → Task 7~9. US-A14 → Task 10~11. US-A15 → Task 12~15. All 5 stories map to at least one task.
+2. **Forbidden-pattern grep**: searched this file for the strings `TBD`/`TODO`/`implement later`/`add appropriate error handling`/`handle edge cases`/`similar to Task` and confirmed 0 hits (see the grep output below — if there had been any, they were fixed before this section was written).
+3. **Symbol provenance check**: every symbol this plan consumes (`Channel`/`NormalizedItem`/`Adapter`/`AdapterError`/`Attachment`/`Capabilities`/`AuthRef`/`Health`/`ThreadRef`/`Outbound`/`SendResult`/`Normalize`) either already exists in the interfaces.md §3.1~3.3 contract or is defined by an earlier task in this plan (Task 1~3) (because Task 6 uses `Attachment`, `type Attachment` was included in Task 4's import list). Every out-of-contract symbol it produces (`createSlackAdapter`/`createGmailAdapter`/`createGoogleCalendarAdapter`/`normalize`/`mapApiError`/`readKeychainSecret`/`CHANNEL`/`*AdapterDeps`) is defined in this document before any later task consumes it — there are no forward references.
 
 ## open_questions
 
-- **calendar_events 상세 테이블과 NormalizedItem의 간극**: A3 §2.1(이 플랜의 필수 읽기 범위 밖)은 어댑터가 `items`와 `calendar_events` 두 row를 같은 트랜잭션에서 upsert한다고 전제하지만, A1의 `Adapter`/`NormalizedItem` 계약은 어댑터에 DB 접근을 주지 않고 `NormalizedItem`에도 `end_at`/`attendees`/`recurrence` 필드가 없다. 이 플랜은 `NormalizedItem`만 만든다(계약 그대로) — `calendar_events`를 누가 무엇을 입력으로 채우는지(예: 커널 ingest write path가 raw Calendar API 리소스를 별도로 받는지, 아니면 `NormalizedItem`을 확장하는지)는 커널/ingest 플랜(US-A05 근방)이 결정해야 한다.
-- **Gmail 첨부(`parts[]`) 정규화 미구현**: A1 §2.2는 `attachments.get` 개별 다운로드를 언급하지만 이 플랜의 `normalize()`는 `payload.parts`를 순회하지 않는다(top-level `body.data`만 읽음) — multipart 메시지의 첨부를 `NormalizedItem.attachments`로 채우는 작업은 별도 태스크로 남아 있다(Task 13의 `attachment.json` fixture가 이 gap을 `expected.attachments: []`로 명시).
-- **세 채널의 에러 매핑 세분화 불일치**: Slack·Gmail은 `mapApiError()`라는 이름 있는 순수 함수로 429/401을 분류하지만 Calendar 어댑터는 `backfill()`/`connect()` 안에서 즉석으로 `retryable_network`/`auth_revoked`만 던진다(410 syncToken 만료만 `subscribe()`에서 별도 처리). 세 어댑터의 에러 분류를 같은 모양(`mapApiError` export)으로 통일할지는 다음 리뷰에서 결정할 문제로 남긴다.
-- **`worktrunk` CLI 플래그 미확정**: A7-D5/§3이 이미 "UNVERIFIED — 스파이크"로 표시한 사항이라 이 플랜은 그대로 인용만 했다 — Phase A 착수 전 드라이런 결과에 따라 이 플랜의 커밋 절차 자체는 영향받지 않는다(스토리당 1 커밋은 worktrunk 유무와 무관).
+- **Gap between the calendar_events detail table and NormalizedItem**: A3 §2.1 (outside this plan's required reading range) assumes the adapter upserts two rows, `items` and `calendar_events`, in the same transaction, but A1's `Adapter`/`NormalizedItem` contract gives the adapter no DB access and `NormalizedItem` has no `end_at`/`attendees`/`recurrence` fields either. This plan creates only `NormalizedItem` (exactly as in the contract) — who fills `calendar_events` with what as input (for example, whether the kernel ingest write path receives the raw Calendar API resource separately, or whether `NormalizedItem` is extended) must be decided by the kernel/ingest plan (around US-A05).
+- **Gmail attachment (`parts[]`) normalization not implemented**: A1 §2.2 mentions individual `attachments.get` downloads, but this plan's `normalize()` does not iterate `payload.parts` (it reads only the top-level `body.data`) — filling `NormalizedItem.attachments` with attachments from multipart messages remains a separate task (Task 13's `attachment.json` fixture documents this gap with `expected.attachments: []`).
+- **Inconsistent error-mapping granularity across the three channels**: Slack and Gmail classify 429/401 with a named pure function, `mapApiError()`, but the Calendar adapter throws only `retryable_network`/`auth_revoked` ad hoc inside `backfill()`/`connect()` (only the 410 syncToken expiry is handled separately in `subscribe()`). Whether to unify the three adapters' error classification under the same shape (`mapApiError` export) is left as a question to decide in the next review.
+- **`worktrunk` CLI flags not settled**: A7-D5/§3 already marks this "UNVERIFIED — spike", so this plan only quotes it as-is — depending on the dry-run results before Phase A starts, this plan's commit procedure itself is unaffected (one commit per story regardless of worktrunk).
 
-## 수정 이력 (2026-09-20, cross-plan review)
+## Revision history (2026-09-20, cross-plan review)
 
-`2026-09-20-plans-review.md`(§1 불일치표·§2 권장 계약 수정) + 업데이트된 `2026-09-20-phase-a-interfaces.md` + `tools/spikes/_probes/2026-09-20-cli-probes.md`를 대조해 반영했다. 적용 항목:
+Applied these after cross-checking `2026-09-20-plans-review.md` (§1 discrepancy table, §2 recommended contract fixes) + the updated `2026-09-20-phase-a-interfaces.md` + `tools/spikes/_probes/2026-09-20-cli-probes.md`. Items applied:
 
-- **(M4) Task 1 — 루트 파일 오너 정정**: 루트 `pnpm-workspace.yaml`/`package.json`/`tsconfig.base.json`/`biome.jsonc` 생성 스텝을 삭제하고 `test -f` 존재 확인으로 교체했다(오너 = `2026-09-20-phase-a-kernel-and-db.md` Task 1, interfaces.md §2 FIXED). Wave 0에서 kernel T1과 이 플랜 T1~T3가 병렬로 돌므로 "루트 파일이 없으면 kernel-and-db Task 1(db-scaffold)을 먼저 실행하고 재개한다"는 안내를 추가했다. Task 1의 `git add`/커밋 본문에서도 루트 파일을 뺐다.
-- **(M1, M2) 버전 핀**: `vitest ^2.1.8` → `vitest 2.1.9`, `typescript ^5.7.2` → `typescript 5.6.3`(전 패키지: protocol/slack/gmail/google-calendar package.json + Tech Stack 줄, 총 5곳)로 전부 교체. `zod ^3.24.1`은 이미 정본과 일치해 유지(오너 = `@omnis/protocol`, zod 4 미사용 명시 추가).
-- **(M7, M8) Keychain 명명 명시**: Task 4(Slack)·Task 7(Gmail)·Task 10(Calendar) 각각의 "읽을 스펙" 문단에 interfaces.md §9 FIXED 규칙을 그대로 인용해 추가했다 — Slack은 `omnis.slack.xoxb.<team_id>`(account=`<team_id>`) + `…​.app` 2항목(`xoxp` 아님), Google 계열은 `omnis.gmail.<email>` 1항목 공유(`<kind>` 생략, gcal이 재사용). Global Constraints의 Keychain 항목명 줄에도 이 예외를 명시했다. 기존 `AuthRef` 예시·connect() 구현(Task 4/7/10)은 이미 이 명명을 따르고 있어 코드 변경은 없다 — 문서화만 보강했다.
-- **Task 15 — `vitest.workspace.ts` 중복 생성 제거**: "Files" 목록과 스텝 4를 "생성"에서 "검증만(존재 + `contract` 프로젝트 엔트리 대조, 실패 시 kernel-and-db Task 1을 먼저 실행하라는 안내)"으로 교체했다(오너 = kernel-and-db Task 1, interfaces.md §2). 스텝 7 커밋의 `git add`/본문에서도 `vitest.workspace.ts`를 뺐다.
-- **커밋 트레일러 규칙**: Global Constraints의 커밋 규칙 줄을 kernel-and-db 플랜·interfaces.md §9와 동일한 형식(브랜치 `ralph/<story-id>` + 워크트리 `omnis/.worktrees/<story-id>` + 제목 `<story-id>: <한 줄 요약>` + 본문에 충족한 acceptance criteria 목록 + 티어별 `Co-Authored-By` 마지막 줄, `fable` 미사용)으로 맞췄다.
+- **(M4) Task 1 — root file ownership corrected**: removed the step that created the root `pnpm-workspace.yaml`/`package.json`/`tsconfig.base.json`/`biome.jsonc` and replaced it with a `test -f` existence check (owner = `2026-09-20-phase-a-kernel-and-db.md` Task 1, interfaces.md §2 FIXED). Because kernel T1 and this plan's T1~T3 run in parallel in Wave 0, added the guidance "if the root files are missing, run kernel-and-db Task 1 (db-scaffold) first and then resume". Also removed the root files from Task 1's `git add`/commit body.
+- **(M1, M2) Version pins**: replaced everything with `vitest ^2.1.8` → `vitest 2.1.9` and `typescript ^5.7.2` → `typescript 5.6.3` (across all packages: protocol/slack/gmail/google-calendar package.json + the Tech Stack line, 5 places in total). Kept `zod ^3.24.1` since it already matches the authoritative source (owner = `@omnis/protocol`; added an explicit note that zod 4 is not used).
+- **(M7, M8) Keychain naming made explicit**: added the interfaces.md §9 FIXED rules verbatim to the "Spec to read" paragraph of Task 4 (Slack), Task 7 (Gmail), and Task 10 (Calendar) — for Slack, `omnis.slack.xoxb.<team_id>` (account=`<team_id>`) plus `…​.app` two items (not `xoxp`); for the Google family, a single shared `omnis.gmail.<email>` item (`<kind>` omitted, reused by gcal). Also made this exception explicit in the Global Constraints Keychain item name line. The existing `AuthRef` examples and connect() implementations (Task 4/7/10) already follow this naming, so there is no code change — only documentation was strengthened.
+- **Task 15 — removed duplicate creation of `vitest.workspace.ts`**: changed the "Files" list and step 4 from "create" to "verify only (existence + comparison against the `contract` project entry, with guidance to run kernel-and-db Task 1 first on failure)" (owner = kernel-and-db Task 1, interfaces.md §2). Also removed `vitest.workspace.ts` from the `git add`/body of the step 7 commit.
+- **Commit trailer rules**: aligned the commit rules line in Global Constraints with the same format as the kernel-and-db plan and interfaces.md §9 (branch `ralph/<story-id>` + worktree `omnis/.worktrees/<story-id>` + subject `<story-id>: <one-line summary>` + body listing the acceptance criteria that were met + a final tier-appropriate `Co-Authored-By` line, `fable` unused).
 
-미반영(이 플랜 범위 밖): M3(`pg`/`packageManager` 핀은 kernel-and-db 플랜 소유, 이 플랜은 `pg`를 의존하지 않는다), M5(루트 스크립트는 kernel-and-db Task 1 소유), M6(`WS /bridge` 서버는 kernel-and-db 소유), M9~M11(desktop/kernel 계약 심볼), M13·M14(CI workflow·phase-0 스파이크 범위 축소).
+Not applied (outside this plan's scope): M3 (the `pg`/`packageManager` pins are owned by the kernel-and-db plan; this plan does not depend on `pg`), M5 (root scripts are owned by kernel-and-db Task 1), M6 (the `WS /bridge` server is owned by kernel-and-db), M9~M11 (desktop/kernel contract symbols), M13·M14 (CI workflow and phase-0 spike scope reduction).

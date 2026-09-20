@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A6 §10: plist 복사 → launchctl bootstrap → 기동 확인. 사용법: scripts/install-local-agent.sh mini|macbook
+# A6 §10: copy plist → launchctl bootstrap → verify startup. Usage: scripts/install-local-agent.sh mini|macbook
 set -euo pipefail
 
 HOST="${1:?usage: install-local-agent.sh <mini|macbook>}"

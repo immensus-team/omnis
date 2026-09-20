@@ -1,33 +1,33 @@
-# omnis — Logan 손이 필요한 것들 (2026-09-20)
+# omnis — Things that need Logan's hands (2026-09-20)
 
-Wave 0(커널·DB·protocol·디자인 토큰·무인 스파이크)은 에이전트가 돌리고 있다. 아래는 에이전트가 못 하는 것만 모았다. 각 항목의 상세 절차는 `docs/superpowers/plans/2026-09-20-phase-0-spikes.md`의 해당 Task에 체크리스트와 스크립트로 준비된다(Wave 1에서 생성). 순서는 개발 착수에 미치는 영향 순.
+Wave 0 (kernel, DB, protocol, design tokens, unattended spikes) is being run by agents. Below are only the things agents can't do. Detailed procedures for each item are prepared as checklists and scripts under the corresponding Task in `docs/superpowers/plans/2026-09-20-phase-0-spikes.md` (created in Wave 1). Ordered by impact on getting development started.
 
-## A. 답이 필요한 결정 (기본값으로 진행 중, 바꾸려면 말해줘)
+## A. Decisions that need an answer (proceeding with defaults; tell me if you want to change them)
 
-| # | 질문 | 지금 기본값 | 근거 위치 |
+| # | Question | Current default | Rationale location |
 |---|---|---|---|
-| Q1 | iPhone을 PWA로 시작(Phase B), 네이티브는 Phase D | PWA | 마스터 §19 |
-| Q4 | 개인 인박스 본문을 DeepSeek에 보낼 범위 | personal·finance·legal·health·VIP는 Anthropic, 나머지 DeepSeek | §14 |
-| Q13 | 위임된 Claude Code 실행 모드 | 게이트 ⑪ 결과로 결정. `--bare`는 API 키 과금이라 구독을 못 씀 | §19, tools/spikes/_probes |
-| Q10 | 위임 자동 실행 범위 | 자동 제안 + 한 번 승인. 완전 자율은 런타임·레포별 허용 규칙을 열 때만 | §11 |
-| Q11 | 비용 상한 도달 시 VIP 초안 | 10% 예비비로 계속 생성 | §14 |
-| Q9 | 라이선스 | Apache-2.0 (LICENSE 파일 이미 커밋) | §19 |
-| — | 자동 보관 기본 규칙 4개 | §11의 규칙. 취향이 정답이라 첫 주 다이제스트 보고 조정 | §11 |
+| Q1 | Start with iPhone as a PWA (Phase B), native in Phase D | PWA | Master §19 |
+| Q4 | Scope of personal inbox bodies sent to DeepSeek | personal, finance, legal, health, VIP go to Anthropic; everything else to DeepSeek | §14 |
+| Q13 | Execution mode for delegated Claude Code | Decided by the Gate ⑪ result. `--bare` bills against the API key, so the subscription can't be used | §19, tools/spikes/_probes |
+| Q10 | Scope of automatic delegated execution | Auto-suggest + single approval. Fully autonomous only when per-runtime and per-repo allow rules are enabled | §11 |
+| Q11 | VIP drafts once the cost ceiling is reached | Keep generating from a 10% reserve | §14 |
+| Q9 | License | Apache-2.0 (LICENSE file already committed) | §19 |
+| — | The 4 default auto-archive rules | The rules in §11. Taste is the answer here, so adjust after the first week's digest | §11 |
 
-## B. 현장·계정 작업 (게이트 7개)
+## B. On-site and account work (7 gates)
 
-| 게이트 | 무엇을 | 왜 Logan | 실패 시 |
+| Gate | What | Why Logan | On failure |
 |---|---|---|---|
-| ③ FileVault + 자동 로그인 (미니) | 미니 앞에서 체크리스트대로 자동 로그인 설정 후 재부팅 관찰 | 재부팅 직후 로그인 화면은 원격으로 안 보임 | FileVault OFF + tailnet-only, Logan 승인 필요 |
-| ④ kmsg read (미니) | `run.sh` 실행 후 System Settings → Accessibility 권한 Allow 1회, 48시간 관찰 | 접근성 권한 최초 승인은 GUI 클릭 | Notification Center DB + OCR 폴백 |
-| ⑤ Tailscale Serve HTTPS | 미니 쪽 setup은 내가 대행. 아이폰 Safari에서 열어 SSL 에러 유무 확인 | 실기기 확인 | MagicDNS 재확인 → TailscaleKit을 Phase D로 앞당김 |
-| ⑨ Slack Socket Mode | api.slack.com/apps에서 manifest로 앱 생성·설치, 토큰 2개를 Keychain에 저장, 테스트 DM 1건 | 워크스페이스 앱 설치는 Logan 계정 | Events API + Funnel 검토 |
-| ⑩ Gmail watch + Pub/Sub | GCP 프로젝트 생성, Gmail API 활성화, OAuth 동의 1회, 테스트 메일 1건 | 계정 소유자만 가능 | `history.list` 1분 폴링(기능 손실 없음) |
-| ① Calendar push via Funnel | Calendar OAuth 동의 1회, Funnel을 잠깐 여는 것 승인 | 공인 인터넷 노출 판단 | syncToken 폴링 1~5분(이미 기본 경로) |
-| ② Beeper + WhatsApp 부번호 | 미니에 Beeper Desktop 설치, 부번호 폰으로 QR 페어링, 토큰 Keychain 저장, 테스트 발송 | 물리적 QR | whatsmeow Go 사이드카 |
+| ③ FileVault + auto-login (Mac mini) | Set up auto-login in front of the Mac mini per the checklist, then observe a reboot | The login screen right after a reboot isn't visible remotely | FileVault OFF + tailnet-only, requires Logan's approval |
+| ④ kmsg read (Mac mini) | Run `run.sh`, then Allow the System Settings → Accessibility permission once, observe for 48 hours | The initial accessibility permission grant requires a GUI click | Notification Center DB + OCR fallback |
+| ⑤ Tailscale Serve HTTPS | I'll handle the setup on the Mac mini side. Open it in iPhone Safari and check whether there are SSL errors | Verification on real hardware | Recheck MagicDNS → move TailscaleKit up into Phase D |
+| ⑨ Slack Socket Mode | Create and install the app from a manifest at api.slack.com/apps, store the 2 tokens in Keychain, 1 test DM | Installing a workspace app requires Logan's account | Events API + Funnel review |
+| ⑩ Gmail watch + Pub/Sub | Create a GCP project, enable the Gmail API, 1 OAuth consent, 1 test email | Only the account owner can do this | `history.list` polling every 1 minute (no loss of functionality) |
+| ① Calendar push via Funnel | 1 Calendar OAuth consent, approval to open the Funnel briefly | Decision on public internet exposure | syncToken polling every 1–5 min (already the default path) |
+| ② Beeper + WhatsApp secondary number | Install Beeper Desktop on the Mac mini, pair via QR with the secondary-number phone, store the token in Keychain, test send | Physical QR | whatsmeow Go sidecar |
 
-준비물: 부번호가 든 휴대폰(②), 미니 앞에 앉을 30분(③④), GCP 과금 계정(⑩, 무료 범위).
+Prerequisites: a phone holding the secondary number (②), 30 minutes sitting in front of the Mac mini (③④), a GCP billing account (⑩, free tier).
 
-## C. 지금 안 해도 되는 것
-- WhatsApp 실번호 연결(Q2), KakaoTalk send(Q3, read 14일 안정 후) — Phase C.
-- iPhone 네이티브 앱, 공개 README — Phase D.
+## C. Things that don't need doing now
+- Connecting the real WhatsApp number (Q2), KakaoTalk send (Q3, after 14 days of stable read) — Phase C.
+- iPhone native app, public README — Phase D.

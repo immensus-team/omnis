@@ -2,49 +2,49 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Phase A가 만든 "인박스가 스스로 라벨을 단다" 위에 **에이전트 층 전체**를 올린다 — 루프 런타임 계약(US-B06)과 tool palette(US-B07)를 먼저 고정하고, 그 위에 답장 초안(B13)·비용 미터(B14)·알림 3등급과 2경로 전달(B15·B17)·자동 보관과 7일 undo(B18)·투두와 위임(B19·B20)·노트 라우팅(B21)·Network 팔로업(B22)·아침 브리핑과 밤 다이제스트(B23·B24)·self-model 수정 제안(B25)을 얹는다. 실계정 연결은 Phase B 범위 밖이므로(B-D5) 14개 스토리 전부가 시드 데이터 + `MockLanguageModelV3` + 스텁 fetch만으로 인수된다.
+**Goal:** Build the **entire agent layer** on top of what Phase A established — "the inbox labels itself." First fix the loop runtime contract (US-B06) and the tool palette (US-B07), then layer on top: reply drafts (B13) · the cost meter (B14) · three notification tiers and two delivery paths (B15 · B17) · auto-archive with a 7-day undo (B18) · todos and delegation (B19 · B20) · note routing (B21) · Network follow-ups (B22) · the morning briefing and nightly digest (B23 · B24) · self-model patch proposals (B25). Connecting real accounts is outside Phase B scope (B-D5), so all 14 stories are accepted with seed data + `MockLanguageModelV3` + stub fetch alone.
 
-**Architecture:** `packages/agents/src/loop/`가 **모든 루프의 단일 실행 경로**다. `registerLoop(spec)`로 등록된 `LoopSpec`을 `runLoopSpec(spec, ctx)`가 돌리고, 그 함수 하나가 예산 강제·A4 §1.6의 실패 처리 7종·`recordRun`/`finishRun` 한 쌍을 전부 책임진다. 루프는 "무엇을 조립하고(assemble) 무엇을 저장하는가(apply)"만 선언한다. 모델에 주는 tool은 `packages/agents/src/tools/`의 읽기 7종 + `propose_*` 6종뿐이고 비가역 tool은 **타입으로도 존재하지 않는다** — 팬텀 12종은 이름 목록으로 하드코딩되어 레지스트리에 새면 유닛 테스트가 깨진다. 비용·알림·보관처럼 "모델이 아니라 커널이 하는 일"은 `packages/kernel/src/{cost,notify,archive}.ts`로 내려가고, `@omnis/agents`는 `@omnis/kernel`을 import하지 않는다(계약 §1) — 대신 구조적으로 호환되는 최소 인터페이스(`LoopKernel`, `LoopLogger`)를 자기 안에 정의한다.
+**Architecture:** `packages/agents/src/loop/` is the **single execution path for every loop**. `runLoopSpec(spec, ctx)` runs the `LoopSpec` registered through `registerLoop(spec)`, and that one function owns budget enforcement, the seven failure-handling cases in A4 §1.6, and the `recordRun`/`finishRun` pair. A loop declares only what it assembles and what it saves (apply). The tools handed to the model are just the seven read tools in `packages/agents/src/tools/` plus the six `propose_*` tools, and irreversible tools **do not exist even at the type level** — the 12 phantom tools are hardcoded as a list of names, so a unit test breaks if any of them leaks into the registry. Work the kernel does rather than the model — cost, notifications, archiving — moves down into `packages/kernel/src/{cost,notify,archive}.ts`, and `@omnis/agents` does not import `@omnis/kernel` (contract §1); instead it defines the structurally compatible minimal interfaces (`LoopKernel`, `LoopLogger`) inside itself.
 
-**Tech Stack:** Node 22 · pnpm workspaces · TypeScript 5.6.3(strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`) · `ai@7.0.107`(`generateObject` / `generateText` + `Output.object` + `stepCountIs` + `tool` + `type ToolSet`) · `@ai-sdk/openai-compatible@3.0.53` · `zod@^3.24.1` · `pg@8.13.1` · `vitest@2.1.9`(+ `ai/test`의 `MockLanguageModelV3`) · `web-push@3.6.7`(허브 발송) · Postgres 17 + pgvector · Tauri 2(macOS 로컬 알림). 버전 핀 출처: Phase A 계약 §2(FIXED) + Phase B 델타 §1.
+**Tech Stack:** Node 22 · pnpm workspaces · TypeScript 5.6.3 (strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`) · `ai@7.0.107` (`generateObject` / `generateText` + `Output.object` + `stepCountIs` + `tool` + `type ToolSet`) · `@ai-sdk/openai-compatible@3.0.53` · `zod@^3.24.1` · `pg@8.13.1` · `vitest@2.1.9` (+ `MockLanguageModelV3` from `ai/test`) · `web-push@3.6.7` (hub sending) · Postgres 17 + pgvector · Tauri 2 (macOS local notifications). Version pin sources: Phase A contract §2 (FIXED) + Phase B delta §1.
 
-**Spec:** /Users/logankim/AI-Workspaces/omnis/docs/spec/00-omnis-design.md (§11 루프 표 · §12 알림 · §14 비용 정책 · §19 Q4/Q7/Q10/Q11) + A4-agent-layer.md (§1 공통 기반 · §3 L2 초안 · §4 L3 투두 · §5 L4 위임 · §6 L5 브리핑/다이제스트 · §7 L6 팔로업 · §8 L7 노트 라우팅 · §9 L8 자동 보관 · §11 인젝션 · §12.4 월 상한 · §13 self-model) + A3-data-schema.md (§2 items/meta · §4 agent_runs/tasks/pending_approvals/notes/digests · §6 jobs) + A5-ui-ux.md (§3.8 되살리기 배너 · §4.4 Web Push) + A6-ops-infra.md (§9 Keychain) + 계약 문서 `2026-09-20-phase-a-interfaces.md` + 델타 `2026-09-20-phase-b-interfaces-delta.md` + 백로그 `2026-09-20-phase-b-backlog.md`
+**Spec:** /Users/logankim/AI-Workspaces/omnis/docs/spec/00-omnis-design.md (§11 loop table · §12 notifications · §14 cost policy · §19 Q4/Q7/Q10/Q11) + A4-agent-layer.md (§1 common foundation · §3 L2 drafts · §4 L3 todos · §5 L4 delegation · §6 L5 briefing/digest · §7 L6 follow-up · §8 L7 note routing · §9 L8 auto-archive · §11 injection · §12.4 monthly cap · §13 self-model) + A3-data-schema.md (§2 items/meta · §4 agent_runs/tasks/pending_approvals/notes/digests · §6 jobs) + A5-ui-ux.md (§3.8 undo banner · §4.4 Web Push) + A6-ops-infra.md (§9 Keychain) + contract document `2026-09-20-phase-a-interfaces.md` + delta `2026-09-20-phase-b-interfaces-delta.md` + backlog `2026-09-20-phase-b-backlog.md`
 
 ## Global Constraints
 
-- Node 22 + pnpm workspaces. 새 패키지는 `pnpm-workspace.yaml`의 글롭 안에 있어야 한다 (A7 §1). 이 계획은 **새 패키지를 만들지 않는다** — `@omnis/agents`·`@omnis/kernel`·`@omnis/db`·`apps/hub`·`apps/desktop`만 고친다.
-- TypeScript strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`, 루트 `tsconfig.base.json`을 extend (A7 §1).
-- Postgres 17 + pgvector. 통합 테스트 DB는 `omnis_test`, 연결 문자열은 `DATABASE_URL`, 없으면 `postgres://logan@127.0.0.1:5432/omnis_test` (계약 §2). 체인마다 자기 테스트 DB를 쓴다 — 다른 계획과 같은 DB를 공유하지 않는다.
-- 버전 핀(FIXED, 전 워크스페이스 동일): `vitest 2.1.9` · `zod ^3.24.1`(zod 4 금지) · `pg 8.13.1` · `typescript 5.6.3` · `@rocicorp/zero 1.9.0`(exact) · `ai 7.0.107`. 이 계획이 더하는 핀은 `web-push 3.6.7` 하나다(델타 §1).
-- 마이그레이션은 append-only. `packages/db/migrations/000N_<name>.sql`, 다음 번호는 `0009` 이후. 이미 적용된 파일은 절대 수정하지 않는다 (A3 §8). 이 계획이 만드는 파일은 **`0012_jobs_phase_b.sql` 하나**다(델타 §6).
-- 승인 게이트 없이 비가역 tool을 연결하지 않는다. `send`/`delete`/`calendar_write`/`delegate`는 `pending_approvals` → `runEgress` 경로만 존재하고, `packages/agents`에는 이 tool들이 **타입으로도 존재하지 않는다** (A7 §7 공통 금지, A4-D3).
-- provider SDK(`@ai-sdk/*`)는 `packages/agents/src/t1/`·`packages/agents/src/t2/` 안에서만 import한다. 다른 디렉터리로 새면 `packages/agents/test/no-egress.test.ts`가 깨진다.
-- `packages/agents/**`에서 `packages/kernel/src/egress/**`를 import하지 않는다(Biome `noRestrictedImports`, Task 5).
-- 테스트를 삭제하거나 스킵해서 통과시키지 않는다 (A7 §7 공통 금지).
-- 커밋 전에 `pnpm lint`가 통과해야 한다.
-- 커밋 메시지는 `<story-id>: <한 줄 요약>` + 본문에 충족한 acceptance criteria + `Implemented-by: <모델>`, 마지막 줄은 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
-- Keychain 명명: `omnis.<service>.<kind>` (이 계획이 쓰는 것: `omnis.openrouter.api_key`, `omnis.anthropic.api_key`, `omnis.webpush.vapid_private`/`…public`). 키 값은 어떤 로그·에러에도 넣지 않는다 (A6-D9).
+- Node 22 + pnpm workspaces. New packages must live inside the glob in `pnpm-workspace.yaml` (A7 §1). This plan **creates no new packages** — it only modifies `@omnis/agents`·`@omnis/kernel`·`@omnis/db`·`apps/hub`·`apps/desktop`.
+- TypeScript strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`, extending the root `tsconfig.base.json` (A7 §1).
+- Postgres 17 + pgvector. The integration test DB is `omnis_test`, the connection string is `DATABASE_URL`, falling back to `postgres://logan@127.0.0.1:5432/omnis_test` (contract §2). Each chain uses its own test DB — it does not share a DB with other plans.
+- Version pins (FIXED, identical across every workspace): `vitest 2.1.9` · `zod ^3.24.1` (zod 4 forbidden) · `pg 8.13.1` · `typescript 5.6.3` · `@rocicorp/zero 1.9.0` (exact) · `ai 7.0.107`. The only pin this plan adds is `web-push 3.6.7` (delta §1).
+- Migrations are append-only. `packages/db/migrations/000N_<name>.sql`, next number after `0009`. Never modify a file that has already been applied (A3 §8). The only file this plan creates is **`0012_jobs_phase_b.sql`** (delta §6).
+- Never wire up an irreversible tool without an approval gate. `send`/`delete`/`calendar_write`/`delegate` exist only through the `pending_approvals` → `runEgress` path, and inside `packages/agents` these tools **do not exist even at the type level** (A7 §7 common prohibitions, A4-D3).
+- Provider SDKs (`@ai-sdk/*`) are imported only inside `packages/agents/src/t1/`·`packages/agents/src/t2/`. If they leak into another directory, `packages/agents/test/no-egress.test.ts` breaks.
+- Do not import `packages/kernel/src/egress/**` from `packages/agents/**` (Biome `noRestrictedImports`, Task 5).
+- Do not delete or skip tests to make them pass (A7 §7 common prohibitions).
+- `pnpm lint` must pass before committing.
+- Commit message format: `<story-id>: <one-line summary>` + the acceptance criteria satisfied in the body + `Implemented-by: <model>`, with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` as the last line.
+- Keychain naming: `omnis.<service>.<kind>` (what this plan uses: `omnis.openrouter.api_key`, `omnis.anthropic.api_key`, `omnis.webpush.vapid_private`/`…public`). Never put key values into any log or error (A6-D9).
 
-## 이 계획이 델타에 **더하는** 것 (명시)
+## What this plan **adds** to the delta (explicit)
 
-델타 §4/§5의 식별자는 그대로 쓴다. 아래 다섯 개는 델타에 없어서 이 계획이 새로 고정하는 것이고, 전부 **추가**이지 기존 시그니처 변경이 아니다.
+Identifiers from delta §4/§5 are used as-is. The five below are missing from the delta, so this plan fixes them anew; they are all **additions**, not changes to existing signatures.
 
-| 심볼 | 왜 필요한가 | 만드는 태스크 |
+| Symbol | Why it is needed | Task that creates it |
 |---|---|---|
-| `TriggerContext` | 델타 §4의 `LoopSpec.assemble(ctx)`·`apply(result, ctx)`·`runLoop(id, ctx)`가 받는 타입인데 델타가 정의하지 않았다 | Task 1 |
-| `LoopSpec.decide?()` | A4 §9.2(자동 보관 ①③④ SQL)·§2.2(분류 3단)가 요구하는 **모델 없는 T0 선판정**. 선택 필드라 기존 `LoopSpec` 구현을 깨지 않는다 | Task 1 |
-| `runLoopSpec(spec, ctx)` | `morningDigestLoop`/`nightlyDigestLoop`이 `LoopId`를 둘 다 `'digest'`로 공유해 레지스트리 키가 충돌한다. 레지스트리를 안 타는 하위 진입점 | Task 3 |
-| `LoopKernel` / `LoopLogger` | `@omnis/agents`는 `@omnis/kernel`을 의존하지 않는다(계약 §1). `Kernel`/`Logger`가 구조적으로 대입되는 최소 인터페이스 | Task 4 |
-| `writeSystemItem` | A4 §1.6·§12.4·§9가 "시스템 Item으로 인박스에 남긴다"를 반복한다. `@omnis/agents` 안에 한 번만 둔다(커널 쪽 4줄 INSERT는 의도된 중복 — `apps/hub/src/archive.ts`가 이미 같은 형태다) | Task 2 |
+| `TriggerContext` | The type that `LoopSpec.assemble(ctx)`·`apply(result, ctx)`·`runLoop(id, ctx)` in delta §4 receive, but the delta never defined it | Task 1 |
+| `LoopSpec.decide?()` | The **model-free T0 pre-decision** required by A4 §9.2 (auto-archive ①③④ SQL)·§2.2 (three-stage classification). It is an optional field, so it does not break existing `LoopSpec` implementations | Task 1 |
+| `runLoopSpec(spec, ctx)` | `morningDigestLoop`/`nightlyDigestLoop` both share the `LoopId` `'digest'`, so the registry key collides. A lower-level entry point that bypasses the registry | Task 3 |
+| `LoopKernel` / `LoopLogger` | `@omnis/agents` does not depend on `@omnis/kernel` (contract §1). Minimal interfaces that `Kernel`/`Logger` are structurally assignable to | Task 4 |
+| `writeSystemItem` | A4 §1.6·§12.4·§9 repeat "leave it in the inbox as a system Item." Keep it in exactly one place inside `@omnis/agents` (the 4-line INSERT on the kernel side is intentional duplication — `apps/hub/src/archive.ts` already has the same shape) | Task 2 |
 
 ---
 
-## Task 1: 루프 계약 타입 + 레지스트리 (US-B06, tier: Opus)
+## Task 1: Loop contract types + registry (US-B06, tier: Opus)
 
-> **스토리** — 목표: `LoopSpec`/`LoopResult`/`LoopTrigger` + 루프 레지스트리. 산출물: `packages/agents/src/loop/{spec,registry}.ts`. 검증: `pnpm --filter @omnis/agents test`. 의존: B05.
+> **Story** — Goal: `LoopSpec`/`LoopResult`/`LoopTrigger` + the loop registry. Deliverables: `packages/agents/src/loop/{spec,registry}.ts`. Verification: `pnpm --filter @omnis/agents test`. Depends on: B05.
 
-**읽을 것:** A4 §1.1·§1.2·§1.5(팬텀 목록), 델타 §4.
-**만들지 말 것(YAGNI):** 루프 우선순위 큐, 루프별 feature flag, 동적 palette 편집 API. 전부 쓰는 곳이 없다.
+**Read:** A4 §1.1·§1.2·§1.5 (phantom list), delta §4.
+**Do not build (YAGNI):** a loop priority queue, per-loop feature flags, a dynamic palette editing API. Nothing uses any of them.
 
 **Files:**
 - Create: `packages/agents/src/loop/spec.ts`, `packages/agents/src/loop/registry.ts`, `packages/agents/src/tools/names.ts`, `packages/agents/test/loop-registry.test.ts`
@@ -57,11 +57,11 @@
 
 ### Steps
 
-- [ ] 1. tool 이름 집합을 먼저 만든다. `spec.ts`가 `palette: ReadonlyArray<ToolName>`을 참조하는데 tool 구현(Task 5)보다 먼저 필요하므로 **이름만** 담은 리프 모듈로 분리한다.
+- [ ] 1. Build the tool name set first. `spec.ts` references `palette: ReadonlyArray<ToolName>`, which is needed before the tool implementations (Task 5), so split it into a leaf module holding **names only**.
 
 ```ts
 // packages/agents/src/tools/names.ts
-// A4 §1.5. 이 파일은 값이 아니라 "이름"만 가진다 — 구현은 read.ts / propose.ts, 조립은 registry.ts.
+// A4 §1.5. This file holds "names" only, not values — implementations live in read.ts / propose.ts, assembly in registry.ts.
 
 export type ToolName =
   | "read_thread"
@@ -85,8 +85,8 @@ export const TOOL_NAMES: readonly ToolName[] = [
   "propose_route", "propose_self_model_patch",
 ] as const;
 
-/** A4 §1.5 마지막 문단: 레지스트리에 이 중 하나라도 등록되면 유닛 테스트가 깨진다.
- *  `archive`가 여기 있는 이유 — 자동 보관은 커널 잡의 SQL 전이지 모델이 부르는 tool이 아니다(A4 §9). */
+/** A4 §1.5 final paragraph: if any one of these ends up in the registry, the unit test breaks.
+ *  Why `archive` is here — auto-archive is a SQL transition in a kernel job, not a tool the model calls (A4 §9). */
 export const PHANTOM_TOOLS: readonly string[] = [
   "send_message", "send_email", "reply", "delete_item", "archive",
   "calendar_create", "calendar_update", "run_agent", "exec",
@@ -94,7 +94,7 @@ export const PHANTOM_TOOLS: readonly string[] = [
 ] as const;
 ```
 
-- [ ] 2. 실패하는 테스트를 쓴다. 레지스트리가 (a) 중복 id를 거부하고 (b) 팬텀 tool이 palette에 있으면 `PhantomToolError`를 던지고 (c) trigger 종류와 필드가 맞는지 본다.
+- [ ] 2. Write the failing test. It checks that the registry (a) rejects duplicate ids, (b) throws `PhantomToolError` when a phantom tool is in the palette, and (c) verifies that the trigger kind and its fields line up.
 
 ```ts
 // packages/agents/test/loop-registry.test.ts
@@ -161,22 +161,22 @@ describe("loop registry (A4 §1.1)", () => {
 });
 ```
 
-- [ ] 3. 테스트를 돌려 실패를 확인한다. 기대 실패: `Failed to resolve import "../src/index.js"`가 아니라 `No "registerLoop" export is defined on the "../src/index.js" mock` 계열 — 정확히는 `SyntaxError: The requested module '../src/index.js' does not provide an export named 'registerLoop'`.
+- [ ] 3. Run the test and confirm the failure. Expected failure: not `Failed to resolve import "../src/index.js"` but the `No "registerLoop" export is defined on the "../src/index.js" mock` family — specifically `SyntaxError: The requested module '../src/index.js' does not provide an export named 'registerLoop'`.
 
 ```bash
 pnpm --filter @omnis/agents test -- loop-registry
 ```
 
-- [ ] 4. `spec.ts`를 쓴다.
+- [ ] 4. Write `spec.ts`.
 
 ```ts
 // packages/agents/src/loop/spec.ts
-// A4 §1.1·§1.2. 커널은 루프를 알지 못하고 이 계약만 안다.
+// A4 §1.1·§1.2. The kernel knows nothing of loops; it knows only this contract.
 import type { z } from "zod";
 import type { AssembledContext } from "../context/assemble.js";
 import type { ToolName } from "../tools/names.js";
 
-/** A4 §1.1. agent_runs.loop의 부분집합이다 — Phase A가 더한 'summarize'는 루프가 아니라 B3 요약 헬퍼다. */
+/** A4 §1.1. A subset of agent_runs.loop — the 'summarize' value Phase A added is not a loop but the B3 summarize helper. */
 export type LoopId =
   | "classify" | "draft" | "task" | "delegate" | "digest"
   | "followup" | "note_route" | "auto_archive" | "ingest";
@@ -185,9 +185,9 @@ export type LoopKind = "reactive" | "deliberate";
 
 export interface LoopTrigger {
   kind: "event" | "schedule" | "manual";
-  /** kind='event': 커널 이벤트 kind. 예: 'item.labeled' */
+  /** kind='event': kernel event kind. e.g. 'item.labeled' */
   on?: string;
-  /** kind='event': 허브에서 평가되는 술어. 모델이 평가하지 않는다. */
+  /** kind='event': predicate evaluated in the hub. The model does not evaluate it. */
   where?: string;
   /** kind='schedule': TZ=Asia/Seoul 5-field cron */
   cron?: string;
@@ -201,10 +201,10 @@ export interface LoopBudget {
   maxSteps: number;
 }
 
-/** 델타에 없어서 이 계획이 고정한다. 루프가 "무엇에 대해 도는가"를 담는 봉투다. */
+/** Missing from the delta, so this plan fixes it. An envelope holding "what the loop runs against." */
 export interface TriggerContext {
   trigger_kind: "event" | "cron" | "manual";
-  /** cron 잡 이름만. item 트리거는 trigger_ref가 아니라 item_id를 쓴다(A4 §1.7). */
+  /** Cron job name only. Item triggers use item_id, not trigger_ref (A4 §1.7). */
   trigger_ref?: string;
   item_id?: string;
   thread_id?: string;
@@ -230,16 +230,16 @@ export interface LoopSpec<TOut> {
   id: LoopId;
   kind: LoopKind;
   trigger: LoopTrigger;
-  /** 비가역 tool은 여기 들어갈 수 없다 — registerLoop이 PhantomToolError로 막는다(A4-D3). */
+  /** Irreversible tools cannot go here — registerLoop blocks them with PhantomToolError (A4-D3). */
   palette: ReadonlyArray<ToolName>;
   budget: LoopBudget;
   tier: "T0" | "T1" | "T2";
   outputSchema: z.ZodType<TOut>;
-  /** 델타 추가(선택). 모델 없이 결론이 나는 T0 경로. null을 돌려주면 모델 경로로 내려간다.
-   *  A4 §9.2의 자동 보관 ①③④가 이 자리에 들어간다. */
+  /** Delta addition (optional). The T0 path where a conclusion is reached without a model. Returning null falls through to the model path.
+   *  Auto-archive ①③④ from A4 §9.2 goes here. */
   decide?(ctx: TriggerContext): Promise<Omit<LoopResult<TOut>, "run_id"> | null>;
   assemble(ctx: TriggerContext): Promise<AssembledContext>;
-  /** 제안만 쓴다. egress 모듈은 여기서도 import 금지(A4 §1.1). */
+  /** Proposals only. Importing egress modules is forbidden here too (A4 §1.1). */
   apply(result: LoopResult<TOut>, ctx: TriggerContext): Promise<void>;
 }
 
@@ -263,7 +263,7 @@ export class PhantomToolError extends Error {
 }
 ```
 
-- [ ] 5. `registry.ts`를 쓴다.
+- [ ] 5. Write `registry.ts`.
 
 ```ts
 // packages/agents/src/loop/registry.ts
@@ -306,16 +306,16 @@ export function listLoops(): LoopSpec<unknown>[] {
   return [...registry.values()];
 }
 
-/** 테스트 전용. 프로덕션 코드에서 호출하지 않는다. */
+/** Test-only. Do not call this from production code. */
 export function resetLoopRegistryForTest(): void {
   registry.clear();
 }
 ```
 
-- [ ] 6. `index.ts`에 re-export를 더한다.
+- [ ] 6. Add the re-exports to `index.ts`.
 
 ```ts
-// packages/agents/src/index.ts — 파일 끝에 추가
+// packages/agents/src/index.ts — append at the end of the file
 export {
   LoopBudgetError, PhantomToolError,
   type LoopBudget, type LoopId, type LoopKind, type LoopResult, type LoopSpec,
@@ -325,21 +325,21 @@ export { getLoop, listLoops, registerLoop, resetLoopRegistryForTest } from "./lo
 export { PHANTOM_TOOLS, TOOL_NAMES, type ToolName } from "./tools/names.js";
 ```
 
-- [ ] 7. 테스트를 돌려 통과를 확인한다. 기대: `loop-registry.test.ts` 5 tests passed.
+- [ ] 7. Run the tests and confirm they pass. Expected: `loop-registry.test.ts` 5 tests passed.
 
 ```bash
 pnpm --filter @omnis/agents test -- loop-registry && pnpm lint
 ```
 
-- [ ] 8. 커밋한다.
+- [ ] 8. Commit.
 
 ```bash
 git add packages/agents/src/loop packages/agents/src/tools/names.ts packages/agents/src/index.ts packages/agents/test/loop-registry.test.ts
-git commit -m "US-B06: 루프 계약 타입과 레지스트리
+git commit -m "US-B06: loop contract types and registry
 
-- LoopSpec/LoopResult/LoopTrigger/LoopBudget/TriggerContext 고정(델타 §4 + TriggerContext·decide 추가)
-- registerLoop이 팬텀 tool 12종·중복 id·트리거 필드 누락·비양수 예산을 거부한다
-- PHANTOM_TOOLS/TOOL_NAMES를 리프 모듈로 분리해 tool 구현보다 먼저 참조 가능하게 했다
+- Fix LoopSpec/LoopResult/LoopTrigger/LoopBudget/TriggerContext (delta §4 + the added TriggerContext and decide)
+- registerLoop rejects all 12 phantom tools, duplicate ids, missing trigger fields, and non-positive budgets
+- Split PHANTOM_TOOLS/TOOL_NAMES into a leaf module so they can be referenced before the tool implementations
 
 Implemented-by: Claude Opus
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -347,12 +347,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 2: 시스템 Item 헬퍼 (US-B06, tier: Sonnet)
+## Task 2: System Item helper (US-B06, tier: Sonnet)
 
-> **스토리** — 목표: A4 §1.6의 "시스템 Item으로 인박스에 남긴다"를 한 군데로 모은다. 산출물: `packages/agents/src/system-item.ts`. 검증: `pnpm --filter @omnis/agents test`.
+> **Story** — Goal: consolidate A4 §1.6's "leave it in the inbox as a system Item" into one place. Deliverables: `packages/agents/src/system-item.ts`. Verification: `pnpm --filter @omnis/agents test`.
 
-**읽을 것:** A3 §2(`items` 컬럼·`accounts_channel_ck`의 `system` 값), `apps/hub/src/archive.ts`(같은 형태의 기존 INSERT).
-**만들지 말 것(YAGNI):** 시스템 Item 전용 테이블, 심각도 enum, 중복 억제 캐시. 필요해지면 `meta`에 키를 더한다.
+**Read:** A3 §2 (`items` columns · the `system` value of `accounts_channel_ck`), `apps/hub/src/archive.ts` (an existing INSERT of the same shape).
+**Do not build (YAGNI):** a system-Item-only table, a severity enum, a dedup cache. If the need arises, add a key to `meta`.
 
 **Files:**
 - Create: `packages/agents/src/system-item.ts`, `packages/agents/test/integration/system-item.test.ts`
@@ -365,7 +365,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다.
+- [ ] 1. Write the failing test.
 
 ```ts
 // packages/agents/test/integration/system-item.test.ts
@@ -381,8 +381,8 @@ afterAll(() => pool.end());
 
 describe("writeSystemItem (A4 §1.6)", () => {
   it("creates the system account/thread once and appends an item", async () => {
-    const a = await writeSystemItem({ body: "자동 처리 실패 1건", meta: { loop: "draft" } });
-    const b = await writeSystemItem({ body: "자동 처리 실패 2건" });
+    const a = await writeSystemItem({ body: "1 automatic-processing failure", meta: { loop: "draft" } });
+    const b = await writeSystemItem({ body: "2 automatic-processing failures" });
     expect(a).not.toBe(b);
 
     const { rows } = await pool.query<{ kind: string; status: string; body: string; meta: unknown }>(
@@ -413,7 +413,7 @@ describe("writeSystemItem (A4 §1.6)", () => {
       [accountId],
     );
     const threadId = thr.rows[0]?.id ?? "";
-    const id = await writeSystemItem({ body: "이 스레드에 남긴다", thread_id: threadId });
+    const id = await writeSystemItem({ body: "leave this on the thread", thread_id: threadId });
     const { rows } = await pool.query<{ thread_id: string }>(
       "SELECT thread_id FROM items WHERE id = $1",
       [id],
@@ -423,19 +423,19 @@ describe("writeSystemItem (A4 §1.6)", () => {
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `does not provide an export named 'writeSystemItem'`.
+- [ ] 2. Confirm the failure. Expected: `does not provide an export named 'writeSystemItem'`.
 
 ```bash
 pnpm --filter @omnis/agents test -- system-item
 ```
 
-- [ ] 3. 구현을 쓴다.
+- [ ] 3. Write the implementation.
 
 ```ts
 // packages/agents/src/system-item.ts
-// A4 §1.6·§12.4·§9: 실패와 정책 전이는 조용히 삼키지 않고 인박스에 남긴다.
-// ponytail: 커널(@omnis/kernel)도 같은 INSERT를 필요로 하지만 agents를 의존할 수 없어 4줄짜리
-// SQL을 각자 갖는다(apps/hub/src/archive.ts가 이미 같은 형태다). 의도된 중복 — 공용 패키지로 뽑지 않는다.
+// A4 §1.6·§12.4·§9: failures and policy transitions are not swallowed silently — they are left in the inbox.
+// ponytail: the kernel (@omnis/kernel) needs the same INSERT but cannot depend on agents, so each
+// carries its own four-line SQL (apps/hub/src/archive.ts already has the same shape). Intentional duplication — do not extract into a shared package.
 import { getAgentsPool } from "./pool.js";
 
 export const SYSTEM_ACCOUNT_EXTERNAL_ID = "omnis";
@@ -443,7 +443,7 @@ export const SYSTEM_THREAD_EXTERNAL_ID = "system:agents";
 
 export interface SystemItemInput {
   body: string;
-  /** 없으면 system 채널의 단일 'system:agents' 스레드에 붙인다. */
+  /** If omitted, attaches to the single 'system:agents' thread on the system channel. */
   thread_id?: string;
   subject?: string;
   meta?: Record<string, unknown>;
@@ -489,25 +489,25 @@ export async function writeSystemItem(input: SystemItemInput): Promise<string> {
 }
 ```
 
-- [ ] 4. `index.ts`에 export를 더한다.
+- [ ] 4. Add the export to `index.ts`.
 
 ```ts
-// packages/agents/src/index.ts — 추가
+// packages/agents/src/index.ts — added
 export {
   SYSTEM_ACCOUNT_EXTERNAL_ID, SYSTEM_THREAD_EXTERNAL_ID,
   writeSystemItem, type SystemItemInput,
 } from "./system-item.js";
 ```
 
-- [ ] 5. 통과를 확인하고 커밋한다.
+- [ ] 5. Confirm it passes and commit.
 
 ```bash
 pnpm --filter @omnis/agents test -- system-item && pnpm lint
 git add packages/agents/src/system-item.ts packages/agents/src/index.ts packages/agents/test/integration/system-item.test.ts
-git commit -m "US-B06: 시스템 Item 헬퍼
+git commit -m "US-B06: system Item helper
 
-- writeSystemItem이 system 채널 계정/스레드를 멱등하게 만들고 items(kind='system')를 남긴다
-- thread_id를 주면 그 스레드에, 없으면 단일 system:agents 스레드에 붙인다
+- writeSystemItem idempotently creates the system channel account/thread and leaves an items(kind='system') row
+- With thread_id it attaches to that thread; otherwise it attaches to the single system:agents thread
 
 Implemented-by: Claude Sonnet
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -515,12 +515,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 3: runLoopSpec — 예산 강제 + 실패 처리 7종 (US-B06, tier: Opus)
+## Task 3: runLoopSpec — budget enforcement + the seven failure cases (US-B06, tier: Opus)
 
-> **스토리** — 목표: 예산 강제(`LoopBudgetError`), A4 §1.6의 공통 실패 처리 7종, 모든 실행이 `recordRun`/`finishRun` 한 쌍. 산출물: `packages/agents/src/loop/run.ts`. 검증: `pnpm --filter @omnis/agents test`.
+> **Story** — Goal: budget enforcement (`LoopBudgetError`), the seven common failure cases in A4 §1.6, and exactly one `recordRun`/`finishRun` pair per execution. Deliverables: `packages/agents/src/loop/run.ts`. Verification: `pnpm --filter @omnis/agents test`.
 
-**읽을 것:** A4 §1.6 표 전체, §1.7, §12.1(T1/T2 provider), 기존 `packages/agents/src/classify.ts`(같은 recordRun 패턴), `packages/agents/src/t1/provider.ts`.
-**만들지 말 것(YAGNI):** 지수 백오프 라이브러리, 서킷 브레이커, 루프별 커스텀 재시도 정책. A4가 정한 건 1s→4s 두 번뿐이다.
+**Read:** the whole A4 §1.6 table, §1.7, §12.1 (T1/T2 providers), the existing `packages/agents/src/classify.ts` (same recordRun pattern), `packages/agents/src/t1/provider.ts`.
+**Do not build (YAGNI):** an exponential backoff library, a circuit breaker, per-loop custom retry policies. All A4 specifies is two waits, 1s→4s.
 
 **Files:**
 - Create: `packages/agents/src/t2/provider.ts`, `packages/agents/src/loop/run.ts`, `packages/agents/test/integration/loop-run.test.ts`
@@ -533,19 +533,19 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Steps
 
-- [ ] 1. T2 provider를 쓴다. **OpenRouter 경유 Claude Sonnet 5**다 — Anthropic 직접 경로는 Batch API(Task 23)에서만 쓰고, 동기 호출은 이미 핀된 `@ai-sdk/openai-compatible` 하나로 끝낸다(새 SDK 의존 0).
+- [ ] 1. Write the T2 provider. It is **Claude Sonnet 5 via OpenRouter** — the direct Anthropic path is used only for the Batch API (Task 23), and synchronous calls are handled entirely by the already-pinned `@ai-sdk/openai-compatible` (zero new SDK dependencies).
 
 ```ts
 // packages/agents/src/t2/provider.ts
-// A4 §12.1: T2 = Claude Sonnet 5 하나뿐이다. 게이트웨이는 OpenRouter(토큰 마크업 없음).
-// Anthropic 직접 경로는 Message Batches(§6.5)에서만 쓴다 — 그건 SDK 없이 fetch로 친다(Task 23).
+// A4 §12.1: T2 is Claude Sonnet 5 and nothing else. The gateway is OpenRouter (no token markup).
+// The direct Anthropic path is used only for Message Batches (§6.5) — that one goes over raw fetch with no SDK (Task 23).
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { LanguageModel } from "ai";
 
 export const T2_BASE_URL = "https://openrouter.ai/api/v1";
-/** OpenRouter 라우팅 슬러그. */
+/** OpenRouter routing slug. */
 export const T2_MODEL_ID = "anthropic/claude-sonnet-5";
-/** A3 §4 agent_runs.model에 기록하는 값(A4 §12.1 표기 그대로). */
+/** The value recorded in A3 §4 agent_runs.model (exactly as written in A4 §12.1). */
 export const T2_RUN_MODEL = "claude-sonnet-5";
 
 export function t2Model(): LanguageModel {
@@ -557,7 +557,7 @@ export function t2Model(): LanguageModel {
 }
 ```
 
-- [ ] 2. 실패하는 테스트를 쓴다. 다섯 가지 실패 경로를 각각 본다.
+- [ ] 2. Write the failing test. It covers each of the five failure paths.
 
 ```ts
 // packages/agents/test/integration/loop-run.test.ts
@@ -587,7 +587,7 @@ beforeAll(async () => {
   threadId = t.rows[0]?.id ?? "";
   const i = await pool.query<{ id: string }>(
     `INSERT INTO items (thread_id, account_id, external_id, kind, body, sent_at)
-     VALUES ($1,$2,'it_loop','message','안녕하세요', now())
+     VALUES ($1,$2,'it_loop','message','Hello there', now())
      ON CONFLICT (account_id, external_id) DO UPDATE SET body = EXCLUDED.body RETURNING id`,
     [threadId, accountId],
   );
@@ -607,7 +607,7 @@ function makeSpec(over: Record<string, unknown> = {}) {
     tier: "T1" as const,
     outputSchema: Out,
     assemble: async () => ({
-      cachedPrefix: "system", volatile: [{ id: "d1", source: "thread", text: "본문" }],
+      cachedPrefix: "system", volatile: [{ id: "d1", source: "thread", text: "body" }],
       tokenEstimate: 100, truncated: false, provenance: [],
     }),
     apply: async () => undefined,
@@ -662,11 +662,11 @@ beforeEach(async () => {
 
 describe("runLoopSpec (A4 §1.6)", () => {
   it("records exactly one run pair on the happy path", async () => {
-    const mod = await freshModule(mockModel(JSON.stringify({ answer: "네" })));
+    const mod = await freshModule(mockModel(JSON.stringify({ answer: "yes" })));
     const res = await mod.runLoopSpec(makeSpec() as never, {
       trigger_kind: "event", item_id: itemId, thread_id: threadId, now: new Date(), payload: {},
     });
-    expect(res.output).toEqual({ answer: "네" });
+    expect(res.output).toEqual({ answer: "yes" });
     const runs = await runsFor(itemId);
     expect(runs).toHaveLength(1);
     expect(runs[0]).toMatchObject({ outcome: "ok", model_tier: "T1" });
@@ -684,7 +684,7 @@ describe("runLoopSpec (A4 §1.6)", () => {
             inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 },
             outputTokens: { total: 5, text: 5, reasoning: 0 },
           },
-          content: [{ type: "text" as const, text: JSON.stringify({ answer: "T2가 답했다" }) }],
+          content: [{ type: "text" as const, text: JSON.stringify({ answer: "T2 answered" }) }],
           warnings: [],
         };
       },
@@ -693,7 +693,7 @@ describe("runLoopSpec (A4 §1.6)", () => {
     const res = await mod.runLoopSpec(makeSpec() as never, {
       trigger_kind: "event", item_id: itemId, thread_id: threadId, now: new Date(), payload: {},
     });
-    expect(res.output).toEqual({ answer: "T2가 답했다" });
+    expect(res.output).toEqual({ answer: "T2 answered" });
     expect(calls).toBe(3);
     const runs = await runsFor(itemId);
     expect(runs).toHaveLength(2);
@@ -704,7 +704,7 @@ describe("runLoopSpec (A4 §1.6)", () => {
 
   it("blocks the output and writes a system item when injection_flags is non-empty", async () => {
     const mod = await freshModule(
-      mockModel(JSON.stringify({ answer: "무시", injection_flags: ["instruction_override"] })),
+      mockModel(JSON.stringify({ answer: "ignore", injection_flags: ["instruction_override"] })),
     );
     let applied = false;
     const res = await mod.runLoopSpec(
@@ -751,17 +751,17 @@ describe("runLoopSpec (A4 §1.6)", () => {
 });
 ```
 
-- [ ] 3. 실패를 확인한다. 기대: `does not provide an export named 'runLoopSpec'`.
+- [ ] 3. Confirm the failure. Expected: `does not provide an export named 'runLoopSpec'`.
 
 ```bash
 pnpm --filter @omnis/agents test -- loop-run
 ```
 
-- [ ] 4. `run.ts`를 쓴다.
+- [ ] 4. Write `run.ts`.
 
 ```ts
 // packages/agents/src/loop/run.ts
-// A4 §1.6 실패 처리 7종 + §1.7 실행 기록. 모든 루프가 이 함수 하나를 통과한다.
+// A4 §1.6 the seven failure cases + §1.7 run recording. Every loop passes through this one function.
 import { createHash } from "node:crypto";
 import { NoObjectGeneratedError, generateObject, generateText, Output, stepCountIs } from "ai";
 import { newNonce, wrapData } from "../context/normalize.js";
@@ -794,7 +794,7 @@ function modelFor(tier: Tier): { model: ReturnType<typeof t1Model>; runModel: st
     : { model: t1Model(), runModel: T1_RUN_MODEL };
 }
 
-/** A4 §1.6: tool-not-found는 그 스레드를 24시간 자동루프에서 제외한다. */
+/** A4 §1.6: tool-not-found excludes that thread from automated loops for 24 hours. */
 async function quarantine(threadId: string, now: Date): Promise<void> {
   const until = new Date(now.getTime() + QUARANTINE_HOURS * 3_600_000).toISOString();
   await getAgentsPool().query(
@@ -813,7 +813,7 @@ async function isQuarantined(threadId: string, now: Date): Promise<boolean> {
   return until !== undefined && until !== null && new Date(until) > now;
 }
 
-/** A4 §1.6: 같은 item에 24시간 내 3회 실패하면 agent_optout으로 마킹하고 더 안 돈다. */
+/** A4 §1.6: three failures on the same item within 24 hours marks agent_optout and stops running it. */
 async function tooManyFailures(loop: LoopId, itemId: string): Promise<boolean> {
   const { rows } = await getAgentsPool().query<{ n: string }>(
     `SELECT count(*)::text AS n FROM agent_runs
@@ -902,12 +902,12 @@ function stringField(output: unknown, key: string, fallback: string): string {
   return typeof v === "string" ? v : fallback;
 }
 
-/** 레지스트리를 타지 않는 하위 진입점. digest 두 루프가 같은 LoopId를 쓰므로 필요하다. */
+/** A lower-level entry point that bypasses the registry. Needed because the two digest loops share a LoopId. */
 export async function runLoopSpec<T>(
   spec: LoopSpec<T>,
   ctx: TriggerContext,
 ): Promise<LoopResult<T>> {
-  // ── 게이트 1·2: quarantine, 24h 3회 실패
+  // ── Gates 1 and 2: quarantine, 3 failures in 24h
   if (ctx.thread_id !== undefined && (await isQuarantined(ctx.thread_id, ctx.now))) {
     return skipped(spec, ctx, "thread is quarantined for 24h (phantom tool)");
   }
@@ -916,7 +916,7 @@ export async function runLoopSpec<T>(
     return skipped(spec, ctx, "3 failures in 24h — marked agent_optout");
   }
 
-  // ── T0 선판정: 모델을 부르지 않고 끝나는 경로(A4 §9.2 ①③④)
+  // ── T0 pre-decision: the path that finishes without calling a model (A4 §9.2 ①③④)
   const decided = spec.decide === undefined ? null : await spec.decide(ctx);
   if (decided !== null) {
     const runId = await recordRun({
@@ -956,7 +956,7 @@ export async function runLoopSpec<T>(
   let lastError: unknown = null;
   let lastRaw = "";
 
-  // A4 §1.6: 같은 티어 1회 재시도 → 한 티어 상승해 1회 → failed.
+  // A4 §1.6: one retry at the same tier → one attempt one tier up → failed.
   for (let attempt = 0; attempt < 3; attempt += 1) {
     if (attempt === 2) {
       const raised = nextTier(tier);
@@ -993,10 +993,10 @@ export async function runLoopSpec<T>(
         context_hash: assembled.cachedPrefix === "" ? undefined : hash(assembled.cachedPrefix),
         ...gen.usage,
       });
-      // A4 §1.6: injection_flags가 비어 있지 않으면 결과물을 만들지 않는다.
+      // A4 §1.6: when injection_flags is non-empty, do not produce a result.
       if (flags.length > 0) {
         await writeSystemItem({
-          body: "이 메시지에 지시문으로 보이는 내용이 있어 자동 처리를 건너뛰었습니다.",
+          body: "This message contains text that looks like instructions, so automatic processing was skipped.",
           ...(ctx.thread_id !== undefined ? { thread_id: ctx.thread_id } : {}),
           meta: { loop: spec.id, injection_flags: flags, run_id: runId },
         });
@@ -1016,7 +1016,7 @@ export async function runLoopSpec<T>(
     ...(lastRaw !== "" ? { raw_output: lastRaw } : {}),
   });
   await writeSystemItem({
-    body: `자동 처리에 실패했습니다(${spec.id}). 직접 확인해 주세요.`,
+    body: `Automatic processing failed (${spec.id}). Please check it manually.`,
     ...(ctx.thread_id !== undefined ? { thread_id: ctx.thread_id } : {}),
     meta: { loop: spec.id, run_id: runId },
   });
@@ -1062,21 +1062,21 @@ async function skipped<T>(
   };
 }
 
-/** A4 §12.2: 캐시 히트율을 사후에 재려면 sha256(cachedPrefix)이 agent_runs에 남아야 한다. */
+/** A4 §12.2: to measure the cache hit rate after the fact, sha256(cachedPrefix) must be recorded in agent_runs. */
 function hash(s: string): string {
   return createHash("sha256").update(s).digest("hex");
 }
 ```
 
-- [ ] 5. `no-egress.test.ts`를 고친다. `/\btools\s*:/` 정규식은 `generateText({ tools: toolRegistry(...) })`를 잡아버리므로 **팬텀 이름 목록 검사**로 갈아끼우고, provider SDK 허용 디렉터리에 `t2/`를 더한다.
+- [ ] 5. Fix `no-egress.test.ts`. The `/\btools\s*:/` regex also catches `generateText({ tools: toolRegistry(...) })`, so replace it with a **phantom-name list check** and add `t2/` to the directories allowed to import provider SDKs.
 
 ```ts
-// packages/agents/test/no-egress.test.ts — describe 블록 전체를 교체
+// packages/agents/test/no-egress.test.ts — replace the whole describe block
 import { PHANTOM_TOOLS } from "../src/tools/names.js";
 
-describe("@omnis/agents tool isolation (A7 §7 공통 금지)", () => {
+describe("@omnis/agents tool isolation (A7 §7 common prohibitions)", () => {
   it("never mentions an irreversible tool name in a tool definition", () => {
-    // 이름 목록은 names.ts가 소유하고, 여기서는 "정의로 등장하지 않는가"만 본다.
+    // names.ts owns the name list; here we only check that they never appear as definitions.
     for (const f of sources(SRC)) {
       if (f.endsWith(`${"tools"}/names.ts`)) continue;
       const text = readFileSync(f, "utf8");
@@ -1098,34 +1098,34 @@ describe("@omnis/agents tool isolation (A7 §7 공통 금지)", () => {
 });
 ```
 
-- [ ] 6. `index.ts`에 export를 더한다.
+- [ ] 6. Add the exports to `index.ts`.
 
 ```ts
-// packages/agents/src/index.ts — 추가
+// packages/agents/src/index.ts — added
 export {
   FAILURE_LIMIT, FAILURE_WINDOW_HOURS, QUARANTINE_HOURS, runLoop, runLoopSpec,
 } from "./loop/run.js";
 export { T2_BASE_URL, T2_MODEL_ID, T2_RUN_MODEL } from "./t2/provider.js";
 ```
 
-- [ ] 7. 통과를 확인한다. 기대: `loop-run.test.ts` 5 tests passed, `no-egress.test.ts` 2 tests passed.
+- [ ] 7. Confirm it passes. Expected: `loop-run.test.ts` 5 tests passed, `no-egress.test.ts` 2 tests passed.
 
 ```bash
 pnpm --filter @omnis/agents test && pnpm lint
 ```
 
-- [ ] 8. 커밋한다.
+- [ ] 8. Commit.
 
 ```bash
 git add packages/agents/src/loop/run.ts packages/agents/src/t2 packages/agents/src/index.ts packages/agents/test
-git commit -m "US-B06: runLoopSpec — 예산 강제와 실패 처리 7종
+git commit -m "US-B06: runLoopSpec — budget enforcement and the seven failure cases
 
-- 타임아웃 1회 재시도 → 한 티어 상승 1회 → failed + 시스템 Item
-- 스키마 위반 원문을 agent_runs.raw_output에 보관
-- tool-not-found → injection_flags += phantom_tool + 스레드 24h quarantine
-- injection_flags 비어있지 않으면 apply를 부르지 않는다
-- 같은 item 24h 3회 실패 → items.meta.agent_optout
-- 모든 경로가 recordRun/finishRun 한 쌍을 남긴다
+- On timeout: one retry → one attempt one tier up → failed + a system Item
+- Keep the raw schema-violation text in agent_runs.raw_output
+- tool-not-found → injection_flags += phantom_tool + 24h thread quarantine
+- When injection_flags is non-empty, apply is not called
+- 3 failures on the same item within 24h → items.meta.agent_optout
+- Every path leaves exactly one recordRun/finishRun pair
 
 Implemented-by: Claude Opus
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -1133,12 +1133,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 4: startLoops — 커널 이벤트·스케줄러 배선 (US-B06, tier: Opus)
+## Task 4: startLoops — kernel event and scheduler wiring (US-B06, tier: Opus)
 
-> **스토리** — 목표: 루프 레지스트리를 커널 스케줄러·이벤트에 붙인다. 산출물: `packages/agents/src/loop/start.ts`. 검증: `pnpm --filter @omnis/agents test`.
+> **Story** — Goal: attach the loop registry to the kernel scheduler and events. Deliverables: `packages/agents/src/loop/start.ts`. Verification: `pnpm --filter @omnis/agents test`.
 
-**읽을 것:** `packages/kernel/src/events.ts`(ephemeral emit = kind로 팬아웃), `apps/hub/src/summarize-job.ts`(같은 디바운스 패턴), `packages/kernel/src/scheduler.ts`.
-**만들지 말 것(YAGNI):** 자체 이벤트 버스, 슬라이딩 디바운스, 루프 동시성 제한. 커널 스케줄러가 이미 틱 단위 직렬이다.
+**Read:** `packages/kernel/src/events.ts` (ephemeral emit fans out by kind), `apps/hub/src/summarize-job.ts` (same debounce pattern), `packages/kernel/src/scheduler.ts`.
+**Do not build (YAGNI):** a bespoke event bus, sliding debounce, loop concurrency limits. The kernel scheduler is already serial per tick.
 
 **Files:**
 - Create: `packages/agents/src/loop/start.ts`, `packages/agents/test/loop-start.test.ts`
@@ -1151,7 +1151,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. 커널은 구조적 스텁으로 갈음한다(DB 불필요 → `test/` 루트의 유닛 테스트다).
+- [ ] 1. Write the failing test. The kernel is replaced by a structural stub (no DB needed → this is a unit test at the root of `test/`).
 
 ```ts
 // packages/agents/test/loop-start.test.ts
@@ -1173,7 +1173,7 @@ function fakeKernel() {
           subs.set(channel, fn);
           return () => subs.delete(channel);
         },
-        async emit() { /* 루프는 이벤트를 쏘지 않는다 */ },
+        async emit() { /* loops do not emit events */ },
       },
       scheduler: {
         register(name: string, cron: string, handler: () => Promise<void>) {
@@ -1237,18 +1237,18 @@ describe("startLoops", () => {
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `does not provide an export named 'startLoops'`.
+- [ ] 2. Confirm the failure. Expected: `does not provide an export named 'startLoops'`.
 
 ```bash
 pnpm --filter @omnis/agents test -- loop-start
 ```
 
-- [ ] 3. 구현을 쓴다.
+- [ ] 3. Write the implementation.
 
 ```ts
 // packages/agents/src/loop/start.ts
-// @omnis/agents는 @omnis/kernel을 의존하지 않는다(계약 §1). Kernel/Logger가 구조적으로
-// 대입되는 최소 인터페이스만 여기 둔다 — 허브가 createKernel()의 결과를 그대로 넘긴다.
+// @omnis/agents does not depend on @omnis/kernel (contract §1). Keep only the minimal
+// interfaces that Kernel/Logger are structurally assignable to here — the hub passes createKernel()'s result straight through.
 import { listLoops } from "./registry.js";
 import { runLoopSpec } from "./run.js";
 import type { LoopId, LoopSpec, TriggerContext } from "./spec.js";
@@ -1269,7 +1269,7 @@ export interface LoopLogger {
   error(msg: string, extra?: Record<string, unknown>): void;
 }
 
-/** schedule 트리거를 쓰는 루프의 jobs.name. 이름은 A3 0006_kernel.sql seed와 1:1이다. */
+/** jobs.name for loops that use a schedule trigger. The names map 1:1 to the A3 0006_kernel.sql seed. */
 export const LOOP_JOB_NAME: Partial<Record<LoopId, string>> = {
   auto_archive: "auto_archive_sweep",
   followup: "network_inactive_sweep",
@@ -1309,8 +1309,8 @@ export function startLoops(deps: { kernel: LoopKernel; logger: LoopLogger }): ()
     }
     if (spec.trigger.kind !== "event" || spec.trigger.on === undefined) continue;
 
-    // ponytail: 고정 지연 디바운스 — 첫 이벤트가 타이머를 걸고, 창이 열린 동안 온 같은 키는
-    // 버린다(apps/hub/src/summarize-job.ts와 같은 형태). 슬라이딩이 필요해지면 그때 바꾼다.
+    // ponytail: fixed-delay debounce — the first event starts the timer, and the same key arriving
+    // while the window is open is dropped (same shape as apps/hub/src/summarize-job.ts). Switch to sliding if the need arises.
     const pending = new Set<string>();
     const debounceMs = spec.trigger.debounceMs ?? 0;
     stops.push(
@@ -1343,33 +1343,33 @@ export function startLoops(deps: { kernel: LoopKernel; logger: LoopLogger }): ()
 }
 ```
 
-- [ ] 4. `index.ts`에 export를 더하고 허브에 배선한다.
+- [ ] 4. Add the exports to `index.ts` and wire them into the hub.
 
 ```ts
-// packages/agents/src/index.ts — 추가
+// packages/agents/src/index.ts — added
 export { LOOP_JOB_NAME, startLoops, type LoopKernel, type LoopLogger } from "./loop/start.js";
 ```
 
 ```ts
-// apps/hub/src/main.ts — import에 startLoops를 더하고,
-// registerSummaryJob 바로 아래(= scheduler.start() 뒤)에 추가한다.
+// apps/hub/src/main.ts — add startLoops to the imports and
+// place it right below registerSummaryJob (= after scheduler.start()).
 //   import { configureAgents, startLoops, summarizeThread } from "@omnis/agents";
 const stopLoops = startLoops({ kernel, logger });
 ```
 
-그리고 `close()`의 `stopSummaryJob();` 바로 아래에 `stopLoops();`를 더한다.
+Then add `stopLoops();` right below `stopSummaryJob();` in `close()`.
 
-- [ ] 5. 통과를 확인하고 커밋한다. 기대: `loop-start.test.ts` 3 tests passed.
+- [ ] 5. Confirm it passes and commit. Expected: `loop-start.test.ts` 3 tests passed.
 
 ```bash
 pnpm --filter @omnis/agents test -- loop-start && pnpm --filter @omnis/hub test && pnpm lint
 git add packages/agents/src/loop/start.ts packages/agents/src/index.ts packages/agents/test/loop-start.test.ts apps/hub/src/main.ts
-git commit -m "US-B06: startLoops — 커널 이벤트/스케줄러 배선
+git commit -m "US-B06: startLoops — kernel event/scheduler wiring
 
-- event 트리거는 debounceMs 고정 지연 디바운스로 runLoopSpec을 한 번만 부른다
-- schedule 트리거는 LOOP_JOB_NAME의 기존 jobs.name으로 scheduler.register된다
-- LoopKernel/LoopLogger 구조적 인터페이스로 @omnis/kernel 의존을 만들지 않는다
-- 허브가 부팅 때 startLoops를 걸고 종료 때 푼다
+- Event triggers call runLoopSpec exactly once via a debounceMs fixed-delay debounce
+- Schedule triggers are registered through scheduler.register under the existing jobs.name in LOOP_JOB_NAME
+- LoopKernel/LoopLogger structural interfaces avoid creating a dependency on @omnis/kernel
+- The hub installs startLoops at boot and releases it at shutdown
 
 Implemented-by: Claude Opus
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -1377,12 +1377,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 5: tool palette — 읽기 7종 + `propose_*` 6종 (US-B07, tier: Opus)
+## Task 5: tool palette — the seven read tools + the six `propose_*` tools (US-B07, tier: Opus)
 
-> **스토리** — 목표: 읽기 tool 7종 + `propose_*` 6종, `propose_*`는 저장만. 팬텀 12종이 레지스트리에 있으면 깨지는 유닛 테스트 + `packages/agents/**` → `packages/kernel/src/egress/**` import 금지 lint 규칙. 산출물: `packages/agents/src/tools/*.ts`, `biome.jsonc`(수정). 검증: `pnpm --filter @omnis/agents test && pnpm lint`. 의존: B06.
+> **Story** — Goal: seven read tools + six `propose_*` tools, where `propose_*` only saves. A unit test that breaks if any of the 12 phantom tools is in the registry, plus a lint rule forbidding `packages/agents/**` → `packages/kernel/src/egress/**` imports. Deliverables: `packages/agents/src/tools/*.ts`, `biome.jsonc` (modified). Verification: `pnpm --filter @omnis/agents test && pnpm lint`. Depends on: B06.
 
-**읽을 것:** A4 §1.5 전체(입출력 표 + 6개 JSON Schema + 팬텀 목록), A3 §4(`tasks`/`pending_approvals`/`notes` 컬럼), 델타 §4.
-**만들지 말 것(YAGNI):** tool별 권한 체크 레이어, tool 결과 캐시, `propose_*`의 배치 버전. 루프 하나당 호출이 한 자릿수다.
+**Read:** all of A4 §1.5 (the input/output table + the 6 JSON Schemas + the phantom list), A3 §4 (`tasks`/`pending_approvals`/`notes` columns), delta §4.
+**Do not build (YAGNI):** a per-tool permission-check layer, a tool result cache, batch versions of `propose_*`. Calls per loop are in the single digits.
 
 **Files:**
 - Create: `packages/agents/src/tools/read.ts`, `packages/agents/src/tools/propose.ts`, `packages/agents/src/tools/registry.ts`, `packages/agents/test/integration/tools.test.ts`
@@ -1395,7 +1395,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. (a) 레지스트리가 palette에 있는 이름만 내고, (b) 팬텀 이름은 어떤 경우에도 키로 나타나지 않고, (c) `propose_task`가 실제로 `tasks` row를 만든다.
+- [ ] 1. Write the failing test. (a) the registry exposes only names present in the palette, (b) phantom names never appear as keys under any circumstance, and (c) `propose_task` actually creates a `tasks` row.
 
 ```ts
 // packages/agents/test/integration/tools.test.ts
@@ -1424,7 +1424,7 @@ beforeAll(async () => {
   threadId = t.rows[0]?.id ?? "";
   const i = await pool.query<{ id: string }>(
     `INSERT INTO items (thread_id, account_id, external_id, kind, subject, body, sent_at)
-     VALUES ($1,$2,'it_tools','email','견적','내일까지 보내드릴게요', now())
+     VALUES ($1,$2,'it_tools','email','Quote','I will send it by tomorrow', now())
      ON CONFLICT (account_id, external_id) DO UPDATE SET body = EXCLUDED.body RETURNING id`,
     [threadId, accountId],
   );
@@ -1456,7 +1456,7 @@ describe("tool palette (A4 §1.5)", () => {
   it("propose_task stores an open task and returns its id", async () => {
     const set = toolRegistry(["propose_task"]);
     const out = (await set.propose_task?.execute?.(
-      { title: "견적서 보내기", source_item_id: itemId, due_basis: "stated", owner: "me",
+      { title: "Send the quote", source_item_id: itemId, due_basis: "stated", owner: "me",
         kind: "todo", confidence: 0.9 },
       { toolCallId: "c2", messages: [] },
     )) as { task_id: string; state: string };
@@ -1465,22 +1465,22 @@ describe("tool palette (A4 §1.5)", () => {
       "SELECT title, created_by FROM tasks WHERE id = $1",
       [out.task_id],
     );
-    expect(rows[0]).toMatchObject({ title: "견적서 보내기", created_by: "agent" });
+    expect(rows[0]).toMatchObject({ title: "Send the quote", created_by: "agent" });
   });
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `does not provide an export named 'toolRegistry'`.
+- [ ] 2. Confirm the failure. Expected: `does not provide an export named 'toolRegistry'`.
 
 ```bash
 pnpm --filter @omnis/agents test -- tools
 ```
 
-- [ ] 3. 읽기 tool 7종을 쓴다. 전부 부작용이 없고 DB만 읽는다.
+- [ ] 3. Write the seven read tools. All of them are side-effect free and read from the DB only.
 
 ```ts
 // packages/agents/src/tools/read.ts
-// A4 §1.5 읽기 tool. 부작용 없음 — SELECT만 한다.
+// A4 §1.5 read tools. No side effects — SELECT only.
 import { asOf, searchMemories } from "@omnis/memory";
 import { type ToolSet, tool } from "ai";
 import { z } from "zod";
@@ -1488,7 +1488,7 @@ import { getAgentsPool } from "../pool.js";
 
 export const READ_TOOLS: ToolSet = {
   read_thread: tool({
-    description: "스레드 하나와 최근 item들을 읽는다.",
+    description: "Read one thread and its recent items.",
     inputSchema: z.object({ thread_id: z.string().uuid(), last_n: z.number().int().max(50).default(12) }),
     execute: async ({ thread_id, last_n }) => {
       const pool = getAgentsPool();
@@ -1513,7 +1513,7 @@ export const READ_TOOLS: ToolSet = {
   }),
 
   search_memory: tool({
-    description: "메모리를 의미 검색한다.",
+    description: "Semantically search memory.",
     inputSchema: z.object({
       query: z.string(), k: z.number().int().max(20).default(6),
       kinds: z.array(z.enum(["fact", "preference", "event"])).optional(),
@@ -1523,7 +1523,7 @@ export const READ_TOOLS: ToolSet = {
   }),
 
   read_person: tool({
-    description: "사람 한 명의 프로필과 채널 식별자를 읽는다.",
+    description: "Read one person's profile and channel identities.",
     inputSchema: z.object({
       person_id: z.string().uuid().optional(), handle: z.string().optional(), channel: z.string().optional(),
     }),
@@ -1544,14 +1544,14 @@ export const READ_TOOLS: ToolSet = {
   }),
 
   read_entity: tool({
-    description: "엔티티를 as-of 시각 기준으로 읽는다(bi-temporal).",
+    description: "Read an entity as of a point in time (bi-temporal).",
     inputSchema: z.object({ entity_id: z.string().uuid(), as_of: z.string().optional() }),
     execute: async ({ entity_id, as_of }) =>
       ({ entities: await asOf(getAgentsPool(), { entityId: entity_id, at: as_of ?? "now" }) }),
   }),
 
   read_calendar: tool({
-    description: "기간 안의 캘린더 이벤트를 읽는다.",
+    description: "Read calendar events within a range.",
     inputSchema: z.object({ from: z.string().datetime(), to: z.string().datetime() }),
     execute: async ({ from, to }) => {
       const { rows } = await getAgentsPool().query(
@@ -1564,7 +1564,7 @@ export const READ_TOOLS: ToolSet = {
   }),
 
   read_tasks: tool({
-    description: "할 일 목록을 읽는다.",
+    description: "Read the task list.",
     inputSchema: z.object({
       state: z.enum(["open", "done", "all"]).default("open"), limit: z.number().int().max(50).default(20),
     }),
@@ -1579,7 +1579,7 @@ export const READ_TOOLS: ToolSet = {
   }),
 
   read_session: tool({
-    description: "에이전트 세션의 durable 요약과 마지막 N턴을 읽는다. raw 로그는 없다(마스터 §9).",
+    description: "Read an agent session's durable summary and its last N turns. There is no raw log (master §9).",
     inputSchema: z.object({ session_key: z.string(), last_n: z.number().int().max(20).default(5) }),
     execute: async ({ session_key, last_n }) => {
       const pool = getAgentsPool();
@@ -1607,13 +1607,13 @@ export const READ_TOOLS: ToolSet = {
 };
 ```
 
-- [ ] 4. `propose_*` 6종을 쓴다. **전부 저장만 한다** — 어떤 것도 채널·런타임을 건드리지 않는다.
+- [ ] 4. Write the six `propose_*` tools. **They only save** — none of them touches a channel or a runtime.
 
 ```ts
 // packages/agents/src/tools/propose.ts
-// A4 §1.5·A4-D3: 제안 tool은 row를 쓸 뿐 아무것도 내보내지 않는다.
-// propose_delegation은 pending_approvals(action='delegate') 한 행을 만드는 게 전부이고,
-// 실제 실행은 커널의 승인 핸들러가 runEgress 경로에서 한다(A4 §5.4).
+// A4 §1.5·A4-D3: proposal tools write a row and emit nothing.
+// propose_delegation does nothing more than create one pending_approvals(action='delegate') row,
+// and the actual execution happens in the kernel's approval handler on the runEgress path (A4 §5.4).
 import { type ToolSet, tool } from "ai";
 import { z } from "zod";
 import { getAgentsPool } from "../pool.js";
@@ -1646,7 +1646,7 @@ export const ProposeTaskInput = z.object({
 });
 export const ProposeDelegationInput = z.object({
   task_id: z.string().uuid(),
-  runtime: z.enum(["claude_code", "codex", "claude_ds", "omnis"]),   // B-D7: hermes 제외
+  runtime: z.enum(["claude_code", "codex", "claude_ds", "omnis"]),   // B-D7: hermes excluded
   host: z.enum(["mini", "macbook"]), brief: z.string().max(2000),
   acceptance: z.array(z.string()).min(1), verify_cmd: z.string().max(300).optional(),
   workdir: z.string().optional(), est_minutes: z.number().int().optional(),
@@ -1676,7 +1676,7 @@ const OMNIS_RUNTIME = "SELECT id FROM agent_runtimes WHERE runtime = 'omnis' LIM
 
 export const PROPOSE_TOOLS: ToolSet = {
   propose_label: tool({
-    description: "item에 라벨을 제안해 저장한다. 발송하지 않는다.",
+    description: "Propose and store a label for an item. Does not send.",
     inputSchema: ProposeLabelInput,
     execute: async (i) => {
       await getAgentsPool().query(
@@ -1692,7 +1692,7 @@ export const PROPOSE_TOOLS: ToolSet = {
   }),
 
   propose_draft: tool({
-    description: "답장 초안을 items(status='draft')로 저장한다. 발송하지 않는다.",
+    description: "Store a reply draft as items(status='draft'). Does not send.",
     inputSchema: ProposeDraftInput,
     execute: async (i) => {
       const { rows } = await getAgentsPool().query<{ id: string }>(
@@ -1715,7 +1715,7 @@ export const PROPOSE_TOOLS: ToolSet = {
   }),
 
   propose_task: tool({
-    description: "할 일을 tasks에 저장한다. duplicate_of가 있으면 기존 task에 출처만 더한다.",
+    description: "Store a task in tasks. If duplicate_of is set, only add the source to the existing task.",
     inputSchema: ProposeTaskInput,
     execute: async (i) => {
       const pool = getAgentsPool();
@@ -1743,7 +1743,7 @@ export const PROPOSE_TOOLS: ToolSet = {
   }),
 
   propose_delegation: tool({
-    description: "위임 승인 카드를 만든다. 승인 없이는 아무것도 실행되지 않는다.",
+    description: "Create a delegation approval card. Nothing runs without approval.",
     inputSchema: ProposeDelegationInput,
     execute: async (i) => {
       const pool = getAgentsPool();
@@ -1759,7 +1759,7 @@ export const PROPOSE_TOOLS: ToolSet = {
                 (${OMNIS_RUNTIME})
          RETURNING id`,
         [JSON.stringify(i),
-         `${i.runtime} on ${i.host}에게 이 작업을 맡깁니다. 예상 ${i.est_minutes ?? "?"}분.`,
+         `${i.runtime} on ${i.host} will take this task. Estimated ${i.est_minutes ?? "?"} min.`,
          (i.est_minutes ?? 0) > 30 ? "high" : "normal", i.task_id]);
       const id = rows[0]?.id;
       if (id === undefined) throw new Error("pending_approvals insert returned no id");
@@ -1769,7 +1769,7 @@ export const PROPOSE_TOOLS: ToolSet = {
   }),
 
   propose_route: tool({
-    description: "노트를 붙일 후보를 최대 3개 제안한다. 자동 첨부는 하지 않는다(A4-D10).",
+    description: "Propose up to 3 candidates to attach the note to. No automatic attachment (A4-D10).",
     inputSchema: ProposeRouteInput,
     execute: async (i) => {
       await getAgentsPool().query(
@@ -1783,14 +1783,14 @@ export const PROPOSE_TOOLS: ToolSet = {
   }),
 
   propose_self_model_patch: tool({
-    description: "self-model 파일 패치를 승인 카드로 만든다. 적용은 승인 뒤 커널이 한다.",
+    description: "Turn a self-model file patch into an approval card. The kernel applies it after approval.",
     inputSchema: ProposeSelfModelPatchInput,
     execute: async (i) => {
       const { rows } = await getAgentsPool().query<{ id: string }>(
         `INSERT INTO pending_approvals (action, args, description, risk, requested_by)
          VALUES ('self_model_edit', $1::jsonb, $2, 'normal', (${OMNIS_RUNTIME}))
          RETURNING id`,
-        [JSON.stringify(i), `${i.file} 수정 제안 — ${i.rationale}`]);
+        [JSON.stringify(i), `${i.file} edit proposal — ${i.rationale}`]);
       const id = rows[0]?.id;
       if (id === undefined) throw new Error("pending_approvals insert returned no id");
       return { approval_id: id };
@@ -1799,7 +1799,7 @@ export const PROPOSE_TOOLS: ToolSet = {
 };
 ```
 
-- [ ] 5. 레지스트리와 lint 규칙을 쓴다.
+- [ ] 5. Write the registry and the lint rule.
 
 ```ts
 // packages/agents/src/tools/registry.ts
@@ -1810,7 +1810,7 @@ import { PHANTOM_TOOLS, type ToolName } from "./names.js";
 
 const ALL: ToolSet = { ...READ_TOOLS, ...PROPOSE_TOOLS };
 
-/** palette에 적힌 것만 모델에게 준다. 팬텀 이름은 ALL에 애초에 없다. */
+/** Give the model only what the palette lists. Phantom names are not in ALL to begin with. */
 export function toolRegistry(palette: readonly ToolName[]): ToolSet {
   const out: ToolSet = {};
   for (const name of palette) {
@@ -1823,34 +1823,34 @@ export function toolRegistry(palette: readonly ToolName[]): ToolSet {
 ```
 
 ```jsonc
-// biome.jsonc — linter.rules.nursery 또는 기존 rules 객체 안에 추가
+// biome.jsonc — add inside linter.rules.nursery or the existing rules object
 "noRestrictedImports": {
   "level": "error",
   "options": {
     "paths": {
-      "@omnis/kernel": "packages/agents는 @omnis/kernel을 의존하지 않는다(계약 §1). LoopKernel 구조적 타입을 쓴다.",
-      "../../kernel/src/egress.js": "egress는 커널 소유다(A4 §1.1).",
-      "@omnis/kernel/egress": "egress는 커널 소유다(A4 §1.1)."
+      "@omnis/kernel": "packages/agents does not depend on @omnis/kernel (contract §1). Use the LoopKernel structural type.",
+      "../../kernel/src/egress.js": "egress is owned by the kernel (A4 §1.1).",
+      "@omnis/kernel/egress": "egress is owned by the kernel (A4 §1.1)."
     }
   }
 }
 ```
 
-`biome.jsonc`의 `overrides`에 `packages/agents/**`만 이 규칙을 받도록 스코프를 건다.
+Scope the rule in `biome.jsonc`'s `overrides` so that only `packages/agents/**` receives it.
 
 ```jsonc
 "overrides": [
   { "includes": ["packages/agents/**"],
     "linter": { "rules": { "style": { "noRestrictedImports": { "level": "error", "options": { "paths": {
-      "@omnis/kernel": "packages/agents는 @omnis/kernel을 의존하지 않는다(계약 §1).",
-      "@omnis/kernel/egress": "egress는 커널 소유다(A4 §1.1)." } } } } } } }
+      "@omnis/kernel": "packages/agents does not depend on @omnis/kernel (contract §1).",
+      "@omnis/kernel/egress": "egress is owned by the kernel (A4 §1.1)." } } } } } } }
 ]
 ```
 
-- [ ] 6. `index.ts`에 export를 더하고 통과를 확인한다. 기대: `tools.test.ts` 4 tests passed, `pnpm lint` 0 errors.
+- [ ] 6. Add the exports to `index.ts` and confirm it passes. Expected: `tools.test.ts` 4 tests passed, `pnpm lint` 0 errors.
 
 ```ts
-// packages/agents/src/index.ts — 추가
+// packages/agents/src/index.ts — added
 export { READ_TOOLS } from "./tools/read.js";
 export {
   PROPOSE_TOOLS, ProposeDelegationInput, ProposeDraftInput, ProposeLabelInput,
@@ -1863,16 +1863,16 @@ export { toolRegistry } from "./tools/registry.js";
 pnpm --filter @omnis/agents test && pnpm lint
 ```
 
-- [ ] 7. 커밋한다.
+- [ ] 7. Commit.
 
 ```bash
 git add packages/agents/src/tools packages/agents/src/index.ts packages/agents/test/integration/tools.test.ts biome.jsonc
-git commit -m "US-B07: tool palette — 읽기 7종 + propose_* 6종
+git commit -m "US-B07: tool palette — seven read tools + six propose_* tools
 
-- READ_TOOLS 7종은 SELECT만 한다
-- PROPOSE_TOOLS 6종은 items/tasks/notes/pending_approvals row만 쓴다(발송 경로 없음)
-- toolRegistry(palette)가 팬텀 12종을 구조적으로 낼 수 없다 + 유닛 테스트가 이를 고정한다
-- biome overrides로 packages/agents → @omnis/kernel(egress) import를 금지했다
+- The 7 READ_TOOLS only SELECT
+- The 6 PROPOSE_TOOLS only write items/tasks/notes/pending_approvals rows (no sending path)
+- toolRegistry(palette) structurally cannot produce the 12 phantom tools, and a unit test pins that
+- biome overrides forbid packages/agents → @omnis/kernel (egress) imports
 
 Implemented-by: Claude Opus
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -1880,12 +1880,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 6: 비용 미터 — `costState` / `POLICY` / `currentPolicy` (US-B14, tier: Opus)
+## Task 6: Cost meter — `costState` / `POLICY` / `currentPolicy` (US-B14, tier: Opus)
 
-> **스토리** — 목표: A4 §12.4의 5상태 + 예비비 별도 집계 + `Policy`. 산출물: `packages/kernel/src/cost/governor.ts`. 검증: `pnpm --filter @omnis/kernel test:integration`. 의존: B06.
+> **Story** — Goal: the five states from A4 §12.4 + separate reserve accounting + `Policy`. Deliverables: `packages/kernel/src/cost/governor.ts`. Verification: `pnpm --filter @omnis/kernel test:integration`. Depends on: B06.
 
-**읽을 것:** A4 §12.4 전체(코드 블록 + 상태 표 + 3개 단서), 델타 §5.
-**만들지 말 것(YAGNI):** 일별 예산, 루프별 상한, 예측 모델. 상한은 월 하나 + 예비비 비율 하나다.
+**Read:** all of A4 §12.4 (the code block + the state table + the 3 caveats), delta §5.
+**Do not build (YAGNI):** daily budgets, per-loop caps, forecasting models. There is one monthly cap and one reserve ratio.
 
 **Files:**
 - Create: `packages/kernel/src/cost/governor.ts`, `packages/kernel/test/cost-governor.test.ts`, `packages/kernel/test/integration/cost-policy.test.ts`
@@ -1893,12 +1893,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Test: `packages/kernel/test/cost-governor.test.ts`, `packages/kernel/test/integration/cost-policy.test.ts`
 
 **Interfaces:**
-- Consumes: `getSetting`/`SETTING_DEFAULTS`(US-B33, `../settings.js` — surfaces 계획이 만든다. 이 태스크는 `cost.cap_usd`/`cost.reserve_ratio` 두 키만 읽는다), `query`(`@omnis/db`).
+- Consumes: `getSetting`/`SETTING_DEFAULTS` (US-B33, `../settings.js` — created by the surfaces plan. This task reads only the two keys `cost.cap_usd`/`cost.reserve_ratio`), `query` (`@omnis/db`).
 - Produces: `CostState`, `CostInput`, `costState`, `Policy`, `POLICY`, `currentPolicy`, `reserveSpendUsd`, `mtdSpendUsd`.
 
 ### Steps
 
-- [ ] 1. 실패하는 순수 함수 테스트를 쓴다(DB 없음).
+- [ ] 1. Write the failing pure-function test (no DB).
 
 ```ts
 // packages/kernel/test/cost-governor.test.ts
@@ -1937,17 +1937,17 @@ describe("costState (A4 §12.4)", () => {
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `Failed to resolve import "../src/cost/governor.js"`.
+- [ ] 2. Confirm the failure. Expected: `Failed to resolve import "../src/cost/governor.js"`.
 
 ```bash
 pnpm --filter @omnis/kernel test -- cost-governor
 ```
 
-- [ ] 3. 구현을 쓴다.
+- [ ] 3. Write the implementation.
 
 ```ts
 // packages/kernel/src/cost/governor.ts
-// A4 §12.4. 예산은 두 개다 — 일반 $54와 VIP·민감 전용 예비비 $6(마스터 §14, §19 Q11).
+// A4 §12.4. There are two budgets — $54 general and a $6 reserve kept for VIP and sensitive work (master §14, §19 Q11).
 import { query } from "@omnis/db";
 import type { Pool } from "pg";
 
@@ -1983,19 +1983,19 @@ export const POLICY: Record<CostState, Policy> = {
     draftsVipSensitive: true, digestCron: "daily", note: null },
   warn: { allowT2NonSensitive: true, allowT2Reserve: true, draftsNonVip: true,
     draftsVipSensitive: true, digestCron: "daily",
-    note: "이번 달 LLM 비용이 상한의 60%입니다." },
+    note: "This month's LLM cost has reached 60% of the cap." },
   degraded: { allowT2NonSensitive: false, allowT2Reserve: true, draftsNonVip: true,
     draftsVipSensitive: true, digestCron: "alternate",
-    note: "비민감 작업의 T2 에스컬레이션을 중단했습니다(T1으로 생성). VIP·민감 초안은 예비비로 계속됩니다." },
+    note: "T2 escalation for non-sensitive work is paused (generated at T1). VIP and sensitive drafts continue from the reserve." },
   reserve_only: { allowT2NonSensitive: false, allowT2Reserve: true, draftsNonVip: false,
     draftsVipSensitive: true, digestCron: "alternate",
-    note: "일반 예산이 소진되어 비VIP 초안 생성을 중단했습니다. 분류·라벨·투두 추출·자동 보관은 계속되고, VIP·민감 초안은 예비비로 계속됩니다." },
+    note: "The general budget is exhausted, so non-VIP draft generation is paused. Classification, labeling, todo extraction, and auto-archive continue, and VIP and sensitive drafts continue from the reserve." },
   frozen: { allowT2NonSensitive: false, allowT2Reserve: false, draftsNonVip: false,
     draftsVipSensitive: false, digestCron: "off",
-    note: "예비비까지 소진되어 모든 초안 생성을 중단했습니다. 분류·라벨·투두 추출·자동 보관은 계속됩니다." },
+    note: "The reserve is exhausted too, so all draft generation is paused. Classification, labeling, todo extraction, and auto-archive continue." },
 };
 
-/** 이번 달 총 지출. agent_runs.cost_usd가 유일한 입력이다(A4 §12.4). */
+/** Month-to-date total spend. agent_runs.cost_usd is the only input (A4 §12.4). */
 export async function mtdSpendUsd(pool: Pool, now: Date): Promise<number> {
   const rows = await query<{ sum: string | null }>(
     pool,
@@ -2006,7 +2006,7 @@ export async function mtdSpendUsd(pool: Pool, now: Date): Promise<number> {
   return Number(rows[0]?.sum ?? "0");
 }
 
-/** 예비비 소진분: model_tier='T2' AND (VIP person이거나 sensitivity<>'normal'인 item). */
+/** Reserve spend: model_tier='T2' AND (a VIP person, or an item with sensitivity<>'normal'). */
 export async function reserveSpendUsd(pool: Pool, now: Date): Promise<number> {
   const rows = await query<{ sum: string | null }>(
     pool,
@@ -2036,7 +2036,7 @@ export async function currentPolicy(
 }
 ```
 
-- [ ] 4. 통합 테스트를 쓴다 — `agent_runs`를 심고 `currentPolicy`가 그 합계를 읽는지 본다.
+- [ ] 4. Write the integration test — seed `agent_runs` and check that `currentPolicy` reads that sum.
 
 ```ts
 // packages/kernel/test/integration/cost-policy.test.ts
@@ -2090,16 +2090,16 @@ describe("currentPolicy (A4 §12.4)", () => {
        ON CONFLICT (account_id, external_id) DO UPDATE SET sensitivity='finance' RETURNING id`,
       [thr.rows[0]?.id ?? "", accountId]);
     await spend(3, "T2", it.rows[0]?.id ?? null);
-    await spend(7, "T2", null);   // item 없는 T2는 예비비가 아니다
+    await spend(7, "T2", null);   // T2 with no item is not reserve spend
     expect(await reserveSpendUsd(pool, new Date())).toBeCloseTo(3, 5);
   });
 });
 ```
 
-- [ ] 5. `index.ts`에 export를 더하고 둘 다 통과를 확인한다. 기대: 5 tests passed.
+- [ ] 5. Add the exports to `index.ts` and confirm both pass. Expected: 5 tests passed.
 
 ```ts
-// packages/kernel/src/index.ts — 추가
+// packages/kernel/src/index.ts — added
 export {
   POLICY, costState, currentPolicy, mtdSpendUsd, reserveSpendUsd,
   type CostInput, type CostState, type Policy,
@@ -2110,15 +2110,15 @@ export {
 pnpm --filter @omnis/kernel test && pnpm --filter @omnis/kernel test:integration && pnpm lint
 ```
 
-- [ ] 6. 커밋한다.
+- [ ] 6. Commit.
 
 ```bash
 git add packages/kernel/src/cost packages/kernel/src/index.ts packages/kernel/test/cost-governor.test.ts packages/kernel/test/integration/cost-policy.test.ts
-git commit -m "US-B14: 비용 미터 costState/POLICY/currentPolicy
+git commit -m "US-B14: cost meter costState/POLICY/currentPolicy
 
-- 5상태(normal/warn/degraded/reserve_only/frozen) + A4 §12.4 정책 표 그대로
-- 예비비는 model_tier='T2' AND (VIP 또는 sensitivity<>normal)로 별도 집계한다
-- degraded 이하에서도 민감도 규칙(VIP·민감 T2)은 깨지지 않는다
+- The five states (normal/warn/degraded/reserve_only/frozen) + the A4 §12.4 policy table as-is
+- Reserve spend is accounted separately via model_tier='T2' AND (VIP or sensitivity<>normal)
+- Even at degraded or below, the sensitivity rule (VIP and sensitive T2) never breaks
 
 Implemented-by: Claude Opus
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -2126,13 +2126,13 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 7: `cost_daily` 뷰 + 00:05 잡 + 상태 전이 기록 (US-B14, tier: Opus)
+## Task 7: The `cost_daily` view + the 00:05 job + state transition recording (US-B14, tier: Opus)
 
-> **스토리** — 목표: `cost_daily` 집계 뷰 + 00:05 잡, 상태 전이 → `audit_log` + 시스템 Item, 루프 게이트. 산출물: `packages/kernel/src/jobs/cost-daily.ts`, `packages/db/migrations/0012_jobs_phase_b.sql`. 검증: `pnpm --filter @omnis/kernel test:integration`.
+> **Story** — Goal: the `cost_daily` aggregate view + the 00:05 job, state transitions → `audit_log` + a system Item, and the loop gate. Deliverables: `packages/kernel/src/jobs/cost-daily.ts`, `packages/db/migrations/0012_jobs_phase_b.sql`. Verification: `pnpm --filter @omnis/kernel test:integration`.
 
-**읽을 것:** 델타 §6(`0012` 행)·§8(잡 4건 표), A3 §6(`jobs` seed 형식), `packages/kernel/src/scheduler.ts`.
-**오너십 주의(2026-09-20 교차 리뷰 M1에서 바뀜):** `0012_jobs_phase_b.sql`은 이제 **웨이브 0 스키마 번들**이 만든다(델타 §6 — `0009`·`0011`·`0012`·`0013`을 한 워크트리·한 커밋으로). 아래 스텝 1의 SQL이 그 번들이 그대로 옮겨 쓰는 **정본 정의**다. **W0가 이미 머지된 뒤라면 파일이 이미 존재하므로 스텝 1을 건너뛰고** 내용이 아래와 같은지 확인만 한다(마이그레이션 러너가 sha256 변경을 throw한다 — 다시 쓰면 안 된다). channels·ops 계획도 이 파일을 만들지 않고 seed된 행을 쓴다.
-**만들지 말 것(YAGNI):** materialized view + REFRESH 잡. 하루치 집계라 일반 뷰로 충분하고, 느려지면 그때 승격한다.
+**Read:** delta §6 (the `0012` row)·§8 (the 4-job table), A3 §6 (`jobs` seed format), `packages/kernel/src/scheduler.ts`.
+**Ownership note (changed in the 2026-09-20 cross review M1):** `0012_jobs_phase_b.sql` is now created by the **wave 0 schema bundle** (delta §6 — `0009`·`0011`·`0012`·`0013` in one worktree and one commit). The SQL in step 1 below is the **canonical definition** that the bundle copies over verbatim. **If W0 is already merged, the file already exists, so skip step 1** and only check that the contents match what is below (the migration runner throws on a sha256 change — it must not be rewritten). The channels and ops plans also do not create this file; they use the seeded rows.
+**Do not build (YAGNI):** a materialized view + a REFRESH job. A day's worth of aggregation is fine with a plain view; promote it if it gets slow.
 
 **Files:**
 - Create: `packages/db/migrations/0012_jobs_phase_b.sql`, `packages/kernel/src/jobs/cost-daily.ts`, `packages/kernel/test/integration/cost-daily.test.ts`
@@ -2145,23 +2145,23 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Steps
 
-- [ ] 1. 마이그레이션을 쓴다 — **W0 번들이 아직 머지되지 않았을 때만**(위 오너십 주의). 델타 §8의 잡 4건 + `cost_daily` 뷰.
+- [ ] 1. Write the migration — **only if the W0 bundle is not merged yet** (see the ownership note above). The 4 jobs from delta §8 + the `cost_daily` view.
 
 ```sql
 -- packages/db/migrations/0012_jobs_phase_b.sql
--- 델타 §8: Phase B가 더하는 잡 4건. 나머지 16건은 0006_kernel.sql이 이미 seed했다.
--- 소유: W0 스키마 번들(델타 §6). 이 블록이 정본 정의이고 번들이 그대로 옮긴다.
--- channels(B37)·ops(B44)·surfaces는 이 파일을 다시 만들지 않는다.
+-- delta §8: the 4 jobs Phase B adds. The other 16 were already seeded by 0006_kernel.sql.
+-- Owner: the W0 schema bundle (delta §6). This block is the canonical definition and the bundle copies it over verbatim.
+-- channels (B37)·ops (B44)·surfaces do not recreate this file.
 
 INSERT INTO jobs (name, schedule, next_run_at) VALUES
-  ('cost_daily',          '5 0 * * *',        now()),   -- A4 §12.4 00:05 KST 집계
-  ('push_batch',          '0 9,12,15,18 * * *', now()), -- A4 §3.6 묶음 알림
+  ('cost_daily',          '5 0 * * *',        now()),   -- A4 §12.4 00:05 KST aggregation
+  ('push_batch',          '0 9,12,15,18 * * *', now()), -- A4 §3.6 batched notifications
   ('outlook_delta_poll',  '*/5 * * * *',      now()),   -- A1 §2.4 (US-B37)
-  ('cost_report_monthly', '10 0 1 * *',       now())    -- A4 §12.4 월간 리포트 (US-B44)
+  ('cost_report_monthly', '10 0 1 * *',       now())    -- A4 §12.4 monthly report (US-B44)
 ON CONFLICT (name) DO NOTHING;
 
--- A4 §12.4: "매일 00:05 KST에 agent_runs를 집계해 cost_daily 뷰를 갱신한다."
--- 뷰이므로 갱신 자체는 공짜고, 잡은 상태 전이 감지와 기록만 한다.
+-- A4 §12.4: "every day at 00:05 KST, aggregate agent_runs and refresh the cost_daily view."
+-- Because it is a view, the refresh itself is free; the job only detects and records state transitions.
 CREATE VIEW cost_daily AS
 SELECT (created_at AT TIME ZONE 'Asia/Seoul')::date AS day,
        loop,
@@ -2179,7 +2179,7 @@ SELECT (created_at AT TIME ZONE 'Asia/Seoul')::date AS day,
 GRANT SELECT ON cost_daily TO omnis_hub;
 ```
 
-- [ ] 2. 실패하는 테스트를 쓴다.
+- [ ] 2. Write the failing test.
 
 ```ts
 // packages/kernel/test/integration/cost-daily.test.ts
@@ -2238,7 +2238,7 @@ describe("cost_daily job (A4 §12.4)", () => {
     const items = await pool.query<{ body: string }>(
       `SELECT body FROM items WHERE kind = 'system' AND body LIKE '%80%' ORDER BY sent_at DESC LIMIT 1`);
     expect(items.rows[0]?.body).toContain("T2");
-    // 두 번째 실행은 상태가 같으므로 아무것도 더 남기지 않는다
+    // The second run sees the same state, so it leaves nothing more behind
     await runCostDaily({ pool, audit: createAudit(pool), logger, now: new Date() });
     const again = await pool.query<{ n: string }>(
       "SELECT count(*)::text AS n FROM audit_log WHERE action = 'cost.state_changed'");
@@ -2247,17 +2247,17 @@ describe("cost_daily job (A4 §12.4)", () => {
 });
 ```
 
-- [ ] 3. 마이그레이션을 적용하고 실패를 확인한다. 기대: `Failed to resolve import "../../src/jobs/cost-daily.js"`.
+- [ ] 3. Apply the migration and confirm the failure. Expected: `Failed to resolve import "../../src/jobs/cost-daily.js"`.
 
 ```bash
 pnpm db:migrate && pnpm --filter @omnis/kernel test:integration -- cost-daily
 ```
 
-- [ ] 4. 구현을 쓴다.
+- [ ] 4. Write the implementation.
 
 ```ts
 // packages/kernel/src/jobs/cost-daily.ts
-// A4 §12.4: 매일 00:05 KST 집계 + 상태 전이 감지. 뷰는 SQL이 갱신하므로 잡은 전이만 본다.
+// A4 §12.4: daily 00:05 KST aggregation + state transition detection. SQL refreshes the view, so the job only looks at transitions.
 import { query } from "@omnis/db";
 import type { Pool } from "pg";
 import type { Audit } from "../audit.js";
@@ -2297,8 +2297,8 @@ export async function runCostDaily(deps: CostDailyDeps): Promise<CostState> {
     actor: "system", action: "cost.state_changed", target_table: "settings",
     before: { from: previous }, after: { to: state, mtdUsd, reserveUsd },
   });
-  // ponytail: @omnis/kernel은 @omnis/agents를 의존할 수 없어 writeSystemItem을 쓰지 못한다.
-  // apps/hub/src/archive.ts와 같은 4줄 INSERT — 의도된 중복이다(계약 §12).
+  // ponytail: @omnis/kernel cannot depend on @omnis/agents, so it cannot use writeSystemItem.
+  // The same 4-line INSERT as apps/hub/src/archive.ts — intentional duplication (contract §12).
   await query(
     pool,
     `WITH acc AS (
@@ -2310,7 +2310,7 @@ export async function runCostDaily(deps: CostDailyDeps): Promise<CostState> {
        ON CONFLICT (account_id, external_id) DO UPDATE SET kind = 'system' RETURNING id, account_id)
      INSERT INTO items (thread_id, account_id, kind, status, body, sent_at, meta)
      SELECT thr.id, thr.account_id, 'system', 'received', $1, now(), $2::jsonb FROM thr`,
-    [policy.note ?? `LLM 비용 상태가 ${state}로 바뀌었습니다.`,
+    [policy.note ?? `LLM cost state changed to ${state}.`,
      JSON.stringify({ cost_state: state, mtd_usd: mtdUsd, reserve_usd: reserveUsd })]);
   logger.warn("cost state changed", { from: previous, to: state, mtdUsd });
   return state;
@@ -2323,10 +2323,10 @@ export function registerCostDailyJob(scheduler: Scheduler, deps: CostDailyDeps):
 }
 ```
 
-- [ ] 5. `index.ts`에 export를 더하고 허브에 등록한 뒤 통과를 확인한다. 기대: 3 tests passed.
+- [ ] 5. Add the exports to `index.ts`, register them in the hub, then confirm it passes. Expected: 3 tests passed.
 
 ```ts
-// packages/kernel/src/index.ts — 추가
+// packages/kernel/src/index.ts — added
 export {
   COST_DAILY_CRON, COST_DAILY_JOB_NAME, registerCostDailyJob, runCostDaily,
   type CostDailyDeps,
@@ -2334,7 +2334,7 @@ export {
 ```
 
 ```ts
-// apps/hub/src/main.ts — registerHealthcheckJob 바로 아래
+// apps/hub/src/main.ts — right below registerHealthcheckJob
 registerCostDailyJob(kernel.scheduler, { pool, audit: kernel.audit, logger });
 ```
 
@@ -2342,15 +2342,15 @@ registerCostDailyJob(kernel.scheduler, { pool, audit: kernel.audit, logger });
 pnpm db:migrate && pnpm --filter @omnis/kernel test:integration && pnpm lint
 ```
 
-- [ ] 6. 커밋한다.
+- [ ] 6. Commit.
 
 ```bash
 git add packages/db/migrations/0012_jobs_phase_b.sql packages/kernel/src/jobs/cost-daily.ts packages/kernel/src/index.ts packages/kernel/test/integration/cost-daily.test.ts apps/hub/src/main.ts
-git commit -m "US-B14: cost_daily 뷰와 00:05 잡
+git commit -m "US-B14: cost_daily view and the 00:05 job
 
-- 0012_jobs_phase_b.sql이 델타 §8의 잡 4건을 seed하고 cost_daily 뷰를 만든다
-- runCostDaily가 상태 전이일 때만 audit_log + 시스템 Item을 남긴다(같은 상태는 무음)
-- 허브가 잡을 등록한다
+- 0012_jobs_phase_b.sql seeds the 4 jobs from delta §8 and creates the cost_daily view
+- runCostDaily leaves an audit_log row + a system Item only on a state transition (the same state is silent)
+- The hub registers the job
 
 Implemented-by: Claude Opus
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -2358,12 +2358,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 8: 초안 순수 함수 — register / needs-reply / 채널 형식 / self-check (US-B13, tier: Opus)
+## Task 8: Draft pure functions — register / needs-reply / channel shape / self-check (US-B13, tier: Opus)
 
-> **스토리** — 목표: `register` 규칙 판정, `needs_reply_score` 산술식, 채널별 길이·형식 8종, self-check 6항. 산출물: `packages/agents/src/draft/{register,selfcheck}.ts`. 검증: `pnpm --filter @omnis/agents test`. 의존: B05, B07.
+> **Story** — Goal: `register` rule determination, the `needs_reply_score` formula, per-channel length and shape rules for 8 channels, and the 6 self-check items. Deliverables: `packages/agents/src/draft/{register,selfcheck}.ts`. Verification: `pnpm --filter @omnis/agents test`. Depends on: B05, B07.
 
-**읽을 것:** A4 §3.1(`needs_reply_score` 규칙 5개 가중치), §3.2(register 판정), §3.4(채널별 표 8행), §3.3(self-check 6항).
-**만들지 말 것(YAGNI):** 학습형 register 분류기, 채널별 프롬프트 파일. 규칙 4줄이 A4가 정한 전부다.
+**Read:** A4 §3.1 (the five `needs_reply_score` weights), §3.2 (register determination), §3.4 (the 8-row per-channel table), §3.3 (the 6 self-check items).
+**Do not build (YAGNI):** a learned register classifier, per-channel prompt files. Four lines of rules are all A4 specifies.
 
 **Files:**
 - Create: `packages/agents/src/draft/register.ts`, `packages/agents/src/draft/selfcheck.ts`, `packages/agents/test/draft-rules.test.ts`
@@ -2376,7 +2376,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다.
+- [ ] 1. Write the failing test.
 
 ```ts
 // packages/agents/test/draft-rules.test.ts
@@ -2389,7 +2389,7 @@ import type { ItemRow } from "../src/types.js";
 const item = (over: Partial<ItemRow> = {}): ItemRow => ({
   id: "i1", thread_id: "t1", account_id: "a1", channel: "gmail", kind: "email",
   scope: "work", sensitivity: "normal", author_person_id: null, author_is_me: false,
-  subject: "견적", body: "언제 보내주실 수 있을까요?", sent_at: new Date().toISOString(),
+  subject: "Quote", body: "When could you send it?", sent_at: new Date().toISOString(),
   embedding: null, ...over,
 });
 
@@ -2398,11 +2398,11 @@ describe("needsReplyScore (A4 §3.1)", () => {
     const s = needsReplyScore(item(), {
       lastAuthorIsThem: true, myReplyRatio: 1, inTo: true, bulkHeaders: false,
     });
-    expect(s).toBeCloseTo(1, 5);   // 0.3 + 0.3 + 0.2 + 0.2, 1.0으로 클램프
+    expect(s).toBeCloseTo(1, 5);   // 0.3 + 0.3 + 0.2 + 0.2, clamped to 1.0
   });
 
   it("drops a newsletter below the threshold", () => {
-    const s = needsReplyScore(item({ body: "구독을 해지하려면 여기를 누르세요" }), {
+    const s = needsReplyScore(item({ body: "Click here to unsubscribe" }), {
       lastAuthorIsThem: true, myReplyRatio: 0, inTo: false, bulkHeaders: true,
     });
     expect(s).toBeLessThan(NEEDS_REPLY_MIN);
@@ -2429,7 +2429,7 @@ describe("CHANNEL_DRAFT_SHAPE (A4 §3.4)", () => {
 
 describe("selfCheck (A4 §3.3)", () => {
   it("fails #6 when the draft copies a link that came from <data>", () => {
-    const r = selfCheck("확인했습니다. https://evil.example/pay 로 보내드릴게요.", {
+    const r = selfCheck("Understood. I'll send it to https://evil.example/pay.", {
       questionCount: 0, externalUrls: ["https://evil.example/pay"], calendarConflicts: [],
       voiceSampleAvgLen: 40, entityNames: [], channel: "gmail",
     });
@@ -2438,7 +2438,7 @@ describe("selfCheck (A4 §3.3)", () => {
   });
 
   it("fails #1 when the draft answers fewer questions than it was asked", () => {
-    const r = selfCheck("네.", {
+    const r = selfCheck("Yes.", {
       questionCount: 2, externalUrls: [], calendarConflicts: [],
       voiceSampleAvgLen: 40, entityNames: [], channel: "slack",
     });
@@ -2446,7 +2446,7 @@ describe("selfCheck (A4 §3.3)", () => {
   });
 
   it("passes a clean draft", () => {
-    const r = selfCheck("네, 목요일 오후 2시에 보내드리겠습니다. 확인해보고 알려드리겠습니다.", {
+    const r = selfCheck("Yes, I'll send it Thursday at 2pm. I'll check and let you know.", {
       questionCount: 1, externalUrls: [], calendarConflicts: [],
       voiceSampleAvgLen: 40, entityNames: [], channel: "gmail",
     });
@@ -2455,17 +2455,17 @@ describe("selfCheck (A4 §3.3)", () => {
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `does not provide an export named 'needsReplyScore'`.
+- [ ] 2. Confirm the failure. Expected: `does not provide an export named 'needsReplyScore'`.
 
 ```bash
 pnpm --filter @omnis/agents test -- draft-rules
 ```
 
-- [ ] 3. `register.ts`를 쓴다.
+- [ ] 3. Write `register.ts`.
 
 ```ts
 // packages/agents/src/draft/register.ts
-// A4 §3.1·§3.2·§3.4. 전부 규칙이다 — 여기에 모델 호출은 없다.
+// A4 §3.1·§3.2·§3.4. All of it is rules — there is no model call here.
 import type { Channel } from "@omnis/protocol";
 import type { ItemRow } from "../types.js";
 
@@ -2488,10 +2488,10 @@ export function pickRegister(ctx: {
   return "formal_ko";
 }
 
-/** A4 §3.1: 0.5 미만이면 초안을 아예 안 만든다. */
+/** A4 §3.1: below 0.5, no draft is produced at all. */
 export const NEEDS_REPLY_MIN = 0.5;
 
-const UNSUBSCRIBE = /구독.{0,4}해지|unsubscribe|수신거부/i;
+const UNSUBSCRIBE = /(cancel|end).{0,4}subscription|unsubscribe|opt[ -]?out/i;
 
 export function needsReplyScore(
   item: ItemRow,
@@ -2511,54 +2511,54 @@ export interface DraftShape {
   notes: string;
 }
 
-/** A4 §3.4 표 그대로. Channel 10값 전부를 덮는다(agent/system은 초안 대상이 아니라 0이다). */
+/** Exactly the A4 §3.4 table. It covers all 10 Channel values (agent/system are not draft targets, so they are 0). */
 export const CHANNEL_DRAFT_SHAPE: Record<Channel, DraftShape> = {
-  gmail: { targetWords: [60, 180], notes: "인사말 + 본문 + 맺음말, 문단 2~3. subject는 Re: 유지." },
-  outlook: { targetWords: [60, 180], notes: "Gmail과 동일." },
-  slack: { targetWords: [10, 60], notes: "인사말 없음, 마크다운 최소. 새 @멘션 추가 금지." },
-  telegram: { targetWords: [8, 45], notes: "1~3문장. 이모지는 VOICE에 샘플이 있을 때만 0~1개." },
-  whatsapp: { targetWords: [6, 30], notes: "1~2문장, 줄바꿈 대신 단문." },
-  kakaotalk: { targetWords: [5, 30], notes: "80자 이하, 존댓말 기본, 줄바꿈 최소, 텍스트만." },
-  linkedin: { targetWords: [40, 90], notes: "인사 + 용건 + 제안 1개. 선제 발신 금지 규칙 적용." },
-  gcal: { targetWords: [10, 60], notes: "초대 응답 문구. 일정 자체는 승인 경로다." },
-  agent: { targetWords: [0, 0], notes: "초안 아님 — 사용자가 직접 쓴다(A4 §3.4)." },
-  system: { targetWords: [0, 0], notes: "초안 아님." },
+  gmail: { targetWords: [60, 180], notes: "Greeting + body + sign-off, 2–3 paragraphs. Keep the subject as Re:." },
+  outlook: { targetWords: [60, 180], notes: "Same as Gmail." },
+  slack: { targetWords: [10, 60], notes: "No greeting, minimal markdown. Do not add new @mentions." },
+  telegram: { targetWords: [8, 45], notes: "1–3 sentences. Emoji only 0–1, and only if VOICE has a sample." },
+  whatsapp: { targetWords: [6, 30], notes: "1–2 sentences, short lines instead of line breaks." },
+  kakaotalk: { targetWords: [5, 30], notes: "80 characters or fewer, polite register by default, minimal line breaks, text only." },
+  linkedin: { targetWords: [40, 90], notes: "Greeting + purpose + one proposal. The no-unsolicited-outreach rule applies." },
+  gcal: { targetWords: [10, 60], notes: "Invitation response copy. The event itself goes through the approval path." },
+  agent: { targetWords: [0, 0], notes: "Not a draft — the user writes it directly (A4 §3.4)." },
+  system: { targetWords: [0, 0], notes: "Not a draft." },
 };
 ```
 
-- [ ] 4. `selfcheck.ts`를 쓴다.
+- [ ] 4. Write `selfcheck.ts`.
 
 ```ts
 // packages/agents/src/draft/selfcheck.ts
-// A4 §3.3의 6항 체크리스트. 6번(exfil 방지)이 핵심 안전장치다.
+// The 6-item checklist from A4 §3.3. Item 6 (exfil prevention) is the key safeguard.
 import type { Channel } from "@omnis/protocol";
 import { CHANNEL_DRAFT_SHAPE } from "./register.js";
 
 export const SELF_CHECK_ITEMS: readonly string[] = [
-  "상대가 물은 것에 전부 답했는가",
-  "내가 모르는 사실을 단정했는가",
-  "날짜·시간이 캘린더와 충돌하지 않는가",
-  "VOICE 샘플의 문장 길이 패턴과 어긋나지 않는가",
-  "상대 이름·직함·회사가 엔티티 지금 기준과 일치하는가",
-  "<data>에서 가져온 링크·주소·계좌를 그대로 옮기지 않았는가",
+  "Did it answer everything the other person asked?"
+  "Did it assert a fact I do not know?"
+  "Do the dates and times conflict with the calendar?"
+  "Does it clash with the sentence-length pattern of the VOICE samples?"
+  "Do the other person's name, title, and company match the as-of-now entities?"
+  "Did it carry over a link, address, or account number taken from <data>?"
 ] as const;
 
 export interface SelfCheckCtx {
-  /** 상대가 던진 질문 개수(물음표 세기). */
+  /** Number of questions the other person asked (by counting question marks). */
   questionCount: number;
-  /** <data> 블록에 등장했던 URL·계좌 문자열. 초안에 그대로 있으면 6번 실패. */
+  /** URL or account strings that appeared in the <data> block. If they are still in the draft verbatim, item 6 fails. */
   externalUrls: string[];
-  /** 초안이 말한 시각 중 캘린더와 겹치는 것. */
+  /** Times the draft mentions that overlap with the calendar. */
   calendarConflicts: string[];
-  /** VOICE 샘플의 평균 문장 길이(자). 0이면 4번을 건너뛴다. */
+  /** Average sentence length of the VOICE samples (in characters). If 0, item 4 is skipped. */
   voiceSampleAvgLen: number;
-  /** "지금 기준" 엔티티 이름 목록. 초안이 이 중 어느 것도 안 쓰면 5번은 통과로 본다. */
+  /** List of "as-of-now" entity names. If the draft uses none of them, item 5 counts as passed. */
   entityNames: string[];
   channel: Channel;
 }
 
-const HEDGE = /확인(해\s?보고|하고)|알아보고|여쭤보고/;
-const ASSERTION = /반드시|무조건|확실히|100%/;
+const HEDGE = /(let me|I'?ll)\s+(check|look|ask|verify|confirm)/i;
+const ASSERTION = /absolutely|definitely|certainly|guaranteed|100%/i;
 
 export function selfCheck(
   draft: string,
@@ -2575,10 +2575,10 @@ export function selfCheck(
     if (avg > ctx.voiceSampleAvgLen * 2 || avg < ctx.voiceSampleAvgLen / 2) failed.push(4);
   }
   if (ctx.entityNames.length > 0) {
-    const stale = /(?:전|前)\s?직장|예전\s?회사/.test(draft);
+    const stale = /former (employer|company)|previous company|used to work/i.test(draft);
     if (stale) failed.push(5);
   }
-  // 6번: <data>에서 온 URL·계좌를 그대로 옮겼는가. 인젝션 경유 exfil의 마지막 방어선이다.
+  // Item 6: did it carry over a URL or account number that came from <data>. This is the last line of defense against injection-driven exfil.
   if (ctx.externalUrls.some((u) => u !== "" && draft.includes(u))) failed.push(6);
 
   const shape = CHANNEL_DRAFT_SHAPE[ctx.channel];
@@ -2589,10 +2589,10 @@ export function selfCheck(
 }
 ```
 
-- [ ] 5. `index.ts`에 export를 더하고 통과를 확인한다. 기대: 7 tests passed.
+- [ ] 5. Add the exports to `index.ts` and confirm it passes. Expected: 7 tests passed.
 
 ```ts
-// packages/agents/src/index.ts — 추가
+// packages/agents/src/index.ts — added
 export {
   CHANNEL_DRAFT_SHAPE, NEEDS_REPLY_MIN, needsReplyScore, pickRegister,
   type DraftShape, type Register,
@@ -2603,12 +2603,12 @@ export { SELF_CHECK_ITEMS, selfCheck, type SelfCheckCtx } from "./draft/selfchec
 ```bash
 pnpm --filter @omnis/agents test -- draft-rules && pnpm lint
 git add packages/agents/src/draft packages/agents/src/index.ts packages/agents/test/draft-rules.test.ts
-git commit -m "US-B13: 초안 순수 함수 — register/needs-reply/채널 형식/self-check
+git commit -m "US-B13: draft pure functions — register/needs-reply/channel shape/self-check
 
-- needsReplyScore 5개 가중치와 0.5 임계(A4 §3.1)
-- pickRegister는 라벨·소속·인사말 규칙이고 모델을 부르지 않는다
-- CHANNEL_DRAFT_SHAPE가 Channel 10값을 전부 덮는다
-- selfCheck 6항, 6번이 <data> 경유 exfil을 잡는다
+- needsReplyScore's five weights and the 0.5 threshold (A4 §3.1)
+- pickRegister uses label, org, and greeting rules and never calls a model
+- CHANNEL_DRAFT_SHAPE covers all 10 Channel values
+- selfCheck's 6 items, with item 6 catching exfil through <data>
 
 Implemented-by: Claude Opus
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -2616,12 +2616,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 9: `draftLoop` — 60초 SLA + 티어 에스컬레이션 6조건 (US-B13, tier: Opus)
+## Task 9: `draftLoop` — the 60-second SLA + the 6 tier-escalation conditions (US-B13, tier: Opus)
 
-> **스토리** — 목표: 트리거·컨텍스트 7슬롯·Deliberate 4스텝·60초 SLA placeholder·에스컬레이션 6조건. 산출물: `packages/agents/src/loops/draft.ts`. 검증: `pnpm --filter @omnis/agents test`.
+> **Story** — Goal: the trigger, the 7 context slots, the 4 Deliberate steps, the 60-second SLA placeholder, and the 6 escalation conditions. Deliverables: `packages/agents/src/loops/draft.ts`. Verification: `pnpm --filter @omnis/agents test`.
 
-**읽을 것:** A4 §3 전체, Task 3의 `runLoopSpec`, Task 5의 `propose_draft`.
-**만들지 말 것(YAGNI):** 초안 A/B 생성, 다국어 자동 감지 라이브러리. `language`는 본문의 한글 비율 한 줄로 가른다.
+**Read:** all of A4 §3, `runLoopSpec` from Task 3, `propose_draft` from Task 5.
+**Do not build (YAGNI):** draft A/B generation, a language auto-detection library. `language` is decided by a one-line check of the Hangul ratio in the body.
 
 **Files:**
 - Create: `packages/agents/src/loops/draft.ts`, `packages/agents/test/integration/draft-loop.test.ts`
@@ -2629,12 +2629,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Test: `packages/agents/test/integration/draft-loop.test.ts`
 
 **Interfaces:**
-- Consumes: `buildContext`(US-B05), `runLoopSpec`/`registerLoop`(Task 1·3), `toolRegistry`(Task 5), `pickRegister`/`needsReplyScore`/`selfCheck`(Task 8), `currentPolicy`(Task 6 — 허브가 `draftPolicy`로 주입).
+- Consumes: `buildContext` (US-B05), `runLoopSpec`/`registerLoop` (Task 1·3), `toolRegistry` (Task 5), `pickRegister`/`needsReplyScore`/`selfCheck` (Task 8), `currentPolicy` (Task 6 — injected by the hub as `draftPolicy`).
 - Produces: `draftLoop`, `DraftOutput`, `type DraftOutputT`, `writePlaceholderDraft`, `shouldEscalate`, `DRAFT_SLA_MS`, `DRAFT_PLACEHOLDER_MS`.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다 — 에스컬레이션 판정과 placeholder 두 개만 본다(모델 경로는 Task 3이 이미 덮는다).
+- [ ] 1. Write the failing test — it covers only escalation determination and the placeholder (Task 3 already covers the model path).
 
 ```ts
 // packages/agents/test/integration/draft-loop.test.ts
@@ -2694,23 +2694,23 @@ describe("draftLoop (A4 §3)", () => {
     const id = await writePlaceholderDraft(threadId);
     const { rows } = await pool.query<{ status: string; body: string; meta: { pending?: boolean } }>(
       "SELECT status, body, meta FROM items WHERE id = $1", [id]);
-    expect(rows[0]).toMatchObject({ status: "draft", body: "초안 준비 중…" });
+    expect(rows[0]).toMatchObject({ status: "draft", body: "Preparing the draft…" });
     expect(rows[0]?.meta.pending).toBe(true);
   });
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `does not provide an export named 'draftLoop'`.
+- [ ] 2. Confirm the failure. Expected: `does not provide an export named 'draftLoop'`.
 
 ```bash
 pnpm --filter @omnis/agents test -- draft-loop
 ```
 
-- [ ] 3. 구현을 쓴다.
+- [ ] 3. Write the implementation.
 
 ```ts
 // packages/agents/src/loops/draft.ts
-// A4 §3 L2 답장 초안 루프(Deliberate).
+// A4 §3 L2 reply draft loop (Deliberate).
 import type { Channel, Sensitivity } from "@omnis/protocol";
 import { z } from "zod";
 import { buildContext } from "../context/assemble.js";
@@ -2721,7 +2721,7 @@ import type { LoopSpec, TriggerContext } from "../loop/spec.js";
 import { getAgentsPool } from "../pool.js";
 import { PROPOSE_TOOLS } from "../tools/propose.js";
 
-/** A4 §3.1 SLA: 60초 안에 status='draft' row가 있어야 한다. 55초에 placeholder를 먼저 쓴다. */
+/** A4 §3.1 SLA: a status='draft' row must exist within 60 seconds. A placeholder is written first at 55 seconds. */
 export const DRAFT_SLA_MS = 60_000;
 export const DRAFT_PLACEHOLDER_MS = 55_000;
 
@@ -2740,7 +2740,7 @@ export const DraftOutput = z.object({
 });
 export type DraftOutputT = z.infer<typeof DraftOutput>;
 
-/** A4 §3.5의 6조건. 하나라도 참이면 T2(Claude Sonnet 5). */
+/** The 6 conditions from A4 §3.5. If any one of them is true, T2 (Claude Sonnet 5). */
 export function shouldEscalate(i: {
   vip: boolean;
   sensitivity: Sensitivity;
@@ -2761,13 +2761,13 @@ export function shouldEscalate(i: {
   return false;
 }
 
-/** A4 §3.1: 화면이 "초안 없음"으로 비는 것보다 "준비 중"이 낫다. */
+/** A4 §3.1: "preparing" beats the screen sitting empty with "no draft." */
 export async function writePlaceholderDraft(threadId: string): Promise<string> {
   const { rows } = await getAgentsPool().query<{ id: string }>(
     `INSERT INTO items (thread_id, account_id, kind, status, body, sent_at, author_is_me, meta)
      SELECT t.id, t.account_id,
             CASE WHEN t.kind = 'email' THEN 'email' ELSE 'message' END,
-            'draft', '초안 준비 중…', now(), true, '{"pending": true}'::jsonb
+            'draft', 'Preparing the draft…', now(), true, '{"pending": true}'::jsonb
        FROM threads t WHERE t.id = $1
      RETURNING id`,
     [threadId]);
@@ -2811,7 +2811,7 @@ export const draftLoop: LoopSpec<DraftOutputT> = {
   tier: "T1",
   outputSchema: DraftOutput,
 
-  // A4 §3.2의 7슬롯. 슬롯 이름과 수치는 그 표 그대로다.
+  // The 7 slots from A4 §3.2. The slot names and numbers are exactly that table.
   assemble: (ctx: TriggerContext) =>
     buildContext({
       selfModel: ["USER.md", "VOICE.md"],
@@ -2836,8 +2836,8 @@ export const draftLoop: LoopSpec<DraftOutputT> = {
       entityNames: [],
       channel,
     });
-    // A4 §3.3 step 4: 실패 항목이 있으면 초안을 저장하되 UI가 볼 수 있게 표시한다 —
-    // 재생성은 runLoopSpec의 재시도가 아니라 사람의 판단이다(6번은 안전 실패라 특히 그렇다).
+    // A4 §3.3 step 4: if any item failed, still store the draft but mark it so the UI can see it —
+    // regeneration is a human decision, not a runLoopSpec retry (item 6 especially, since it is a safety failure).
     const shape = CHANNEL_DRAFT_SHAPE[channel];
     const existing = p.placeholder_item_id;
     if (existing !== undefined) {
@@ -2865,10 +2865,10 @@ export const draftLoop: LoopSpec<DraftOutputT> = {
 registerLoop(draftLoop);
 ```
 
-- [ ] 4. `index.ts`에 export를 더하고 통과를 확인한다. 기대: `draft-loop.test.ts` 3 tests passed.
+- [ ] 4. Add the exports to `index.ts` and confirm it passes. Expected: `draft-loop.test.ts` 3 tests passed.
 
 ```ts
-// packages/agents/src/index.ts — 추가
+// packages/agents/src/index.ts — added
 export {
   DRAFT_PLACEHOLDER_MS, DRAFT_SLA_MS, DraftOutput, draftLoop, shouldEscalate,
   writePlaceholderDraft, type DraftOutputT,
@@ -2878,12 +2878,12 @@ export {
 ```bash
 pnpm --filter @omnis/agents test && pnpm lint
 git add packages/agents/src/loops/draft.ts packages/agents/src/index.ts packages/agents/test/integration/draft-loop.test.ts
-git commit -m "US-B13: L2 답장 초안 루프
+git commit -m "US-B13: L2 reply draft loop
 
-- 트리거(item.labeled + needs_reply_score>=0.5, 20초 디바운스)와 A4 §3.7 예산
-- 7슬롯 컨텍스트, palette에 propose_draft 하나만 쓰기 tool로 들어간다
-- 60초 SLA placeholder(meta.pending) → 완료 시 같은 row 교체
-- shouldEscalate 6조건
+- The trigger (item.labeled + needs_reply_score>=0.5, 20-second debounce) and the A4 §3.7 budget
+- 7-slot context; propose_draft is the only write tool that goes into the palette
+- 60-second SLA placeholder (meta.pending) → replaced in the same row on completion
+- shouldEscalate's 6 conditions
 
 Implemented-by: Claude Opus
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -2891,12 +2891,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 10: 알림 3등급 판정 + 조용시간 (US-B15, tier: Sonnet)
+## Task 10: Notification tier determination + quiet hours (US-B15, tier: Sonnet)
 
-> **스토리** — 목표: 즉시/묶음/무음 판정, 조용시간 23:00~07:00 + 예외 1개. 산출물: `packages/kernel/src/notify/tier.ts`. 검증: `pnpm --filter @omnis/kernel test`. 의존: B13.
+> **Story** — Goal: immediate/batched/silent determination, quiet hours 23:00–07:00 + one exception. Deliverables: `packages/kernel/src/notify/tier.ts`. Verification: `pnpm --filter @omnis/kernel test`. Depends on: B13.
 
-**읽을 것:** A4 §3.6 표 전체, 델타 §2.3(`NotifyTier`).
-**만들지 말 것(YAGNI):** 사용자별 알림 프로필, 채널별 on/off. Settings의 `notify.quiet_hours`/`notify.vip_override` 두 키가 전부다.
+**Read:** the whole A4 §3.6 table, delta §2.3 (`NotifyTier`).
+**Do not build (YAGNI):** per-user notification profiles, per-channel on/off. The two Settings keys `notify.quiet_hours`/`notify.vip_override` are all there is.
 
 **Files:**
 - Create: `packages/kernel/src/notify/tier.ts`, `packages/kernel/test/notify-tier.test.ts`
@@ -2904,19 +2904,19 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Test: `packages/kernel/test/notify-tier.test.ts`
 
 **Interfaces:**
-- Consumes: `NotifyTier`(`@omnis/protocol`, 델타 §2.3).
+- Consumes: `NotifyTier` (`@omnis/protocol`, delta §2.3).
 - Produces: `notifyTierFor`, `inQuietHours`, `QUIET_START_HOUR_KST`, `QUIET_END_HOUR_KST`, `PUSH_BATCH_HOURS_KST`.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다.
+- [ ] 1. Write the failing test.
 
 ```ts
 // packages/kernel/test/notify-tier.test.ts
 import { describe, expect, it } from "vitest";
 import { PUSH_BATCH_HOURS_KST, inQuietHours, notifyTierFor } from "../src/notify/tier.js";
 
-/** KST 기준 시각을 UTC Date로 만든다(Asia/Seoul은 DST가 없어 고정 -9h). */
+/** Build a UTC Date for a KST wall-clock time (Asia/Seoul has no DST, so a fixed -9h). */
 const kst = (h: number, m = 0): Date => new Date(Date.UTC(2026, 8, 20, h - 9, m));
 
 describe("inQuietHours (A4 §3.6)", () => {
@@ -2967,17 +2967,17 @@ describe("notifyTierFor (A4 §3.6)", () => {
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `Failed to resolve import "../src/notify/tier.js"`.
+- [ ] 2. Confirm the failure. Expected: `Failed to resolve import "../src/notify/tier.js"`.
 
 ```bash
 pnpm --filter @omnis/kernel test -- notify-tier
 ```
 
-- [ ] 3. 구현을 쓴다.
+- [ ] 3. Write the implementation.
 
 ```ts
 // packages/kernel/src/notify/tier.ts
-// A4 §3.6. 맥과 폰에 똑같이 적용된다 — 폰 전용 규칙은 없다.
+// A4 §3.6. It applies identically on the Mac and the phone — there are no phone-only rules.
 import type { NotifyTier } from "@omnis/protocol";
 
 export const QUIET_START_HOUR_KST = 23;
@@ -3001,14 +3001,14 @@ export function notifyTierFor(i: {
   mentionsMe: boolean;
   meetingWithin2h: boolean;
   now: Date;
-  /** Settings `notify.vip_override`. 기본 true — 끄면 조용시간 예외가 사라진다. */
+  /** Settings `notify.vip_override`. Defaults to true — turning it off removes the quiet-hours exception. */
   vipOverride?: boolean;
 }): NotifyTier {
   const immediate =
     i.priority === "now" && (i.vip || i.mentionsMe || i.meetingWithin2h);
   if (immediate) {
     if (!inQuietHours(i.now)) return "immediate";
-    // 조용시간 예외는 vip AND priority='now' 하나뿐이고, 그것조차 Settings에서 끌 수 있다.
+    // The only quiet-hours exception is vip AND priority='now', and even that can be turned off in Settings.
     return i.vip && (i.vipOverride ?? true) ? "immediate" : "batched";
   }
   if (i.priority === "today") return "batched";
@@ -3016,10 +3016,10 @@ export function notifyTierFor(i: {
 }
 ```
 
-- [ ] 4. `index.ts`에 export를 더하고 통과를 확인한다. 기대: 4 tests passed.
+- [ ] 4. Add the exports to `index.ts` and confirm it passes. Expected: 4 tests passed.
 
 ```ts
-// packages/kernel/src/index.ts — 추가
+// packages/kernel/src/index.ts — added
 export {
   PUSH_BATCH_HOURS_KST, QUIET_END_HOUR_KST, QUIET_START_HOUR_KST, inQuietHours, notifyTierFor,
 } from "./notify/tier.js";
@@ -3028,11 +3028,11 @@ export {
 ```bash
 pnpm --filter @omnis/kernel test -- notify-tier && pnpm lint
 git add packages/kernel/src/notify/tier.ts packages/kernel/src/index.ts packages/kernel/test/notify-tier.test.ts
-git commit -m "US-B15: 알림 3등급 판정과 조용시간
+git commit -m "US-B15: notification tier determination and quiet hours
 
-- notifyTierFor가 즉시/묶음/무음을 A4 §3.6 표 그대로 가른다
-- inQuietHours 23:00~07:00 KST(자정 넘김 처리), 예외는 vip AND priority=now 하나
-- 예외는 notify.vip_override로 끌 수 있다
+- notifyTierFor splits immediate/batched/silent exactly per the A4 §3.6 table
+- inQuietHours 23:00–07:00 KST (handles crossing midnight), with a single exception: vip AND priority=now
+- The exception can be turned off with notify.vip_override
 
 Implemented-by: Claude Sonnet
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -3040,12 +3040,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 11: `push_batch` 잡 + `createNotifier` (US-B15, tier: Sonnet)
+## Task 11: The `push_batch` job + `createNotifier` (US-B15, tier: Sonnet)
 
-> **스토리** — 목표: 묶음 잡(09/12/15/18 KST)이 "초안 N건 준비됨" 1건으로 접고, 본문은 첫 80자만 싣는다. 산출물: `packages/kernel/src/notify/batch.ts`. 검증: `pnpm --filter @omnis/kernel test`.
+> **Story** — Goal: the batch job (09/12/15/18 KST) folds everything into a single "N drafts ready" notification and ships only the first 80 characters as the body. Deliverables: `packages/kernel/src/notify/batch.ts`. Verification: `pnpm --filter @omnis/kernel test`.
 
-**읽을 것:** A4 §3.6 마지막 두 문단, 델타 §2.3(`PushPayload.body`는 `max(80)`), 델타 §8(`push_batch`).
-**만들지 말 것(YAGNI):** 알림 dedup 저장소, 읽음 처리 동기화. 묶음 1건은 매번 새로 센다.
+**Read:** the last two paragraphs of A4 §3.6, delta §2.3 (`PushPayload.body` is `max(80)`), delta §8 (`push_batch`).
+**Do not build (YAGNI):** a notification dedup store, read-state sync. The single batch is counted fresh every time.
 
 **Files:**
 - Create: `packages/kernel/src/notify/batch.ts`, `packages/kernel/test/integration/notify-batch.test.ts`
@@ -3053,12 +3053,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Test: `packages/kernel/test/integration/notify-batch.test.ts`
 
 **Interfaces:**
-- Consumes: `PushPayload`/`NotifyTier`(`@omnis/protocol`), `notifyTierFor`/`inQuietHours`(Task 10), `sendWebPush`(Task 12 — 여기서는 `Notifier.send`로 주입받는 형태로만 쓴다).
+- Consumes: `PushPayload`/`NotifyTier` (`@omnis/protocol`), `notifyTierFor`/`inQuietHours` (Task 10), `sendWebPush` (Task 12 — used here only in the form injected as `Notifier.send`).
 - Produces: `Notifier`, `createNotifier`, `runPushBatch`, `registerPushBatchJob`, `PUSH_BATCH_JOB_NAME`, `PUSH_BATCH_CRON`, `first80`.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다.
+- [ ] 1. Write the failing test.
 
 ```ts
 // packages/kernel/test/integration/notify-batch.test.ts
@@ -3091,8 +3091,8 @@ describe("push_batch (A4 §3.6)", () => {
   });
 
   it("truncates a body to the first 80 characters", () => {
-    expect(first80("가".repeat(200))).toHaveLength(80);
-    expect(first80("짧다")).toBe("짧다");
+    expect(first80("é".repeat(200))).toHaveLength(80);
+    expect(first80("short")).toBe("short");
   });
 
   it("folds every pending draft into a single push", async () => {
@@ -3100,7 +3100,7 @@ describe("push_batch (A4 §3.6)", () => {
       await pool.query(
         `INSERT INTO items (thread_id, account_id, kind, status, body, sent_at, author_is_me)
          SELECT $1, account_id, 'email', 'draft', $2, now(), true FROM threads WHERE id = $1`,
-        [threadId, `초안 ${i}`]);
+        [threadId, `Draft ${i}`]);
     }
     const send = vi.fn(async () => undefined);
     const n = await runPushBatch({
@@ -3111,7 +3111,7 @@ describe("push_batch (A4 §3.6)", () => {
     expect(send).toHaveBeenCalledTimes(1);
     const payload = send.mock.calls[0]?.[0] as { title: string; body: string; kind: string };
     expect(payload.kind).toBe("draft");
-    expect(payload.body).toContain("3건");
+    expect(payload.body).toContain("3 drafts");
     expect(payload.body.length).toBeLessThanOrEqual(80);
   });
 
@@ -3125,17 +3125,17 @@ describe("push_batch (A4 §3.6)", () => {
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `Failed to resolve import "../../src/notify/batch.js"`.
+- [ ] 2. Confirm the failure. Expected: `Failed to resolve import "../../src/notify/batch.js"`.
 
 ```bash
 pnpm --filter @omnis/kernel test:integration -- notify-batch
 ```
 
-- [ ] 3. 구현을 쓴다.
+- [ ] 3. Write the implementation.
 
 ```ts
 // packages/kernel/src/notify/batch.ts
-// A4 §3.6: 묶음 등급은 3시간 간격으로 "초안 N건 준비됨" 1건으로 접힌다.
+// A4 §3.6: the batched tier folds into a single "N drafts ready" every 3 hours.
 import { query } from "@omnis/db";
 import type { NotifyTier, PushPayload } from "@omnis/protocol";
 import type { Pool } from "pg";
@@ -3149,7 +3149,7 @@ export interface Notifier {
   send(p: PushPayload, tier: NotifyTier): Promise<void>;
 }
 
-/** A4 §3.6 프라이버시 원칙: 잠금화면에 본문 전문을 띄우지 않는다. */
+/** A4 §3.6 privacy principle: never put the full body on the lock screen. */
 export function first80(s: string): string {
   return s.length <= 80 ? s : s.slice(0, 80);
 }
@@ -3175,7 +3175,7 @@ export async function runPushBatch(deps: PushBatchDeps): Promise<number> {
     {
       kind: "draft",
       title: "omnis",
-      body: first80(`초안 ${n}건 준비됨`),
+      body: first80(`${n} drafts ready`),
       deep_link: threadId === "" ? "omnis://inbox" : `omnis://thread/${threadId}`,
     },
     "batched",
@@ -3190,7 +3190,7 @@ export function registerPushBatchJob(scheduler: Scheduler, deps: PushBatchDeps):
   });
 }
 
-/** 실제 발송기는 Task 12의 Web Push + Tauri 로컬 알림이다. 여기서는 주입 지점만 만든다. */
+/** The real senders are Task 12's Web Push + Tauri local notifications. Here we only create the injection point. */
 export function createNotifier(deps: {
   pool: Pool;
   logger: Logger;
@@ -3202,7 +3202,7 @@ export function createNotifier(deps: {
       try {
         await deps.send(p, tier);
       } catch (e) {
-        // A4: 발송 실패를 조용히 삼키지 않는다. agent_runs가 아니라 시스템 Item이다(백로그 US-B17).
+        // A4: do not swallow a send failure silently. It becomes a system Item, not an agent_runs row (backlog US-B17).
         deps.logger.error("notify send failed", {
           kind: p.kind, err: e instanceof Error ? e.message : String(e),
         });
@@ -3217,7 +3217,7 @@ export function createNotifier(deps: {
              ON CONFLICT (account_id, external_id) DO UPDATE SET kind = 'system' RETURNING id, account_id)
            INSERT INTO items (thread_id, account_id, kind, status, body, sent_at)
            SELECT thr.id, thr.account_id, 'system', 'received', $1, now() FROM thr`,
-          [`알림 발송에 실패했습니다(${p.kind}). 설정에서 푸시 구독을 확인해 주세요.`],
+          [`Notification delivery failed (${p.kind}). Check the push subscription in settings.`],
         );
       }
     },
@@ -3225,10 +3225,10 @@ export function createNotifier(deps: {
 }
 ```
 
-- [ ] 4. `index.ts`에 export를 더하고 통과를 확인한다. 기대: 4 tests passed.
+- [ ] 4. Add the exports to `index.ts` and confirm it passes. Expected: 4 tests passed.
 
 ```ts
-// packages/kernel/src/index.ts — 추가
+// packages/kernel/src/index.ts — added
 export {
   PUSH_BATCH_CRON, PUSH_BATCH_JOB_NAME, createNotifier, first80, registerPushBatchJob,
   runPushBatch, type Notifier, type PushBatchDeps,
@@ -3238,11 +3238,11 @@ export {
 ```bash
 pnpm --filter @omnis/kernel test:integration -- notify-batch && pnpm lint
 git add packages/kernel/src/notify/batch.ts packages/kernel/src/index.ts packages/kernel/test/integration/notify-batch.test.ts
-git commit -m "US-B15: push_batch 잡과 createNotifier
+git commit -m "US-B15: push_batch job and createNotifier
 
-- 09/12/15/18 KST에 대기 초안 전부를 '초안 N건 준비됨' 1건으로 접는다
-- 본문은 first80으로 잘라 잠금화면에 전문이 뜨지 않게 한다
-- 발송 실패는 시스템 Item으로 노출한다(조용히 삼키지 않는다)
+- At 09/12/15/18 KST, folds every pending draft into one 'N drafts ready' notification
+- first80 truncates the body so the full text never shows on the lock screen
+- A send failure is surfaced as a system Item (never swallowed silently)
 
 Implemented-by: Claude Sonnet
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -3250,14 +3250,14 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 12: Web Push 발송기 + macOS 로컬 알림 (US-B17, tier: Sonnet)
+## Task 12: Web Push sender + macOS local notifications (US-B17, tier: Sonnet)
 
-> **스토리** — 목표: VAPID 서명 Web Push(`push_subscriptions` 조회, 액션 2개, 410/404 정리) + Tauri 알림 딥링크. 산출물: `packages/kernel/src/notify/webpush.ts`, `apps/desktop/src-tauri/src/notify.rs`. 검증: `pnpm --filter @omnis/kernel test`. 의존: B15, B16.
+> **Story** — Goal: VAPID-signed Web Push (querying `push_subscriptions`, two actions, 410/404 cleanup) + Tauri notification deep links. Deliverables: `packages/kernel/src/notify/webpush.ts`, `apps/desktop/src-tauri/src/notify.rs`. Verification: `pnpm --filter @omnis/kernel test`. Depends on: B15, B16.
 
-**읽을 것:** A5 §4.4, 델타 §2.3(`PushPayload`)·§6(`0011_push_subscriptions.sql`은 **웨이브 0 스키마 번들** 소유)·§9(VAPID 환경변수).
-**의존 주의:** `push_subscriptions` 테이블은 **W0 스키마 번들의 `0011`이 만든다**(델타 §6, 2026-09-20 교차 리뷰 M3에서 surfaces US-B36 소유에서 옮겨졌다 — 옛 배치는 B17↔B36 순환이었다). 이 태스크의 통합 테스트는 그 마이그레이션이 적용된 DB를 전제하므로 **W0 머지 후**에 실행한다.
-**Web Push 단일 오너(2026-09-20 교차 리뷰 M-webpush):** VAPID 설정과 실제 발송·구독 정리는 **이 파일(`packages/kernel/src/notify/webpush.ts`)만** 갖는다 — `vapidFromEnv`/`sendWebPush`/`pruneSubscription`/`WEBPUSH_GONE_CODES`/`VapidKeys`. surfaces 계획 Task 10은 `POST`/`DELETE /push/subscribe`와 `GET /push/vapid-public-key` **라우트만** 만들고 이 모듈을 `@omnis/kernel`에서 import해 쓴다(`web-push` 의존도 여기 한 곳에만 둔다). `apps/hub`에 두 번째 발송 구현(`sendPush`/`configureWebPush`/`PushSender`)을 만들지 않는다.
-**만들지 말 것(YAGNI):** 자체 VAPID 서명 구현, 재시도 큐. `web-push`가 서명·암호화를 다 하고, 실패한 엔드포인트는 다음 발송에서 다시 만난다.
+**Read:** A5 §4.4, delta §2.3 (`PushPayload`)·§6 (`0011_push_subscriptions.sql` is owned by the **wave 0 schema bundle**)·§9 (VAPID env vars).
+**Dependency note:** the `push_subscriptions` table is created by **`0011` in the W0 schema bundle** (delta §6; moved off surfaces US-B36 ownership in the 2026-09-20 cross review M3 — the old assignment was a B17↔B36 cycle). This task's integration test assumes a DB with that migration applied, so it runs **after W0 is merged**.
+**Single Web Push owner (2026-09-20 cross review M-webpush):** VAPID configuration plus the actual sending and subscription cleanup live in **this file only** (`packages/kernel/src/notify/webpush.ts`) — `vapidFromEnv`/`sendWebPush`/`pruneSubscription`/`WEBPUSH_GONE_CODES`/`VapidKeys`. surfaces plan Task 10 creates **only the routes** `POST`/`DELETE /push/subscribe` and `GET /push/vapid-public-key` and imports this module from `@omnis/kernel` to use it (the `web-push` dependency also lives in this one place). Do not create a second sending implementation (`sendPush`/`configureWebPush`/`PushSender`) in `apps/hub`.
+**Do not build (YAGNI):** a hand-rolled VAPID signing implementation, a retry queue. `web-push` handles all the signing and encryption, and a failed endpoint is encountered again on the next send.
 
 **Files:**
 - Create: `packages/kernel/src/notify/webpush.ts`, `packages/kernel/test/integration/webpush.test.ts`, `apps/desktop/src-tauri/src/notify.rs`
@@ -3270,13 +3270,13 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Steps
 
-- [ ] 1. 의존을 더한다.
+- [ ] 1. Add the dependency.
 
 ```bash
 pnpm --filter @omnis/kernel add web-push@3.6.7 && pnpm --filter @omnis/kernel add -D @types/web-push@3.6.4
 ```
 
-- [ ] 2. 실패하는 테스트를 쓴다. `web-push` 모듈 자체를 mock해 네트워크를 타지 않는다.
+- [ ] 2. Write the failing test. Mock the `web-push` module itself so no network is touched.
 
 ```ts
 // packages/kernel/test/integration/webpush.test.ts
@@ -3297,7 +3297,7 @@ afterAll(() => pool.end());
 
 const vapid = { publicKey: "pub", privateKey: "priv", subject: "mailto:x@example.com" };
 const payload = {
-  kind: "approval" as const, title: "omnis", body: "승인 대기 1건",
+  kind: "approval" as const, title: "omnis", body: "1 approval pending",
   deep_link: "omnis://thread/abc", approval_id: "11111111-1111-1111-1111-111111111111",
 };
 
@@ -3344,17 +3344,17 @@ describe("sendWebPush (A5 §4.4)", () => {
 });
 ```
 
-- [ ] 3. 실패를 확인한다. 기대: `Failed to resolve import "../../src/notify/webpush.js"`.
+- [ ] 3. Confirm the failure. Expected: `Failed to resolve import "../../src/notify/webpush.js"`.
 
 ```bash
 pnpm --filter @omnis/kernel test:integration -- webpush
 ```
 
-- [ ] 4. 구현을 쓴다.
+- [ ] 4. Write the implementation.
 
 ```ts
 // packages/kernel/src/notify/webpush.ts
-// A5 §4.4 + A4 §3.6. 키는 Keychain omnis.webpush.vapid_* → launchd가 env로 주입한다(델타 §9).
+// A5 §4.4 + A4 §3.6. The keys live in Keychain omnis.webpush.vapid_* → launchd injects them as env (delta §9).
 import { query } from "@omnis/db";
 import type { PushPayload } from "@omnis/protocol";
 import type { Pool } from "pg";
@@ -3367,7 +3367,7 @@ export interface VapidKeys {
   subject: string;
 }
 
-/** 구독이 사라졌음을 뜻하는 응답. 둘 다 조용히 지운다(RFC 8030). */
+/** Responses meaning the subscription is gone. Both are deleted silently (RFC 8030). */
 export const WEBPUSH_GONE_CODES: readonly number[] = [404, 410];
 
 export function vapidFromEnv(env: NodeJS.ProcessEnv = process.env): VapidKeys {
@@ -3395,13 +3395,13 @@ export async function sendWebPush(
 
   const subs = await query<{ endpoint: string; p256dh: string; auth: string }>(
     pool, "SELECT endpoint, p256dh, auth FROM push_subscriptions");
-  // 액션 2개는 A5 §4.4 그대로. approve는 앱을 열지 않고 POST /approvals/:id/decide를 친다.
+  // The two actions are exactly as in A5 §4.4. approve hits POST /approvals/:id/decide without opening the app.
   const body = JSON.stringify({
     title: payload.title,
     body: payload.body,
     actions: [
-      { action: "approve", title: "승인" },
-      { action: "open", title: "열기" },
+      { action: "approve", title: "Approve" },
+      { action: "open", title: "Open" },
     ],
     data: {
       deep_link: payload.deep_link,
@@ -3435,24 +3435,24 @@ export async function sendWebPush(
 }
 ```
 
-- [ ] 5. `index.ts`에 export를 더한다.
+- [ ] 5. Add the exports to `index.ts`.
 
 ```ts
-// packages/kernel/src/index.ts — 추가
+// packages/kernel/src/index.ts — added
 export {
   WEBPUSH_GONE_CODES, pruneSubscription, sendWebPush, vapidFromEnv, type VapidKeys,
 } from "./notify/webpush.js";
 ```
 
-- [ ] 6. macOS 로컬 알림을 쓴다. Tauri notification 플러그인이 알림을 띄우고, 클릭은 `omnis://thread/{id}` 딥링크로 돌아온다.
+- [ ] 6. Write the macOS local notification. The Tauri notification plugin shows the notification, and a click comes back through the `omnis://thread/{id}` deep link.
 
 ```rust
 // apps/desktop/src-tauri/src/notify.rs
-// A4 §3.6: 맥 알림은 Web Push와 같은 3등급을 따른다. 본문은 첫 80자만 싣는다.
+// A4 §3.6: macOS notifications follow the same three tiers as Web Push. The body carries only the first 80 characters.
 use tauri::AppHandle;
 use tauri_plugin_notification::NotificationExt;
 
-/// omnis://thread/{id} 딥링크. approval_id가 있으면 승인 카드로 바로 연다.
+/// omnis://thread/{id} deep link. With an approval_id it opens the approval card directly.
 pub fn deep_link_for(thread_id: &str, approval_id: Option<&str>) -> String {
     match approval_id {
         Some(a) => format!("omnis://thread/{thread_id}?approval={a}"),
@@ -3460,7 +3460,7 @@ pub fn deep_link_for(thread_id: &str, approval_id: Option<&str>) -> String {
     }
 }
 
-/// 본문은 80자(문자 단위)까지만 — 잠금화면에 전문이 뜨지 않게 한다.
+/// The body is capped at 80 characters (character-based, not bytes) — the full text never lands on the lock screen.
 pub fn first_80(body: &str) -> String {
     body.chars().take(80).collect()
 }
@@ -3495,14 +3495,14 @@ mod tests {
 
     #[test]
     fn body_is_truncated_to_80_characters_not_bytes() {
-        let long = "가".repeat(200);
+        let long = "é".repeat(200);
         assert_eq!(first_80(&long).chars().count(), 80);
     }
 }
 ```
 
 ```rust
-// apps/desktop/src-tauri/src/lib.rs — mod 선언과 invoke_handler에 추가
+// apps/desktop/src-tauri/src/lib.rs — add to the mod declarations and invoke_handler
 mod notify;
 // .invoke_handler(tauri::generate_handler![notify::notify_local])
 ```
@@ -3511,18 +3511,18 @@ mod notify;
 pnpm --filter @omnis/desktop exec -- cargo add tauri-plugin-notification --manifest-path src-tauri/Cargo.toml
 ```
 
-- [ ] 7. 둘 다 통과를 확인하고 커밋한다. 기대: vitest 3 tests passed, `cargo test` 2 tests passed.
+- [ ] 7. Confirm both pass and commit. Expected: vitest 3 tests passed, `cargo test` 2 tests passed.
 
 ```bash
 pnpm --filter @omnis/kernel test:integration -- webpush && \
   (cd apps/desktop/src-tauri && cargo test notify) && pnpm lint
 git add packages/kernel/src/notify/webpush.ts packages/kernel/src/index.ts packages/kernel/package.json packages/kernel/test/integration/webpush.test.ts apps/desktop/src-tauri
-git commit -m "US-B17: Web Push 발송기와 macOS 로컬 알림
+git commit -m "US-B17: Web Push sender and macOS local notifications
 
-- VAPID 서명 후 push_subscriptions 전체에 발송, 액션은 Approve/Open 2개
-- 410/404 응답은 구독을 지우고 나머지는 fail_count만 올린다
-- VAPID 키가 없으면 0을 돌려주고 아무것도 보내지 않는다
-- Tauri notify_local이 omnis://thread/{id} 딥링크를 만들고 본문을 80자로 자른다
+- After VAPID signing, sends to every push_subscriptions row with the two actions Approve/Open
+- A 410/404 response deletes the subscription; anything else just bumps fail_count
+- With no VAPID keys it returns 0 and sends nothing
+- Tauri notify_local builds the omnis://thread/{id} deep link and truncates the body to 80 characters
 
 Implemented-by: Claude Sonnet
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -3530,12 +3530,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 13: `archiveItem` / `undoArchive` — 7일 undo + 30일 재보관 제외 (US-B18, tier: Opus)
+## Task 13: `archiveItem` / `undoArchive` — 7-day undo + 30-day re-archive exclusion (US-B18, tier: Opus)
 
-> **스토리** — 목표: `items.meta.archived_by` 기록, `undoArchive()`(`archived`→`received` + `audit_log` + 해당 스레드 30일 제외), 하드 삭제 경로 없음. 산출물: `packages/kernel/src/archive.ts`. 검증: `pnpm --filter @omnis/kernel test:integration`. 의존: B06.
+> **Story** — Goal: recording `items.meta.archived_by`, `undoArchive()` (`archived`→`received` + `audit_log` + a 30-day exclusion for that thread), and no hard-delete path. Deliverables: `packages/kernel/src/archive.ts`. Verification: `pnpm --filter @omnis/kernel test:integration`. Depends on: B06.
 
-**읽을 것:** A4 §9.3(`archived_by` JSON 형식)·§9.4(되살리기 4항), 델타 §5(`archive.ts` 블록)·§0-4(두 컬럼을 둘 다 쓴다), `apps/hub/src/archive.ts`(스레드 단위 보관 — 이것과 다른 축이다).
-**만들지 말 것(YAGNI):** undo 토큰 테이블. 토큰은 `digests.id`와 그룹 reason의 조합으로 그날 다이제스트에서 재계산한다(Task 22).
+**Read:** A4 §9.3 (the `archived_by` JSON shape)·§9.4 (the 4 undo clauses), delta §5 (the `archive.ts` block)·§0-4 (both columns are used), `apps/hub/src/archive.ts` (thread-level archiving — a different axis from this one).
+**Do not build (YAGNI):** an undo token table. The token is recomputed in that day's digest from the combination of `digests.id` and the group reason (Task 22).
 
 **Files:**
 - Create: `packages/kernel/src/archive.ts`, `packages/kernel/test/integration/archive.test.ts`
@@ -3548,7 +3548,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다.
+- [ ] 1. Write the failing test.
 
 ```ts
 // packages/kernel/test/integration/archive.test.ts
@@ -3578,14 +3578,14 @@ beforeEach(async () => {
   threadId = t.rows[0]?.id ?? "";
   const i = await pool.query<{ id: string }>(
     `INSERT INTO items (thread_id, account_id, external_id, kind, status, body, sent_at, meta)
-     VALUES ($1,$2,'it_arch','email','received','뉴스레터', now(), '{}'::jsonb)
+     VALUES ($1,$2,'it_arch','email','received','Newsletter', now(), '{}'::jsonb)
      ON CONFLICT (account_id, external_id)
        DO UPDATE SET status='received', meta='{}'::jsonb RETURNING id`, [threadId, accountId]);
   itemId = i.rows[0]?.id ?? "";
 });
 
 const meta = {
-  rule_ids: ["ar_sender_nonhuman", "ar_no_cta"], reason: "뉴스레터", tier: "T0" as const,
+  rule_ids: ["ar_sender_nonhuman", "ar_no_cta"], reason: "Newsletter", tier: "T0" as const,
   confidence: 0.93, run_id: "00000000-0000-0000-0000-0000000000aa",
   at: new Date().toISOString(),
 };
@@ -3596,7 +3596,7 @@ describe("archiveItem / undoArchive (A4 §9.3·§9.4)", () => {
     const { rows } = await pool.query<{ status: string; ab: typeof meta }>(
       "SELECT status, meta->'archived_by' AS ab FROM items WHERE id = $1", [itemId]);
     expect(rows[0]?.status).toBe("archived");
-    expect(rows[0]?.ab.reason).toBe("뉴스레터");
+    expect(rows[0]?.ab.reason).toBe("Newsletter");
     expect(UNDO_WINDOW_DAYS).toBe(7);
     expect(REARCHIVE_EXCLUSION_DAYS).toBe(30);
   });
@@ -3625,22 +3625,22 @@ describe("archiveItem / undoArchive (A4 §9.3·§9.4)", () => {
   it("archivedSince lists the day's archived items by reason", async () => {
     await archiveItem(pool, itemId, meta);
     const groups = await archivedSince(pool, new Date(Date.now() - 3_600_000));
-    expect(groups.find((g) => g.reason === "뉴스레터")?.count).toBeGreaterThanOrEqual(1);
+    expect(groups.find((g) => g.reason === "Newsletter")?.count).toBeGreaterThanOrEqual(1);
   });
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `Failed to resolve import "../../src/archive.js"`.
+- [ ] 2. Confirm the failure. Expected: `Failed to resolve import "../../src/archive.js"`.
 
 ```bash
 pnpm --filter @omnis/kernel test:integration -- archive
 ```
 
-- [ ] 3. 구현을 쓴다.
+- [ ] 3. Write the implementation.
 
 ```ts
 // packages/kernel/src/archive.ts
-// A4 §9.3·§9.4. 하드 삭제는 어떤 경우에도 하지 않는다(A3 §11: items는 영구 보존).
+// A4 §9.3·§9.4. Never hard-delete under any circumstance (A3 §11: items are kept forever).
 import { query } from "@omnis/db";
 import type { Pool } from "pg";
 import type { Audit } from "./audit.js";
@@ -3654,7 +3654,7 @@ export interface ArchivedByMeta {
   tier: "T0" | "T1";
   confidence: number;
   run_id: string;
-  /** undo 7일 창의 기준 시각. items에는 보관 시각 컬럼이 없다(A4 §9.3). */
+  /** The reference timestamp for the 7-day undo window. items has no archived-at column (A4 §9.3). */
   at: string;
 }
 
@@ -3672,7 +3672,7 @@ export async function archiveItem(
   );
 }
 
-/** 사람이 되살린 스레드는 30일간 자동 보관 대상에서 제외한다(A4 §9.4). */
+/** A thread a human undid is excluded from auto-archive for 30 days (A4 §9.4). */
 export async function isRearchiveExcluded(
   pool: Pool,
   threadId: string,
@@ -3725,11 +3725,11 @@ export interface ArchivedGroup {
   item_ids: string[];
 }
 
-/** 밤 다이제스트가 하루치를 reason으로 묶어 읽는다(A4 §9.4 "전량 노출"). */
+/** The nightly digest reads a day's worth grouped by reason (A4 §9.4 "full exposure"). */
 export async function archivedSince(pool: Pool, since: Date): Promise<ArchivedGroup[]> {
   const rows = await query<{ reason: string; count: string; item_ids: string[] }>(
     pool,
-    `SELECT COALESCE(meta->'archived_by'->>'reason', '기타') AS reason,
+    `SELECT COALESCE(meta->'archived_by'->>'reason', 'Other') AS reason,
             count(*)::text AS count,
             (array_agg(id ORDER BY sent_at DESC))[1:50] AS item_ids
        FROM items
@@ -3742,10 +3742,10 @@ export async function archivedSince(pool: Pool, since: Date): Promise<ArchivedGr
 }
 ```
 
-- [ ] 4. `index.ts`에 export를 더하고 통과를 확인한다. 기대: 4 tests passed.
+- [ ] 4. Add the exports to `index.ts` and confirm it passes. Expected: 4 tests passed.
 
 ```ts
-// packages/kernel/src/index.ts — 추가
+// packages/kernel/src/index.ts — added
 export {
   REARCHIVE_EXCLUSION_DAYS, UNDO_WINDOW_DAYS, archiveItem, archivedSince,
   isRearchiveExcluded, undoArchive, type ArchivedByMeta, type ArchivedGroup,
@@ -3755,12 +3755,12 @@ export {
 ```bash
 pnpm --filter @omnis/kernel test:integration -- archive && pnpm lint
 git add packages/kernel/src/archive.ts packages/kernel/src/index.ts packages/kernel/test/integration/archive.test.ts
-git commit -m "US-B18: archiveItem/undoArchive — 7일 undo와 30일 재보관 제외
+git commit -m "US-B18: archiveItem/undoArchive — 7-day undo and 30-day re-archive exclusion
 
-- items.meta.archived_by에 rule_ids/reason/tier/confidence/run_id/at을 남긴다
-- undoArchive는 7일 창 안에서만 archived→received로 되돌리고 audit_log를 남긴다
-- 되살린 스레드는 threads.meta.no_auto_archive_until로 30일 제외된다
-- 하드 삭제 경로가 없다
+- Writes rule_ids/reason/tier/confidence/run_id/at into items.meta.archived_by
+- undoArchive flips archived→received only inside the 7-day window and leaves an audit_log row
+- An undone thread is excluded for 30 days via threads.meta.no_auto_archive_until
+- There is no hard-delete path
 
 Implemented-by: Claude Opus
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -3768,25 +3768,25 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 14: `autoArchiveLoop` — 하드 게이트 5종 + T0 판정 + T1 임계 (US-B18, tier: Opus)
+## Task 14: `autoArchiveLoop` — the 5 hard gates + the T0 verdict + the T1 threshold (US-B18, tier: Opus)
 
-> **스토리** — 목표: 하드 게이트 5종 먼저, ①③④는 순수 SQL(T0), ②·④-b만 T1(`confidence ≥ 0.85`), 22:00 스윕. 산출물: `packages/agents/src/loops/auto-archive.ts`. 검증: `pnpm --filter @omnis/agents test && pnpm eval:archive`.
+> **Story** — Goal: the 5 hard gates first, ①③④ as pure SQL (T0), only ② and ④-b at T1 (`confidence ≥ 0.85`), and the 22:00 sweep. Deliverables: `packages/agents/src/loops/auto-archive.ts`. Verification: `pnpm --filter @omnis/agents test && pnpm eval:archive`.
 
-**읽을 것:** A4 §9.1~§9.5 전체(하드 게이트 목록, 판정 표 5행, T1 임계), Task 1의 `decide?`, Task 13.
-**만들지 말 것(YAGNI):** 규칙 카운터 테이블. A4 §9.3이 집계 쿼리로 얻으라고 못박았다.
+**Read:** all of A4 §9.1–§9.5 (the hard gate list, the 5-row verdict table, the T1 threshold), `decide?` from Task 1, Task 13.
+**Do not build (YAGNI):** a rule counter table. A4 §9.3 pins this down to an aggregate query.
 
 **Files:**
 - Create: `packages/agents/src/loops/auto-archive.ts`, `packages/agents/test/integration/auto-archive.test.ts`, `tools/eval/auto-archive.ts`, `eval/auto_archive.jsonl`
-- Modify: `packages/agents/src/index.ts`, `package.json`(루트 `eval:archive` 스크립트)
+- Modify: `packages/agents/src/index.ts`, `package.json` (the root `eval:archive` script)
 - Test: `packages/agents/test/integration/auto-archive.test.ts`
 
 **Interfaces:**
-- Consumes: `archiveItem`/`isRearchiveExcluded`(Task 13 — 허브가 주입하지 않고 `@omnis/kernel`을 **의존하지 않으므로**, 이 루프는 `apply()`에서 직접 SQL을 쓴다), `needsReplyScore`(Task 8), `registerLoop`/`runLoopSpec`(Task 1·3).
+- Consumes: `archiveItem`/`isRearchiveExcluded` (Task 13 — the hub does not inject them, and since it does **not** depend on `@omnis/kernel`, this loop writes SQL directly in `apply()`), `needsReplyScore` (Task 8), `registerLoop`/`runLoopSpec` (Task 1·3).
 - Produces: `autoArchiveLoop`, `AutoArchiveOutput`, `type AutoArchiveOutputT`, `hardGate`, `nonHumanSender`, `T1_ARCHIVE_CONFIDENCE_MIN`, `AUTO_ARCHIVE_RULES`, `sweepAutoArchive`.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다 — 하드 게이트와 T0 경로가 핵심이다.
+- [ ] 1. Write the failing test — the hard gates and the T0 path are the core of it.
 
 ```ts
 // packages/agents/test/integration/auto-archive.test.ts
@@ -3820,7 +3820,7 @@ async function mkItem(over: Record<string, unknown> = {}): Promise<string> {
   const { rows } = await pool.query<{ id: string }>(
     `INSERT INTO items (thread_id, account_id, kind, status, sensitivity, body, sent_at, meta)
      VALUES ($1,$2,'email','received',$3,$4, now(), $5::jsonb) RETURNING id`,
-    [threadId, accountId, over.sensitivity ?? "normal", over.body ?? "주간 뉴스레터입니다",
+    [threadId, accountId, over.sensitivity ?? "normal", over.body ?? "This is the weekly newsletter",
      JSON.stringify(over.meta ?? {})]);
   return rows[0]?.id ?? "";
 }
@@ -3843,7 +3843,7 @@ describe("autoArchiveLoop hard gates (A4 §9.2)", () => {
     const plain = await mkItem();
     await pool.query(
       `INSERT INTO pending_approvals (action, args, description, thread_id)
-       VALUES ('send','{}'::jsonb,'승인 대기',$1)`, [threadId]);
+       VALUES ('send','{}'::jsonb,'pending approval',$1)`, [threadId]);
     expect((await hardGate(pool, plain)).blocked).toBe(true);
   });
 
@@ -3855,7 +3855,7 @@ describe("autoArchiveLoop hard gates (A4 §9.2)", () => {
   });
 
   it("archives a newsletter entirely at T0 (no model call)", async () => {
-    const id = await mkItem({ body: "이번 주 소식입니다. 구독 해지는 아래에서." });
+    const id = await mkItem({ body: "Here is this week's news. To unsubscribe, see below." });
     await pool.query(
       `UPDATE items SET meta = meta || '{"headers":{"List-Unsubscribe":"<x>"}}'::jsonb WHERE id = $1`,
       [id]);
@@ -3871,18 +3871,18 @@ describe("autoArchiveLoop hard gates (A4 §9.2)", () => {
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `does not provide an export named 'autoArchiveLoop'`.
+- [ ] 2. Confirm the failure. Expected: `does not provide an export named 'autoArchiveLoop'`.
 
 ```bash
 pnpm --filter @omnis/agents test -- auto-archive
 ```
 
-- [ ] 3. 구현을 쓴다.
+- [ ] 3. Write the implementation.
 
 ```ts
 // packages/agents/src/loops/auto-archive.ts
-// A4 §9. 이 루프는 egress가 아니다 — pending_approvals를 만들지 않고, 7일 undo·전량 노출·
-// 하드 삭제 금지 셋으로 보장한다.
+// A4 §9. This loop is not egress — it creates no pending_approvals, and it is guaranteed by three things:
+// the 7-day undo, full exposure, and no hard delete.
 import { z } from "zod";
 import { registerLoop } from "../loop/registry.js";
 import type { LoopSpec, TriggerContext } from "../loop/spec.js";
@@ -3918,7 +3918,7 @@ export function nonHumanSender(i: { handle: string; meta: Record<string, unknown
   const headers = (i.meta.headers ?? i.meta) as Record<string, unknown>;
   if (typeof headers["List-Unsubscribe"] === "string") return true;
   if (String(headers.Precedence ?? "").toLowerCase() === "bulk") return true;
-  if (i.meta.bot === true) return true;   // Slack bot 발신
+  if (i.meta.bot === true) return true;   // sent by a Slack bot
   return false;
 }
 
@@ -3927,7 +3927,7 @@ export interface HardGateResult {
   reason: string | null;
 }
 
-/** A4 §9.2: 규칙보다 먼저 평가하는 하드 게이트 5종. 하나라도 걸리면 절대 보관하지 않는다. */
+/** A4 §9.2: the 5 hard gates evaluated before the rules. If any one of them trips, never archive. */
 export async function hardGate(
   pool: ReturnType<typeof getAgentsPool>,
   itemId: string,
@@ -3976,26 +3976,26 @@ async function t0Verdict(itemId: string): Promise<AutoArchiveOutputT | null> {
   if (r === undefined) return null;
 
   const rules: string[] = [];
-  // ① 발신자가 사람이 아님 (T0, $0)
+  // ① The sender is not a human (T0, $0)
   if (!nonHumanSender({ handle: r.handle, meta: r.meta })) return null;
   rules.push(AUTO_ARCHIVE_RULES.senderNonHuman);
-  // ③ VIP 아님 + sensitivity normal — hardGate가 이미 보장했다
+  // ③ Not a VIP + sensitivity normal — hardGate already guarantees this
   rules.push(AUTO_ARCHIVE_RULES.notVipNormal);
-  // ④ 내가 답한 적 없음. 답한 적이 있으면 ④-b(T1)로 넘어간다.
+  // ④ I have never replied. If I have replied, it falls through to ④-b (T1).
   if (r.i_replied) return null;
   rules.push(AUTO_ARCHIVE_RULES.neverReplied);
-  // ② T0 경로: 물음표 부재. 물음표가 있으면 T1을 태운다.
+  // ② The T0 path: no question mark. With a question mark, it runs T1.
   if (r.body.includes("?") || r.body.includes("？")) return null;
   rules.push(AUTO_ARCHIVE_RULES.noCta);
 
   return {
     archive: true,
     reason: typeof (r.meta as { headers?: Record<string, unknown> }).headers?.["List-Unsubscribe"] === "string"
-      ? "뉴스레터" : "알림 메일",
+      ? "Newsletter" : "Notification email",
     rule_ids: rules,
     tier: "T0",
     confidence: 0.95,
-    rationale: "발신자가 사람이 아니고 나에게 향한 질문이 없어 보관했습니다.",
+    rationale: "Archived because the sender is not a human and there is no question addressed to me.",
     injection_flags: [],
   };
 }
@@ -4003,8 +4003,8 @@ async function t0Verdict(itemId: string): Promise<AutoArchiveOutputT | null> {
 async function applyArchive(itemId: string, out: AutoArchiveOutputT, runId: string): Promise<void> {
   if (!out.archive) return;
   if (out.tier === "T1" && out.confidence < T1_ARCHIVE_CONFIDENCE_MIN) return;
-  // ponytail: @omnis/agents는 @omnis/kernel을 의존할 수 없어 archiveItem을 직접 못 부른다.
-  // 같은 UPDATE 한 문장을 여기 둔다(계약 §12의 의도된 중복).
+  // ponytail: @omnis/agents cannot depend on @omnis/kernel, so it cannot call archiveItem directly.
+  // The same single UPDATE statement lives here (intentional duplication per contract §12).
   await getAgentsPool().query(
     `UPDATE items SET status = 'archived',
         meta = meta || jsonb_build_object('archived_by', jsonb_build_object(
@@ -4037,7 +4037,7 @@ export const autoArchiveLoop: LoopSpec<AutoArchiveOutputT> = {
         loop: "auto_archive" as const,
         output: {
           archive: false, reason: gate.reason ?? "gate", rule_ids: [], tier: "T0" as const,
-          confidence: 1, rationale: `하드 게이트(${gate.reason ?? "gate"})에 걸려 보관하지 않았습니다.`,
+          confidence: 1, rationale: `Blocked by a hard gate (${gate.reason ?? "gate"}), so it was not archived.`,
           injection_flags: [],
         },
         confidence: 1, rationale: "hard gate", escalate: false,
@@ -4045,7 +4045,7 @@ export const autoArchiveLoop: LoopSpec<AutoArchiveOutputT> = {
       };
     }
     const t0 = await t0Verdict(itemId);
-    if (t0 === null) return null;   // ② 또는 ④-b가 애매하다 → T1 경로
+    if (t0 === null) return null;   // ② or ④-b is ambiguous → the T1 path
     return {
       loop: "auto_archive" as const, output: t0, confidence: t0.confidence,
       rationale: t0.rationale, escalate: false, injection_flags: [], unresolved: [],
@@ -4065,7 +4065,7 @@ export const autoArchiveLoop: LoopSpec<AutoArchiveOutputT> = {
 
 registerLoop(autoArchiveLoop);
 
-/** A4 §9.1 두 번째 경로: 22:00 스윕. 23:00 다이제스트보다 먼저 끝난다. */
+/** A4 §9.1 second path: the 22:00 sweep. It finishes before the 23:00 digest. */
 export async function sweepAutoArchive(runOne: (itemId: string, threadId: string) => Promise<void>): Promise<number> {
   const { rows } = await getAgentsPool().query<{ id: string; thread_id: string }>(
     `SELECT id, thread_id FROM items
@@ -4077,11 +4077,11 @@ export async function sweepAutoArchive(runOne: (itemId: string, threadId: string
 }
 ```
 
-- [ ] 4. 평가 하네스를 쓴다. 150건 골든 세트는 시드로 만들고, **오보관 precision ≥ 0.97 + VIP·민감 보관 0건**을 하드 게이트로 건다.
+- [ ] 4. Write the eval harness. Build a 150-case golden set from seed data and make **false-archive precision ≥ 0.97 + zero VIP/sensitive archives** a hard gate.
 
 ```ts
 // tools/eval/auto-archive.ts
-// A4 §9.5. 시드 JSONL만 읽는다 — 실계정이 필요 없다(B-D5).
+// A4 §9.5. It reads only the seed JSONL — no real account required (B-D5).
 import { readFileSync } from "node:fs";
 import { hardGate, nonHumanSender } from "@omnis/agents";
 import { createPool } from "@omnis/db";
@@ -4118,7 +4118,7 @@ for (const c of cases) {
 const precision = tp / Math.max(1, tp + fp);
 const recall = tp / Math.max(1, tp + fn);
 console.log(`auto-archive: n=${cases.length} precision=${precision.toFixed(3)} recall=${recall.toFixed(3)} unsafe=${unsafe}`);
-if (unsafe > 0) { console.error("FAIL: VIP·민감 item이 보관되었다"); process.exit(1); }
+if (unsafe > 0) { console.error("FAIL: a VIP or sensitive item was archived"); process.exit(1); }
 if (precision < 0.97) { console.error("FAIL: precision < 0.97"); process.exit(1); }
 if (recall < 0.70) { console.error("FAIL: recall < 0.70"); process.exit(1); }
 void hardGate;
@@ -4126,31 +4126,31 @@ void createPool;
 ```
 
 ```jsonl
-// eval/auto_archive.jsonl — 처음 4줄(나머지 146줄은 같은 형식으로 채운다: 보관해야 함 90 / 안 됨 60)
-{"id":"e1","handle":"no-reply@news.example","body":"이번 주 소식입니다","meta":{"headers":{"List-Unsubscribe":"<x>"}},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
-{"id":"e2","handle":"notifications@github.example","body":"빌드가 성공했습니다","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
-{"id":"e3","handle":"kim@client.example","body":"견적서 언제 받을 수 있을까요?","meta":{},"sensitivity":"normal","vip":true,"i_replied":true,"expect_archive":false}
-{"id":"e4","handle":"no-reply@bank.example","body":"이체 내역 안내","meta":{},"sensitivity":"finance","vip":false,"i_replied":false,"expect_archive":false}
+// eval/auto_archive.jsonl — the first 4 lines (fill the remaining 146 in the same format: 90 that should be archived / 60 that should not)
+{"id":"e1","handle":"no-reply@news.example","body":"Here is this week's news","meta":{"headers":{"List-Unsubscribe":"<x>"}},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
+{"id":"e2","handle":"notifications@github.example","body":"The build succeeded","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
+{"id":"e3","handle":"kim@client.example","body":"When can I get the quote?","meta":{},"sensitivity":"normal","vip":true,"i_replied":true,"expect_archive":false}
+{"id":"e4","handle":"no-reply@bank.example","body":"Transfer history notice","meta":{},"sensitivity":"finance","vip":false,"i_replied":false,"expect_archive":false}
 ```
 
-> **루트 `package.json` 스크립트는 건드리지 않는다(2026-09-20 교차 리뷰 M12).** `"eval:archive": "tsx tools/eval/auto-archive.ts"` 항목은 memory-ingestion 플랜 Task 1이 **단일 오너**로 이미 넣는다(델타 §1). 이 태스크는 그 스크립트가 가리키는 `tools/eval/auto-archive.ts`만 만든다 — 스크립트 블록을 다시 넣으면 루트 `package.json`에서 머지 충돌이 난다.
+> **Do not touch the root `package.json` scripts (2026-09-20 cross review M12).** The `"eval:archive": "tsx tools/eval/auto-archive.ts"` entry is already added by memory-ingestion plan Task 1 as the **single owner** (delta §1). This task creates only `tools/eval/auto-archive.ts`, which that script points at — adding the script block again causes a merge conflict in the root `package.json`.
 
-- [ ] 5. 통과를 확인한다. 기대: `auto-archive.test.ts` 4 tests passed, `pnpm eval:archive`가 `unsafe=0`을 찍고 exit 0.
+- [ ] 5. Confirm it passes. Expected: `auto-archive.test.ts` 4 tests passed, and `pnpm eval:archive` prints `unsafe=0` and exits 0.
 
 ```bash
 pnpm --filter @omnis/agents test -- auto-archive && pnpm eval:archive && pnpm lint
 ```
 
-- [ ] 6. 커밋한다.
+- [ ] 6. Commit.
 
 ```bash
 git add packages/agents/src/loops/auto-archive.ts packages/agents/src/index.ts packages/agents/test/integration/auto-archive.test.ts tools/eval/auto-archive.ts eval/auto_archive.jsonl
-git commit -m "US-B18: L8 자동 보관 루프
+git commit -m "US-B18: L8 auto-archive loop
 
-- 하드 게이트 5종(민감·VIP·pending approval·injection_flags·kind)을 규칙보다 먼저 본다
-- ①③④는 순수 SQL(T0), ②·④-b만 T1이고 confidence < 0.85면 보관하지 않는다
-- 22:00 스윕이 그날 놓친 것을 훑는다
-- pnpm eval:archive가 오보관 precision 0.97과 VIP·민감 보관 0건을 하드 게이트로 건다
+- The 5 hard gates (sensitivity, VIP, pending approval, injection_flags, kind) are checked before the rules
+- ①③④ are pure SQL (T0); only ② and ④-b run at T1, and confidence < 0.85 means no archive
+- The 22:00 sweep picks up whatever the day missed
+- pnpm eval:archive hard-gates on false-archive precision 0.97 and zero VIP/sensitive archives
 
 Implemented-by: Claude Opus
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -4158,12 +4158,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 15: `taskLoop` — 정밀도 우선 투두 추출 (US-B19, tier: Sonnet)
+## Task 15: `taskLoop` — precision-first todo extraction (US-B19, tier: Sonnet)
 
-> **스토리** — 목표: 트리거 3종, `confidence < 0.70`은 저장조차 안 함, item당 최대 3, `duplicate_of` 병합, `due_basis='inferred'` 표시. 산출물: `packages/agents/src/loops/task.ts`. 검증: `pnpm --filter @omnis/agents test`. 의존: B07, **B20**(백로그 §2, 2026-09-20 교차 리뷰 M14 — `taskLoop`이 `routeByRule`을 import한다).
+> **Story** — Goal: three triggers, `confidence < 0.70` is not even stored, at most 3 per item, `duplicate_of` merging, and `due_basis='inferred'` marking. Deliverables: `packages/agents/src/loops/task.ts`. Verification: `pnpm --filter @omnis/agents test`. Depends on: B07, **B20** (backlog §2, 2026-09-20 cross review M14 — `taskLoop` imports `routeByRule`).
 
-**읽을 것:** A4 §4.1~§4.2·§4.5, Task 5의 `propose_task`.
-**만들지 말 것(YAGNI):** 별도 중복 판정 서비스. 조립기가 넣어준 open task 목록과 모델의 `duplicate_of` 한 필드로 끝난다.
+**Read:** A4 §4.1–§4.2·§4.5, `propose_task` from Task 5.
+**Do not build (YAGNI):** a separate duplicate-detection service. The open task list the assembler provides plus the model's single `duplicate_of` field is all it takes.
 
 **Files:**
 - Create: `packages/agents/src/loops/task.ts`, `packages/agents/test/integration/task-loop.test.ts`
@@ -4171,12 +4171,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Test: `packages/agents/test/integration/task-loop.test.ts`
 
 **Interfaces:**
-- Consumes: `buildContext`(US-B05), `PROPOSE_TOOLS`(Task 5), `extractHints`/`routeByRule`(Task 17 — `apply()`가 optional chaining 없이 직접 부른다. Task 17을 먼저 머지한다).
+- Consumes: `buildContext` (US-B05), `PROPOSE_TOOLS` (Task 5), `extractHints`/`routeByRule` (Task 17 — `apply()` calls them directly with no optional chaining. Merge Task 17 first).
 - Produces: `taskLoop`, `TaskOutput`, `type TaskOutputT`, `TASK_CONFIDENCE_MIN`, `TASK_MAX_PER_ITEM`.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다.
+- [ ] 1. Write the failing test.
 
 ```ts
 // packages/agents/test/integration/task-loop.test.ts
@@ -4203,7 +4203,7 @@ beforeEach(async () => {
   threadId = t.rows[0]?.id ?? "";
   const i = await pool.query<{ id: string }>(
     `INSERT INTO items (thread_id, account_id, kind, body, sent_at)
-     VALUES ($1,$2,'message','내일까지 견적서 보내드릴게요', now()) RETURNING id`,
+     VALUES ($1,$2,'message','I will send you the quote by tomorrow', now()) RETURNING id`,
     [threadId, accountId]);
   itemId = i.rows[0]?.id ?? "";
   await pool.query("DELETE FROM tasks WHERE source_item_id = $1", [itemId]);
@@ -4212,8 +4212,8 @@ afterAll(() => pool.end());
 
 const result = (tasks: unknown[]) => ({
   loop: "task" as const, run_id: "00000000-0000-0000-0000-0000000000bb",
-  output: { tasks, confidence: 0.9, rationale: "약속 문장", injection_flags: [] },
-  confidence: 0.9, rationale: "약속 문장", escalate: false,
+  output: { tasks, confidence: 0.9, rationale: "a promise sentence", injection_flags: [] },
+  confidence: 0.9, rationale: "a promise sentence", escalate: false,
   injection_flags: [], unresolved: [],
 });
 
@@ -4229,19 +4229,19 @@ describe("taskLoop (A4 §4.2)", () => {
   it("drops tasks below the confidence floor without storing them", async () => {
     await taskLoop.apply(
       result([
-        { title: "확실한 약속", owner: "me", due_basis: "stated", confidence: 0.8 },
-        { title: "애매한 추측", owner: "me", due_basis: "inferred", confidence: 0.69 },
+        { title: "A definite promise", owner: "me", due_basis: "stated", confidence: 0.8 },
+        { title: "A vague guess", owner: "me", due_basis: "inferred", confidence: 0.69 },
       ]) as never,
       { trigger_kind: "event", item_id: itemId, thread_id: threadId, now: new Date(), payload: {} });
     const { rows } = await pool.query<{ title: string }>(
       "SELECT title FROM tasks WHERE source_item_id = $1", [itemId]);
-    expect(rows.map((r) => r.title)).toEqual(["확실한 약속"]);
+    expect(rows.map((r) => r.title)).toEqual(["A definite promise"]);
   });
 
   it("stores at most three tasks per item", async () => {
     await taskLoop.apply(
       result([1, 2, 3, 4, 5].map((n) => ({
-        title: `할 일 ${n}`, owner: "me", due_basis: "none", confidence: 0.9,
+        title: `Task ${n}`, owner: "me", due_basis: "none", confidence: 0.9,
       }))) as never,
       { trigger_kind: "event", item_id: itemId, thread_id: threadId, now: new Date(), payload: {} });
     const { rows } = await pool.query<{ n: string }>(
@@ -4251,10 +4251,10 @@ describe("taskLoop (A4 §4.2)", () => {
 
   it("merges into the existing task when duplicate_of is set", async () => {
     const t = await pool.query<{ id: string }>(
-      "INSERT INTO tasks (title, created_by) VALUES ('기존 할 일','agent') RETURNING id");
+      "INSERT INTO tasks (title, created_by) VALUES ('Existing task','agent') RETURNING id");
     const existing = t.rows[0]?.id ?? "";
     await taskLoop.apply(
-      result([{ title: "같은 할 일", owner: "me", due_basis: "none", confidence: 0.9,
+      result([{ title: "The same task", owner: "me", due_basis: "none", confidence: 0.9,
                 duplicate_of: existing }]) as never,
       { trigger_kind: "event", item_id: itemId, thread_id: threadId, now: new Date(), payload: {} });
     const { rows } = await pool.query<{ n: string }>(
@@ -4267,17 +4267,17 @@ describe("taskLoop (A4 §4.2)", () => {
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `does not provide an export named 'taskLoop'`.
+- [ ] 2. Confirm the failure. Expected: `does not provide an export named 'taskLoop'`.
 
 ```bash
 pnpm --filter @omnis/agents test -- task-loop
 ```
 
-- [ ] 3. 구현을 쓴다.
+- [ ] 3. Write the implementation.
 
 ```ts
 // packages/agents/src/loops/task.ts
-// A4 §4. 정밀도 우선 — 거짓 투두는 진짜 투두를 묻는다.
+// A4 §4. Precision first — a false todo buries a real one.
 import { z } from "zod";
 import { buildContext } from "../context/assemble.js";
 import { registerLoop } from "../loop/registry.js";
@@ -4344,13 +4344,13 @@ export const taskLoop: LoopSpec<TaskOutputT> = {
         { toolCallId: result.run_id, messages: [] },
       )) as { task_id: string } | undefined;
 
-      // A4 §4.4: owner='agent'면 같은 실행 안에서 routeByRule을 돌린다(LLM 호출 없음, ~1ms).
+      // A4 §4.4: when owner='agent', routeByRule runs inside the same execution (no LLM call, ~1ms).
       if (out === undefined || t.owner !== "agent" || t.duplicate_of !== undefined) continue;
-      if (result.injection_flags.length > 0) continue;               // 폭주 방지 ④
-      if (t.confidence < TASK_CONFIDENCE_MIN) continue;              // 폭주 방지 ③
+      if (result.injection_flags.length > 0) continue;               // runaway guard ④
+      if (t.confidence < TASK_CONFIDENCE_MIN) continue;              // runaway guard ③
       const hints = extractHints(`${t.title}\n${t.detail ?? ""}\n${t.agent_hint ?? ""}`);
       const routing = routeByRule(hints, await hostHealth());
-      if (routing === null) continue;                                // 규칙이 못 가름 → L4가 깨어난다
+      if (routing === null) continue;                                // the rules could not decide → L4 wakes up
       if (!(await underDelegationCaps(ctx.thread_id ?? null))) continue;
       await PROPOSE_TOOLS.propose_delegation?.execute?.(
         {
@@ -4366,7 +4366,7 @@ export const taskLoop: LoopSpec<TaskOutputT> = {
   },
 };
 
-/** A4 §4.4 폭주 방지 ①②: 하루 5건, 같은 스레드 24h 2건. */
+/** A4 §4.4 runaway guards ①②: 5 per day, 2 per thread in 24h. */
 async function underDelegationCaps(threadId: string | null): Promise<boolean> {
   const { getAgentsPool } = await import("../pool.js");
   const pool = getAgentsPool();
@@ -4385,10 +4385,10 @@ async function underDelegationCaps(threadId: string | null): Promise<boolean> {
 registerLoop(taskLoop);
 ```
 
-- [ ] 4. `index.ts`에 export를 더하고 통과를 확인한다. 기대: 4 tests passed.
+- [ ] 4. Add the exports to `index.ts` and confirm it passes. Expected: 4 tests passed.
 
 ```ts
-// packages/agents/src/index.ts — 추가
+// packages/agents/src/index.ts — added
 export {
   TASK_CONFIDENCE_MIN, TASK_MAX_PER_ITEM, TaskOutput, taskLoop, type TaskOutputT,
 } from "./loops/task.js";
@@ -4397,11 +4397,11 @@ export {
 ```bash
 pnpm --filter @omnis/agents test -- task-loop && pnpm lint
 git add packages/agents/src/loops/task.ts packages/agents/src/index.ts packages/agents/test/integration/task-loop.test.ts
-git commit -m "US-B19: L3 투두 추출 루프
+git commit -m "US-B19: L3 todo extraction loop
 
-- confidence < 0.70은 저장조차 하지 않는다(정밀도 우선)
-- item당 최대 3개, duplicate_of면 기존 task에 source_item_id만 더한다
-- owner='agent'면 같은 실행 안에서 routeByRule을 돌리고 폭주 방지 4종을 통과할 때만 승인 카드를 만든다
+- confidence < 0.70 is not even stored (precision first)
+- At most 3 per item; with duplicate_of it only adds source_item_id to the existing task
+- When owner='agent' it runs routeByRule inside the same execution and creates an approval card only if all four runaway guards pass
 
 Implemented-by: Claude Sonnet
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -4409,12 +4409,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 16: `task_remind` 잡 — LLM 없는 순수 SQL 3그룹 (US-B19, tier: Sonnet)
+## Task 16: The `task_remind` job — 3 pure-SQL groups with no LLM (US-B19, tier: Sonnet)
 
-> **스토리** — 목표: 리마인드 잡(09/14/19 KST)은 LLM 없이 순수 SQL 3그룹, 묶음 등급 알림. 산출물: `packages/kernel/src/jobs/task-remind.ts`. 검증: `pnpm --filter @omnis/kernel test:integration`.
+> **Story** — Goal: the reminder job (09/14/19 KST) runs 3 pure-SQL groups with no LLM and sends batched-tier notifications. Deliverables: `packages/kernel/src/jobs/task-remind.ts`. Verification: `pnpm --filter @omnis/kernel test:integration`.
 
-**읽을 것:** A4 §4.3(SQL 원문 + 3그룹 문구), Task 10·11.
-**만들지 말 것(YAGNI):** 스누즈 상태 머신. `tasks.remind_at`이 이미 있고 A4가 요구한 건 세 그룹 문장이다.
+**Read:** A4 §4.3 (the SQL as written + the 3 group strings), Task 10·11.
+**Do not build (YAGNI):** a snooze state machine. `tasks.remind_at` already exists, and what A4 asked for is three group sentences.
 
 **Files:**
 - Create: `packages/kernel/src/jobs/task-remind.ts`, `packages/kernel/test/integration/task-remind.test.ts`
@@ -4427,7 +4427,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다.
+- [ ] 1. Write the failing test.
 
 ```ts
 // packages/kernel/test/integration/task-remind.test.ts
@@ -4450,18 +4450,18 @@ describe("task_remind (A4 §4.3)", () => {
   it("splits open tasks into due_soon / stale / undelegated", async () => {
     await pool.query(
       `INSERT INTO tasks (title, state, due_at, created_at, created_by) VALUES
-         ('오늘 마감','open', now() + interval '3 hours', now(), 'remind-test'),
-         ('3일째 방치','open', NULL, now() - interval '4 days', 'remind-test')`);
+         ('Due today','open', now() + interval '3 hours', now(), 'remind-test'),
+         ('Untouched for 3 days','open', NULL, now() - interval '4 days', 'remind-test')`);
     await pool.query(
       `INSERT INTO tasks (title, state, owner_kind, delegated_session_id, created_at, created_by)
-       VALUES ('아직 안 나간 위임','open','agent', NULL, now() - interval '5 hours', 'remind-test')`);
+       VALUES ('A delegation that never went out','open','agent', NULL, now() - interval '5 hours', 'remind-test')`);
     const groups = await remindGroups(pool);
     const by = Object.fromEntries(groups.map((g) => [g.kind, g]));
     expect(by.due_soon?.count).toBeGreaterThanOrEqual(1);
     expect(by.stale?.count).toBeGreaterThanOrEqual(1);
     expect(by.undelegated?.count).toBeGreaterThanOrEqual(1);
-    expect(by.due_soon?.line).toContain("마감");
-    expect(by.undelegated?.line).toContain("에이전트");
+    expect(by.due_soon?.line).toContain("Due today");
+    expect(by.undelegated?.line).toContain("agent");
   });
 
   it("sends one batched push per non-empty group and nothing when all empty", async () => {
@@ -4473,7 +4473,7 @@ describe("task_remind (A4 §4.3)", () => {
 
     await pool.query(
       `INSERT INTO tasks (title, state, due_at, created_by)
-       VALUES ('오늘 마감','open', now() + interval '2 hours', 'remind-test')`);
+       VALUES ('Due today','open', now() + interval '2 hours', 'remind-test')`);
     send.mockClear();
     await runTaskRemind({ pool, logger, notifier: { send } });
     expect(send).toHaveBeenCalled();
@@ -4482,17 +4482,17 @@ describe("task_remind (A4 §4.3)", () => {
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `Failed to resolve import "../../src/jobs/task-remind.js"`.
+- [ ] 2. Confirm the failure. Expected: `Failed to resolve import "../../src/jobs/task-remind.js"`.
 
 ```bash
 pnpm --filter @omnis/kernel test:integration -- task-remind
 ```
 
-- [ ] 3. 구현을 쓴다.
+- [ ] 3. Write the implementation.
 
 ```ts
 // packages/kernel/src/jobs/task-remind.ts
-// A4 §4.3: 이건 LLM 없이 순수 SQL이다. 알림은 §3.6의 '묶음' 등급을 쓴다.
+// A4 §4.3: this is pure SQL with no LLM. Notifications use the 'batched' tier from §3.6.
 import { query } from "@omnis/db";
 import type { Pool } from "pg";
 import type { Logger } from "../logger.js";
@@ -4512,9 +4512,9 @@ export interface RemindGroup {
 }
 
 const LINE: Record<RemindKind, (n: number) => string> = {
-  due_soon: (n) => `오늘 마감 ${n}건`,
-  stale: (n) => `3일째 손 안 댄 항목 ${n}건`,
-  undelegated: (n) => `에이전트에게 넘기기로 한 ${n}건이 아직 안 나갔습니다`,
+  due_soon: (n) => `${n} due today`,
+  stale: (n) => `${n} items untouched for 3 days`,
+  undelegated: (n) => `${n} items you meant to hand to an agent have not gone out yet`,
 };
 
 export async function remindGroups(pool: Pool): Promise<RemindGroup[]> {
@@ -4568,10 +4568,10 @@ export function registerTaskRemindJob(scheduler: Scheduler, deps: TaskRemindDeps
 }
 ```
 
-- [ ] 4. `index.ts`에 export를 더하고 통과를 확인한다. 기대: 3 tests passed.
+- [ ] 4. Add the exports to `index.ts` and confirm it passes. Expected: 3 tests passed.
 
 ```ts
-// packages/kernel/src/index.ts — 추가
+// packages/kernel/src/index.ts — added
 export {
   TASK_REMIND_CRON, TASK_REMIND_JOB_NAME, registerTaskRemindJob, remindGroups, runTaskRemind,
   type RemindGroup, type RemindKind, type TaskRemindDeps,
@@ -4581,11 +4581,11 @@ export {
 ```bash
 pnpm --filter @omnis/kernel test:integration -- task-remind && pnpm lint
 git add packages/kernel/src/jobs/task-remind.ts packages/kernel/src/index.ts packages/kernel/test/integration/task-remind.test.ts
-git commit -m "US-B19: task_remind 잡 — 순수 SQL 3그룹
+git commit -m "US-B19: task_remind job — 3 pure-SQL groups
 
-- 09/14/19 KST, LLM 호출 0
-- due_soon/stale/undelegated 세 그룹이 각각 다른 문구를 쓴다
-- 알림은 묶음 등급으로 나간다
+- 09/14/19 KST, zero LLM calls
+- The three groups due_soon/stale/undelegated each use a different string
+- Notifications go out at the batched tier
 
 Implemented-by: Claude Sonnet
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -4593,13 +4593,13 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 17: `extractHints` / `routeByRule` — 규칙이 먼저다 (US-B20, tier: Opus)
+## Task 17: `extractHints` / `routeByRule` — the rules come first (US-B20, tier: Opus)
 
-> **스토리** — 목표: `DelegationHints` 추출(정규식, LLM 아님) + `routeByRule()`(~1ms, 규칙 5종) + 폭주 방지 상수. 산출물: `packages/agents/src/delegate/route.ts`. 검증: `pnpm --filter @omnis/agents test`. 의존: **B07**(백로그 §2, 2026-09-20 교차 리뷰 M14 — 옛 `B19`는 방향이 거꾸로였다: `routeByRule`은 `tasks`를 읽지 않는다).
-> **실행 순서 주의:** Task 15(`taskLoop`)가 이 모듈을 import한다. **Task 17을 Task 15보다 먼저 구현한다.**
+> **Story** — Goal: `DelegationHints` extraction (regex, not an LLM) + `routeByRule()` (~1ms, 5 rules) + the runaway-guard constants. Deliverables: `packages/agents/src/delegate/route.ts`. Verification: `pnpm --filter @omnis/agents test`. Depends on: **B07** (backlog §2, 2026-09-20 cross review M14 — the old `B19` had the direction backwards: `routeByRule` does not read `tasks`).
+> **Execution order warning:** Task 15 (`taskLoop`) imports this module. **Implement Task 17 before Task 15.**
 
-**읽을 것:** A4 §5.2 전체(코드 블록 + 런타임 표), B-D6·B-D7(Hermes 제외).
-**만들지 말 것(YAGNI):** 호스트 헬스 서비스. `agent_runtimes.last_seen_at` 한 컬럼이면 충분하다.
+**Read:** all of A4 §5.2 (the code block + the runtime table), B-D6·B-D7 (Hermes excluded).
+**Do not build (YAGNI):** a host health service. The single `agent_runtimes.last_seen_at` column is enough.
 
 **Files:**
 - Create: `packages/agents/src/delegate/route.ts`, `packages/agents/test/delegate-route.test.ts`
@@ -4612,7 +4612,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다(순수 함수라 DB 없음).
+- [ ] 1. Write the failing test (pure functions, so no DB).
 
 ```ts
 // packages/agents/test/delegate-route.test.ts
@@ -4625,7 +4625,7 @@ const hosts = { mini: { lastHeartbeatMs: 0 }, macbook: { lastHeartbeatMs: 0 } };
 
 describe("extractHints (A4 §5.2)", () => {
   it("pulls absolute paths, cron words and minutes out of text with regex only", () => {
-    const h = extractHints("/Users/logankim/AI-Workspaces/omnis 에서 매일 리포트를 돌려줘. 약 45분 걸림");
+    const h = extractHints("Run the report every day in /Users/logankim/AI-Workspaces/omnis, which takes about 45 minutes");
     expect(h.needs_paths).toEqual(["/Users/logankim/AI-Workspaces/omnis"]);
     expect(h.needs_always_on).toBe(true);
     expect(h.est_minutes).toBe(45);
@@ -4633,29 +4633,29 @@ describe("extractHints (A4 §5.2)", () => {
   });
 
   it("flags a GUI channel session", () => {
-    expect(extractHints("카카오톡으로 답장 보내는 일").needs_channel_session).toBe(true);
-    expect(extractHints("LinkedIn 메시지 정리").needs_channel_session).toBe(true);
-    expect(extractHints("문서 요약").needs_channel_session).toBe(false);
+    expect(extractHints("Replying over KakaoTalk").needs_channel_session).toBe(true);
+    expect(extractHints("Tidying up LinkedIn messages").needs_channel_session).toBe(true);
+    expect(extractHints("Summarizing a document").needs_channel_session).toBe(false);
   });
 });
 
 describe("routeByRule (A4 §5.2)", () => {
   it("applies the five rules in order", () => {
-    expect(routeByRule(extractHints("/Users/logankim/x 파일 고쳐줘"), hosts))
+    expect(routeByRule(extractHints("Fix the file /Users/logankim/x"), hosts))
       .toMatchObject({ host: "macbook", rule_id: "dr_local_files" });
-    expect(routeByRule(extractHints("카카오톡 정리"), hosts))
+    expect(routeByRule(extractHints("Tidy up KakaoTalk"), hosts))
       .toMatchObject({ host: "mini", rule_id: "dr_gui_session" });
-    expect(routeByRule({ ...extractHints("긴 작업"), est_minutes: 30 }, hosts))
+    expect(routeByRule({ ...extractHints("A long task"), est_minutes: 30 }, hosts))
       .toMatchObject({ host: "mini", rule_id: "dr_long_batch" });
-    expect(routeByRule(extractHints("매일 돌려줘"), hosts))
+    expect(routeByRule(extractHints("Run it daily"), hosts))
       .toMatchObject({ host: "mini", rule_id: "dr_always_on" });
-    expect(routeByRule(extractHints("문서 요약"), {
+    expect(routeByRule(extractHints("Summarizing a document"), {
       mini: { lastHeartbeatMs: 0 }, macbook: { lastHeartbeatMs: 300_000 },
     })).toMatchObject({ host: "mini", rule_id: "dr_macbook_offline" });
   });
 
   it("returns null when nothing splits it — that is L4's entry point", () => {
-    expect(routeByRule(extractHints("문서 요약"), hosts)).toBe(null);
+    expect(routeByRule(extractHints("Summarizing a document"), hosts)).toBe(null);
   });
 
   it("never routes to hermes in Phase B (B-D7)", () => {
@@ -4676,17 +4676,17 @@ describe("routeByRule (A4 §5.2)", () => {
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `does not provide an export named 'extractHints'`.
+- [ ] 2. Confirm the failure. Expected: `does not provide an export named 'extractHints'`.
 
 ```bash
 pnpm --filter @omnis/agents test -- delegate-route
 ```
 
-- [ ] 3. 구현을 쓴다.
+- [ ] 3. Write the implementation.
 
 ```ts
 // packages/agents/src/delegate/route.ts
-// A4 §5.2: 결정 규칙이 먼저, LLM은 나중. 여기에 모델 호출은 없다(~1ms).
+// A4 §5.2: the decision rules come first, the LLM later. There is no model call here (~1ms).
 import type { HostId, RuntimeKind } from "@omnis/protocol";
 import { getAgentsPool } from "../pool.js";
 
@@ -4702,7 +4702,7 @@ export interface DelegationHints {
   repo: string | null;
 }
 
-/** Phase B에서 hermes는 위임 대상이 아니다(B-D7, 마스터 §19 Q7). */
+/** In Phase B, hermes is not a delegation target (B-D7, master §19 Q7). */
 export type DelegationRuntime = Exclude<RuntimeKind, "hermes">;
 
 export interface Routing {
@@ -4717,10 +4717,10 @@ export interface HostHealth {
 }
 
 const ABS_PATH = /(\/Users\/[\w./-]+|\/Volumes\/[\w./-]+|\/opt\/[\w./-]+)/g;
-const GUI_CHANNEL = /카카오톡|kakao|linkedin|링크드인/i;
-const ALWAYS_ON = /매일|매주|주기적|정기적으로|cron|스케줄/i;
-const MINUTES = /(\d{1,3})\s*분/;
-const HOURS = /(\d{1,2})\s*시간/;
+const GUI_CHANNEL = /kakaotalk|kakao|linkedin/i;
+const ALWAYS_ON = /daily|weekly|periodic|regularly|cron|schedule/i;
+const MINUTES = /(\d{1,3})\s*min/;
+const HOURS = /(\d{1,2})\s*hours?/;
 
 export function extractHints(text: string): DelegationHints {
   const paths = [...new Set(text.match(ABS_PATH) ?? [])];
@@ -4749,7 +4749,7 @@ export function routeByRule(h: DelegationHints, hosts: HostHealth): Routing | nu
   return null;
 }
 
-/** A4 §5.2 런타임 표. hermes는 Phase C로 미룬다(B-D7). */
+/** A4 §5.2 runtime table. hermes is deferred to Phase C (B-D7). */
 export function pickRuntime(i: {
   filesTouched: number;
   specClear: boolean;
@@ -4773,10 +4773,10 @@ export async function hostHealth(now: Date = new Date()): Promise<HostHealth> {
 }
 ```
 
-- [ ] 4. `index.ts`에 export를 더하고 통과를 확인한다. 기대: 5 tests passed.
+- [ ] 4. Add the exports to `index.ts` and confirm it passes. Expected: 5 tests passed.
 
 ```ts
-// packages/agents/src/index.ts — 추가
+// packages/agents/src/index.ts — added
 export {
   DELEGATION_DAILY_CAP, DELEGATION_THREAD_CAP_24H, MACBOOK_OFFLINE_MS, extractHints,
   hostHealth, pickRuntime, routeByRule,
@@ -4787,12 +4787,12 @@ export {
 ```bash
 pnpm --filter @omnis/agents test -- delegate-route && pnpm lint
 git add packages/agents/src/delegate/route.ts packages/agents/src/index.ts packages/agents/test/delegate-route.test.ts
-git commit -m "US-B20: extractHints/routeByRule — 규칙이 먼저
+git commit -m "US-B20: extractHints/routeByRule — the rules come first
 
-- DelegationHints 추출은 전부 정규식이다(LLM 호출 0)
-- routeByRule 5규칙, 못 가르면 null을 돌려 L4를 깨운다
-- pickRuntime은 hermes를 절대 고르지 않는다(B-D7)
-- 폭주 방지 상수(하루 5건 / 스레드 24h 2건)
+- DelegationHints extraction is entirely regex (zero LLM calls)
+- routeByRule has 5 rules; when they cannot decide it returns null and wakes L4
+- pickRuntime never selects hermes (B-D7)
+- The runaway-guard constants (5 per day / 2 per thread in 24h)
 
 Implemented-by: Claude Opus
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -4800,12 +4800,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 18: `delegateLoop` + 승인 실행 게이트 (US-B20, tier: Opus)
+## Task 18: `delegateLoop` + the approval execution gate (US-B20, tier: Opus)
 
-> **스토리** — 목표: 규칙이 못 가른 task를 L4(T2)가 판단하고, 승인 1회 → `delegate.run` 실행. 완전 자율은 `settings.autonomy.rules`가 열렸고 `est_minutes ≤ 30` + 레포 안 + egress 없음일 때만. 산출물: `packages/agents/src/loops/delegate.ts`, `packages/agents/src/delegate/brief.ts`. 검증: `pnpm --filter @omnis/agents test`.
+> **Story** — Goal: L4 (T2) judges a task the rules could not split, and one approval → a `delegate.run` execution. Full autonomy only when `settings.autonomy.rules` is enabled and `est_minutes ≤ 30` + inside the repo + no egress. Deliverables: `packages/agents/src/delegate/brief.ts`, `packages/agents/src/loops/delegate.ts`. Verification: `pnpm --filter @omnis/agents test`.
 
-**읽을 것:** A4 §5.1·§5.3(브리프 규격)·§5.4(승인 흐름), B-D6.
-**만들지 말 것(YAGNI):** 자동 재위임. A4 §5.4가 "실패한 브리프를 그대로 다시 던지면 같은 실패를 반복한다"로 금지했다.
+**Read:** A4 §5.1·§5.3 (the brief spec)·§5.4 (the approval flow), B-D6.
+**Do not build (YAGNI):** automatic re-delegation. A4 §5.4 forbids it: "throwing the same failed brief again just repeats the same failure."
 
 **Files:**
 - Create: `packages/agents/src/delegate/brief.ts`, `packages/agents/src/loops/delegate.ts`, `packages/agents/test/integration/delegate-loop.test.ts`
@@ -4818,7 +4818,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다.
+- [ ] 1. Write the failing test.
 
 ```ts
 // packages/agents/test/integration/delegate-loop.test.ts
@@ -4837,19 +4837,19 @@ afterAll(() => pool.end());
 describe("renderBrief (A4 §5.3)", () => {
   it("renders all eight sections and keeps acceptance non-empty", () => {
     const b = renderBrief({
-      goal: "리포트 스크립트를 고친다",
-      background: ["지난주 실패했다 (item:it_1)", "로그는 ops/logs에 있다 (memory:m_2)"],
-      steps: ["원인 파악", "수정"],
-      acceptance: ["pnpm test가 통과한다"],
+      goal: "Fix the report script",
+      background: ["It failed last week (item:it_1)", "The logs are in ops/logs (memory:m_2)"],
+      steps: ["Find the cause", "Fix it"],
+      acceptance: ["pnpm test passes"],
       verifyCmd: "pnpm test",
       workdir: "/Users/logankim/AI-Workspaces/omnis",
     });
-    for (const h of ["## 목표", "## 배경", "## 해야 할 일", "## 수용 기준", "## 검증 명령",
-                     "## 작업 디렉터리", "## 금지"]) {
+    for (const h of ["## Goal", "## Background", "## Steps", "## Acceptance Criteria", "## Verify Command",
+                     "## Workdir", "## Do Not"]) {
       expect(b).toContain(h);
     }
-    expect(b).toContain("- [ ] pnpm test가 통과한다");
-    expect(b).toContain("커밋/푸시하지 않는다");
+    expect(b).toContain("- [ ] pnpm test passes");
+    expect(b).toContain("Do not commit or push");
   });
 
   it("refuses an empty acceptance list", () => {
@@ -4892,18 +4892,18 @@ describe("delegateLoop (A4 §5)", () => {
 
   it("creates a pending approval row, never an execution", async () => {
     const t = await pool.query<{ id: string }>(
-      "INSERT INTO tasks (title, owner_kind, created_by) VALUES ('위임 후보','agent','agent') RETURNING id");
+      "INSERT INTO tasks (title, owner_kind, created_by) VALUES ('Delegation candidate','agent','agent') RETURNING id");
     const taskId = t.rows[0]?.id ?? "";
     await delegateLoop.apply(
       {
         loop: "delegate", run_id: "00000000-0000-0000-0000-0000000000cc",
         output: {
-          runtime: "claude_code", host: "mini", goal: "고친다", background: [], steps: ["a"],
-          acceptance: ["테스트 통과"], verify_cmd: "pnpm test",
+          runtime: "claude_code", host: "mini", goal: "Fix it", background: [], steps: ["a"],
+          acceptance: ["Tests pass"], verify_cmd: "pnpm test",
           workdir: "/Users/logankim/AI-Workspaces/omnis", est_minutes: 20,
-          confidence: 0.8, rationale: "레포 안 작업", injection_flags: [],
+          confidence: 0.8, rationale: "Work inside the repo", injection_flags: [],
         },
-        confidence: 0.8, rationale: "레포 안 작업", escalate: false,
+        confidence: 0.8, rationale: "Work inside the repo", escalate: false,
         injection_flags: [], unresolved: [],
       } as never,
       { trigger_kind: "event", task_id: taskId, now: new Date(), payload: {} });
@@ -4914,20 +4914,20 @@ describe("delegateLoop (A4 §5)", () => {
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `does not provide an export named 'renderBrief'`.
+- [ ] 2. Confirm the failure. Expected: `does not provide an export named 'renderBrief'`.
 
 ```bash
 pnpm --filter @omnis/agents test -- delegate-loop
 ```
 
-- [ ] 3. `brief.ts`를 쓴다.
+- [ ] 3. Write `brief.ts`.
 
 ```ts
 // packages/agents/src/delegate/brief.ts
-// A4 §5.3: 브리프는 자기완결적이어야 한다 — 대상 런타임은 omnis의 컨텍스트를 모른다.
+// A4 §5.3: the brief must be self-contained — the target runtime knows nothing of omnis's context.
 export interface BriefInput {
   goal: string;
-  /** 각 줄 끝에 (item:xxx) 또는 (memory:xxx). 3~6줄. */
+  /** Each line ends with (item:xxx) or (memory:xxx). 3–6 lines. */
   background: string[];
   steps: string[];
   acceptance: string[];
@@ -4940,24 +4940,24 @@ export function renderBrief(i: BriefInput): string {
     throw new Error("brief.acceptance must not be empty (A4 §5.3 minItems 1)");
   }
   return [
-    "## 목표", i.goal, "",
-    "## 배경", ...(i.background.length === 0 ? ["(배경 없음)"] : i.background), "",
-    "## 해야 할 일", ...i.steps.map((s, n) => `${n + 1}. ${s}`), "",
-    "## 수용 기준", ...i.acceptance.map((a) => `- [ ] ${a}`), "",
-    "## 검증 명령", i.verifyCmd, "",
-    "## 작업 디렉터리", i.workdir, "",
-    "## 금지",
-    "- 이 브리프에 없는 파일을 수정하지 않는다",
-    "- 커밋/푸시하지 않는다 (omnis가 diff를 받아 사람에게 보여준다)",
+    "## Goal", i.goal, "",
+    "## Background", ...(i.background.length === 0 ? ["(no background)"] : i.background), "",
+    "## Steps", ...i.steps.map((s, n) => `${n + 1}. ${s}`), "",
+    "## Acceptance Criteria", ...i.acceptance.map((a) => `- [ ] ${a}`), "",
+    "## Verify Command", i.verifyCmd, "",
+    "## Workdir", i.workdir, "",
+    "## Do Not",
+    "- Do not modify files that are not in this brief",
+    "- Do not commit or push (omnis takes the diff and shows it to a human)",
   ].join("\n");
 }
 ```
 
-- [ ] 4. `delegate.ts`를 쓴다.
+- [ ] 4. Write `delegate.ts`.
 
 ```ts
 // packages/agents/src/loops/delegate.ts
-// A4 §5. 승인 없이 실행되는 경로는 없다 — 이 루프의 유일한 산출물은 pending_approvals 한 행이다.
+// A4 §5. No path executes without approval — this loop's only output is a single pending_approvals row.
 import { z } from "zod";
 import { buildContext } from "../context/assemble.js";
 import { renderBrief } from "../delegate/brief.js";
@@ -4965,7 +4965,7 @@ import { registerLoop } from "../loop/registry.js";
 import type { LoopSpec, TriggerContext } from "../loop/spec.js";
 import { PROPOSE_TOOLS } from "../tools/propose.js";
 
-/** A4 §4.4: 자율 규칙이 열려 있어도 30분을 넘으면 승인을 탄다. */
+/** A4 §4.4: even with an autonomy rule enabled, anything over 30 minutes goes through approval. */
 export const AUTONOMY_MAX_MINUTES = 30;
 
 export interface AutonomyRule {
@@ -4987,7 +4987,7 @@ export function autonomyAllows(i: {
 }
 
 export const DelegateOutput = z.object({
-  runtime: z.enum(["claude_code", "codex", "claude_ds", "omnis"]),   // B-D7: hermes 없음
+  runtime: z.enum(["claude_code", "codex", "claude_ds", "omnis"]),   // B-D7: no hermes
   host: z.enum(["mini", "macbook"]),
   goal: z.string().max(200),
   background: z.array(z.string().max(200)).max(6).default([]),
@@ -5046,10 +5046,10 @@ export const delegateLoop: LoopSpec<DelegateOutputT> = {
 registerLoop(delegateLoop);
 ```
 
-- [ ] 5. `index.ts`에 export를 더하고 통과를 확인한다. 기대: 5 tests passed.
+- [ ] 5. Add the exports to `index.ts` and confirm it passes. Expected: 5 tests passed.
 
 ```ts
-// packages/agents/src/index.ts — 추가
+// packages/agents/src/index.ts — added
 export { renderBrief, type BriefInput } from "./delegate/brief.js";
 export {
   AUTONOMY_MAX_MINUTES, DelegateOutput, autonomyAllows, delegateLoop,
@@ -5060,12 +5060,12 @@ export {
 ```bash
 pnpm --filter @omnis/agents test -- delegate && pnpm lint
 git add packages/agents/src/delegate/brief.ts packages/agents/src/loops/delegate.ts packages/agents/src/index.ts packages/agents/test/integration/delegate-loop.test.ts
-git commit -m "US-B20: L4 위임 루프와 승인 게이트
+git commit -m "US-B20: L4 delegation loop and the approval gate
 
-- 규칙이 null을 돌려준 task만 T2로 깨운다
-- renderBrief가 A4 §5.3의 8섹션을 내고 빈 acceptance를 거부한다
-- 산출물은 pending_approvals(action='delegate') 한 행뿐 — 실행 경로가 없다
-- autonomyAllows는 기본 꺼짐이고 30분 초과/레포 밖/egress는 여전히 승인을 탄다
+- Only a task the rules returned null for wakes T2
+- renderBrief emits the 8 sections from A4 §5.3 and rejects an empty acceptance list
+- The only output is one pending_approvals row (action='delegate') — there is no execution path
+- autonomyAllows is off by default, and over 30 minutes / outside the repo / egress still go through approval
 
 Implemented-by: Claude Opus
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -5073,12 +5073,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 19: `noteRouteLoop` — 검색이 먼저, 자동 첨부 없음 (US-B21, tier: Sonnet)
+## Task 19: `noteRouteLoop` — search first, never auto-attach (US-B21, tier: Sonnet)
 
-> **스토리** — 목표: `note` insert 트리거 → 후보 최대 3개, 신뢰도 낮으면 제안 자체를 안 함, 자동 라우팅 없음. 산출물: `packages/agents/src/loops/note-route.ts`. 검증: `pnpm --filter @omnis/agents test`. 의존: B07.
+> **Story** — Goal: a `note` insert trigger → at most 3 candidates, no proposal at all when confidence is low, and no automatic routing. Deliverables: `packages/agents/src/loops/note-route.ts`. Verification: `pnpm --filter @omnis/agents test`. Depends on: B07.
 
-**읽을 것:** A4 §8.1~§8.4(후보 산출 5단계, 신뢰도 표 3행, "자동 첨부는 어떤 confidence에서도 하지 않는다").
-**만들지 말 것(YAGNI):** 노트 전용 임베딩 테이블. 후보는 `threads`/`persons`/`memories`에서 바로 뽑는다.
+**Read:** A4 §8.1–§8.4 (the 5 candidate-generation steps, the 3-row confidence table, "never auto-attach at any confidence").
+**Do not build (YAGNI):** a notes-only embedding table. Candidates are pulled straight from `threads`/`persons`/`memories`.
 
 **Files:**
 - Create: `packages/agents/src/loops/note-route.ts`, `packages/agents/test/integration/note-route.test.ts`
@@ -5091,7 +5091,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다.
+- [ ] 1. Write the failing test.
 
 ```ts
 // packages/agents/test/integration/note-route.test.ts
@@ -5108,15 +5108,15 @@ let noteId = "";
 beforeEach(async () => {
   configureAgents({ pool });
   const n = await pool.query<{ id: string }>(
-    "INSERT INTO notes (body) VALUES ('김 대표님께 견적 다시 확인') RETURNING id");
+    "INSERT INTO notes (body) VALUES ('Re-confirm the quote with CEO Kim') RETURNING id");
   noteId = n.rows[0]?.id ?? "";
 });
 afterAll(() => pool.end());
 
 const res = (candidates: unknown[]) => ({
   loop: "note_route" as const, run_id: "00000000-0000-0000-0000-0000000000dd",
-  output: { candidates, confidence: 0.9, rationale: "같은 주제", injection_flags: [] },
-  confidence: 0.9, rationale: "같은 주제", escalate: false, injection_flags: [], unresolved: [],
+  output: { candidates, confidence: 0.9, rationale: "same topic", injection_flags: [] },
+  confidence: 0.9, rationale: "same topic", escalate: false, injection_flags: [], unresolved: [],
 });
 
 describe("noteRouteLoop (A4 §8)", () => {
@@ -5139,7 +5139,7 @@ describe("noteRouteLoop (A4 §8)", () => {
          ON CONFLICT (account_id, external_id) DO UPDATE SET kind='email' RETURNING id`,
       [t.rows[0]?.id ?? ""]);
     await noteRouteLoop.apply(
-      res([{ kind: "thread", id: thr.rows[0]?.id ?? "", confidence: 0.99, why: "같은 견적 건" }]) as never,
+      res([{ kind: "thread", id: thr.rows[0]?.id ?? "", confidence: 0.99, why: "the same quote thread" }]) as never,
       { trigger_kind: "event", note_id: noteId, now: new Date(), payload: {} });
     const { rows } = await pool.query<{ route_state: string; routed_to_thread_id: string | null }>(
       "SELECT route_state, routed_to_thread_id FROM notes WHERE id = $1", [noteId]);
@@ -5150,7 +5150,7 @@ describe("noteRouteLoop (A4 §8)", () => {
   it("stores no proposal at all below 0.50 (route_state='none')", async () => {
     await noteRouteLoop.apply(
       res([{ kind: "thread", id: "00000000-0000-0000-0000-0000000000ee",
-             confidence: 0.3, why: "약함" }]) as never,
+             confidence: 0.3, why: "weak" }]) as never,
       { trigger_kind: "event", note_id: noteId, now: new Date(), payload: {} });
     const { rows } = await pool.query<{ route_state: string }>(
       "SELECT route_state FROM notes WHERE id = $1", [noteId]);
@@ -5159,17 +5159,17 @@ describe("noteRouteLoop (A4 §8)", () => {
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `does not provide an export named 'noteRouteLoop'`.
+- [ ] 2. Confirm the failure. Expected: `does not provide an export named 'noteRouteLoop'`.
 
 ```bash
 pnpm --filter @omnis/agents test -- note-route
 ```
 
-- [ ] 3. 구현을 쓴다.
+- [ ] 3. Write the implementation.
 
 ```ts
 // packages/agents/src/loops/note-route.ts
-// A4 §8. LLM은 후보를 만들어내지 못한다 — 검색이 준 목록 안에서만 고른다.
+// A4 §8. The LLM cannot invent candidates — it only chooses within the list search returned.
 import { z } from "zod";
 import { buildContext } from "../context/assemble.js";
 import { registerLoop } from "../loop/registry.js";
@@ -5209,7 +5209,7 @@ export const noteRouteLoop: LoopSpec<RouteOutputT> = {
   async apply(result, ctx) {
     const noteId = ctx.note_id;
     if (noteId === undefined) return;
-    // A4 §8.3: 0.50 미만이면 라우팅 없이 보관한다. 신뢰도가 아무리 높아도 자동 첨부는 없다.
+    // A4 §8.3: below 0.50 it is stored with no routing. However high the confidence, there is no auto-attach.
     const kept = result.output.candidates
       .filter((c) => c.confidence >= ROUTE_CONFIDENCE_MIN)
       .slice(0, 3);
@@ -5229,10 +5229,10 @@ export const noteRouteLoop: LoopSpec<RouteOutputT> = {
 registerLoop(noteRouteLoop);
 ```
 
-- [ ] 4. `index.ts`에 export를 더하고 통과를 확인한다. 기대: 3 tests passed.
+- [ ] 4. Add the exports to `index.ts` and confirm it passes. Expected: 3 tests passed.
 
 ```ts
-// packages/agents/src/index.ts — 추가
+// packages/agents/src/index.ts — added
 export {
   ROUTE_CONFIDENCE_HIGH, ROUTE_CONFIDENCE_MIN, RouteOutput, noteRouteLoop, type RouteOutputT,
 } from "./loops/note-route.js";
@@ -5241,11 +5241,11 @@ export {
 ```bash
 pnpm --filter @omnis/agents test -- note-route && pnpm lint
 git add packages/agents/src/loops/note-route.ts packages/agents/src/index.ts packages/agents/test/integration/note-route.test.ts
-git commit -m "US-B21: L7 노트 라우팅 루프
+git commit -m "US-B21: L7 note routing loop
 
-- note.created 2초 디바운스, 후보는 최대 3개
-- confidence < 0.50이면 제안 자체를 안 만들고 route_state='none'으로 둔다
-- 어떤 신뢰도에서도 자동 첨부하지 않는다(A4-D10)
+- note.created with a 2-second debounce, at most 3 candidates
+- Below confidence 0.50 it creates no proposal at all and leaves route_state='none'
+- Never auto-attaches at any confidence (A4-D10)
 
 Implemented-by: Claude Sonnet
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -5253,12 +5253,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 20: `followupLoop` + 비활성 감지 스윕 (US-B22, tier: Sonnet)
+## Task 20: `followupLoop` + the inactivity detection sweep (US-B22, tier: Sonnet)
 
-> **스토리** — 목표: 초면 판정, 비활성 감지 스윕(평일 10:00, cadence SQL), draft + task 동시 제안, `relationship_state` 갱신(`closed`만 승인). 산출물: `packages/agents/src/loops/followup.ts`. 검증: `pnpm --filter @omnis/agents test`. 의존: B03, B07.
+> **Story** — Goal: first-contact detection, an inactivity sweep (weekdays at 10:00, cadence SQL), simultaneous draft + task proposals, and `relationship_state` updates (`closed` only with approval). Deliverables: `packages/agents/src/loops/followup.ts`. Verification: `pnpm --filter @omnis/agents test`. Depends on: B03, B07.
 
-**읽을 것:** A4 §7.2(초면 판정 함수)·§7.3(SQL 원문 + cadence 우선순위 4항)·§7.4(출력 스키마 + 채널 선택 규칙 + 선제 발신 금지).
-**만들지 말 것(YAGNI):** 관계 점수 모델. `priority_score`는 이미 컬럼이고 이 루프는 읽기만 한다.
+**Read:** A4 §7.2 (the first-contact function)·§7.3 (the SQL as written + the 4 cadence priorities)·§7.4 (the output schema + the channel selection rule + the no-cold-outreach rule).
+**Do not build (YAGNI):** a relationship scoring model. `priority_score` is already a column and this loop only reads it.
 
 **Files:**
 - Create: `packages/agents/src/loops/followup.ts`, `packages/agents/test/integration/followup-loop.test.ts`
@@ -5271,7 +5271,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다.
+- [ ] 1. Write the failing test.
 
 ```ts
 // packages/agents/test/integration/followup-loop.test.ts
@@ -5309,7 +5309,7 @@ describe("pickFollowupChannel (A4 §7.4)", () => {
     expect(pickFollowupChannel({ counts: { kakaotalk: 9 }, theySentLast: false, hasEmail: false }))
       .toBe(null);
     expect(pickFollowupChannel({ counts: { slack: 3, telegram: 3 }, theySentLast: true, hasEmail: true }))
-      .toBe("gmail");   // 동률이면 이메일
+      .toBe("gmail");   // on a tie, email
   });
 });
 
@@ -5332,8 +5332,8 @@ describe("inactiveCandidates (A4 §7.3)", () => {
               ('fu-active','active', false, $1, 5)`, [threadId]);
     const rows = await inactiveCandidates(pool);
     const names = rows.map((r) => r.display_name);
-    expect(names).toContain("fu-vip");        // vip=14일 < 20일 경과
-    expect(names).not.toContain("fu-active"); // active=30일 > 20일 경과
+    expect(names).toContain("fu-vip");        // vip=14 days < 20 days elapsed
+    expect(names).not.toContain("fu-active"); // active=30 days > 20 days elapsed
     expect(rows.length).toBeLessThanOrEqual(INACTIVE_SWEEP_LIMIT);
   });
 });
@@ -5360,7 +5360,7 @@ describe("followupLoop (A4 §7.4)", () => {
       { trigger_kind: "cron", person_id: personId, now: new Date(), payload: {} });
     ({ rows } = await pool.query<{ s: string }>(
       "SELECT relationship_state AS s FROM persons WHERE id = $1", [personId]));
-    expect(rows[0]?.s).toBe("active");   // closed는 승인을 타므로 아직 안 바뀐다
+    expect(rows[0]?.s).toBe("active");   // closed goes through approval, so it has not changed yet
     const ap = await pool.query<{ n: string }>(
       `SELECT count(*)::text AS n FROM pending_approvals
         WHERE action = 'memory_write' AND args->>'person_id' = $1`, [personId]);
@@ -5369,17 +5369,17 @@ describe("followupLoop (A4 §7.4)", () => {
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `does not provide an export named 'isFirstContact'`.
+- [ ] 2. Confirm the failure. Expected: `does not provide an export named 'isFirstContact'`.
 
 ```bash
 pnpm --filter @omnis/agents test -- followup-loop
 ```
 
-- [ ] 3. 구현을 쓴다.
+- [ ] 3. Write the implementation.
 
 ```ts
 // packages/agents/src/loops/followup.ts
-// A4 §7 L6 Network 팔로업 루프.
+// A4 §7 L6 Network follow-up loop.
 import type { Channel } from "@omnis/protocol";
 import type { Pool } from "pg";
 import { z } from "zod";
@@ -5388,9 +5388,9 @@ import { registerLoop } from "../loop/registry.js";
 import type { LoopSpec, TriggerContext } from "../loop/spec.js";
 import { getAgentsPool } from "../pool.js";
 
-/** A4 §7.3: 하루 최대 10명 — 이 이상은 팔로업이 아니라 스팸이다. */
+/** A4 §7.3: at most 10 people a day — beyond that it is spam, not follow-up. */
 export const INACTIVE_SWEEP_LIMIT = 10;
-/** 마스터 §13: 이 두 채널로는 선제 발신하지 않는다. */
+/** Master §13: never cold-outreach on these two channels. */
 export const NO_COLD_OUTREACH_CHANNELS: readonly Channel[] = ["linkedin", "kakaotalk"];
 
 export function isFirstContact(
@@ -5402,7 +5402,7 @@ export function isFirstContact(
   return days <= 90 && p.item_count < 3;
 }
 
-/** A4 §7.4 채널 선택: 최근 90일 최다 채널, 동률이면 이메일. 선제 발신 금지 2채널은 예외. */
+/** A4 §7.4 channel selection: the most-used channel in the last 90 days, email on a tie. The two no-cold-outreach channels are the exception. */
 export function pickFollowupChannel(i: {
   counts: Partial<Record<Channel, number>>;
   theySentLast: boolean;
@@ -5428,7 +5428,7 @@ export interface InactiveCandidate {
   effective_cadence_days: number;
 }
 
-/** A4 §7.3 SQL 원문. LLM은 이 후보에 대해서만 돈다. */
+/** A4 §7.3 SQL as written. The LLM runs only over these candidates. */
 export async function inactiveCandidates(pool: Pool): Promise<InactiveCandidate[]> {
   const { rows } = await pool.query<InactiveCandidate>(
     `WITH cadence AS (
@@ -5476,7 +5476,7 @@ export type FollowupOutputT = z.infer<typeof FollowupOutput>;
 export const followupLoop: LoopSpec<FollowupOutputT> = {
   id: "followup",
   kind: "deliberate",
-  // 스윕 잡이 후보를 뽑아 사람마다 이 이벤트를 쏜다 — 루프 자체는 "사람 한 명"에 대해 돈다.
+  // The sweep job picks the candidates and fires this event per person — the loop itself runs for "one person".
   trigger: { kind: "event", on: "person.inactive", debounceMs: 0 },
   palette: ["read_thread", "read_person", "read_entity", "read_calendar", "search_memory",
             "propose_draft", "propose_task"],
@@ -5498,15 +5498,15 @@ export const followupLoop: LoopSpec<FollowupOutputT> = {
     const update = o.relationship_update;
     if (update === undefined) return;
 
-    // A4 §7.4: relationship_update는 자동 적용된다. 단 'closed'로의 전이만 승인이 필요하다 —
-    // 관계를 끊는 판단은 에이전트가 할 일이 아니다.
+    // A4 §7.4: relationship_update applies automatically. Only the transition to 'closed' needs approval —
+    // deciding to end a relationship is not an agent's job.
     if (update.state === "closed") {
       await pool.query(
         `INSERT INTO pending_approvals (action, args, description, risk, requested_by)
          VALUES ('memory_write', $1::jsonb, $2, 'normal',
                  (SELECT id FROM agent_runtimes WHERE runtime = 'omnis' LIMIT 1))`,
         [JSON.stringify({ person_id: o.person_id, state: "closed", note: update.note ?? null }),
-         `${o.person_id} 관계를 'closed'로 바꿀까요? — ${o.rationale}`]);
+         `Change the relationship for ${o.person_id} to 'closed'? — ${o.rationale}`]);
       return;
     }
     await pool.query(
@@ -5521,7 +5521,7 @@ export const followupLoop: LoopSpec<FollowupOutputT> = {
 
 registerLoop(followupLoop);
 
-/** A4 §7.3 평일 10:00 스윕(jobs.name = 'network_inactive_sweep'). 후보마다 루프를 한 번씩 돌린다. */
+/** A4 §7.3 weekday 10:00 sweep (jobs.name = 'network_inactive_sweep'). It runs the loop once per candidate. */
 export async function sweepFollowups(
   runOne: (c: InactiveCandidate) => Promise<void>,
 ): Promise<number> {
@@ -5531,10 +5531,10 @@ export async function sweepFollowups(
 }
 ```
 
-- [ ] 4. `index.ts`에 export를 더하고 통과를 확인한다. 기대: 4 tests passed.
+- [ ] 4. Add the exports to `index.ts` and confirm it passes. Expected: 4 tests passed.
 
 ```ts
-// packages/agents/src/index.ts — 추가
+// packages/agents/src/index.ts — added
 export {
   FollowupOutput, INACTIVE_SWEEP_LIMIT, NO_COLD_OUTREACH_CHANNELS, followupLoop,
   inactiveCandidates, isFirstContact, pickFollowupChannel, sweepFollowups,
@@ -5545,12 +5545,12 @@ export {
 ```bash
 pnpm --filter @omnis/agents test -- followup-loop && pnpm lint
 git add packages/agents/src/loops/followup.ts packages/agents/src/index.ts packages/agents/test/integration/followup-loop.test.ts
-git commit -m "US-B22: L6 Network 팔로업 루프
+git commit -m "US-B22: L6 Network follow-up loop
 
-- isFirstContact 규칙 판정(90일 + item 3건)
-- inactiveCandidates가 A4 §7.3 cadence 우선순위 SQL 그대로 하루 10명만 뽑는다
-- pickFollowupChannel이 LinkedIn/KakaoTalk 선제 발신을 막고 이메일로 대체한다
-- relationship_update는 자동 적용, 'closed'만 승인 카드를 만든다
+- isFirstContact is a rule-based decision (90 days + 3 items)
+- inactiveCandidates uses the A4 §7.3 cadence-priority SQL as written and picks only 10 people a day
+- pickFollowupChannel blocks cold outreach on LinkedIn/KakaoTalk and substitutes email
+- relationship_update applies automatically; only 'closed' creates an approval card
 
 Implemented-by: Claude Sonnet
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -5560,10 +5560,10 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 21: `rankBriefItems` + `morningDigestLoop` (US-B23, tier: Opus)
 
-> **스토리** — 목표: 06:30 KST 동기 호출, 6섹션 콘텐츠 모델, **랭킹은 LLM이 아니라 산술 점수**(8항 가중합, 한 스레드 1회), LLM은 한 줄 요약 문장만, `digests(kind='morning')` 1행 + 커버리지 지표. 산출물: `packages/agents/src/loops/digest-morning.ts`, `packages/agents/src/digest/rank.ts`. 검증: `pnpm --filter @omnis/agents test`. 의존: B18, B19.
+> **Story** — Goal: a synchronous call at 06:30 KST, a 6-section content model, **ranking by an arithmetic score rather than the LLM** (an 8-term weighted sum, one entry per thread), the LLM writing only the one-line summary sentences, and one `digests(kind='morning')` row + coverage metrics. Deliverables: `packages/agents/src/loops/digest-morning.ts`, `packages/agents/src/digest/rank.ts`. Verification: `pnpm --filter @omnis/agents test`. Depends on: B18, B19.
 
-**읽을 것:** A4 §6.2(`MorningBriefing`/`BriefItem`)·§6.3(점수식 8항)·§6.6(커버리지 지표), 델타 §4(digest 타입).
-**만들지 말 것(YAGNI):** 섹션별 프롬프트. LLM이 쓰는 문장은 `greeting`과 `one_liner` 둘뿐이다.
+**Read:** A4 §6.2 (`MorningBriefing`/`BriefItem`)·§6.3 (the 8-term scoring formula)·§6.6 (coverage metrics), delta §4 (the digest types).
+**Do not build (YAGNI):** per-section prompts. The LLM writes only two strings, `greeting` and `one_liner`.
 
 **Files:**
 - Create: `packages/agents/src/digest/rank.ts`, `packages/agents/src/loops/digest-morning.ts`, `packages/agents/test/digest-rank.test.ts`, `packages/agents/test/integration/digest-morning.test.ts`
@@ -5571,12 +5571,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Test: `packages/agents/test/digest-rank.test.ts`, `packages/agents/test/integration/digest-morning.test.ts`
 
 **Interfaces:**
-- Consumes: `runLoopSpec`(Task 3 — 레지스트리를 타지 않는다), `buildContext`(US-B05).
+- Consumes: `runLoopSpec` (Task 3 — it does not go through the registry), `buildContext` (US-B05).
 - Produces: `BriefCandidate`, `BriefItem`, `BriefSection`, `MorningBriefing`, `rankBriefItems`, `SECTION_CAPS`, `morningDigestLoop`, `morningCandidates`, `MORNING_DIGEST_CRON`.
 
 ### Steps
 
-- [ ] 1. 실패하는 랭킹 테스트를 쓴다(순수 함수).
+- [ ] 1. Write the failing ranking test (pure function).
 
 ```ts
 // packages/agents/test/digest-rank.test.ts
@@ -5586,7 +5586,7 @@ import { SECTION_CAPS, rankBriefItems, type BriefCandidate } from "../src/index.
 const now = new Date("2026-09-20T00:00:00Z");
 const c = (over: Partial<BriefCandidate>): BriefCandidate => ({
   ref: { kind: "item", id: over.ref?.id ?? "i1" },
-  thread_id: "t1", section: "needs_you", line: "줄", why: "이유",
+  thread_id: "t1", section: "needs_you", line: "line", why: "reason",
   priority: "fyi", vip: false, pendingApproval: false, unansweredTurns: 0,
   meetingToday: false, dueToday: false, ageHours: 0, snoozed: false,
   ...over,
@@ -5627,17 +5627,17 @@ describe("rankBriefItems (A4 §6.3)", () => {
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `does not provide an export named 'rankBriefItems'`.
+- [ ] 2. Confirm the failure. Expected: `does not provide an export named 'rankBriefItems'`.
 
 ```bash
 pnpm --filter @omnis/agents test -- digest-rank
 ```
 
-- [ ] 3. `rank.ts`를 쓴다.
+- [ ] 3. Write `rank.ts`.
 
 ```ts
 // packages/agents/src/digest/rank.ts
-// A4 §6.3: 랭킹은 LLM이 하지 않는다. 산술 점수로 정렬하고 LLM은 한 줄 요약만 쓴다.
+// A4 §6.3: the LLM does not do the ranking. It sorts by arithmetic score and the LLM writes only the one-line summary.
 export type BriefSectionId = "needs_you" | "drafts" | "calendar" | "commitments" | "agents";
 
 export interface BriefItem {
@@ -5653,7 +5653,7 @@ export interface BriefCandidate extends BriefItem {
   priority: "now" | "today" | "week" | "fyi";
   vip: boolean;
   pendingApproval: boolean;
-  /** 내가 마지막으로 답한 뒤 상대가 보낸 미응답 턴 수. 3으로 클램프된다. */
+  /** Unanswered turns they sent after my last reply. Clamped to 3. */
   unansweredTurns: number;
   meetingToday: boolean;
   dueToday: boolean;
@@ -5700,7 +5700,7 @@ function score(c: BriefCandidate, seenThread: boolean): number {
   );
 }
 
-/** 한 스레드는 브리핑 전체에서 최대 1회 등장한다(A4 §6.3 마지막 항). */
+/** A thread appears at most once in the whole briefing (the last term of A4 §6.3). */
 export function rankBriefItems(rows: BriefCandidate[], now: Date): BriefItem[] {
   void now;
   const sorted = [...rows].sort((a, b) => score(b, false) - score(a, false));
@@ -5718,11 +5718,11 @@ export function rankBriefItems(rows: BriefCandidate[], now: Date): BriefItem[] {
 }
 ```
 
-- [ ] 4. `digest-morning.ts`를 쓴다 — 후보 수집은 SQL, 조립은 산술, 모델은 두 문장만 쓴다.
+- [ ] 4. Write `digest-morning.ts` — SQL collects the candidates, arithmetic assembles them, and the model writes only two strings.
 
 ```ts
 // packages/agents/src/loops/digest-morning.ts
-// A4 §6.1~§6.3. 브리핑은 06:30에 완성돼야 하므로 배치 큐를 쓰지 않고 동기 호출한다.
+// A4 §6.1–§6.3. The briefing must be complete by 06:30, so it uses a synchronous call rather than a batch queue.
 import { z } from "zod";
 import { buildContext } from "../context/assemble.js";
 import {
@@ -5733,7 +5733,7 @@ import { getAgentsPool } from "../pool.js";
 
 export const MORNING_DIGEST_CRON = "30 6 * * *";
 
-/** 모델이 쓰는 건 이 두 문장뿐이다(A4 §6.3). */
+/** These two strings are all the model writes (A4 §6.3). */
 export const MorningDigestOutput = z.object({
   greeting: z.string().max(120),
   one_liner: z.string().max(160),
@@ -5744,11 +5744,11 @@ export const MorningDigestOutput = z.object({
 export type MorningDigestOutputT = z.infer<typeof MorningDigestOutput>;
 
 const SECTION_TITLE: Record<string, string> = {
-  needs_you: "지금 결정이 필요한 것",
-  drafts: "초안이 준비된 답장",
-  calendar: "오늘 일정",
-  commitments: "내가 한 약속",
-  agents: "에이전트 진행/결과",
+  needs_you: "Needs your decision",
+  drafts: "Replies with a draft ready",
+  calendar: "Today's schedule",
+  commitments: "Promises I made",
+  agents: "Agent progress/results",
 };
 
 export async function morningCandidates(now: Date): Promise<BriefCandidate[]> {
@@ -5761,7 +5761,7 @@ export async function morningCandidates(now: Date): Promise<BriefCandidate[]> {
   }>(
     `WITH approvals AS (
        SELECT 'approval'::text AS kind, a.id::text AS id, a.thread_id::text AS thread_id,
-              'needs_you'::text AS section, a.description AS line, '승인 대기'::text AS why,
+              'needs_you'::text AS section, a.description AS line, 'approval pending'::text AS why,
               'now'::text AS priority, false AS vip, true AS pending_approval,
               0 AS unanswered_turns, false AS meeting_today, false AS due_today,
               (EXTRACT(EPOCH FROM (now() - a.created_at))/3600)::text AS age_hours,
@@ -5769,7 +5769,7 @@ export async function morningCandidates(now: Date): Promise<BriefCandidate[]> {
          FROM pending_approvals a WHERE a.state = 'pending'),
      drafts AS (
        SELECT 'item', i.id::text, i.thread_id::text, 'drafts',
-              left(i.body, 90), COALESCE(i.meta->'draft'->>'rationale', '초안 준비됨'), 'today',
+              left(i.body, 90), COALESCE(i.meta->'draft'->>'rationale', 'draft ready'), 'today',
               COALESCE(p.vip, false), false, 0, false, false,
               (EXTRACT(EPOCH FROM (now() - i.sent_at))/3600)::text, false
          FROM items i
@@ -5777,7 +5777,7 @@ export async function morningCandidates(now: Date): Promise<BriefCandidate[]> {
         WHERE i.status = 'draft' AND (i.meta->>'pending') IS DISTINCT FROM 'true'),
      events AS (
        SELECT 'event', c.id::text, i.thread_id::text, 'calendar',
-              COALESCE(i.subject, '(제목 없음)'),
+              COALESCE(i.subject, '(no subject)'),
               to_char(c.start_at AT TIME ZONE 'Asia/Seoul', 'HH24:MI'),
               'today', false, false, 0, true, false, '0', false
          FROM calendar_events c JOIN items i ON i.id = c.item_id
@@ -5786,7 +5786,7 @@ export async function morningCandidates(now: Date): Promise<BriefCandidate[]> {
           AND c.start_at <  date_trunc('day', $1::timestamptz) + interval '1 day'),
      commitments AS (
        SELECT 'task', t.id::text, COALESCE(i.thread_id::text, t.id::text), 'commitments',
-              t.title, '내가 한 약속', 'today', false, false, 0, false,
+              t.title, 'Promises I made', 'today', false, false, 0, false,
               (t.due_at IS NOT NULL AND t.due_at < $1::timestamptz + interval '1 day'),
               (EXTRACT(EPOCH FROM (now() - t.created_at))/3600)::text, false
          FROM tasks t LEFT JOIN items i ON i.id = t.source_item_id
@@ -5844,7 +5844,7 @@ export const morningDigestLoop: LoopSpec<MorningDigestOutputT> = {
       quiet += all.length - kept.length;
       sections.push({ id: id as BriefSection["id"], title: SECTION_TITLE[id] ?? id, items: kept });
     }
-    sections.push({ id: "quiet", title: "그 외", count: quiet });
+    sections.push({ id: "quiet", title: "Everything else", count: quiet });
 
     const briefing = {
       greeting: result.output.greeting, sections, one_liner: result.output.one_liner,
@@ -5859,11 +5859,11 @@ export const morningDigestLoop: LoopSpec<MorningDigestOutputT> = {
        JSON.stringify({ candidates: candidates.length, shown: ranked.length, quiet })]);
   },
 };
-// 레지스트리에 넣지 않는다 — LoopId 'digest'를 nightlyDigestLoop과 공유하므로
-// 두 루프 모두 runLoopSpec으로 직접 돈다(허브가 cron 핸들러를 등록한다).
+// Not registered — it shares the LoopId 'digest' with nightlyDigestLoop, so
+// both loops run directly through runLoopSpec (the hub registers the cron handlers).
 ```
 
-- [ ] 5. 통합 테스트를 쓰고 통과를 확인한다.
+- [ ] 5. Write the integration test and confirm it passes.
 
 ```ts
 // packages/agents/test/integration/digest-morning.test.ts
@@ -5894,7 +5894,7 @@ describe("morningDigestLoop (A4 §6)", () => {
     const r = {
       loop: "digest" as const, run_id: "00000000-0000-0000-0000-00000000aaaa",
       output: {
-        greeting: "좋은 아침입니다.", one_liner: "오늘은 견적 2건이 핵심입니다.",
+        greeting: "Good morning.", one_liner: "Two quotes are the key thing today.",
         confidence: 0.9, rationale: "", injection_flags: [],
       },
       confidence: 0.9, rationale: "", escalate: false, injection_flags: [], unresolved: [],
@@ -5914,10 +5914,10 @@ describe("morningDigestLoop (A4 §6)", () => {
 pnpm --filter @omnis/agents test -- digest && pnpm lint
 ```
 
-- [ ] 6. `index.ts`에 export를 더하고 커밋한다.
+- [ ] 6. Add the exports to `index.ts` and commit.
 
 ```ts
-// packages/agents/src/index.ts — 추가
+// packages/agents/src/index.ts — added
 export {
   SECTION_CAPS, rankBriefItems,
   type BriefCandidate, type BriefItem, type BriefSection, type BriefSectionId,
@@ -5931,12 +5931,12 @@ export {
 
 ```bash
 git add packages/agents/src/digest packages/agents/src/loops/digest-morning.ts packages/agents/src/index.ts packages/agents/test/digest-rank.test.ts packages/agents/test/integration/digest-morning.test.ts
-git commit -m "US-B23: L5 아침 브리핑
+git commit -m "US-B23: L5 morning briefing
 
-- rankBriefItems는 A4 §6.3의 8항 산술 가중합이고 한 스레드는 전체에서 1회만 나온다
-- 섹션 상한 5/7/전부/5/5, 나머지는 quiet.count 숫자로만 합산한다
-- 모델이 쓰는 문장은 greeting과 one_liner 둘뿐이다
-- digests(kind='morning') 하루 1행 + 커버리지 지표
+- rankBriefItems is the 8-term arithmetic weighted sum from A4 §6.3, and each thread appears only once overall
+- Section caps 5/7/all/5/5; everything else is only counted in the quiet.count number
+- The only strings the model writes are greeting and one_liner
+- One digests(kind='morning') row a day + coverage metrics
 
 Implemented-by: Claude Opus
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -5944,12 +5944,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 22: `nightlyDigestLoop` — 자동 보관 전량 노출 + 비용 필드 (US-B24, tier: Opus)
+## Task 22: `nightlyDigestLoop` — full auto-archive exposure + the cost field (US-B24, tier: Opus)
 
-> **스토리** — 목표: 23:00 KST, `NightlyDigest` 모델(그룹별 `reason`/`samples`≤3/`undo_token` 7일), 자동 보관 전량 노출, `cost` 필드(MTD/cap/tier_state). 산출물: `packages/agents/src/loops/digest-nightly.ts`. 검증: `pnpm --filter @omnis/agents test`. 의존: B14, B18, B23.
+> **Story** — Goal: 23:00 KST, the `NightlyDigest` model (per-group `reason`/`samples` ≤3/`undo_token` 7-day), full auto-archive exposure, and the `cost` field (MTD/cap/tier_state). Deliverables: `packages/agents/src/loops/digest-nightly.ts`. Verification: `pnpm --filter @omnis/agents test`. Depends on: B14, B18, B23.
 
-**읽을 것:** A4 §6.4(`NightlyDigest`/`DigestGroup`)·§9.4(전량 노출·undo 7일), Task 13의 `archivedSince`.
-**만들지 말 것(YAGNI):** undo 토큰 테이블. 토큰은 `sha256(digest_id + reason)` 앞 16자로 언제든 재계산되고, 7일 창은 `meta.archived_by.at`이 판정한다.
+**Read:** A4 §6.4 (`NightlyDigest`/`DigestGroup`)·§9.4 (full exposure, 7-day undo), `archivedSince` from Task 13.
+**Do not build (YAGNI):** an undo token table. The token is always recomputable as the first 16 characters of `sha256(digest_id + reason)`, and the 7-day window is decided by `meta.archived_by.at`.
 
 **Files:**
 - Create: `packages/agents/src/loops/digest-nightly.ts`, `packages/agents/test/integration/digest-nightly.test.ts`
@@ -5957,12 +5957,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Test: `packages/agents/test/integration/digest-nightly.test.ts`
 
 **Interfaces:**
-- Consumes: `BriefItem`(Task 21), `buildContext`(US-B05). 비용 수치는 `ctx.payload.cost`로 허브가 주입한다(`currentPolicy`는 커널 소유라 agents가 직접 못 부른다).
+- Consumes: `BriefItem` (Task 21), `buildContext` (US-B05). The hub injects the cost figures via `ctx.payload.cost` (`currentPolicy` is owned by the kernel, so agents cannot call it directly).
 - Produces: `nightlyDigestLoop`, `NightlyDigestOutput`, `NightlyDigest`, `DigestGroup`, `undoTokenFor`, `NIGHTLY_DIGEST_CRON`, `nightlyGroups`.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다.
+- [ ] 1. Write the failing test.
 
 ```ts
 // packages/agents/test/integration/digest-nightly.test.ts
@@ -5993,9 +5993,9 @@ beforeEach(async () => {
       `INSERT INTO items (thread_id, account_id, kind, status, body, sent_at, meta)
        VALUES ($1,$2,'email','archived',$3, now(),
          jsonb_build_object('archived_by', jsonb_build_object(
-           'rule_ids','["ar_no_cta"]'::jsonb,'reason','뉴스레터','tier','T0',
+           'rule_ids','["ar_no_cta"]'::jsonb,'reason','Newsletter','tier','T0',
            'confidence',0.95,'run_id','r','at', now()::text)))`,
-      [threadId, accountId, `뉴스레터 ${i}`]);
+      [threadId, accountId, `Newsletter ${i}`]);
   }
 });
 afterAll(() => pool.end());
@@ -6007,10 +6007,10 @@ describe("nightlyDigestLoop (A4 §6.4·§9.4)", () => {
 
   it("exposes every archived item — count is the full number, samples are capped at 3", async () => {
     const groups = await nightlyGroups(pool, new Date(Date.now() - 3_600_000), "d1");
-    const g = groups.find((x) => x.reason === "뉴스레터");
+    const g = groups.find((x) => x.reason === "Newsletter");
     expect(g?.count).toBe(5);
     expect(g?.samples.length).toBe(3);
-    expect(g?.undo_token).toBe(undoTokenFor("d1", "뉴스레터"));
+    expect(g?.undo_token).toBe(undoTokenFor("d1", "Newsletter"));
   });
 
   it("stores the cost field the hub injected", async () => {
@@ -6018,7 +6018,7 @@ describe("nightlyDigestLoop (A4 §6.4·§9.4)", () => {
       {
         loop: "digest", run_id: "00000000-0000-0000-0000-00000000bbbb",
         output: {
-          headline: "오늘 처리 3건, 자동 보관 5건.", one_liner: "조용한 하루였습니다.",
+          headline: "3 handled today, 5 auto-archived.", one_liner: "A quiet day.",
           confidence: 0.9, rationale: "", injection_flags: [],
         },
         confidence: 0.9, rationale: "", escalate: false, injection_flags: [], unresolved: [],
@@ -6038,17 +6038,17 @@ describe("nightlyDigestLoop (A4 §6.4·§9.4)", () => {
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `does not provide an export named 'nightlyGroups'`.
+- [ ] 2. Confirm the failure. Expected: `does not provide an export named 'nightlyGroups'`.
 
 ```bash
 pnpm --filter @omnis/agents test -- digest-nightly
 ```
 
-- [ ] 3. 구현을 쓴다.
+- [ ] 3. Write the implementation.
 
 ```ts
 // packages/agents/src/loops/digest-nightly.ts
-// A4 §6.4. 판정은 §9(L8)가 소유하고, 여기는 그 결과를 사람이 볼 수 있게 노출하는 쪽만 정의한다.
+// A4 §6.4. The verdict is owned by §9 (L8); this module only defines how to expose its result for a human to see.
 import { createHash } from "node:crypto";
 import type { Channel } from "@omnis/protocol";
 import type { Pool } from "pg";
@@ -6076,7 +6076,7 @@ export interface NightlyDigest {
   agents: { runs: number; failed: number; delegated: number };
 }
 
-/** 7일 창은 meta.archived_by.at이 판정하므로 토큰은 저장하지 않는다 — 재계산 가능한 값이다. */
+/** The 7-day window is decided by meta.archived_by.at, so the token is not stored — it is a recomputable value. */
 export function undoTokenFor(digestId: string, reason: string): string {
   return createHash("sha256").update(`${digestId}::${reason}`).digest("hex").slice(0, 16);
 }
@@ -6090,7 +6090,7 @@ export const NightlyDigestOutput = z.object({
 });
 export type NightlyDigestOutputT = z.infer<typeof NightlyDigestOutput>;
 
-/** A4 §9.4: 자동 보관은 전량 노출한다 — count는 전체 수, samples만 3건으로 자른다. */
+/** A4 §9.4: auto-archive is fully exposed — count is the total, only samples are cut to 3. */
 export async function nightlyGroups(
   pool: Pool,
   since: Date,
@@ -6099,7 +6099,7 @@ export async function nightlyGroups(
   const { rows } = await pool.query<{
     reason: string; count: string; samples: { id: string; line: string }[];
   }>(
-    `SELECT COALESCE(meta->'archived_by'->>'reason','기타') AS reason,
+    `SELECT COALESCE(meta->'archived_by'->>'reason','Other') AS reason,
             count(*)::text AS count,
             jsonb_agg(jsonb_build_object('id', id, 'line', left(COALESCE(subject, body), 90))
                       ORDER BY sent_at DESC) AS samples
@@ -6187,13 +6187,13 @@ export const nightlyDigestLoop: LoopSpec<NightlyDigestOutputT> = {
        })]);
   },
 };
-// morningDigestLoop과 같은 이유로 레지스트리에 넣지 않는다(LoopId 'digest' 공유).
+// Not registered, for the same reason as morningDigestLoop (it shares the LoopId 'digest').
 ```
 
-- [ ] 4. `index.ts`에 export를 더하고 통과를 확인한다. 기대: 3 tests passed.
+- [ ] 4. Add the exports to `index.ts` and confirm it passes. Expected: 3 tests passed.
 
 ```ts
-// packages/agents/src/index.ts — 추가
+// packages/agents/src/index.ts — added
 export {
   NIGHTLY_DIGEST_CRON, NightlyDigestOutput, nightlyDigestLoop, nightlyGroups, undoTokenFor,
   type DigestGroup, type NightlyDigest, type NightlyDigestOutputT,
@@ -6203,12 +6203,12 @@ export {
 ```bash
 pnpm --filter @omnis/agents test -- digest-nightly && pnpm lint
 git add packages/agents/src/loops/digest-nightly.ts packages/agents/src/index.ts packages/agents/test/integration/digest-nightly.test.ts
-git commit -m "US-B24: L5 밤 다이제스트
+git commit -m "US-B24: L5 nightly digest
 
-- 23:00 KST, NightlyDigest 모델(그룹별 reason/samples<=3/undo_token)
-- 자동 보관은 count로 전량 노출하고 samples만 3건으로 자른다
-- undo_token은 sha256(digest_id::reason) 재계산 값이라 저장하지 않는다
-- cost 필드(MTD/cap/tier_state)는 허브가 currentPolicy로 주입한다
+- 23:00 KST, the NightlyDigest model (per-group reason/samples<=3/undo_token)
+- Auto-archive is fully exposed via count; only samples are cut to 3
+- undo_token is a recomputed sha256(digest_id::reason) value, so it is not stored
+- The cost field (MTD/cap/tier_state) is injected by the hub from currentPolicy
 
 Implemented-by: Claude Opus
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -6218,11 +6218,11 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 23: `memory_consolidate` — Anthropic Message Batches (US-B24, tier: Opus)
 
-> **스토리** — 목표: 야간 메모리 통합은 T2 + Anthropic Message Batches(23:30 제출, 다음 아침 전 수확). 산출물: `packages/agents/src/memory/consolidate.ts`. 검증: `pnpm --filter @omnis/agents test`.
+> **Story** — Goal: nightly memory consolidation runs at T2 + Anthropic Message Batches (submitted 23:30, harvested before the next morning). Deliverables: `packages/agents/src/memory/consolidate.ts`. Verification: `pnpm --filter @omnis/agents test`.
 
-**읽을 것:** A4 §6.5, 델타 §9(`OMNIS_ANTHROPIC_API_KEY`).
-**설계 메모:** `@ai-sdk/anthropic`을 새로 핀하지 않는다 — Batches는 SDK가 아니라 **`fetch` 두 번**(제출 + 수확)이고, 그 편이 테스트에서 스텁하기도 쉽다. 동기 T2 호출은 Task 3의 OpenRouter 경로를 그대로 쓴다.
-**만들지 말 것(YAGNI):** 배치 상태 폴링 루프. 23:30 제출 → 06:00 수확 두 잡이면 되고, 미완이면 그날은 건너뛴다.
+**Read:** A4 §6.5, delta §9 (`OMNIS_ANTHROPIC_API_KEY`).
+**Design note:** do not pin `@ai-sdk/anthropic` fresh — Batches is not an SDK but **two `fetch` calls** (submit + harvest), and that is also easier to stub in tests. Synchronous T2 calls use the Task 3 OpenRouter path as is.
+**Do not build (YAGNI):** a batch status polling loop. Two jobs — submit at 23:30, harvest at 06:00 — are enough, and an unfinished batch is skipped that day.
 
 **Files:**
 - Create: `packages/agents/src/memory/consolidate.ts`, `packages/agents/test/memory-consolidate.test.ts`
@@ -6230,12 +6230,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Test: `packages/agents/test/memory-consolidate.test.ts`
 
 **Interfaces:**
-- Consumes: 없음(`fetch`만 쓴다). 수확 결과를 `memories`에 반영하는 쪽은 US-B08의 `upsertMemory`/`supersede`가 받는다.
+- Consumes: nothing (it uses only `fetch`). The side that writes the harvested results into `memories` is handled by US-B08's `upsertMemory`/`supersede`.
 - Produces: `ANTHROPIC_BATCH_URL`, `ANTHROPIC_BATCH_MODEL`, `submitConsolidation`, `harvestConsolidation`, `MEMORY_CONSOLIDATE_CRON`, `MEMORY_HARVEST_CRON`, `type ConsolidationRequest`, `type ConsolidationResult`.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. `fetch`를 스텁해 네트워크를 타지 않는다.
+- [ ] 1. Write the failing test. Stub `fetch` so no network is touched.
 
 ```ts
 // packages/agents/test/memory-consolidate.test.ts
@@ -6259,7 +6259,7 @@ describe("memory consolidation via Message Batches (A4 §6.5)", () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     vi.stubEnv("OMNIS_ANTHROPIC_API_KEY", "");
-    expect(await submitConsolidation([{ custom_id: "m1", prompt: "요약해줘" }])).toBe(null);
+    expect(await submitConsolidation([{ custom_id: "m1", prompt: "Summarize this" }])).toBe(null);
     expect(fetchSpy).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
@@ -6294,22 +6294,22 @@ describe("memory consolidation via Message Batches (A4 §6.5)", () => {
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `does not provide an export named 'submitConsolidation'`.
+- [ ] 2. Confirm the failure. Expected: `does not provide an export named 'submitConsolidation'`.
 
 ```bash
 pnpm --filter @omnis/agents test -- memory-consolidate
 ```
 
-- [ ] 3. 구현을 쓴다.
+- [ ] 3. Write the implementation.
 
 ```ts
 // packages/agents/src/memory/consolidate.ts
-// A4 §6.5: 지연에 둔감한 유일한 작업이라 배치가 정확히 맞는다(Anthropic Message Batches, -50%).
-// SDK를 새로 핀하지 않는다 — 제출/수확 각각 fetch 한 번이다.
+// A4 §6.5: the only task insensitive to latency, so batching fits exactly (Anthropic Message Batches, -50%).
+// No new SDK pin — one fetch each for submit and harvest.
 export const ANTHROPIC_BATCH_URL = "https://api.anthropic.com/v1/messages/batches";
 export const ANTHROPIC_BATCH_MODEL = "claude-sonnet-5";
 export const MEMORY_CONSOLIDATE_CRON = "30 23 * * *";
-/** 다음 아침 브리핑(06:30) 전에 수확한다. */
+/** Harvested before the next morning briefing (06:30). */
 export const MEMORY_HARVEST_CRON = "0 6 * * *";
 
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -6336,7 +6336,7 @@ function headers(key: string): Record<string, string> {
   };
 }
 
-/** 키가 없으면 null을 돌려준다 — 델타 §9: T2 경로가 스킵되고 시스템 Item이 뜬다. */
+/** Returns null when the key is missing — delta §9: the T2 path is skipped and a system Item appears. */
 export async function submitConsolidation(
   requests: readonly ConsolidationRequest[],
 ): Promise<string | null> {
@@ -6387,10 +6387,10 @@ export async function harvestConsolidation(batchId: string): Promise<Consolidati
 }
 ```
 
-- [ ] 4. `index.ts`에 export를 더하고 통과를 확인한다. 기대: 4 tests passed.
+- [ ] 4. Add the exports to `index.ts` and confirm it passes. Expected: 4 tests passed.
 
 ```ts
-// packages/agents/src/index.ts — 추가
+// packages/agents/src/index.ts — added
 export {
   ANTHROPIC_BATCH_MODEL, ANTHROPIC_BATCH_URL, MEMORY_CONSOLIDATE_CRON, MEMORY_HARVEST_CRON,
   harvestConsolidation, submitConsolidation,
@@ -6401,11 +6401,11 @@ export {
 ```bash
 pnpm --filter @omnis/agents test -- memory-consolidate && pnpm lint
 git add packages/agents/src/memory/consolidate.ts packages/agents/src/index.ts packages/agents/test/memory-consolidate.test.ts
-git commit -m "US-B24: 야간 메모리 통합 — Anthropic Message Batches
+git commit -m "US-B24: nightly memory consolidation — Anthropic Message Batches
 
-- 23:30 제출 / 06:00 수확, 새 provider SDK 핀 없이 fetch 두 번
-- OMNIS_ANTHROPIC_API_KEY가 없으면 null을 돌려주고 아무것도 보내지 않는다
-- 배치가 아직 안 끝났으면 빈 배열을 돌려 그날은 건너뛴다
+- Submit 23:30 / harvest 06:00, two fetches with no new provider SDK pin
+- With no OMNIS_ANTHROPIC_API_KEY it returns null and sends nothing
+- If the batch has not finished it returns an empty array and that day is skipped
 
 Implemented-by: Claude Opus
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -6413,17 +6413,17 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Task 24: self-model 수정 제안 + 적용 (US-B25, tier: Opus)
+## Task 24: self-model patch proposals + apply (US-B25, tier: Opus)
 
-> **스토리** — 목표: 일요일 21:00 잡, 입력 5종, 패치 제약(파일당 1개·최대 3개·변경 ≤20줄·`evidence` ≥2, USER.md 삭제는 ≥3), 승인 시 `git apply`+커밋+스냅샷 캐시 무효화, 무시된 패치는 diff 해시로 4주 억제. 산출물: `packages/agents/src/self-model/propose.ts`, `packages/kernel/src/self-model/apply.ts`. 검증: `pnpm --filter @omnis/agents test`. 의존: B02, B07.
+> **Story** — Goal: a Sunday 21:00 job, 5 kinds of input, the patch constraints (one per file·at most 3·≤20 changed lines·`evidence` ≥2, ≥3 for a USER.md deletion), `git apply` + commit + snapshot cache invalidation on approval, and suppressing ignored patches for 4 weeks by diff hash. Deliverables: `packages/agents/src/self-model/propose.ts`, `packages/kernel/src/self-model/apply.ts`. Verification: `pnpm --filter @omnis/agents test`. Depends on: B02, B07.
 
-**읽을 것:** A4 §13.1~§13.3 전체, 델타 §3(`applySelfModelPatch`/`invalidateSnapshotCache`)·§0-2(`~/.omnis/self-model/`).
-**만들지 말 것(YAGNI):** 자체 diff 파서. `git apply --check`가 검증하고 `git apply`가 적용한다.
+**Read:** all of A4 §13.1–§13.3, delta §3 (`applySelfModelPatch`/`invalidateSnapshotCache`)·§0-2 (`~/.omnis/self-model/`).
+**Do not build (YAGNI):** a custom diff parser. `git apply --check` validates and `git apply` applies.
 
 **Files:**
 - Create: `packages/agents/src/self-model/propose.ts`, `packages/kernel/src/self-model/apply.ts`, `packages/agents/test/integration/self-model-propose.test.ts`, `packages/kernel/test/integration/self-model-apply.test.ts`
 - Modify: `packages/agents/src/index.ts`, `packages/kernel/src/index.ts`
-- Test: 위 두 테스트 파일
+- Test: the two test files above
 
 **Interfaces:**
 - Consumes: `PROPOSE_TOOLS.propose_self_model_patch`(Task 5), `applySelfModelPatch`/`invalidateSnapshotCache`(US-B02, `@omnis/memory`), `Audit`(Phase A).
@@ -6431,7 +6431,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Steps
 
-- [ ] 1. 실패하는 제약 테스트를 쓴다.
+- [ ] 1. Write the failing constraint test.
 
 ```ts
 // packages/agents/test/integration/self-model-propose.test.ts
@@ -6453,7 +6453,7 @@ afterAll(() => pool.end());
 
 const diff = (lines: number) =>
   ["--- a/VOICE.md", "+++ b/VOICE.md", "@@ -1,1 +1,1 @@",
-   ...Array.from({ length: lines }, (_, i) => `+새 줄 ${i}`)].join("\n");
+   ...Array.from({ length: lines }, (_, i) => `+new line ${i}`)].join("\n");
 
 describe("self-model patch constraints (A4 §13.2)", () => {
   it("runs on Sunday 21:00 KST with the documented caps", () => {
@@ -6468,7 +6468,7 @@ describe("self-model patch constraints (A4 §13.2)", () => {
       .toBe(false);
     expect(validatePatch({ file: "VOICE.md", diff: diff(2), rationale: "r", evidence: ["a", "b"] }).ok)
       .toBe(true);
-    const deletion = ["--- a/USER.md", "+++ b/USER.md", "@@ -1,2 +1,1 @@", "-지운다"].join("\n");
+    const deletion = ["--- a/USER.md", "+++ b/USER.md", "@@ -1,2 +1,1 @@", "-delete this"].join("\n");
     expect(validatePatch({ file: "USER.md", diff: deletion, rationale: "r", evidence: ["a", "b"] }).ok)
       .toBe(false);
     expect(validatePatch({ file: "USER.md", diff: deletion, rationale: "r",
@@ -6493,17 +6493,17 @@ describe("self-model patch constraints (A4 §13.2)", () => {
 });
 ```
 
-- [ ] 2. 실패를 확인한다. 기대: `does not provide an export named 'validatePatch'`.
+- [ ] 2. Confirm the failure. Expected: `does not provide an export named 'validatePatch'`.
 
 ```bash
 pnpm --filter @omnis/agents test -- self-model-propose
 ```
 
-- [ ] 3. `propose.ts`를 쓴다.
+- [ ] 3. Write `propose.ts`.
 
 ```ts
 // packages/agents/src/self-model/propose.ts
-// A4 §13. 사용자가 직접 쓴 텍스트는 사용자만 바꾼다 — 이 모듈은 제안 카드까지만 만든다.
+// A4 §13. Only the user changes text the user wrote — this module goes no further than an approval card.
 import { createHash } from "node:crypto";
 import type { Pool } from "pg";
 import { getAgentsPool } from "../pool.js";
@@ -6533,14 +6533,14 @@ function changedLines(diff: string): { added: number; removed: number } {
 
 export function validatePatch(p: SelfModelPatch): { ok: boolean; reason: string | null } {
   const { added, removed } = changedLines(p.diff);
-  if (added + removed === 0) return { ok: false, reason: "빈 diff" };
+  if (added + removed === 0) return { ok: false, reason: "empty diff" };
   if (added + removed > MAX_PATCH_LINES) {
-    return { ok: false, reason: `변경 줄이 ${MAX_PATCH_LINES}줄을 넘었습니다(${added + removed})` };
+    return { ok: false, reason: `changed lines exceed ${MAX_PATCH_LINES} (${added + removed})` };
   }
   const deletionOnly = added === 0 && removed > 0;
   const need = p.file === "USER.md" && deletionOnly ? 3 : 2;
   if (p.evidence.length < need) {
-    return { ok: false, reason: `근거가 ${need}개 필요합니다(${p.evidence.length}개)` };
+    return { ok: false, reason: `${need} pieces of evidence required (${p.evidence.length} given)` };
   }
   return { ok: true, reason: null };
 }
@@ -6549,7 +6549,7 @@ export function diffHash(diff: string): string {
   return createHash("sha256").update(diff.trim()).digest("hex").slice(0, 32);
 }
 
-/** 무시된 패치는 4주간 다시 제안하지 않는다(A4 §13.2). settings kv를 그대로 쓴다. */
+/** An ignored patch is not proposed again for 4 weeks (A4 §13.2). It uses the settings kv as is. */
 export async function suppressPatch(
   pool: Pool,
   hash: string,
@@ -6574,7 +6574,7 @@ export async function isSuppressed(
   return until !== undefined && new Date(until) > now;
 }
 
-/** 파일당 최대 1개, 전체 최대 3개. 억제된 diff와 제약 위반은 건너뛴다. */
+/** At most 1 per file, at most 3 overall. Suppressed diffs and constraint violations are skipped. */
 export async function proposeSelfModelPatches(
   patches: readonly SelfModelPatch[],
   runId: string,
@@ -6598,11 +6598,11 @@ export async function proposeSelfModelPatches(
 }
 ```
 
-- [ ] 4. 커널 쪽 적용을 쓴다 — `git apply --check` → 적용 → 커밋 → 스냅샷 캐시 무효화.
+- [ ] 4. Write the kernel-side apply — `git apply --check` → apply → commit → invalidate the snapshot cache.
 
 ```ts
 // packages/kernel/src/self-model/apply.ts
-// A4 §13.2: 승인 시 커널이 self-model git 레포에 git apply + 커밋하고 스냅샷 캐시를 무효화한다.
+// A4 §13.2: on approval the kernel runs git apply + commit in the self-model git repo and invalidates the snapshot cache.
 import { execFile } from "node:child_process";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -6619,7 +6619,7 @@ export function selfModelDir(env: NodeJS.ProcessEnv = process.env): string {
   return env[SELF_MODEL_DIR_ENV] ?? join(env.HOME ?? "", ".omnis", "self-model");
 }
 
-/** diff가 실제로 적용 가능한지 먼저 본다. 실패하면 승인은 failExecution으로 간다. */
+/** First check whether the diff is actually applicable. If it fails, the approval goes to failExecution. */
 export async function checkPatch(dir: string, diff: string): Promise<boolean> {
   const tmp = await mkdtemp(join(tmpdir(), "omnis-patch-"));
   const file = join(tmp, "patch.diff");
@@ -6641,7 +6641,7 @@ export async function applyApprovedSelfModelPatch(
     throw new Error(`git apply --check failed for ${args.file}`);
   }
   const { commit } = await applySelfModelPatch(args.file, args.diff, args.rationale);
-  // 다음 루프 호출부터 새 프리픽스를 쓴다 — 캐시가 한 번 비워지므로 일요일 밤에 몰아서 한다.
+  // The next loop call uses the new prefix — the cache is cleared once, so this is batched onto Sunday night.
   invalidateSnapshotCache();
   await deps.audit.record({
     actor: "me", action: "self_model.applied", target_table: "settings",
@@ -6652,7 +6652,7 @@ export async function applyApprovedSelfModelPatch(
 }
 ```
 
-- [ ] 5. 커널 테스트를 쓴다 — 임시 git 레포에서 실제 `git apply --check`를 돌린다.
+- [ ] 5. Write the kernel test — it runs a real `git apply --check` in a temporary git repo.
 
 ```ts
 // packages/kernel/test/integration/self-model-apply.test.ts
@@ -6668,7 +6668,7 @@ function repo(): string {
   execFileSync("git", ["-C", dir, "init", "-q"]);
   execFileSync("git", ["-C", dir, "config", "user.email", "t@example.com"]);
   execFileSync("git", ["-C", dir, "config", "user.name", "t"]);
-  writeFileSync(join(dir, "VOICE.md"), "안녕하세요\n", "utf8");
+  writeFileSync(join(dir, "VOICE.md"), "Hello\n", "utf8");
   execFileSync("git", ["-C", dir, "add", "."]);
   execFileSync("git", ["-C", dir, "commit", "-qm", "init"]);
   return dir;
@@ -6683,19 +6683,19 @@ describe("self-model apply (A4 §13.2)", () => {
   it("accepts an applicable diff and rejects a stale one", async () => {
     const dir = repo();
     const good = ["--- a/VOICE.md", "+++ b/VOICE.md", "@@ -1 +1,2 @@",
-      " 안녕하세요", "+대표님, 안녕하세요"].join("\n");
+      " Hello", "+Hello there"].join("\n");
     expect(await checkPatch(dir, good)).toBe(true);
     const stale = ["--- a/VOICE.md", "+++ b/VOICE.md", "@@ -1 +1 @@",
-      "-없는 줄", "+새 줄"].join("\n");
+      "-a line that is not there", "+new line"].join("\n");
     expect(await checkPatch(dir, stale)).toBe(false);
   });
 });
 ```
 
-- [ ] 6. 두 `index.ts`에 export를 더하고 통과를 확인한다. 기대: agents 4 + kernel 2 tests passed.
+- [ ] 6. Add the exports to both `index.ts` files and confirm they pass. Expected: agents 4 + kernel 2 tests passed.
 
 ```ts
-// packages/agents/src/index.ts — 추가
+// packages/agents/src/index.ts — added
 export {
   MAX_PATCHES, MAX_PATCH_LINES, SELF_MODEL_CRON, SUPPRESSION_WEEKS, diffHash, isSuppressed,
   proposeSelfModelPatches, suppressPatch, validatePatch, type SelfModelPatch,
@@ -6703,7 +6703,7 @@ export {
 ```
 
 ```ts
-// packages/kernel/src/index.ts — 추가
+// packages/kernel/src/index.ts — added
 export {
   SELF_MODEL_DIR_ENV, applyApprovedSelfModelPatch, checkPatch, selfModelDir,
 } from "./self-model/apply.js";
@@ -6713,11 +6713,11 @@ export {
 pnpm --filter @omnis/agents test -- self-model && \
   pnpm --filter @omnis/kernel test:integration -- self-model && pnpm lint
 git add packages/agents/src/self-model packages/kernel/src/self-model packages/agents/src/index.ts packages/kernel/src/index.ts packages/agents/test/integration/self-model-propose.test.ts packages/kernel/test/integration/self-model-apply.test.ts
-git commit -m "US-B25: self-model 수정 제안과 적용
+git commit -m "US-B25: self-model patch proposal and apply
 
-- 일요일 21:00, 파일당 1개·최대 3개·변경 20줄·evidence 2개(USER.md 삭제는 3개)
-- 무시된 패치는 diff 해시로 4주 억제한다(settings kv)
-- 승인 시 git apply --check → applySelfModelPatch → 스냅샷 캐시 무효화 → audit_log
+- Sunday 21:00, one per file·at most 3·20 changed lines·2 evidence items (3 for a USER.md deletion)
+- An ignored patch is suppressed for 4 weeks by diff hash (settings kv)
+- On approval: git apply --check → applySelfModelPatch → invalidate the snapshot cache → audit_log
 
 Implemented-by: Claude Opus
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -6725,24 +6725,24 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## 실행 순서
+## Execution order
 
-의존이 있는 곳만 적는다. 나머지는 순서 무관이다.
+Only the places with dependencies are listed. The rest are order-independent.
 
-1. **Task 1 → 5 → 2 → 3 → 4** (US-B06·B07). Task 3(`runLoopSpec`)이 Task 5의 `toolRegistry`를 import하므로 **Task 5가 Task 3보다 먼저다**.
-2. **Task 6 → 7** (US-B14). Task 7의 `0012_jobs_phase_b.sql`을 channels·ops 계획이 기다린다 — 웨이브 초반에 머지한다.
-3. **Task 8 → 9** (US-B13). Task 9는 US-B05(`buildContext`)가 머지된 뒤에 실행한다.
-4. **Task 10 → 11 → 12** (US-B15·B17). Task 12는 **W0 스키마 번들**(`0011_push_subscriptions.sql`)이 머지된 뒤에 실행한다(델타 §6).
+1. **Task 1 → 5 → 2 → 3 → 4** (US-B06·B07). Task 3 (`runLoopSpec`) imports Task 5's `toolRegistry`, so **Task 5 comes before Task 3**.
+2. **Task 6 → 7** (US-B14). The channels and ops plans are waiting on Task 7's `0012_jobs_phase_b.sql` — merge it early in the wave.
+3. **Task 8 → 9** (US-B13). Run Task 9 after US-B05 (`buildContext`) is merged.
+4. **Task 10 → 11 → 12** (US-B15·B17). Run Task 12 after the **W0 schema bundle** (`0011_push_subscriptions.sql`) is merged (delta §6).
 5. **Task 13 → 14** (US-B18).
-6. **Task 17 → 15 → 16** (US-B20·B19). `taskLoop`이 `routeByRule`을 import하므로 **Task 17이 먼저다**.
+6. **Task 17 → 15 → 16** (US-B20·B19). `taskLoop` imports `routeByRule`, so **Task 17 comes first**.
 7. **Task 17 → 18** (US-B20).
-8. **Task 19**(US-B21), **Task 20**(US-B22) — 독립.
-9. **Task 21 → 22 → 23** (US-B23·B24). Task 22는 Task 6(`currentPolicy`)과 Task 13·14(보관 결과)가 있어야 의미 있는 값을 낸다.
-10. **Task 24** (US-B25) — US-B02(`applySelfModelPatch`)가 머지된 뒤.
+8. **Task 19** (US-B21), **Task 20** (US-B22) — independent.
+9. **Task 21 → 22 → 23** (US-B23·B24). Task 22 only produces meaningful values once Task 6 (`currentPolicy`) and Task 13·14 (the archive results) are in place.
+10. **Task 24** (US-B25) — after US-B02 (`applySelfModelPatch`) is merged.
 
-## 스토리 커버리지
+## Story coverage
 
-| 스토리 | 태스크 | 주요 산출물 |
+| Story | Tasks | Main deliverables |
 |---|---|---|
 | US-B06 | 1, 2, 3, 4 | `loop/{spec,registry,run,start}.ts`, `system-item.ts` |
 | US-B07 | 5 | `tools/{names,read,propose,registry}.ts`, `biome.jsonc` |
@@ -6759,9 +6759,9 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 | US-B24 | 22, 23 | `loops/digest-nightly.ts`, `memory/consolidate.ts` |
 | US-B25 | 24 | `self-model/propose.ts`(agents), `self-model/apply.ts`(kernel) |
 
-## 전체 검증
+## Full verification
 
-모든 태스크가 끝난 뒤 한 번에 돌린다. **실계정 없이 전부 통과해야 한다**(B-D5).
+Run it all at once after every task is done. **All of it must pass with no real account** (B-D5).
 
 ```bash
 pnpm db:migrate && \
@@ -6774,7 +6774,7 @@ pnpm eval:archive && \
 (cd apps/desktop/src-tauri && cargo test notify)
 ```
 
-끝난 뒤 SQL 하드 게이트 3줄을 직접 확인한다(A4 §1.7·§9.5·A3 §9 규칙 5).
+Afterwards, check the three SQL hard gates by hand (A4 §1.7·§9.5·A3 §9 rule 5).
 
 ```sql
 SELECT count(*) FROM agent_runs WHERE outcome = 'running' AND created_at < now() - interval '1 hour';  -- 0
@@ -6783,12 +6783,12 @@ SELECT count(*) FROM items i LEFT JOIN persons p ON p.id = i.author_person_id
 SELECT count(*) FROM audit_log WHERE action = 'item.sent' AND approval_id IS NULL;                      -- 0
 ```
 
-## 열린 항목
+## Open items
 
-1. ~~**`0012_jobs_phase_b.sql`의 오너십.**~~ **닫힘(2026-09-20 교차 리뷰 M1)**: `0009`·`0011`·`0012`·`0013`은 **웨이브 0 스키마 번들**(단일 워크트리·단일 커밋)이 만든다(델타 §6). 이 계획의 Task 7은 `cost_daily` 뷰 정의의 **출처**이고(번들이 그 정의를 그대로 옮긴다) 마이그레이션 파일 자체를 만들지 않는다 — Task 7은 W0 머지 후 실행한다.
-2. ~~**`LoopSpec.decide?`와 `TriggerContext`가 델타에 없다.**~~ **닫힘**: 델타 §4에 `TriggerContext`·`LoopSpec.decide?()`·`runLoopSpec`·`LoopKernel`/`LoopLogger`·`writeSystemItem`·`LoopId`가 추가되었다(교차 리뷰 M4·M5). 델타가 정본이다.
-3. **T2 게이트웨이.** A4 §12.1은 "Anthropic은 API 키로 직접 호출한다"지만, 새 SDK 핀을 피하려고 동기 T2는 OpenRouter(`anthropic/claude-sonnet-5`)로, Batch API만 Anthropic 직접 `fetch`로 갈랐다. 단가는 같고 배치 할인도 유지되지만 `agent_runs.provider`가 동기 T2에서 `openrouter`로 기록된다 — 비용 리포트(US-B44)가 이 구분을 어떻게 볼지 ops 계획과 맞춰야 한다.
-4. **`item.labeled` 이벤트의 발행자.** `draftLoop`·`taskLoop`·`autoArchiveLoop`이 전부 이 이벤트를 기다리는데, Phase A의 `classify()`는 아직 이벤트를 쏘지 않는다. 허브의 분류 파이프라인이 `kernel.events.emit('ephemeral', 'item.labeled', …)`를 부르도록 memory-ingestion 계획(US-B03이 `ingest.sink`를 고칠 때)과 배선 지점을 맞춰야 한다. 같은 이유로 `note.created`·`task.created`·`person.inactive`의 발행자도 정해야 한다(앞 둘은 NOTIFY 채널이 이미 있고, `person.inactive`는 `sweepFollowups`가 쏜다).
-5. **골든 세트 데이터.** `eval/auto_archive.jsonl` 150건, `eval/draft.jsonl` 40건, `eval/task.jsonl` 100건, `eval/route_note.jsonl` 50건, `eval/followup.jsonl` 20건은 이 계획이 형식과 하드 게이트만 정하고 **내용은 Logan의 실제 인박스에서 뽑아야 한다**. 실계정 연결 전까지는 합성 데이터로 하한만 지킨다. → **Logan 결정(백로그 §7-1)**: 초안 채택률·무수정 전송률·브리핑 커버리지 세 지표는 Phase B 종료 판정에서 **유예**한다. `eval/auto_archive.jsonl`의 **VIP·민감 보관 0건 게이트는 유예 대상이 아니다** — 합성 데이터로도 깨지면 안 되는 안전 불변식이다.
-6. **`NightlyDigest.still_open`.** Task 22가 빈 배열로 둔다 — 아침 브리핑의 `needs_you` 후보를 재사용하면 되지만 "내일 아침 예고"의 선정 규칙이 A4 §6.4에 없다. Logan 확인이 필요하다.
-7. **`cost` 필드 주입 지점.** `nightlyDigestLoop`이 `ctx.payload.cost`로 받는데, 이 값을 넣는 cron 핸들러(허브)는 `currentPolicy(pool)`를 부른다. `morning_digest`/`nightly_digest` 잡 핸들러를 허브의 어느 파일에 둘지(현재 `apps/hub/src/main.ts`)는 surfaces 계획의 허브 라우트 추가와 겹칠 수 있다.
+1. ~~**Ownership of `0012_jobs_phase_b.sql`.**~~ **Closed (2026-09-20 cross review M1)**: `0009`·`0011`·`0012`·`0013` are created by the **wave 0 schema bundle** (single worktree, single commit) (delta §6). Task 7 of this plan is the **source** of the `cost_daily` view definition (the bundle copies that definition verbatim) and does not create the migration file itself — run Task 7 after W0 is merged.
+2. ~~**`LoopSpec.decide?` and `TriggerContext` are missing from the delta.**~~ **Closed**: delta §4 now adds `TriggerContext`·`LoopSpec.decide?()`·`runLoopSpec`·`LoopKernel`/`LoopLogger`·`writeSystemItem`·`LoopId` (cross review M4·M5). The delta is authoritative.
+3. **The T2 gateway.** A4 §12.1 says "Anthropic is called directly with an API key," but to avoid a new SDK pin we split it: synchronous T2 goes through OpenRouter (`anthropic/claude-sonnet-5`), and only the Batch API uses a direct Anthropic `fetch`. The unit price is the same and the batch discount is preserved, but `agent_runs.provider` records `openrouter` for synchronous T2 — how the cost report (US-B44) should treat that distinction has to be aligned with the ops plan.
+4. **The publisher of the `item.labeled` event.** `draftLoop`·`taskLoop`·`autoArchiveLoop` all wait on this event, but Phase A's `classify()` does not emit it yet. The wiring point has to be aligned with the memory-ingestion plan (when US-B03 changes `ingest.sink`) so that the hub's classification pipeline calls `kernel.events.emit('ephemeral', 'item.labeled', …)`. For the same reason the publishers of `note.created`·`task.created`·`person.inactive` must be decided too (the first two already have NOTIFY channels, and `sweepFollowups` emits `person.inactive`).
+5. **Golden set data.** The 150 cases in `eval/auto_archive.jsonl`, 40 in `eval/draft.jsonl`, 100 in `eval/task.jsonl`, 50 in `eval/route_note.jsonl` and 20 in `eval/followup.jsonl` — this plan fixes only the format and the hard gates, and **the contents must be drawn from Logan's real inbox**. Until a real account is connected, synthetic data only holds the lower bound. → **Logan's decision (backlog §7-1)**: the three metrics — draft adoption rate, send-without-edit rate and briefing coverage — are **deferred** in the Phase B exit decision. The **zero VIP/sensitive archives gate in `eval/auto_archive.jsonl` is not deferred** — it is a safety invariant that must not break even on synthetic data.
+6. **`NightlyDigest.still_open`.** Task 22 leaves it an empty array — reusing the morning briefing's `needs_you` candidates would work, but A4 §6.4 has no selection rule for a "tomorrow morning preview." Needs Logan's confirmation.
+7. **Where the `cost` field is injected.** `nightlyDigestLoop` receives it as `ctx.payload.cost`, and the cron handler (in the hub) that supplies it calls `currentPolicy(pool)`. Which hub file holds the `morning_digest`/`nightly_digest` job handlers (currently `apps/hub/src/main.ts`) may collide with the surfaces plan's hub route additions.

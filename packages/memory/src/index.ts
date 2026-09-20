@@ -31,3 +31,60 @@ export {
   type EntityType,
   type RelationInput,
 } from "./entities.js";
+export {
+  chunkDocument,
+  chunkCode,
+  chunkCalendarEvent,
+  CHUNK_MIN_TOKENS,
+  CHUNK_MAX_TOKENS,
+  CHUNK_OVERLAP_TOKENS,
+  type Chunk,
+  type CalendarChunkInput,
+} from "./ingest/chunk.js";
+export {
+  DENY_PATTERNS,
+  MAX_INGEST_FILE_BYTES,
+  IngestDeniedError,
+  gitignoreMatcher,
+  isBinary,
+  isDenied,
+} from "./ingest/deny.js";
+export {
+  DEAD_LETTER_THRESHOLD,
+  RETRY_BACKOFF_MS,
+  getSource,
+  saveCursor,
+  recordSuccess,
+  recordFailure,
+  withRetry,
+  writeIngestSystemItem,
+  type IngestSource,
+} from "./ingest/source.js";
+export {
+  parseExtractOutput,
+  setExtractor,
+  getExtractor,
+  createT1Extractor,
+  EXTRACT_BUDGET,
+  type Extractor,
+  type ExtractResult,
+} from "./ingest/extract.js";
+export {
+  runIngest,
+  registerIngestProvider,
+  resetIngestProviders,
+  type IngestDoc,
+  type IngestProvider,
+  type RunIngestDeps,
+} from "./ingest/run.js";
+export { createCalendarProvider } from "./ingest/calendar.js";
+export {
+  scanRoots,
+  createLocalMiniProvider,
+  watchLocalRoots,
+  type LocalFile,
+  type ScanOptions,
+} from "./ingest/local-mini.js";
+export { createLocalMacbookProvider, type BridgeCall } from "./ingest/local-macbook.js";
+export { createDriveProvider, DRIVE_TEXT_MIME, type DriveFetch } from "./ingest/drive.js";
+export { createGithubProvider, GithubRateLimitError, type GithubFetch } from "./ingest/github.js";

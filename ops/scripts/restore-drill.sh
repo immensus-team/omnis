@@ -1,6 +1,6 @@
 #!/bin/bash
-# US-B41: 분기 복구 리허설. --dry-run은 최신 덤프가 읽을 수 있는 파일인지만 확인한다(사람이 분기 1회
-# 인자 없이 돌려 스크래치 포트 5433에 실제로 복원하고 row count를 검증한다).
+# US-B41: quarterly restore drill. --dry-run only checks that the latest dump is a readable file (a human
+# runs it once a quarter with no argument to actually restore into scratch port 5433 and verify row counts).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BACKUP_DIR="${OMNIS_BACKUP_DIR:-$HOME/omnis-var/backup}"

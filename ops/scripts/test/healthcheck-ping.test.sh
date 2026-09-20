@@ -5,7 +5,7 @@ SCRIPT="$ROOT/ops/scripts/healthcheck-ping.sh"
 FAKE_BIN="$(mktemp -d)"
 trap 'rm -rf "$FAKE_BIN"' EXIT
 
-# 가짜 security: 매 서비스마다 "not found"(healthchecks uuid 미설정 상태를 흉내낸다).
+# Fake security: returns "not found" for every service (mimics the state where no healthchecks uuid is configured).
 cat > "$FAKE_BIN/security" <<'FAKESEC'
 #!/bin/bash
 echo "no such keychain item" >&2
@@ -14,8 +14,8 @@ FAKESEC
 chmod +x "$FAKE_BIN/security"
 export PATH="$FAKE_BIN:$PATH"
 
-# 1) healthchecks uuid가 하나도 없어도 --check는 "설정 없음"을 경고만 하고 exit 0이어야 한다
-#    (신규 설치 직후에도 스크립트 자체는 안전하게 돌아야 한다 — 실제 핑 실패와는 다른 상태).
+# 1) Even with no healthchecks uuid at all, --check must only warn "not configured" and exit 0
+#    (the script itself must run safely right after a fresh install — a different state from an actual ping failure).
 "$SCRIPT" --check
 echo "ok: --check succeeds even with zero configured jobs (reports, does not ping)"
 
@@ -23,8 +23,8 @@ out="$("$SCRIPT" --check)"
 echo "$out" | grep -q "15 jobs configured" || { echo "FAIL: expected 15 jobs, got: $out" >&2; exit 1; }
 echo "ok: --check reports exactly 15 configured jobs"
 
-# 2) --list: 15행 전부 slug + tier(critical|warning)로 정확히 갈라져야 한다.
-#    check_cmd가 파이프를 품고 있어서 `IFS='|' read`로 자르면 tier에 명령 꼬리가 섞여 들어간다.
+# 2) --list: all 15 rows must split cleanly into slug + tier (critical|warning).
+#    check_cmd contains a pipe, so splitting with `IFS='|' read` lets the command tail bleed into tier.
 list_out="$("$SCRIPT" --list)"
 [ "$(echo "$list_out" | wc -l | tr -d ' ')" = "15" ] || { echo "FAIL: --list should print 15 rows" >&2; exit 1; }
 while IFS=$'\t' read -r slug tier; do
@@ -33,7 +33,7 @@ while IFS=$'\t' read -r slug tier; do
 done <<< "$list_out"
 echo "ok: all 15 jobs parse to a slug + exactly critical|warning"
 
-# 3) --run: 체크가 죄다 실패하면 실패 개수를 정확히 세고 non-zero로 끝나야 한다(launchd가 이 exit code를 본다).
+# 3) --run: when every check fails, it must count the failures exactly and exit non-zero (launchd watches this exit code).
 CURL_LOG="$FAKE_BIN/curl.log"
 cat > "$FAKE_BIN/curl" <<FAKECURL
 #!/bin/bash
@@ -58,7 +58,7 @@ counted="$(echo "$run_out" | sed -n 's/^ran 15 checks, \([0-9]*\) failed$/\1/p')
 [ "$counted" = "$fail_lines" ] || { echo "FAIL: --run counted $counted failures but printed $fail_lines" >&2; exit 1; }
 echo "ok: --run counts $counted failures and exits non-zero"
 
-# 4) 경보는 omnis-critical / omnis-warning 두 토픽으로만 가야 한다(tier 파싱이 깨지면 여기로 샌다).
+# 4) Alerts must go only to the two topics omnis-critical / omnis-warning (broken tier parsing leaks here).
 grep -o 'http://ntfy\.test/[^ ]*' "$CURL_LOG" | sort -u > "$FAKE_BIN/topics"
 [ -s "$FAKE_BIN/topics" ] || { echo "FAIL: no ntfy post captured" >&2; exit 1; }
 while read -r url; do
@@ -69,11 +69,11 @@ while read -r url; do
 done < "$FAKE_BIN/topics"
 echo "ok: alerts route only to omnis-critical / omnis-warning"
 
-# 5) check_cmd도 온전해야 한다 — 파이프 뒤 grep이 잘려 나가면 결과를 검사하지 않고 통과해 버린다.
+# 5) check_cmd must stay intact too — if the grep after the pipe is cut off, the check passes without inspecting the result.
 grep -q 'check failed: psql .* | grep -qx t' "$CURL_LOG" || { echo "FAIL: check_cmd lost its trailing pipe" >&2; exit 1; }
 echo "ok: check_cmd keeps the pipeline that turns a query result into pass/fail"
 
-# 6) 시크릿처럼 보이는 값(sk-, xoxb-, 40자+ 토큰)이 샘플 로그 라인에 없는지 확인한다(계약 §9).
+# 6) Verify the sample log line carries no secret-shaped value (sk-, xoxb-, 40+ char tokens) (contract §9).
 sample_log='{"ts":"2026-09-20T00:00:00Z","level":"info","pkg":"@omnis/kernel","msg":"job ok","trace_id":null}'
 if echo "$sample_log" | grep -qE 'sk-[A-Za-z0-9]{20,}|xox[bp]-[A-Za-z0-9-]{10,}'; then
   echo "FAIL: sample log line looks like it leaks a secret" >&2; exit 1

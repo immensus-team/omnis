@@ -139,7 +139,7 @@ describe("formatReport", () => {
     expect(table).not.toContain("xoxb-");
   });
 
-  it("prints the detail column so api=fail shows the error (CHECKLIST 진단 경로)", () => {
+  it("prints the detail column so api=fail shows the error (CHECKLIST diagnostic path)", () => {
     const table = formatReport([
       { channel: "slack", account: "T0FAKE", keychain: "ok", api: "fail", detail: "invalid_auth" },
     ]);

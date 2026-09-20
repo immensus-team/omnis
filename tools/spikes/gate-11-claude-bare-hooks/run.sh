@@ -64,7 +64,7 @@ cat > "$FIXTURE_DIR/.claude/settings.json" <<'JSON'
 JSON
 
 # deviation 5 (see result.md): mode (a) needs API-key auth -- `--bare` never reads OAuth/Keychain
-# (_probes 전제 2). On this machine no ANTHROPIC_API_KEY is exported, but `claude-ds` is on PATH
+# (_probes premise 2). On this machine no ANTHROPIC_API_KEY is exported, but `claude-ds` is on PATH
 # and is literally `exec claude "$@"` with ANTHROPIC_AUTH_TOKEN exported from the Keychain, i.e.
 # exactly the API-key-authenticated Claude Code that mode (a) calls for. Use it as the driver so
 # the gate's core question is measured instead of blocked at the login screen.

@@ -11,7 +11,7 @@ export { classify, ClassifyOutput, type ClassifyResult, type ClassifyCtx } from 
 export { applyRules, WORK_DOMAINS, DETERMINISTIC_RULES, type RuleHit } from "./classify/rules.js";
 export { knnVote, KNN_K, KNN_MARGIN_MIN, KNN_SIM_MIN, type KnnVerdict } from "./classify/knn.js";
 export { classifyWithT1, T1ClassifyOutput, SchemaViolationError } from "./t1/classify-t1.js";
-export { T1_BASE_URL, T1_MODEL_ID, T1_RUN_MODEL } from "./t1/provider.js";
+export { T1_BASE_URL, T1_MODEL_ID, T1_RUN_MODEL, t1Model } from "./t1/provider.js";
 export { sensitivityFor, pickSensitivity, SENSITIVITY_PRIORITY } from "./sensitivity.js";
 export { summarizeThread, type SummarizeThreadResult } from "./summarize.js";
 export { summarizeWithT1, T1SummaryOutput } from "./t1/summarize-t1.js";
@@ -73,3 +73,119 @@ export {
   type Register,
 } from "./draft/register.js";
 export { SELF_CHECK_ITEMS, selfCheck, type SelfCheckCtx } from "./draft/selfcheck.js";
+export {
+  DELEGATION_DAILY_CAP,
+  DELEGATION_THREAD_CAP_24H,
+  MACBOOK_OFFLINE_MS,
+  extractHints,
+  hostHealth,
+  pickRuntime,
+  routeByRule,
+  type DelegationHints,
+  type DelegationRuntime,
+  type HostHealth,
+  type Routing,
+} from "./delegate/route.js";
+export {
+  TASK_CONFIDENCE_MIN,
+  TASK_MAX_PER_ITEM,
+  TaskOutput,
+  taskLoop,
+  type TaskOutputT,
+} from "./loops/task.js";
+export { renderBrief, type BriefInput } from "./delegate/brief.js";
+export {
+  AUTONOMY_MAX_MINUTES,
+  DelegateOutput,
+  autonomyAllows,
+  delegateLoop,
+  type AutonomyRule,
+  type DelegateOutputT,
+} from "./loops/delegate.js";
+export {
+  DRAFT_PLACEHOLDER_MS,
+  DRAFT_SLA_MS,
+  DraftOutput,
+  draftLoop,
+  shouldEscalate,
+  writePlaceholderDraft,
+  type DraftOutputT,
+} from "./loops/draft.js";
+export {
+  ROUTE_CONFIDENCE_HIGH,
+  ROUTE_CONFIDENCE_MIN,
+  RouteOutput,
+  noteRouteLoop,
+  type RouteOutputT,
+} from "./loops/note-route.js";
+export {
+  FollowupOutput,
+  INACTIVE_SWEEP_LIMIT,
+  NO_COLD_OUTREACH_CHANNELS,
+  followupLoop,
+  inactiveCandidates,
+  isFirstContact,
+  pickFollowupChannel,
+  sweepFollowups,
+  type FollowupOutputT,
+  type InactiveCandidate,
+} from "./loops/followup.js";
+export {
+  AUTO_ARCHIVE_RULES,
+  AutoArchiveOutput,
+  T1_ARCHIVE_CONFIDENCE_MIN,
+  autoArchiveLoop,
+  hardGate,
+  nonHumanSender,
+  sweepAutoArchive,
+  type AutoArchiveOutputT,
+  type HardGateResult,
+} from "./loops/auto-archive.js";
+export {
+  SECTION_CAPS,
+  rankBriefItems,
+  type BriefCandidate,
+  type BriefItem,
+  type BriefSection,
+  type BriefSectionId,
+  type MorningBriefing,
+} from "./digest/rank.js";
+export {
+  MORNING_DIGEST_CRON,
+  MorningDigestOutput,
+  morningCandidates,
+  morningDigestLoop,
+  type MorningDigestOutputT,
+} from "./loops/digest-morning.js";
+export {
+  NIGHTLY_DIGEST_CRON,
+  NightlyDigestOutput,
+  nightlyDigestLoop,
+  nightlyGroups,
+  undoTokenFor,
+  type DigestGroup,
+  type NightlyDigest,
+  type NightlyDigestOutputT,
+} from "./loops/digest-nightly.js";
+export {
+  ANTHROPIC_BATCH_MODEL,
+  ANTHROPIC_BATCH_URL,
+  MEMORY_CONSOLIDATE_CRON,
+  MEMORY_HARVEST_CRON,
+  harvestConsolidation,
+  submitConsolidation,
+  type ConsolidationRequest,
+  type ConsolidationResult,
+} from "./memory/consolidate.js";
+export {
+  MAX_PATCHES,
+  MAX_PATCH_LINES,
+  SELF_MODEL_CRON,
+  SUPPRESSION_WEEKS,
+  diffHash,
+  isSuppressed,
+  proposeSelfModelPatches,
+  suppressPatch,
+  validatePatch,
+  type SelfModelPatch,
+} from "./self-model/propose.js";

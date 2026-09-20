@@ -1,7 +1,7 @@
 // 시드는 전부 "실제 코드 경로"를 탄다: 어댑터 normalize → 커널 IngestSink,
 // 커널 approvals.propose, @omnis/agents classify(T0 규칙), WS /bridge 위의 로컬 에이전트 브리지.
 // 에이전트 세션도 마찬가지다: thread/agent_sessions/items 전부 허브가 만든다(US-A34).
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import WebSocket from "ws";
 import { ClaudeCodeAdapter } from "../../apps/local-agent/src/bridges/claude-code.js";
@@ -32,24 +32,38 @@ export interface SeedResult {
   itemCount: number;
 }
 
+// 스모크 시드는 어댑터 픽스처 전부가 아니라 이 고정 슬라이스만 재생한다. 픽스처 디렉터리는
+// 어댑터 계약 코퍼스라서 계속 자라고(38/42/44건), 디렉터리를 통째로 훑으면 시드 크기가 같이
+// 자라 Inbox 목록이 가상화 구간에 들어가면서 행 수를 세는 A1/A2/A4/A4b/A5가 깨진다.
+// 모든 픽스처의 normalize()는 어댑터 contract 테스트가 따로 본다.
 const CHANNELS: {
   channel: Channel;
   fixturesDir: string;
+  fixtures: string[];
   normalize: (raw: unknown) => NormalizedItem[];
 }[] = [
   {
     channel: "slack",
     fixturesDir: join(REPO_ROOT, "packages/adapters/slack/fixtures"),
+    fixtures: [
+      "attachment.json",
+      "deleted_message.json",
+      "edited_message.json",
+      "text_message.json",
+      "thread_reply.json",
+    ],
     normalize: normalizeSlack,
   },
   {
     channel: "gmail",
     fixturesDir: join(REPO_ROOT, "packages/adapters/gmail/fixtures"),
+    fixtures: ["attachment.json", "text_message.json", "thread_reply.json"],
     normalize: normalizeGmail,
   },
   {
     channel: "gcal",
     fixturesDir: join(REPO_ROOT, "packages/adapters/google-calendar/fixtures"),
+    fixtures: ["attachment.json", "text_message.json", "thread_reply.json"],
     normalize: normalizeGcal,
   },
 ];
@@ -62,12 +76,11 @@ interface Fixture {
 
 function fixtureItems(
   dir: string,
+  files: string[],
   normalize: (raw: unknown) => NormalizedItem[],
 ): NormalizedItem[] {
   const out: NormalizedItem[] = [];
-  for (const file of readdirSync(dir)
-    .filter((f) => f.endsWith(".json"))
-    .sort()) {
+  for (const file of [...files].sort()) {
     const fixture = JSON.parse(readFileSync(join(dir, file), "utf8")) as Fixture;
     if (fixture.expected.errorKind !== undefined) continue; // 에러 픽스처는 mapApiError의 몫
     out.push(...normalize(fixture.raw));
@@ -90,7 +103,7 @@ export async function seed(pool: Pool, env: E2EEnv): Promise<SeedResult> {
     );
     // 이제 slack/gmail/gcal의 normalize()가 전부 threadMeta를 싣는다 — raw fixture를
     // 그대로 넣는다(합성 workaround 제거, main의 실결함 #1 root fix).
-    for (const item of fixtureItems(spec.fixturesDir, spec.normalize)) {
+    for (const item of fixtureItems(spec.fixturesDir, spec.fixtures, spec.normalize)) {
       await sink(account.id, item);
     }
     const thread = await one<{ id: string }>(

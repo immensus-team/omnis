@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// PreToolUse hook: stdin으로 { tool_name, tool_input, ... } JSON을 받아 exit code 2로 "차단"하면
-// Claude Code가 이를 승인 필요로 취급한다(hook 표면 자체 확인이 목적이라 실제 브리지 소켓은 흉내만 낸다).
+// PreToolUse hook: reads { tool_name, tool_input, ... } JSON from stdin and "blocks" with exit
+// code 2, which Claude Code treats as requiring approval (the goal is to confirm the hook surface
+// itself, so the real bridge socket is only stubbed out).
 let raw = "";
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
