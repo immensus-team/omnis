@@ -86,3 +86,10 @@ export {
   type HostHealth,
   type Routing,
 } from "./delegate/route.js";
+export {
+  TASK_CONFIDENCE_MIN,
+  TASK_MAX_PER_ITEM,
+  TaskOutput,
+  taskLoop,
+  type TaskOutputT,
+} from "./loops/task.js";
