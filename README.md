@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="docs/spec/00-omnis-design.md"><img alt="Docs" src="https://img.shields.io/badge/DOCS-DESIGN%20SPEC-FFD21E?style=for-the-badge&labelColor=555555"></a>
+  <a href="https://www.immensus.team"><img alt="Docs" src="https://img.shields.io/badge/DOCS-WWW.IMMENSUS.TEAM-FFD21E?style=for-the-badge&labelColor=555555"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/LICENSE-APACHE%202.0-44CC11?style=for-the-badge&labelColor=555555"></a>
   <a href="https://github.com/immensus-team"><img alt="Built by Immensus" src="https://img.shields.io/badge/BUILT%20BY-IMMENSUS-8A2BE2?style=for-the-badge&labelColor=555555"></a>
 </p>
