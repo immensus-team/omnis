@@ -1,23 +1,23 @@
-# Gate ⑥: Zero + Postgres 반영 지연
+# Gate ⑥: Zero + Postgres propagation latency
 
-- **질문**: 로컬 Postgres 17(pgvector) + zero-cache를 붙였을 때, 한 row INSERT부터 Zero 클라이언트 구독이 그 변경을 받기까지의 시간이 G5(≤2초)를 만족하는가.
-- **소유 부록**: A6 (§5, §11.3 ⑥행)
+- **Question**: When a local Postgres 17 (pgvector) instance is paired with zero-cache, does the time from a single row INSERT until a Zero client subscription receives that change satisfy G5 (≤2s)?
+- **Owning appendix**: A6 (§5, §11.3 row ⑥)
 - **Owner**: agent(unattended)
-- **Host**: macbook (M5 Max, 로컬 Homebrew postgresql@17 + zero-cache-dev, 둘 다 이 스파이크 전용 스크래치 DB/replica)
-- **실행일**: 2026-09-20
-- **결과(Pass/Fail)**: **PASS**
-- **측정치/근거**:
-  - `npx tsx measure.ts` 3회 실행: `latency_ms=68.9` (exit 0), `latency_ms=46.0` (exit 0), `latency_ms=65.1` (exit 0). 셋 다 Pass 기준(≤2000ms)의 4% 미만.
-  - 3회차는 zero-cache를 완전히 내렸다가 이 문서의 재현 절차(아래 **비고** 마지막 줄)로만 다시 올려서 측정했다 — 새 `ZERO_REPLICA_FILE`로 replica를 처음부터 다시 만든 상태에서도 동일한 수준이므로, 측정치는 따뜻한 캐시에 의존하지 않는다.
-  - `wal_level`을 `replica`→`logical`로 변경(`ALTER SYSTEM SET wal_level = 'logical';` + `brew services restart postgresql@17`), 재시작 후 `SHOW wal_level;` → `logical` 확인. **로컬 Homebrew postgresql@17의 영구 설정 변경**(이 맥북에서 돌아가는 다른 프로젝트의 Postgres에도 적용됨 — 인스턴스가 하나뿐이라 격리 불가. 되돌리려면 `ALTER SYSTEM SET wal_level = 'replica'` 후 재시작).
-  - `omnis_spike_zero` DB(pgvector는 불필요해 미설치, `pgcrypto`만 `CREATE EXTENSION`)에 `probe_events` 스크래치 테이블 생성, `zero-cache-dev`(포트 4848)를 붙이고 Zero 클라이언트로 `probe_events` 구독을 연 뒤, 별도 `psql` INSERT 시각(`performance.now()` 기준 t0)부터 클라이언트 리스너가 새 row를 받은 시각(t1)까지를 측정.
+- **Host**: macbook (M5 Max, local Homebrew postgresql@17 + zero-cache-dev, both on a scratch DB/replica dedicated to this spike)
+- **Run date**: 2026-09-20
+- **Result (Pass/Fail)**: **PASS**
+- **Measurements/Evidence**:
+  - `npx tsx measure.ts` run 3 times: `latency_ms=68.9` (exit 0), `latency_ms=46.0` (exit 0), `latency_ms=65.1` (exit 0). All three are under 4% of the pass threshold (≤2000ms).
+  - For the third run, zero-cache was fully shut down and brought back up using only this document's reproduction procedure (last line of **Notes** below) before measuring — the same level holds even with the replica rebuilt from scratch under a new `ZERO_REPLICA_FILE`, so the measurements do not depend on a warm cache.
+  - Changed `wal_level` from `replica` to `logical` (`ALTER SYSTEM SET wal_level = 'logical';` + `brew services restart postgresql@17`); after the restart, `SHOW wal_level;` → confirmed `logical`. **This is a permanent configuration change to the local Homebrew postgresql@17** (it also applies to other projects' Postgres running on this MacBook — there is only one instance, so it cannot be isolated. To revert: `ALTER SYSTEM SET wal_level = 'replica'` then restart).
+  - Created the `probe_events` scratch table in the `omnis_spike_zero` DB (pgvector was not needed and is not installed; only `pgcrypto` via `CREATE EXTENSION`), attached `zero-cache-dev` (port 4848), opened a `probe_events` subscription from a Zero client, then measured from the time of a separate `psql` INSERT (t0, on the `performance.now()` clock) to the time the client listener received the new row (t1).
 - **decided_by**: agent
-- **비고**:
-  - **계획서 원문 대비 발견한 3가지 API 드리프트**(설치된 `@rocicorp/zero@1.9.0`을 직접 검사해 확인, deviations에도 기록):
-    1. `timestamp()` 컬럼 헬퍼가 존재하지 않는다(패키지 export는 `boolean/enumeration/json/number/string`뿐). `createdAt`을 `number()`로 바꾸고 Postgres 쪽 실제 컬럼명(`created_at`)에 매핑하려면 `.from("created_at")`가 필요했다(Zero는 컬럼명을 자동으로 camelCase 변환하지 않는다).
-    2. `z.query.<table>`(계획서가 쓴 API)은 1.9.0에서 "legacy queries"로 deprecated이며 `createSchema`에 `enableLegacyQueries: true`를 명시하지 않으면 타입·런타임 모두 `undefined`다.
-    3. 쿼리 키는 스키마의 JS 변수명(`probeEvents`)이 아니라 `table()`에 넘긴 실제 테이블명 문자열(`probe_events`)이다.
-  - **가장 오래 걸린 디버깅**(계획서에 없던 발견): `schema.ts`에 `definePermissions`가 없으면 zero-cache-dev가 시작 로그에 "no tables will be syncable"만 남기고 **모든 쿼리가 조용히 0 rows를 반환**한다(에러 없이 그냥 빈 결과 — Postgres에는 row가 있는데 클라이언트에는 안 보임). `probe_events: { row: { select: ANYONE_CAN } }`를 추가해서 해결. 이 스파이크는 로컬 1회성 스크래치 DB라 `ANYONE_CAN`으로 충분하지만, Phase A `@omnis/kernel/zero-schema.ts`는 실제 행 단위 권한 규칙이 필요하다(이 태스크 범위 밖).
-  - `wal_level` 변경은 시스템 전역이라, 이 맥북의 로컬 Postgres를 쓰는 다른 워크트리(`omnis.plan-kernel-db` 등)도 `logical`로 바뀐 상태에서 돈다 — 이후 게이트나 태스크가 이를 전제해도 안전하다(A3가 프로덕션에서도 `wal_level=logical`을 요구하므로 방향은 맞다).
-  - `tools/spikes/gate-06-zero-postgres/`는 자체 `package.json`(`pnpm install --ignore-workspace`로 설치, 루트 `pnpm-workspace.yaml`의 `packages/*`/`apps/*` 글롭 밖이라 루트 lockfile은 건드리지 않음)와 자체 `pnpm-lock.yaml`을 갖는다 — Global Constraints의 "빌드 그래프 밖" 요구를 만족한다.
-  - `zero-cache-dev` 프로세스는 측정 후 종료해 뒀다(포트 4848 사용 안 함). 재현하려면: `omnis_spike_zero` DB가 이미 있고 `wal_level=logical`이 이미 적용된 상태이므로, `cd tools/spikes/gate-06-zero-postgres && ZERO_UPSTREAM_DB=postgres://logankim@localhost:5432/omnis_spike_zero ZERO_CVR_DB=postgres://logankim@localhost:5432/omnis_spike_zero ZERO_REPLICA_FILE=/tmp/omnis-spike-zero-<new>.db npx zero-cache-dev -p schema.ts &` 후 `npx tsx measure.ts`.
+- **Notes**:
+  - **Three API drift points found relative to the plan document's original text** (confirmed by inspecting the installed `@rocicorp/zero@1.9.0` directly; also recorded in deviations):
+    1. There is no `timestamp()` column helper (the package only exports `boolean/enumeration/json/number/string`). Switching `createdAt` to `number()` and mapping it to the actual Postgres column name (`created_at`) required `.from("created_at")` (Zero does not automatically camelCase column names).
+    2. `z.query.<table>` (the API the plan document used) is deprecated as "legacy queries" in 1.9.0, and is `undefined` at both the type and runtime level unless `enableLegacyQueries: true` is specified on `createSchema`.
+    3. The query key is not the schema's JS variable name (`probeEvents`) but the actual table name string passed to `table()` (`probe_events`).
+  - **The longest debugging session** (a finding not in the plan document): without `definePermissions` in `schema.ts`, zero-cache-dev only logs "no tables will be syncable" at startup and **every query silently returns 0 rows** (no error, just empty results — rows exist in Postgres but are invisible to the client). Fixed by adding `probe_events: { row: { select: ANYONE_CAN } }`. This spike uses a one-off local scratch DB, so `ANYONE_CAN` is sufficient, but Phase A `@omnis/kernel/zero-schema.ts` needs real row-level permission rules (outside this task's scope).
+  - The `wal_level` change is system-wide, so other worktrees on this MacBook that use the local Postgres (such as `omnis.plan-kernel-db`) also run with it set to `logical` — it is safe for later gates or tasks to assume this (A3 requires `wal_level=logical` in production too, so the direction is consistent).
+  - `tools/spikes/gate-06-zero-postgres/` has its own `package.json` (installed with `pnpm install --ignore-workspace`; it falls outside the `packages/*`/`apps/*` globs in the root `pnpm-workspace.yaml`, so the root lockfile is untouched) and its own `pnpm-lock.yaml` — this satisfies Global Constraints' "outside the build graph" requirement.
+  - The `zero-cache-dev` process was stopped after measuring (port 4848 is not in use). To reproduce: since the `omnis_spike_zero` DB already exists and `wal_level=logical` is already in effect, run `cd tools/spikes/gate-06-zero-postgres && ZERO_UPSTREAM_DB=postgres://logankim@localhost:5432/omnis_spike_zero ZERO_CVR_DB=postgres://logankim@localhost:5432/omnis_spike_zero ZERO_REPLICA_FILE=/tmp/omnis-spike-zero-<new>.db npx zero-cache-dev -p schema.ts &` then `npx tsx measure.ts`.
