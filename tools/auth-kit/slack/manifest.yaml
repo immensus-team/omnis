@@ -1,6 +1,6 @@
 # omnis Slack app manifest — api.slack.com/apps → "Create New App" → "From an app manifest".
 # Contains only the scopes A1 §2.1 requires: Socket Mode + message.im/channels/groups/mpim events +
-# bot(xoxb)/user(xoxp) scopes. After deployment, store the three tokens xoxb/xoxp/app-level in Keychain (README.ko.md).
+# bot(xoxb)/user(xoxp) scopes. After deployment, store the three tokens xoxb/xoxp/app-level in Keychain (README.md).
 display_information:
   name: omnis
   description: Logan's personal inbox/agent bridge (omnis project)

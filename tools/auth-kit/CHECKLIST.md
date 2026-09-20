@@ -4,8 +4,8 @@ In order. Finishing just the three Phase A items (Slack/Gmail/Calendar) complete
 
 ## Phase A — Now (MacBook, ~25 min total)
 
-1. **Slack** (~10 min) — [`slack/README.ko.md`](slack/README.ko.md)
-2. **Gmail + Calendar** (~15 min, both from one Google consent) — [`google/README.ko.md`](google/README.ko.md)
+1. **Slack** (~10 min) — [`slack/README.md`](slack/README.md)
+2. **Gmail + Calendar** (~15 min, both from one Google consent) — [`google/README.md`](google/README.md)
 3. Verify:
    ```bash
    cp tools/auth-kit/accounts.example.json tools/auth-kit/accounts.local.json
@@ -16,13 +16,13 @@ In order. Finishing just the three Phase A items (Slack/Gmail/Calendar) complete
 
 ## Phase B — Later (no adapters yet; console steps only, for a preview)
 
-4. **Outlook** — [`outlook/README.ko.md`](outlook/README.ko.md)
-5. **Telegram** — [`telegram/README.ko.md`](telegram/README.ko.md)
+4. **Outlook** — [`outlook/README.md`](outlook/README.md)
+5. **Telegram** — [`telegram/README.md`](telegram/README.md)
 
 ## Phase C — At the mini (GUI session required, ~30 min)
 
 6. **KakaoTalk / WhatsApp (Beeper) / LinkedIn / Codex sign-in** —
-   [`mini/README.ko.md`](mini/README.ko.md)
+   [`mini/README.md`](mini/README.md)
 
 ## If you get stuck
 

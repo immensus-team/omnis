@@ -3,7 +3,7 @@
 // Token values are never printed to stdout: existence is checked without `-w`, and only the API call
 // reads the value into memory and uses it immediately (A6 §9). The only channels wired up today are
 // slack/gmail/gcal, which actually have adapters (A1 §2.1-§2.3) — outlook/telegram have no adapter at
-// all, so they're out of scope (see each README.ko.md).
+// all, so they're out of scope (see each README.md).
 
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
