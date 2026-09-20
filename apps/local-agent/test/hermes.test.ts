@@ -180,3 +180,120 @@ describe("HermesAdapter.startTurn()", () => {
     ).rejects.toBeInstanceOf(BridgeError);
   });
 });
+
+function sseStream(lines: string[]): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    start(controller) {
+      for (const line of lines) controller.enqueue(encoder.encode(`${line}\n`));
+      controller.close();
+    },
+  });
+}
+
+describe("HermesAdapter SSE pump", () => {
+  it("suppresses ': keepalive' comments and emits delta/itemCompleted/turnCompleted for data lines", async () => {
+    const fetchFn = vi.fn(
+      async () =>
+        new Response(
+          sseStream([
+            ": keepalive",
+            `data: ${JSON.stringify({ type: "delta", text: "hel" })}`,
+            ": keepalive",
+            `data: ${JSON.stringify({ type: "delta", text: "lo" })}`,
+            `data: ${JSON.stringify({ type: "done" })}`,
+          ]),
+          { status: 200, headers: { "X-Hermes-Session-Id": "resp-1" } },
+        ),
+    );
+    const adapter = new HermesAdapter({
+      baseUrl: "http://127.0.0.1:8642",
+      token: "tok-1",
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+    const { sink, calls } = fakeSink();
+    await adapter.startTurn(baseSession("human"), { text: "hi" }, sink);
+    await new Promise((r) => setTimeout(r, 20)); // #pump는 fire-and-forget(void) — 배출 완료를 잠깐 기다린다
+    expect(calls.delta?.map((d) => (d as { text: string }).text)).toEqual(["hel", "lo"]);
+    expect(calls.itemCompleted).toHaveLength(1);
+    expect((calls.itemCompleted?.[0] as { body: string }).body).toBe("hello");
+    expect(calls.turnCompleted).toHaveLength(1);
+    expect((calls.turnCompleted?.[0] as { status: string }).status).toBe("ok");
+  });
+
+  // gate-hermes-sse: /v1/responses는 OpenAI Responses 호환일 수 있다 — 두 필드명 모양이 같은 결과를 내야 한다
+  it("accepts the OpenAI Responses shape (response.output_text.delta / response.completed) identically", async () => {
+    const fetchFn = vi.fn(
+      async () =>
+        new Response(
+          sseStream([
+            ": keepalive",
+            `data: ${JSON.stringify({ type: "response.output_text.delta", delta: "hel" })}`,
+            `data: ${JSON.stringify({ type: "response.output_text.delta", delta: "lo" })}`,
+            `data: ${JSON.stringify({ type: "response.output_text.done", text: "hello" })}`,
+            `data: ${JSON.stringify({ type: "response.completed" })}`,
+          ]),
+          { status: 200 },
+        ),
+    );
+    const adapter = new HermesAdapter({
+      baseUrl: "http://127.0.0.1:8642",
+      token: "tok-1",
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+    const { sink, calls } = fakeSink();
+    await adapter.startTurn(baseSession("human"), { text: "hi" }, sink);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls.delta?.map((d) => (d as { text: string }).text)).toEqual(["hel", "lo"]);
+    expect((calls.itemCompleted?.[0] as { body: string }).body).toBe("hello");
+    expect(calls.turnCompleted).toHaveLength(1); // 종료 이벤트가 둘이어도 턴 종료는 한 번
+  });
+
+  it("drops unknown event types and malformed JSON without throwing", async () => {
+    const fetchFn = vi.fn(
+      async () =>
+        new Response(
+          sseStream([
+            "data: {not json",
+            `data: ${JSON.stringify({ type: "response.output_item.added" })}`,
+            `data: ${JSON.stringify({ type: "delta", text: "ok" })}`,
+            "data: [DONE]",
+            `data: ${JSON.stringify({ type: "done" })}`,
+          ]),
+          { status: 200 },
+        ),
+    );
+    const adapter = new HermesAdapter({
+      baseUrl: "http://127.0.0.1:8642",
+      token: "tok-1",
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+    const { sink, calls } = fakeSink();
+    await adapter.startTurn(baseSession("human"), { text: "hi" }, sink);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls.delta).toHaveLength(1);
+    expect(calls.turnCompleted).toHaveLength(1);
+  });
+});
+
+describe("HermesAdapter.cancel()/close()", () => {
+  it("cancel() aborts the in-flight fetch via the turn handle", async () => {
+    const fetchFn = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(init.signal).toBeInstanceOf(AbortSignal);
+      return new Response(sseStream([]), { status: 200 });
+    });
+    const adapter = new HermesAdapter({
+      baseUrl: "http://127.0.0.1:8642",
+      token: "tok-1",
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+    const { sink } = fakeSink();
+    const handle = await adapter.startTurn(baseSession("human"), { text: "hi" }, sink);
+    expect(await adapter.cancel(handle, "user cancelled")).toBe(true);
+  });
+
+  it("close() resolves without throwing (stateless HTTP client, no resident resource)", async () => {
+    const adapter = new HermesAdapter({ baseUrl: "http://127.0.0.1:8642", token: "tok-1" });
+    await expect(adapter.close()).resolves.toBeUndefined();
+  });
+});

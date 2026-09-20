@@ -130,23 +130,88 @@ export class HermesAdapter implements RuntimeAdapter {
     };
   }
 
+  /** gate-hermes-sse: 필드명 한 벌에 고정하지 않는다 — `type`이 `delta`로 끝나면 델타,
+   *  `done`/`completed`로 끝나면 종료. 본문은 `text ?? delta`. 모르는 `type`과 `: keepalive`
+   *  주석은 조용히 버린다(A2 §4.4 — keepalive는 이벤트로 올리지 않는다). */
   async #pump(
-    _body: ReadableStream<Uint8Array>,
-    _sessionKey: string,
-    _turnId: string,
-    _sink: EventSink,
+    body: ReadableStream<Uint8Array>,
+    sessionKey: string,
+    turnId: string,
+    sink: EventSink,
   ): Promise<void> {
-    /* Task 13이 SSE 파싱을 채운다 */
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let text = "";
+    let seq = 0;
+    let done = false;
+
+    const handleLine = (raw: string): void => {
+      const line = raw.trimEnd();
+      if (line === "" || line.startsWith(":")) return; // ': keepalive'
+      if (!line.startsWith("data:")) return;
+      const payload = line.slice(5).trim();
+      if (payload === "[DONE]" || payload === "") return;
+      let ev: { type?: string; text?: string; delta?: string };
+      try {
+        ev = JSON.parse(payload) as typeof ev;
+      } catch {
+        return; // 미지 형식이 파서를 죽이지 않는다(claude-code.ts stream-json 파서와 동일 원칙)
+      }
+      const type = ev.type ?? "";
+      if (type.endsWith("delta")) {
+        const chunk = ev.text ?? ev.delta ?? "";
+        if (chunk === "") return;
+        text += chunk;
+        sink.delta({
+          session_key: sessionKey,
+          turn_id: turnId,
+          item_id: turnId,
+          seq: seq++,
+          text: chunk,
+          channel: "output",
+        });
+      } else if (!done && (type.endsWith("done") || type.endsWith("completed"))) {
+        // Responses 호환 스트림은 종료 이벤트를 둘(`…output_text.done` + `response.completed`)
+        // 보낼 수 있다 — 턴 종료는 한 번만 올린다.
+        done = true;
+        sink.itemCompleted({
+          session_key: sessionKey,
+          turn_id: turnId,
+          item_id: turnId,
+          kind: "agent_turn",
+          body: text,
+          status: "ok",
+          meta: {},
+        });
+        sink.turnCompleted({
+          session_key: sessionKey,
+          turn_id: turnId,
+          status: "ok",
+          usage: { cost_usd: null, duration_ms: 0, num_turns: 1 },
+        });
+      }
+    };
+
+    for (;;) {
+      const { value, done: eof } = await reader.read();
+      if (eof) break;
+      buf += decoder.decode(value, { stream: true });
+      let nl = buf.indexOf("\n");
+      while (nl >= 0) {
+        handleLine(buf.slice(0, nl));
+        buf = buf.slice(nl + 1);
+        nl = buf.indexOf("\n");
+      }
+    }
+    handleLine(buf); // 개행 없이 끝난 마지막 줄도 흘리지 않는다
   }
 
-  async cancel(): Promise<boolean> {
-    throw new BridgeError(
-      BRIDGE_ERRORS.CAPABILITY_UNSUPPORTED,
-      "cancel not implemented until Task 13",
-    );
+  async cancel(h: TurnHandle, reason: string): Promise<boolean> {
+    return await h.cancel(reason);
   }
 
   async close(): Promise<void> {
-    /* Task 13이 채운다 */
+    /* HTTP 클라이언트라 닫을 상주 자원이 없다(A2 §4.4 — 프로세스를 spawn하지 않는다) */
   }
 }
