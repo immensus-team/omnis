@@ -1,0 +1,60 @@
+{
+  "scenario": "pdf_and_unknown_mimetype_files",
+  "raw": {
+    "type": "message",
+    "subtype": "file_share",
+    "channel": "C07OMNISEN",
+    "channel_name": "omnis-eng",
+    "user": "U07MIN0001",
+    "text": "계약서 사본과 데이터 덤프 첨부합니다",
+    "ts": "1715678590.001200",
+    "team": "T07OMNISTM",
+    "upload": true,
+    "files": [
+      {
+        "id": "F07PDF0001",
+        "name": "contract-2024.pdf",
+        "mimetype": "application/pdf",
+        "size": 233472,
+        "url_private": "https://files.slack.com/files-pri/T07OMNISTM-F07PDF0001/contract-2024.pdf"
+      },
+      {
+        "id": "F07DUMP001",
+        "name": "dump.sql",
+        "size": 1048576,
+        "url_private": "https://files.slack.com/files-pri/T07OMNISTM-F07DUMP001/dump.sql"
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISEN",
+        "externalId": "1715678590.001200",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U07MIN0001" },
+        "body": "계약서 사본과 데이터 덤프 첨부합니다",
+        "attachments": [
+          {
+            "kind": "file",
+            "mimeType": "application/pdf",
+            "sizeBytes": 233472,
+            "caption": "contract-2024.pdf"
+          },
+          { "kind": "file", "sizeBytes": 1048576, "caption": "dump.sql" }
+        ],
+        "sentAt": "2024-05-14T09:23:10.001Z",
+        "status": "received",
+        "sourceHash": "1715678590.001200",
+        "threadMeta": {
+          "externalId": "C07OMNISEN",
+          "kind": "group",
+          "title": "#omnis-eng",
+          "participants": [{ "externalId": "U07MIN0001", "displayName": "U07MIN0001" }],
+          "lastItemAt": "2024-05-14T09:23:10.001Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

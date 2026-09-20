@@ -1,0 +1,36 @@
+{
+  "scenario": "private_channel_message",
+  "raw": {
+    "type": "message",
+    "channel": "G07OMNISPR",
+    "channel_name": "omnis-hiring",
+    "channel_type": "group",
+    "user": "U07MIN0001",
+    "text": "2차 면접 피드백 올렸습니다 (비공개)",
+    "ts": "1715678630.001600",
+    "team": "T07OMNISTM"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "G07OMNISPR",
+        "externalId": "1715678630.001600",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U07MIN0001" },
+        "body": "2차 면접 피드백 올렸습니다 (비공개)",
+        "attachments": [],
+        "sentAt": "2024-05-14T09:23:50.001Z",
+        "status": "received",
+        "sourceHash": "1715678630.001600",
+        "threadMeta": {
+          "externalId": "G07OMNISPR",
+          "kind": "group",
+          "title": "#omnis-hiring",
+          "participants": [{ "externalId": "U07MIN0001", "displayName": "U07MIN0001" }],
+          "lastItemAt": "2024-05-14T09:23:50.001Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

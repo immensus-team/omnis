@@ -1,0 +1,36 @@
+{
+  "scenario": "group_dm_mpim_message",
+  "raw": {
+    "type": "message",
+    "channel": "G07OMNISMP",
+    "channel_type": "mpim",
+    "user": "U07DANA001",
+    "text": "셋이서만 얘기합시다 — 계약 조건 변경 건",
+    "ts": "1715678620.001500",
+    "team": "T07OMNISTM",
+    "inviter": "U07JIN0001"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "G07OMNISMP",
+        "externalId": "1715678620.001500",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U07DANA001" },
+        "body": "셋이서만 얘기합시다 — 계약 조건 변경 건",
+        "attachments": [],
+        "sentAt": "2024-05-14T09:23:40.001Z",
+        "status": "received",
+        "sourceHash": "1715678620.001500",
+        "threadMeta": {
+          "externalId": "G07OMNISMP",
+          "kind": "group",
+          "title": null,
+          "participants": [{ "externalId": "U07DANA001", "displayName": "U07DANA001" }],
+          "lastItemAt": "2024-05-14T09:23:40.001Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "scenario": "message_deleted_with_previous_message",
+  "raw": {
+    "type": "message",
+    "subtype": "message_deleted",
+    "hidden": true,
+    "channel": "C07OMNISLA",
+    "channel_name": "omnis-launch",
+    "ts": "1715678720.002400",
+    "deleted_ts": "1715678400.000100",
+    "previous_message": {
+      "type": "message",
+      "user": "U07DANA001",
+      "text": "잘못 올린 공지입니다",
+      "ts": "1715678400.000100"
+    },
+    "event_ts": "1715678720.002400"
+  },
+  "expected": { "items": [] }
+}

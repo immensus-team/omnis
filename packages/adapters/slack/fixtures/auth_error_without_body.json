@@ -1,0 +1,9 @@
+{
+  "scenario": "auth_error_without_body",
+  "raw": {
+    "httpStatus": 401,
+    "headers": { "content-type": "text/html" },
+    "statusText": "Unauthorized"
+  },
+  "expected": { "errorKind": "auth_expired" }
+}

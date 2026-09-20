@@ -1,0 +1,37 @@
+{
+  "scenario": "channel_join_system_message",
+  "raw": {
+    "type": "message",
+    "subtype": "channel_join",
+    "channel": "C07OMNISLA",
+    "channel_name": "omnis-launch",
+    "user": "U07MIN0001",
+    "text": "<@U07MIN0001> has joined the channel",
+    "ts": "1715678510.000400",
+    "team": "T07OMNISTM",
+    "inviter": "U07JIN0001"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISLA",
+        "externalId": "1715678510.000400",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U07MIN0001" },
+        "body": "<@U07MIN0001> has joined the channel",
+        "attachments": [],
+        "sentAt": "2024-05-14T09:21:50.000Z",
+        "status": "received",
+        "sourceHash": "1715678510.000400",
+        "threadMeta": {
+          "externalId": "C07OMNISLA",
+          "kind": "group",
+          "title": "#omnis-launch",
+          "participants": [{ "externalId": "U07MIN0001", "displayName": "U07MIN0001" }],
+          "lastItemAt": "2024-05-14T09:21:50.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

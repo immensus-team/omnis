@@ -1,0 +1,26 @@
+{
+  "scenario": "message_changed_with_previous_message",
+  "raw": {
+    "type": "message",
+    "subtype": "message_changed",
+    "hidden": true,
+    "channel": "C07OMNISEN",
+    "channel_name": "omnis-eng",
+    "ts": "1715678710.002300",
+    "message": {
+      "type": "message",
+      "user": "U07JIN0001",
+      "text": "배포는 목요일입니다",
+      "ts": "1715678400.000100",
+      "edited": { "user": "U07JIN0001", "ts": "1715678710.000000" }
+    },
+    "previous_message": {
+      "type": "message",
+      "user": "U07JIN0001",
+      "text": "배포는 수요일입니다",
+      "ts": "1715678400.000100"
+    },
+    "event_ts": "1715678710.002300"
+  },
+  "expected": { "items": [] }
+}

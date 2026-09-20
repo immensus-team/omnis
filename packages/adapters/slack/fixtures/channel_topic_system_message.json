@@ -1,0 +1,37 @@
+{
+  "scenario": "channel_topic_system_message",
+  "raw": {
+    "type": "message",
+    "subtype": "channel_topic",
+    "channel": "C07OMNISEN",
+    "channel_name": "omnis-eng",
+    "user": "U07JIN0001",
+    "text": "set the channel topic: 스프린트 24 — 배포는 금요일 🚀",
+    "topic": "스프린트 24 — 배포는 금요일 🚀",
+    "ts": "1715678520.000500",
+    "team": "T07OMNISTM"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISEN",
+        "externalId": "1715678520.000500",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U07JIN0001" },
+        "body": "set the channel topic: 스프린트 24 — 배포는 금요일 🚀",
+        "attachments": [],
+        "sentAt": "2024-05-14T09:22:00.000Z",
+        "status": "received",
+        "sourceHash": "1715678520.000500",
+        "threadMeta": {
+          "externalId": "C07OMNISEN",
+          "kind": "group",
+          "title": "#omnis-eng",
+          "participants": [{ "externalId": "U07JIN0001", "displayName": "U07JIN0001" }],
+          "lastItemAt": "2024-05-14T09:22:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

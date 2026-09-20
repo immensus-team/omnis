@@ -1,0 +1,42 @@
+{
+  "scenario": "thread_parent_with_reply_metadata",
+  "raw": {
+    "type": "message",
+    "channel": "C07OMNISEN",
+    "channel_name": "omnis-eng",
+    "user": "U07JIN0001",
+    "text": "PR #412 머지했습니다. 리뷰 감사합니다 🙏",
+    "ts": "1715678400.000100",
+    "thread_ts": "1715678400.000100",
+    "reply_count": 3,
+    "reply_users_count": 2,
+    "latest_reply": "1715678445.000200",
+    "reply_users": ["U07DANA001", "U07MIN0001"],
+    "subscribed": true,
+    "last_read": "1715678445.000200",
+    "team": "T07OMNISTM"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISEN",
+        "externalId": "1715678400.000100",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U07JIN0001" },
+        "body": "PR #412 머지했습니다. 리뷰 감사합니다 🙏",
+        "attachments": [],
+        "sentAt": "2024-05-14T09:20:00.000Z",
+        "status": "received",
+        "sourceHash": "1715678400.000100",
+        "threadMeta": {
+          "externalId": "C07OMNISEN",
+          "kind": "group",
+          "title": "#omnis-eng",
+          "participants": [{ "externalId": "U07JIN0001", "displayName": "U07JIN0001" }],
+          "lastItemAt": "2024-05-14T09:20:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

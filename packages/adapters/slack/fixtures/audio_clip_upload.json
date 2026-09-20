@@ -1,0 +1,54 @@
+{
+  "scenario": "audio_clip_upload",
+  "raw": {
+    "type": "message",
+    "subtype": "file_share",
+    "channel": "C07OMNISEN",
+    "channel_name": "omnis-eng",
+    "user": "U07MIN0001",
+    "text": "회의 녹음 남겨둡니다",
+    "ts": "1715678570.001000",
+    "team": "T07OMNISTM",
+    "upload": true,
+    "files": [
+      {
+        "id": "F07AUDIO01",
+        "name": "standup-clip.mp4",
+        "mimetype": "audio/mp4",
+        "filetype": "mp4",
+        "size": 512000,
+        "url_private": "https://files.slack.com/files-pri/T07OMNISTM-F07AUDIO01/standup-clip.mp4"
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISEN",
+        "externalId": "1715678570.001000",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U07MIN0001" },
+        "body": "회의 녹음 남겨둡니다",
+        "attachments": [
+          {
+            "kind": "audio",
+            "mimeType": "audio/mp4",
+            "sizeBytes": 512000,
+            "caption": "standup-clip.mp4"
+          }
+        ],
+        "sentAt": "2024-05-14T09:22:50.001Z",
+        "status": "received",
+        "sourceHash": "1715678570.001000",
+        "threadMeta": {
+          "externalId": "C07OMNISEN",
+          "kind": "group",
+          "title": "#omnis-eng",
+          "participants": [{ "externalId": "U07MIN0001", "displayName": "U07MIN0001" }],
+          "lastItemAt": "2024-05-14T09:22:50.001Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "scenario": "message_without_team_or_channel_name",
+  "raw": {
+    "type": "message",
+    "channel": "C07OMNISEN",
+    "user": "U07DANA001",
+    "text": "team도 channel_name도 없는 최소 페이로드",
+    "ts": "1715678700.002200"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISEN",
+        "externalId": "1715678700.002200",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U07DANA001" },
+        "body": "team도 channel_name도 없는 최소 페이로드",
+        "attachments": [],
+        "sentAt": "2024-05-14T09:25:00.002Z",
+        "status": "received",
+        "sourceHash": "1715678700.002200",
+        "threadMeta": {
+          "externalId": "C07OMNISEN",
+          "kind": "group",
+          "title": null,
+          "participants": [{ "externalId": "U07DANA001", "displayName": "U07DANA001" }],
+          "lastItemAt": "2024-05-14T09:25:00.002Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

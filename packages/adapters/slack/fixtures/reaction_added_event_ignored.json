@@ -1,0 +1,12 @@
+{
+  "scenario": "reaction_added_event_ignored",
+  "raw": {
+    "type": "reaction_added",
+    "user": "U07MIN0001",
+    "reaction": "eyes",
+    "item": { "type": "message", "channel": "C07OMNISEN", "ts": "1715678400.000100" },
+    "item_user": "U07JIN0001",
+    "event_ts": "1715678730.002500"
+  },
+  "expected": { "items": [] }
+}

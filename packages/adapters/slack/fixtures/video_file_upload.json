@@ -1,0 +1,54 @@
+{
+  "scenario": "video_file_upload",
+  "raw": {
+    "type": "message",
+    "subtype": "file_share",
+    "channel": "C07OMNISLA",
+    "channel_name": "omnis-launch",
+    "user": "U07JIN0001",
+    "text": "데모 영상 올립니다 🎬",
+    "ts": "1715678580.001100",
+    "team": "T07OMNISTM",
+    "upload": true,
+    "files": [
+      {
+        "id": "F07VIDEO01",
+        "name": "demo-cut.mp4",
+        "mimetype": "video/mp4",
+        "filetype": "mp4",
+        "size": 4194304,
+        "url_private": "https://files.slack.com/files-pri/T07OMNISTM-F07VIDEO01/demo-cut.mp4"
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISLA",
+        "externalId": "1715678580.001100",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U07JIN0001" },
+        "body": "데모 영상 올립니다 🎬",
+        "attachments": [
+          {
+            "kind": "video",
+            "mimeType": "video/mp4",
+            "sizeBytes": 4194304,
+            "caption": "demo-cut.mp4"
+          }
+        ],
+        "sentAt": "2024-05-14T09:23:00.001Z",
+        "status": "received",
+        "sourceHash": "1715678580.001100",
+        "threadMeta": {
+          "externalId": "C07OMNISLA",
+          "kind": "group",
+          "title": "#omnis-launch",
+          "participants": [{ "externalId": "U07JIN0001", "displayName": "U07JIN0001" }],
+          "lastItemAt": "2024-05-14T09:23:00.001Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

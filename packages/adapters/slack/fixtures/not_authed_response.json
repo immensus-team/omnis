@@ -1,0 +1,9 @@
+{
+  "scenario": "not_authed_response",
+  "raw": {
+    "httpStatus": 401,
+    "headers": { "content-type": "application/json; charset=utf-8" },
+    "body": { "ok": false, "error": "not_authed" }
+  },
+  "expected": { "errorKind": "auth_expired" }
+}

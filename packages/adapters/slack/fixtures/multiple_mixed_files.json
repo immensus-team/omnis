@@ -1,0 +1,95 @@
+{
+  "scenario": "multiple_mixed_files",
+  "raw": {
+    "type": "message",
+    "subtype": "file_share",
+    "channel": "C07OMNISLA",
+    "channel_name": "omnis-launch",
+    "user": "U07DANA001",
+    "text": "런칭 자료 일괄 첨부 📦",
+    "ts": "1715678600.001300",
+    "team": "T07OMNISTM",
+    "upload": true,
+    "files": [
+      {
+        "name": "cover.png",
+        "mimetype": "image/png",
+        "size": 81920,
+        "url_private": "https://files.slack.com/files-pri/T07OMNISTM-F07IMG0001/cover.png"
+      },
+      {
+        "name": "teaser.gif",
+        "mimetype": "image/gif",
+        "size": 655360,
+        "url_private": "https://files.slack.com/files-pri/T07OMNISTM-F07GIF0001/teaser.gif"
+      },
+      {
+        "name": "voice-note.m4a",
+        "mimetype": "audio/m4a",
+        "size": 40960,
+        "url_private": "https://files.slack.com/files-pri/T07OMNISTM-F07M4A0001/voice-note.m4a"
+      },
+      {
+        "name": "broll.mov",
+        "mimetype": "video/quicktime",
+        "size": 8388608,
+        "url_private": "https://files.slack.com/files-pri/T07OMNISTM-F07MOV0001/broll.mov"
+      },
+      {
+        "name": "press-kit.zip",
+        "mimetype": "application/zip",
+        "size": 2097152,
+        "url_private": "https://files.slack.com/files-pri/T07OMNISTM-F07ZIP0001/press-kit.zip"
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISLA",
+        "externalId": "1715678600.001300",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U07DANA001" },
+        "body": "런칭 자료 일괄 첨부 📦",
+        "attachments": [
+          { "kind": "image", "mimeType": "image/png", "sizeBytes": 81920, "caption": "cover.png" },
+          {
+            "kind": "image",
+            "mimeType": "image/gif",
+            "sizeBytes": 655360,
+            "caption": "teaser.gif"
+          },
+          {
+            "kind": "audio",
+            "mimeType": "audio/m4a",
+            "sizeBytes": 40960,
+            "caption": "voice-note.m4a"
+          },
+          {
+            "kind": "video",
+            "mimeType": "video/quicktime",
+            "sizeBytes": 8388608,
+            "caption": "broll.mov"
+          },
+          {
+            "kind": "file",
+            "mimeType": "application/zip",
+            "sizeBytes": 2097152,
+            "caption": "press-kit.zip"
+          }
+        ],
+        "sentAt": "2024-05-14T09:23:20.001Z",
+        "status": "received",
+        "sourceHash": "1715678600.001300",
+        "threadMeta": {
+          "externalId": "C07OMNISLA",
+          "kind": "group",
+          "title": "#omnis-launch",
+          "participants": [{ "externalId": "U07DANA001", "displayName": "U07DANA001" }],
+          "lastItemAt": "2024-05-14T09:23:20.001Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}
