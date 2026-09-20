@@ -3,21 +3,40 @@ import { createRoot } from "react-dom/client";
 import "@omnis/ui/tokens.css";
 import "./app.css";
 import { App } from "./App.js";
+import { type OAuthClient, Onboarding } from "./screens/Onboarding.js";
 import { loadZeroToken } from "./zero-client.js";
 
 const root = document.getElementById("root");
 if (root === null) throw new Error("#root not found in index.html");
 
-// US-A21b: Zero permissions는 허브가 서명한 토큰 없이는 한 행도 안 내려준다. 화면이 뜨기 전에
-// 한 번 받아 둔다 — 실패해도(허브가 아직 안 떴다 등) 앱은 띄우고 Zero만 빈 상태로 시작한다.
+// US-A21b: Zero permissions hand down not a single row without a hub-signed token, so one is
+// fetched before the screen appears. A failure (the hub is not up yet, say) still mounts the app —
+// it just starts with Zero empty.
 loadZeroToken()
   .catch((e: unknown) => {
     console.error("zero auth token unavailable — rows will not sync", e);
   })
   .finally(() => {
     createRoot(root).render(
-      <StrictMode>
-        <App />
-      </StrictMode>,
+      <StrictMode>{isOnboardingPreview() ? <OnboardingPreview /> : <App />}</StrictMode>,
     );
   });
+
+/** US-D06 §4.1.3: onboarding has no first-run flow wired yet, and D6 is an accent story — so the
+ *  screen is reachable at `?screen=onboarding` rather than by a route, purely so it can be opened
+ *  and screenshotted. Wiring a first-run flow is not D6's job. */
+function isOnboardingPreview(): boolean {
+  return new URLSearchParams(window.location.search).get("screen") === "onboarding";
+}
+
+/** The preview's OAuth client rejects: that is what leaves the screen in the resting state a
+ *  first-run user actually sees — three Connect buttons and a disabled Continue — and it is also
+ *  the shortest path to the error state, which is the other state worth looking at. Nothing here
+ *  reaches the keychain, so the preview cannot store a real secret by accident. */
+const PREVIEW_OAUTH: OAuthClient = {
+  connect: () => Promise.reject(new Error("onboarding preview: no OAuth flow is wired yet")),
+};
+
+function OnboardingPreview() {
+  return <Onboarding oauthClient={PREVIEW_OAUTH} onDone={() => undefined} />;
+}

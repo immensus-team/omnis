@@ -2223,6 +2223,82 @@ body {
   }
 }
 
+/* ==========================================================================================
+   US-D06 §4.1.3 onboarding — the `void` surface, full bleed, words on a card.
+
+   The screen had a `.onboarding` class and no CSS at all, so this is new work rather than a
+   re-skin: there was no plate to put an aurora behind. `void` is the only variant that is
+   reproducible at alpha 1 (§2.5) and the only one whose silhouette is the curve rather than the
+   landscape ridge, which is what reference image 2 is.
+   `void` carries no vignette (`--aurora-vignette: transparent`), so the surface runs to all four
+   edges of `#root` and the card is what stops the screen from being a photograph with a form on it.
+   ========================================================================================== */
+.aurora.onboarding {
+  /* §3.2's onboarding blur: 64px, the largest of the three — this surface is viewport-sized, and at
+     42px the ridge line stayed legible as a shape rather than as weather. */
+  --aurora-blur: 64px;
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+/* §4.3's answer for a surface whose mass crosses the content band: a scrim, not a shadow. The card
+   is well over 40 words, so the words do not get to sit on the aurora directly (§5.3 guard 4) — the
+   20px backdrop blur plus `--aurora-scrim` is what holds --text-primary's 7:1 over the darkest
+   pixel behind it. Deliberately not `.glass-surface`: that name means "the chrome recipe", and this
+   card is content, not chrome. */
+.onboarding__card {
+  width: min(460px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 28px;
+  border-radius: 20px;
+  background: var(--aurora-scrim);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  border: var(--hairline);
+  box-shadow: var(--shadow-glass);
+}
+
+.onboarding__card h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 650;
+}
+
+.onboarding__card ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.onboarding__card li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.onboarding__card li > span:first-child {
+  flex: 1 1 auto;
+}
+
+.onboarding__card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.onboarding__card [role="alert"] {
+  color: var(--danger-500);
+  font-size: 12px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   /* The ask panel: 320ms of lift-and-scale becomes a cross-fade. */
   .ask-panel {

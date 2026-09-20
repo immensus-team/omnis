@@ -1,10 +1,11 @@
-import { Button } from "@omnis/ui";
+import { AuroraSurface, Button } from "@omnis/ui";
 import { useState } from "react";
 import { storeChannelSecret } from "../api/keychain.js";
 
 export type OnboardingChannel = "slack" | "gmail" | "gcal";
 
-/** 계약 §9: 채널 하나가 keychain 항목 1개일 필요는 없다 — Slack은 bot+app 토큰 2개, account는 항목마다 채널이 정한다. */
+/** Contract §9: one channel does not have to be one keychain entry — Slack is two tokens (bot +
+ *  app), and the channel decides the account for each entry. */
 export interface ChannelSecretEntry {
   keychainService: string;
   account: string;
@@ -23,8 +24,13 @@ const REQUIRED_CHANNELS: { id: OnboardingChannel; label: string }[] = [
 
 type ConnectState = "idle" | "connecting" | "connected" | "error";
 
-/** A5 §7.1: Phase A 필수 채널은 Slack/Gmail/Calendar 3개뿐. Outlook/Telegram/WhatsApp/
- *  KakaoTalk/LinkedIn은 이 화면의 범위 밖(마스터 D12, "맥미니에서 설정 필요" 안내만). */
+/** A5 §7.1: Phase A has exactly three required channels. Outlook/Telegram/WhatsApp/KakaoTalk/
+ *  LinkedIn are outside this screen's scope — the master D12 note below is all it says about them.
+ *
+ *  US-D06 §4.1.3: the screen is a full-bleed `void` aurora with the words on a scrim. That is how it
+ *  answers §5.3 guard 4 instead of violating it — the screen is well over 40 words, so the text does
+ *  not get to sit directly on a moving surface. The aurora is what surrounds the card, never what
+ *  the card is made of. */
 export function Onboarding({
   oauthClient,
   onDone,
@@ -39,7 +45,9 @@ export function Onboarding({
     setState((s) => ({ ...s, [channel]: "connecting" }));
     try {
       const entries = await oauthClient.connect(channel);
-      // 계약 §9: Slack은 이 배열이 2항목(bot + app 토큰)이고, 나머지 채널은 1항목이다. 순서는 상관없다 — 전부 저장돼야 "연결됨".
+      // Contract §9: for Slack this array holds two entries (bot + app token) and for the other
+      // channels one. The order does not matter — all of them have to be stored before the channel
+      // reads as "Connected".
       for (const entry of entries) {
         await storeChannelSecret(entry.keychainService, entry.account, entry.secret);
       }
@@ -52,27 +60,31 @@ export function Onboarding({
   const allConnected = REQUIRED_CHANNELS.every((c) => state[c.id] === "connected");
 
   return (
-    <div className="onboarding">
-      <h1>omnis에 오신 걸 환영해요</h1>
-      <ul>
-        {REQUIRED_CHANNELS.map((c) => (
-          <li key={c.id}>
-            <span>{c.label}</span>
-            <Button disabled={state[c.id] === "connecting"} onClick={() => void connect(c.id)}>
-              {state[c.id] === "connected"
-                ? "연결됨"
-                : state[c.id] === "connecting"
-                  ? "연결 중…"
-                  : "연결"}
-            </Button>
-            {state[c.id] === "error" && <span role="alert">연결 실패, 다시 시도해주세요</span>}
-          </li>
-        ))}
-      </ul>
-      <p>WhatsApp / KakaoTalk / LinkedIn: 맥미니에서 설정이 필요해요</p>
-      <Button onClick={onDone} disabled={!allConnected}>
-        계속
-      </Button>
-    </div>
+    <AuroraSurface variant="void" className="onboarding">
+      <div className="onboarding__card">
+        <h1>Welcome to omnis</h1>
+        <ul>
+          {REQUIRED_CHANNELS.map((c) => (
+            <li key={c.id}>
+              <span>{c.label}</span>
+              <Button disabled={state[c.id] === "connecting"} onClick={() => void connect(c.id)}>
+                {state[c.id] === "connected"
+                  ? "Connected"
+                  : state[c.id] === "connecting"
+                    ? "Connecting…"
+                    : "Connect"}
+              </Button>
+              {state[c.id] === "error" && (
+                <span role="alert">Connection failed — please try again</span>
+              )}
+            </li>
+          ))}
+        </ul>
+        <p>WhatsApp / KakaoTalk / LinkedIn: set these up on the Mac mini</p>
+        <Button onClick={onDone} disabled={!allConnected}>
+          Continue
+        </Button>
+      </div>
+    </AuroraSurface>
   );
 }
