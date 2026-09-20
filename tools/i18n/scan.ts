@@ -1,16 +1,18 @@
-/** 아직 사전으로 빠지지 않은 하드코딩 문구를 훑어 tools/i18n/report.md를 낳는다 — 마이그레이션
- * 대상 목록을 손으로 뒤지는 대신 뽑아 보려는 도구다. 읽기 전용: 소스는 절대 고치지 않는다.
+/** Sweeps hardcoded copy that has not made it into the dictionary yet and produces
+ * tools/i18n/report.md — a tool for extracting the migration target list instead of hunting for
+ * it by hand. Read-only: it never modifies the sources.
  *
- * 완전한 파서가 아니라 휴리스틱이라 오탐·누락이 둘 다 있다(한계는 리포트 꼬리에 적어 둔다).
- * 그래서 "이 줄을 지워라"가 아니라 "여기 후보가 있다"는 출발점으로만 쓴다.
+ * It is a heuristic rather than a real parser, so it both over- and under-reports (the limits are
+ * written at the tail of the report). Use it as a starting point — "there are candidates here" —
+ * not as "delete this line".
  *
- * 실행: 리포 루트에서 `npx tsx tools/i18n/scan.ts` (인자 없음). */
+ * Run: `npx tsx tools/i18n/scan.ts` from the repo root (no arguments). */
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 
 const REPO_ROOT = join(import.meta.dirname, "..", "..");
 const SOURCE_DIRS = ["apps/desktop/src", "packages/ui/src"];
-/** 사전 자체는 스캔 대상이 아니다 — 여기 있는 건 전부 "이미 i18n된" 문구다. */
+/** The dictionary itself is not a scan target — everything in it is already i18n'd copy. */
 const DICTIONARY_DIR = join("packages/ui", "src", "i18n");
 const REPORT_PATH = join(REPO_ROOT, "tools", "i18n", "report.md");
 const SKIP_DIRS = new Set(["node_modules", "dist", ".turbo", "coverage", "build", ".git"]);
@@ -24,7 +26,7 @@ const FILE_RE = /^\S+\.(tsx?|jsx?|css|json|md|png|svg|html|ya?ml|sql|sh|toml|wof
 interface Hit {
   text: string;
   offset: number;
-  /** JSX 텍스트 노드(`<h1>받은 편지함</h1>`)면 true — 위치 판정과 영어 휴리스틱이 달라진다. */
+  /** True for a JSX text node (e.g. `<h1>Inbox</h1>`) — position detection and the English heuristic differ. */
   jsx: boolean;
 }
 
@@ -35,9 +37,10 @@ interface Candidate {
   key: string;
 }
 
-/** 주석을 같은 길이의 공백으로 덮는다 — 오프셋(=줄 번호)이 그대로 남아서 이후 두 패스가 같은
- * 좌표계를 쓴다. 이 리포지토리는 주석에 한국어가 흔해서, 안 걷어내면 리포트가 설명문으로 뒤덮인다.
- * 문자열 안의 `//`(URL 등)를 주석으로 오인하지 않으려고 문자열 상태를 함께 추적한다. */
+/** Blank out comments with equal-length whitespace — the offsets (and therefore line numbers)
+ * survive, so the two later passes share one coordinate system. Korean comments are common in this
+ * repository, and leaving them in would bury the report in prose. String state is tracked alongside
+ * so a `//` inside a string (a URL, say) is not mistaken for a comment. */
 function maskComments(src: string): string {
   const out = src.split("");
   let i = 0;
@@ -69,7 +72,7 @@ function maskComments(src: string): string {
           continue;
         }
         if (ch === c) break;
-        // 작은/큰따옴표는 줄을 넘지 못한다(넘으면 그건 문자열이 아니라 어퍼스트로피 오타다).
+        // Single and double quotes cannot span lines (if one appears to, it is a stray apostrophe, not a string).
         if (c !== "`" && ch === "\n") break;
         j++;
       }
@@ -83,7 +86,7 @@ function maskComments(src: string): string {
   return out.join("");
 }
 
-/** 마스킹된 소스에서 문자열/템플릿 리터럴만 줍는다(주석은 이미 공백이라 자연히 빠진다). */
+/** Collect only string/template literals from the masked source (comments are already whitespace, so they drop out). */
 function scanLiterals(src: string): Hit[] {
   const hits: Hit[] = [];
   let i = 0;
@@ -101,12 +104,12 @@ function scanLiterals(src: string): Hit[] {
           continue;
         }
         if (ch === c) break;
-        // 작은/큰따옴표는 줄을 넘지 못한다(넘으면 그건 문자열이 아니라 어퍼스트로피 오타다).
+        // Single and double quotes cannot span lines (if one appears to, it is a stray apostrophe, not a string).
         if (c !== "`" && ch === "\n") break;
         j++;
       }
-      // 닫는 따옴표를 못 찾았으면 한 글자만 진행한다 — 정규식 리터럴이나 JSX 텍스트의
-      // 어퍼스트로피(don't)에 스캐너가 통째로 삼켜지지 않게.
+      // With no closing quote found, advance a single character — so the scanner is not swallowed
+      // whole by a regex literal or by an apostrophe in JSX text (don't).
       if (src[j] !== c) {
         i++;
         continue;
@@ -122,8 +125,10 @@ function scanLiterals(src: string): Hit[] {
   return hits;
 }
 
-/** JSX 텍스트 노드. 중괄호·부등호가 없는 구간만 주워서 표현식 보간(`{count}개`)은 리터럴 쪽이
- * 잡게 둔다. `a > b < c` 같은 비교식도 걸리지만, 공백 없는 한 토막이라 아래 휴리스틱이 걷어낸다. */
+/** JSX text nodes. Only spans free of braces and angle brackets are collected, so expression
+ * interpolation (`{count} items`) is left for the literal pass to catch. A comparison like
+ * `a > b < c` gets picked up too, but it comes through as a single space-free token, which the
+ * heuristic below filters out. */
 function scanJsxText(masked: string): Hit[] {
   const hits: Hit[] = [];
   for (const m of masked.matchAll(/>([^<>{}]+)</g)) {
@@ -141,28 +146,30 @@ function lineAt(src: string, offset: number): number {
   return line;
 }
 
-/** 문구인가, 코드 조각인가. 한국어는 거의 확실히 문구라 먼저 통과시키고, 영어는 "문장처럼
- * 보이는 것"만 남긴다 — 그래서 컴포넌트 안의 단어 하나짜리 영어 라벨(Save/Retry)은 놓친다.
- * 기본 로케일이 ko라 그 라벨들도 한국어 쪽에서 잡히므로 의도된 트레이드오프다. */
+/** Copy or code fragment? Korean is almost certainly copy, so it passes first; for English only
+ * "looks like a sentence" survives — which means a single-word English label (Save/Retry) inside a
+ * component is missed. Since the default locale is `ko`, those labels are still caught on the
+ * Korean side, so this is a deliberate trade-off. */
 function classify(text: string, jsx: boolean): boolean {
   const s = text.trim();
   if (s.length === 0) return false;
-  if (HEX_RE.test(s) || FILE_RE.test(s)) return false; // 색상값 / 파일명
+  if (HEX_RE.test(s) || FILE_RE.test(s)) return false; // color value / filename
   if (s.includes("://") || s.startsWith("/") || s.startsWith("./") || s.startsWith("../"))
-    return false; // URL·경로
+    return false; // URL or path
   if (HANGUL_RE.test(s)) return true;
   if (!/[A-Za-z]{2}/.test(s)) return false;
 
-  // className/식별자: 공백 없이 전부 소문자이면서 구분자(-, :, /)를 포함 — tailwind가 대표적.
-  // 대문자로 시작하는 하이픈 단어("Read-only")는 살아남도록 소문자 조건을 둔다.
+  // className/identifier: no whitespace, all lowercase, containing a separator (-, :, /) —
+  // tailwind is the typical case. The lowercase condition keeps a hyphenated word that starts with
+  // a capital ("Read-only") alive.
   if (!/\s/.test(s) && s === s.toLowerCase() && /[-:/]/.test(s)) return false;
 
-  // 단어 하나짜리 영어는 기술 토큰으로 본다(키 이름·enum 값 등).
+  // A single-word English string is treated as a technical token (key name, enum value, ...).
   if (jsx) return s.length > 1 && /^[A-Z]/.test(s);
   return s.length > 3 && /\s/.test(s) && /^[A-Z]/.test(s);
 }
 
-/** 가장 가까운 앞쪽 컴포넌트 선언 이름. 못 찾으면 파일명으로 떨어진다. */
+/** The nearest preceding component declaration name. Falls back to the filename when none is found. */
 function enclosingName(src: string, offset: number, file: string): string {
   const head = src.slice(0, offset);
   const patterns = [
@@ -183,7 +190,7 @@ function enclosingName(src: string, offset: number, file: string): string {
   return name || basename(file).replace(/\.tsx?$/, "");
 }
 
-/** 리터럴 바로 앞/뒤를 보고 화면에서의 역할을 짐작한다 — 키 이름의 가운데 토막이 된다. */
+/** Guess the on-screen role from the text just before/after the literal — it becomes the middle segment of the key name. */
 function roleOf(src: string, hit: Hit): string {
   const before = src.slice(Math.max(0, hit.offset - 40), hit.offset);
   if (/placeholder\s*=\s*["']?$/.test(before)) return "placeholder";
@@ -203,8 +210,8 @@ function camel(words: readonly string[]): string {
     .join("");
 }
 
-/** 키 토막으로 쓸 수 있게 이름을 눕힌다: `Inbox` → `inbox`, `FILTERS` → `filters`,
- * `TOOL_LABELS` → `toolLabels`. 상수 이름을 그냥 소문자화하면 `fILTERS`가 나온다. */
+/** Lowercase a name so it can serve as a key segment: `Inbox` → `inbox`, `FILTERS` → `filters`,
+ * `TOOL_LABELS` → `toolLabels`. Plainly lowercasing a constant name would yield `fILTERS`. */
 function decap(name: string): string {
   if (name === name.toUpperCase())
     return camel(
@@ -216,9 +223,9 @@ function decap(name: string): string {
   return (name[0] ?? "").toLowerCase() + name.slice(1);
 }
 
-/** 문자열 안의 ASCII 단어에서 리프 이름을 짐작한다. 한국어 문구는 ASCII가 없어 줄 번호로
- * 떨어지는데, 그건 의도다 — 한글을 억지로 로마자화한 키보다 `l140`이 정직하고, 사람이
- * 옮기면서 어차피 이름을 다시 짓는다. */
+/** Guess the leaf name from the ASCII words inside the string. Korean copy has no ASCII and falls
+ * back to the line number, which is intentional — `l140` is more honest than a key that force-
+ * romanizes Hangul, and a human renames it while migrating anyway. */
 function leafSlug(text: string, line: number): string {
   const words = (text.match(/[A-Za-z][A-Za-z0-9]*/g) ?? [])
     .filter((w) => w.length > 1)
@@ -240,12 +247,12 @@ function walk(dir: string): string[] {
 
 function scanFile(file: string): Candidate[] {
   const rel = relative(REPO_ROOT, file);
-  // 사전 자체는 대상이 아니다 — 여기 있는 문구는 전부 "이미 i18n된" 것이다.
+  // The dictionary itself is not a target — every string in it is already i18n'd.
   if (rel.startsWith(`${DICTIONARY_DIR}/`)) return [];
 
   const src = readFileSync(file, "utf8");
-  // 주석을 먼저 지운 뒤에 두 패스를 돌린다 — JSX 텍스트 정규식은 주석을 구분하지 못해서,
-  // 안 지우면 `// 설명 … const [` 같은 코드가 문구로 둔갑한다.
+  // Wipe comments before running the two passes — the JSX text regex cannot tell a comment apart,
+  // so without this a line like `// note … const [` would masquerade as copy.
   const masked = maskComments(src);
   const hits = [...scanLiterals(masked), ...scanJsxText(masked)].sort(
     (a, b) => a.offset - b.offset,
@@ -257,7 +264,7 @@ function scanFile(file: string): Candidate[] {
     if (!classify(hit.text, hit.jsx)) continue;
     const line = lineAt(src, hit.offset);
     const text = hit.text.trim().replace(/\s+/g, " ").slice(0, MAX_TEXT);
-    // 같은 줄에 같은 문구가 두 번 나오면(예: 조건부 렌더) 표에 두 번 넣을 이유가 없다.
+    // The same string twice on one line (a conditional render, say) has no reason to appear twice in the table.
     const dedupe = `${line}:${text}`;
     if (seen.has(dedupe)) continue;
     seen.add(dedupe);
@@ -280,20 +287,21 @@ function cell(text: string): string {
 
 function report(all: Candidate[], filesScanned: number, byDir: Map<string, number>): string {
   const lines: string[] = [
-    "# i18n 하드코딩 문구 스캔 리포트",
+    "# i18n Hardcoded Copy Scan Report",
     "",
-    "`tsx tools/i18n/scan.ts`가 생성한다 — 손으로 고치지 말 것(다음 실행에 덮인다).",
-    "이 리포트는 **읽기 전용 스캔** 결과다: 스크립트는 소스를 고치지 않는다.",
+    "Generated by `tsx tools/i18n/scan.ts` — do not edit by hand (the next run overwrites it).",
+    "This report is the result of a **read-only scan**: the script never modifies the sources.",
     "",
-    "## 요약",
+    "## Summary",
     "",
-    `- 스캔한 파일: ${filesScanned}`,
-    `- 후보 문자열: ${all.length}`,
-    ...SOURCE_DIRS.map((d) => `  - ${d}: ${byDir.get(d) ?? 0}건`),
+    `- Files scanned: ${filesScanned}`,
+    `- Candidate strings: ${all.length}`,
+    ...SOURCE_DIRS.map((d) => `  - ${d}: ${byDir.get(d) ?? 0}`),
     "",
-    "`Suggested key`는 컴포넌트 이름 + 위치(placeholder/ariaLabel/button/text) + 문자열 속 영단어로",
-    "만든 **출발점**이다. 한국어 문구는 영단어가 없어 `l{줄번호}`로 떨어진다 — 옮기면서 이름을",
-    "다시 짓는 게 전제다.",
+    "`Suggested key` is a **starting point** built from component name + role",
+    "(placeholder/ariaLabel/button/text) + the English words in the string. Korean copy has no",
+    "English words and falls back to `l{line}`, on the assumption that a human renames it while",
+    "migrating.",
     "",
   ];
 
@@ -314,14 +322,18 @@ function report(all: Candidate[], filesScanned: number, byDir: Map<string, numbe
   }
 
   lines.push(
-    "## 이 도구의 한계 (오탐·누락은 정상)",
+    "## Limits of this tool (over- and under-reporting are expected)",
     "",
-    "- 완전한 파서가 아니다. TS 파서를 붙이지 않으려고 주석·문자열·템플릿만 걷는 상태 기계를 쓴다.",
-    "- 오탐: JSX처럼 보이는 비교식(`a > b < c`), 정규식 리터럴 안의 따옴표, 어퍼스트로피가 만드는",
-    "  가짜 문자열. 공백/대문자 휴리스틱이 대부분 걸러내지만 0은 아니다.",
-    "- 누락: 단어 하나짜리 영어 라벨(Save, Retry)은 기술 토큰으로 보고 버린다. 기본 로케일이 ko라",
-    "  같은 버튼이 한국어 쪽에서 잡히므로 의도적으로 감수한 트레이드오프다.",
-    "- 누락: `packages/ui/src/i18n/**`(사전), `*.test.ts(x)`, `node_modules`·`dist`는 대상이 아니다.",
+    "- It is not a full parser. To avoid pulling in a TS parser it uses a state machine that walks",
+    "  only comments, strings and templates.",
+    "- False positives: a comparison that looks like JSX (`a > b < c`), quotes inside a regex",
+    "  literal, and phantom strings produced by apostrophes. The whitespace/capital heuristics",
+    "  filter out most of them, but not all.",
+    "- Missed: a one-word English label (Save, Retry) is discarded as a technical token. Since the",
+    "  default locale is `ko`, the same button is still caught on the Korean side, so this trade-off",
+    "  is deliberate.",
+    "- Missed: `packages/ui/src/i18n/**` (the dictionary), `*.test.ts(x)`, `node_modules` and `dist`",
+    "  are not targets.",
     "",
   );
 
