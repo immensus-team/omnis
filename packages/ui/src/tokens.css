@@ -51,10 +51,18 @@
     "SF Pro Text", system-ui, sans-serif;
   --hairline: 1px solid var(--border-hairline);
   --dur-fast: 100ms;
+  /* US-D04: DESIGN-DIRECTION's motion ladder is "160ms entry, 240ms transition, 320ms layer
+     appearance". Each rung now has a token: --dur-base is the entry rung (a row lifting into
+     selection, a pill changing state, a tab switching — every "this thing changed under your
+     finger" answer), --dur-move the transition rung (a row leaving the list), --dur-panel the layer
+     rung (a floating panel arriving: the ask panel, the command palette, the detail sheet, the row
+     hover card). The story that introduced the ladder had --dur-panel on the wrong rung: 240ms is
+     the transition rung, and the panel was spending it. */
   --dur-base: 160ms;
+  --dur-move: 240ms;
   --dur-slow: 400ms;
-  /* US-D01: the floating panel's (ask panel) spring entry. DESIGN-DIRECTION's "240ms transition" slot. */
-  --dur-panel: 240ms;
+  /* US-D01: the floating panel's (ask panel) spring entry — US-D04 moved it onto its own rung. */
+  --dur-panel: 320ms;
   --ease-spring: cubic-bezier(0.2, 0, 0, 1);
   /* US-D01, the two liquid-glass pieces: a 1px inner highlight (the feel of light touching the
      glass's top face) and the soft shadow that lifts the surface. .glass-surface uses both together
@@ -81,12 +89,20 @@
   --glass-highlight: oklch(1 0 0 / 0.1);
   --shadow-glass: 0 8px 24px oklch(0 0 0 / 0.45), 0 1px 3px oklch(0 0 0 / 0.35);
 }
+/* US-D04: reduced motion swaps travel for a cross-fade rather than switching motion off. Apple's
+   rule (apple-design §14) is "a gentler, non-vestibular equivalent" — what a reduced-motion user
+   must not get is *movement*, not *feedback*: a row that snaps into selection with no transition
+   at all reads as a rendering glitch, while an 80ms fade reads as a state change. So all five
+   durations collapse onto the one fade length instead of onto 0ms, and app.css's matching
+   reduced-motion block is what strips the transforms (a shortened slide is still a slide).
+   The pair has to move together — motion.test.ts reads this file and asserts it. */
 @media (prefers-reduced-motion: reduce) {
   :root {
-    --dur-fast: 0ms;
-    --dur-base: 0ms;
-    --dur-slow: 0ms;
-    --dur-panel: 0ms;
+    --dur-fast: 80ms;
+    --dur-base: 80ms;
+    --dur-move: 80ms;
+    --dur-slow: 80ms;
+    --dur-panel: 80ms;
   }
 }
 /* apple-design §14's counterpart signal — having brought glass in, respect its opposite (reduced

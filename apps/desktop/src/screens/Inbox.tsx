@@ -11,6 +11,7 @@ import { GroupHeader } from "@omnis/ui/components/group-header";
 import { InboxRow, type LabelChip, type RowAvatar } from "@omnis/ui/components/inbox-row";
 import type { RelationshipState } from "@omnis/ui/components/person-card";
 import { type AgentPillState, AgentStatusPill } from "@omnis/ui/components/status-pill";
+import { LEAVE_MS, motionMs } from "@omnis/ui/lib/motion";
 import { formatRelativeTime } from "@omnis/ui/lib/relative-time";
 import {
   type AgentRuntimeKind,
@@ -19,7 +20,7 @@ import {
   agentSessionKinsoState,
 } from "@omnis/ui/lib/row-meta";
 import { useQuery } from "@rocicorp/zero/react";
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
 import { setThreadArchived } from "../api/threads.js";
 import { useKeymap } from "../hooks/use-keymap.js";
@@ -119,16 +120,26 @@ export interface ArchivableRow {
 
 /** US-A36: Inbox leaves archived threads out, and the Archived view shows only those, newest
  *  archived first. `pending` is the optimistic override (id -> archived?) that holds until the
- *  HTTP round trip and Zero replication arrive. */
+ *  HTTP round trip and Zero replication arrive.
+ *
+ *  US-D04 `leaving` is the small hole in that rule: a thread that has just been archived (or
+ *  restored) stays in whichever list it is currently leaving, for as long as the leave animation
+ *  runs. Without it the row is filtered out on the same frame the click lands and there is nothing
+ *  left to animate — the list snaps up by one row height and the row is simply gone. Inbox.tsx
+ *  drops the id from the set when the animation ends, and the row then leaves by the normal rule.
+ *  It is a parameter rather than a check inside the filter because it is a property of the *view*,
+ *  not of a row: a leaving row is visible in both the inbox and the archived list. */
 export function applyArchiveView<T extends ArchivableRow>(
   rows: T[],
   view: "inbox" | "archived",
   pending: Record<string, boolean>,
+  leaving: ReadonlySet<string> = new Set(),
 ): T[] {
   const isArchived = (r: T): boolean => pending[r.threadId] ?? r.archivedAt !== null;
-  if (view === "inbox") return rows.filter((r) => !isArchived(r));
+  const stays = (r: T): boolean => leaving.has(r.threadId);
+  if (view === "inbox") return rows.filter((r) => stays(r) || !isArchived(r));
   return rows
-    .filter(isArchived)
+    .filter((r) => stays(r) || isArchived(r))
     .sort(
       (a, b) =>
         (b.archivedAt ?? Number.MAX_SAFE_INTEGER) - (a.archivedAt ?? Number.MAX_SAFE_INTEGER),
@@ -216,6 +227,10 @@ export function Inbox({
   // Optimistic override: keeps the row from sitting there unchanged until the hub round trip and
   // Zero replication arrive.
   const [pendingArchive, setPendingArchive] = useState<Record<string, boolean>>({});
+  /** US-D04: threads that have just been archived or restored and are still playing their leave
+   *  animation. See applyArchiveView's `leaving` for why the row has to stay in the data. */
+  const [leavingIds, setLeavingIds] = useState<ReadonlySet<string>>(new Set());
+  const leaveTimers = useRef<number[]>([]);
   // US-D02: the label chip filter. An empty Set means no label condition (it is ANDed with the
   // others).
   const [selectedLabelIds, setSelectedLabelIds] = useState<Set<string>>(new Set());
@@ -376,18 +391,51 @@ export function Inbox({
   }, [threadRows]);
 
   const toggleArchive = useCallback((threadId: string, archived: boolean) => {
+    // US-D04: the row is held in the list for one leave animation. The server call goes out
+    // immediately rather than after the animation — the round trip overlaps the 240ms instead of
+    // queueing behind it, and the optimistic state below still lands on the same frame as the
+    // click, so nothing about the archive is slower than it was.
+    setLeavingIds((s) => new Set(s).add(threadId));
     setPendingArchive((p) => ({ ...p, [threadId]: archived }));
+    leaveTimers.current.push(
+      window.setTimeout(() => {
+        setLeavingIds((s) => {
+          if (!s.has(threadId)) return s;
+          const next = new Set(s);
+          next.delete(threadId);
+          return next;
+        });
+      }, motionMs(LEAVE_MS)),
+    );
     setThreadArchived(threadId, archived).catch((e: unknown) => {
       // If the hub refuses, the optimistic state is rolled back — the screen does not get to lie
-      // ahead of the server.
+      // ahead of the server. The row comes back on the next render, so the leave animation is cut
+      // short; that is the right way round (a failed archive should not keep showing the row
+      // sliding away).
       setPendingArchive((p) => {
         const next = { ...p };
         delete next[threadId];
         return next;
       });
+      setLeavingIds((s) => {
+        if (!s.has(threadId)) return s;
+        const next = new Set(s);
+        next.delete(threadId);
+        return next;
+      });
       console.error("archive failed", e);
     });
   }, []);
+
+  // The leave timers outlive a row that unmounts first (archiving the last row and switching views,
+  // or closing the window mid-animation). A pending timer that fires after unmount would call
+  // setState on a dead component, so they are cleared together on the way out.
+  useEffect(
+    () => () => {
+      for (const timer of leaveTimers.current) window.clearTimeout(timer);
+    },
+    [],
+  );
 
   useKeymap(
     useCallback(
@@ -420,8 +468,8 @@ export function Inbox({
     return pillFiltered.filter((r) => matching.has(r.threadId));
   }, [pillFiltered, threadLabels, selectedLabelIds]);
   const viewFiltered = useMemo(
-    () => applyArchiveView(labelFiltered, view, pendingArchive),
-    [labelFiltered, view, pendingArchive],
+    () => applyArchiveView(labelFiltered, view, pendingArchive, leavingIds),
+    [labelFiltered, view, pendingArchive, leavingIds],
   );
   // Archived sorts by archive time, newest first — it does not pull needs-attention to the top.
   const filtered = useMemo(
@@ -595,6 +643,7 @@ export function Inbox({
               labels={item.row.labels}
               person={item.row.person}
               archived={view === "archived"}
+              leaving={leavingIds.has(item.row.id)}
               onArchive={(id) => toggleArchive(id, view !== "archived")}
               onSelect={(id) => {
                 setSelectedId(id);

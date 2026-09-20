@@ -1,4 +1,5 @@
 import * as HoverCard from "@radix-ui/react-hover-card";
+import { type CSSProperties, type RefObject, useEffect, useRef, useState } from "react";
 import { cn } from "../lib/cn.js";
 import {
   type AgentRuntimeKind,
@@ -71,6 +72,39 @@ export interface InboxRowProps {
    *  an agent session, which has no person — the card then omits those rows rather than inventing
    *  them. */
   person?: { vip?: boolean; relationshipState?: RelationshipState | null } | null;
+  /** US-D04: this row has just been archived (or restored) and is on its way out of the list. The
+   *  screen keeps it in the data for the length of the leave animation (motion.ts's LEAVE_MS) so
+   *  there is something left to animate; this prop is what makes it collapse while it waits. */
+  leaving?: boolean;
+}
+
+/** US-D04: the archive collapse animates `height`, and `height: auto` only interpolates where
+ *  `interpolate-size: allow-keywords` exists — Chromium 129+, which macOS's WKWebView (what Tauri
+ *  renders in) does not ship. So the row measures itself once, on the frame `leaving` turns on while
+ *  it is still at full height, and hands the pixel value to app.css's @keyframes inbox-row-leave
+ *  through --row-collapse-h.
+ *  Once, not per frame: reading the rect of every animating row on every frame is exactly the layout
+ *  thrash the rest of this pass avoids. The class is applied only after the measurement lands, so a
+ *  row never starts an animation whose `from` height is unset — that would make the height discrete
+ *  (auto -> 0 snaps instead of collapsing) while the opacity still faded, which reads as a glitch
+ *  rather than as motion. */
+function useCollapseHeight(leaving: boolean): {
+  ref: RefObject<HTMLDivElement>;
+  style: CSSProperties | undefined;
+} {
+  const ref = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState<number | null>(null);
+  useEffect(() => {
+    if (!leaving) {
+      setHeight(null);
+      return;
+    }
+    setHeight(ref.current?.getBoundingClientRect().height ?? null);
+  }, [leaving]);
+  return {
+    ref,
+    style: height === null ? undefined : ({ "--row-collapse-h": `${height}px` } as CSSProperties),
+  };
 }
 
 function pickChips(labels: LabelChip[]): { shown: LabelChip[]; more: number } {
@@ -124,6 +158,10 @@ export function InboxRow(props: InboxRowProps) {
     props.unreadCount !== undefined && props.unreadCount > 0
       ? [{ label: "Unread", value: props.unreadCount, numeric: true }]
       : [];
+  // US-D04: `style` is undefined until the row has been measured, so the leaving class and the
+  // height it needs land in the same commit (see useCollapseHeight).
+  const collapse = useCollapseHeight(props.leaving === true);
+  const leaving = props.leaving === true && collapse.style !== undefined;
   return (
     // US-D02: HoverCard.Trigger is asChild, so it only adds hover handlers to this row div — no
     // wrapper element appears and the row's role="option", click and keyboard behaviour are
@@ -133,12 +171,18 @@ export function InboxRow(props: InboxRowProps) {
     // short (100ms) so the card follows while moving between rows.
     <HoverCard.Root openDelay={400} closeDelay={100}>
       <HoverCard.Trigger asChild>
-        {/* biome-ignore lint/a11y/useSemanticElements: A5 §3.1 listbox/option pattern — <option> is only valid inside <select> and can't hold this row's markup. */}
         <div
+          ref={collapse.ref}
+          style={collapse.style}
+          // biome-ignore lint/a11y/useSemanticElements: A5 §3.1 listbox/option pattern — <option> is only valid inside <select> and can't hold this row's markup.
           role="option"
           tabIndex={0}
           aria-selected={props.selected}
-          className={cn("inbox-row", props.selected && "inbox-row--selected")}
+          className={cn(
+            "inbox-row",
+            props.selected && "inbox-row--selected",
+            leaving && "inbox-row--leaving",
+          )}
           onClick={() => props.onSelect(props.id)}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {

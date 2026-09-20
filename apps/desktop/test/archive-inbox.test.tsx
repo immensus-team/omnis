@@ -4,9 +4,10 @@
 // file tags queries by table name and returns different rows per table (Inbox runs seven).
 import "./setup";
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { LEAVE_MS, REDUCED_FADE_MS } from "@omnis/ui/lib/motion";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { VirtuosoMockContext } from "react-virtuoso";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const THREAD_A = "11111111-1111-1111-1111-111111111111";
 const THREAD_B = "22222222-2222-2222-2222-222222222222";
@@ -80,6 +81,9 @@ beforeEach(() => {
   fetchMock.mockClear();
   vi.stubGlobal("fetch", fetchMock);
 });
+// The leave animation is advanceable in every test that archives something; this is the backstop
+// for one that throws before reaching its own vi.useRealTimers().
+afterEach(() => vi.useRealTimers());
 
 const renderInbox = () =>
   render(
@@ -96,6 +100,13 @@ const rowNames = (): string[] =>
 const archivedPill = () => screen.getByRole("button", { name: "Archived" });
 const url = (call: number): string => String(fetchMock.mock.calls[call]?.[0]);
 
+/** US-D04: an archived row is no longer gone on the frame the click lands — it stays in the list
+ *  for one leave animation (LEAVE_MS) and then goes. Every assertion after an archive or a restore
+ *  therefore has two halves: what the list shows while the row is leaving, and what it shows once
+ *  the animation has run out. Driven by the same constant the screen holds the row for, so a change
+ *  to the duration cannot leave these tests passing against a stale number. */
+const runLeaveAnimation = () => act(() => vi.advanceTimersByTime(LEAVE_MS));
+
 describe("Inbox archive/restore (US-A36)", () => {
   it("hides threads that are already archived and lists them under the Archived pill", () => {
     renderInbox();
@@ -106,34 +117,54 @@ describe("Inbox archive/restore (US-A36)", () => {
     expect(screen.getByRole("button", { name: "Restore" })).toBeInTheDocument();
   });
 
-  it("archives the selected row with `e` — it leaves the list at once and shows up in Archived", async () => {
+  it("archives the selected row with `e` — it collapses out, then shows up in Archived", () => {
+    vi.useFakeTimers();
     renderInbox();
     fireEvent.click(screen.getByRole("option", { name: /New mail/ }));
     fireEvent.keyDown(window, { key: "e" });
 
-    expect(rowNames()).toEqual([]);
+    // US-D04, first half: the row is still in the list — it has to be, or there is nothing left to
+    // animate. What changed on the click is that it is marked as leaving, which is the flag app.css
+    // hangs the collapse off and which switches the row's pointer-events off.
+    expect(rowNames()).toEqual(["New mail"]);
+    expect(screen.getByRole("option", { name: /New mail/ })).toHaveClass("inbox-row--leaving");
+    // The server call is not held back behind the animation — it goes out on the click.
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(url(0)).toContain(`/api/threads/${THREAD_A}/archive`);
 
+    // Second half: once the animation has run out the row leaves by the ordinary archived rule.
+    runLeaveAnimation();
+    expect(rowNames()).toEqual([]);
+
     fireEvent.click(archivedPill());
     expect(rowNames()).toEqual(["New mail", "Older mail"]);
+    vi.useRealTimers();
   });
 
   it("restores it with `u` — back in the Inbox, and the hub gets the unarchive", () => {
+    vi.useFakeTimers();
     renderInbox();
     fireEvent.click(screen.getByRole("option", { name: /New mail/ }));
     fireEvent.keyDown(window, { key: "e" });
+    runLeaveAnimation();
     fireEvent.click(archivedPill());
     fireEvent.click(screen.getByRole("option", { name: /New mail/ }));
     fireEvent.keyDown(window, { key: "u" });
 
+    // A restore leaves the Archived list by the same route an archive leaves the Inbox — the row is
+    // held for one animation there too, which is why the assertion still sees it.
+    expect(rowNames()).toEqual(["New mail", "Older mail"]);
+    runLeaveAnimation();
     expect(rowNames()).toEqual(["Older mail"]);
     expect(url(1)).toContain(`/api/threads/${THREAD_A}/unarchive`);
+
     fireEvent.click(archivedPill());
     expect(rowNames()).toEqual(["New mail"]);
+    vi.useRealTimers();
   });
 
   it("the hover action archives the row it belongs to without opening it", () => {
+    vi.useFakeTimers();
     const onOpen = vi.fn();
     render(
       <VirtuosoMockContext.Provider value={{ viewportHeight: 600, itemHeight: 72 }}>
@@ -143,6 +174,48 @@ describe("Inbox archive/restore (US-A36)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Archive" }));
     expect(onOpen).not.toHaveBeenCalled();
     expect(url(0)).toContain(`/api/threads/${THREAD_A}/archive`);
+
+    runLeaveAnimation();
     expect(rowNames()).toEqual([]);
+    vi.useRealTimers();
+  });
+});
+
+describe("Inbox archive leave honours prefers-reduced-motion (US-D04)", () => {
+  const REAL_MATCH_MEDIA = window.matchMedia;
+  afterEach(() => {
+    window.matchMedia = REAL_MATCH_MEDIA;
+  });
+
+  /** jsdom's window.matchMedia always reports matches:false, so the reduced branch is only
+   *  reachable against a stub — the same limitation channel-rail.test.tsx works around. The screen
+   *  reads window.matchMedia, not globalThis's. */
+  const stubReducedMotion = () => {
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("prefers-reduced-motion"),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+  };
+
+  it("holds a leaving row for the reduced fade, not for the full leave duration", () => {
+    stubReducedMotion();
+    vi.useFakeTimers();
+    renderInbox();
+    fireEvent.click(screen.getByRole("option", { name: /New mail/ }));
+    fireEvent.keyDown(window, { key: "e" });
+
+    // The row is still held and still marked — reduced motion shortens the exit, it does not skip
+    // it. (This is the assertion that would catch a regression to the old `--dur-*: 0ms` behaviour:
+    // at zero the row would already be gone on this line.)
+    expect(screen.getByRole("option", { name: /New mail/ })).toHaveClass("inbox-row--leaving");
+
+    // Gone one reduced fade later. At the same instant a full-motion user still has the row (the
+    // suite above asserts presence and then advances LEAVE_MS), so this is the reduced path and not
+    // an accidental instant removal.
+    act(() => vi.advanceTimersByTime(REDUCED_FADE_MS));
+    expect(rowNames()).toEqual([]);
+    vi.useRealTimers();
   });
 });
