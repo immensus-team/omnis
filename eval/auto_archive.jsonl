@@ -33,13 +33,13 @@
 {"id":"e33","handle":"no-reply@baemin.example","body":"주문이 접수되었습니다. 조리 후 배달이 시작됩니다.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
 {"id":"e34","handle":"no-reply@kurly.example","body":"새벽배송 주문이 확정되었습니다.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
 {"id":"e35","handle":"no-reply@musinsa.example","body":"주문하신 상품이 출고되었습니다.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
-{"id":"e36","handle":"no-reply@yanolja.example","body":"예약이 확정되었습니다. 체크인 안내를 확인해 주세요.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
+{"id":"e36","handle":"no-reply@yanolja.example","body":"예약이 확정되었습니다. 체크인은 9월 22일 15시부터 가능합니다.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
 {"id":"e37","handle":"no-reply@zigzag.example","body":"교환 신청이 접수되었습니다.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
-{"id":"e38","handle":"no-reply@ohouse.example","body":"주문하신 가구의 배송 일정이 확정되었습니다.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
+{"id":"e38","handle":"no-reply@ohouse.example","body":"주문하신 가구의 배송 일정이 확정되었습니다. 배송은 10월 2일 오전으로 예정되어 있습니다.","meta":{},"sensitivity":"normal","vip":false,"i_replied":true,"expect_archive":true}
 {"id":"e39","handle":"no-reply@emart.example","body":"주문이 정상 접수되었습니다.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
 {"id":"e40","handle":"no-reply@ssg.example","body":"결제 완료 후 상품 준비가 시작되었습니다.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
 {"id":"e41","handle":"no-reply@wanted.example","body":"지원 내역이 접수되었습니다.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
-{"id":"e42","handle":"no-reply@class101.example","body":"수강 신청이 완료되었습니다.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
+{"id":"e42","handle":"no-reply@class101.example","body":"신청하신 수강 과정 등록이 완료되었습니다. 개강일은 10월 6일입니다.","meta":{},"sensitivity":"normal","vip":false,"i_replied":true,"expect_archive":true}
 {"id":"e43","handle":"no-reply@inflearn.example","body":"결제하신 강의를 바로 수강하실 수 있습니다.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
 {"id":"e44","handle":"no-reply@jobplanet.example","body":"작성하신 리뷰가 등록되었습니다.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
 {"id":"e45","handle":"no-reply@dhl.example","body":"Your shipment has cleared customs and is out for delivery.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
@@ -69,7 +69,7 @@
 {"id":"e69","handle":"calendar-notification@google.example","body":"Accepted: 'Vendor demo' — Thursday 15:00.","meta":{"headers":{"Precedence":"bulk"}},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
 {"id":"e70","handle":"calendar-notification@google.example","body":"한지우 님이 '스프린트 회고' 초대를 수락했습니다.","meta":{"headers":{"Precedence":"bulk"}},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
 {"id":"e71","handle":"no-reply@aws.example","body":"Scheduled maintenance for RDS in ap-northeast-2 on 2026-10-03.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
-{"id":"e72","handle":"no-reply@aws.example","body":"Your service quota increase request for Lambda concurrency was approved.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
+{"id":"e72","handle":"no-reply@aws.example","body":"Your service quota increase request for Lambda concurrency was approved. The new limit is already active in ap-northeast-2.","meta":{},"sensitivity":"normal","vip":false,"i_replied":true,"expect_archive":true}
 {"id":"e73","handle":"no-reply@aws.example","body":"Your ACM certificate for api.example.com was renewed automatically.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
 {"id":"e74","handle":"no-reply@cloudflare.example","body":"Your SSL certificate was renewed and deployed to all edge nodes.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
 {"id":"e75","handle":"no-reply@sentry.example","body":"Weekly digest: 3 new issues, 41 events, 0 regressions.","meta":{},"sensitivity":"normal","vip":false,"i_replied":false,"expect_archive":true}
