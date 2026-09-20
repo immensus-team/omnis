@@ -2,48 +2,48 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 미니(`vigors-mac-mini`)를 Phase B 상태로 운영 가능하게 만드는 인프라 6종 — Web Push VAPID 키 회전, Tailscale Serve PWA 마운트 + ACL 문서, 야간 백업 + 분기 복구 리허설, healthchecks.io + ntfy 이중 경보, 부팅 프리플라이트, 월간 비용 리포트 잡. 코드 의존이 있는 것은 US-B44(커널 스케줄러 잡) 하나뿐이고 나머지 5개는 셸 스크립트 + launchd + 문서다.
+**Goal:** Six pieces of infrastructure that make the mini (`vigors-mac-mini`) operable in its Phase B state — Web Push VAPID key rotation, Tailscale Serve PWA mount + ACL document, nightly backup + quarterly restore drill, healthchecks.io + ntfy dual alerting, boot preflight, and a monthly cost report job. Only one of them has a code dependency, US-B44 (a kernel scheduler job); the other five are shell scripts + launchd + documents.
 
-**Architecture:** `ops/mini/`(A6 §1·§10, 실측 반영 — LaunchAgent만 쓰고 sudo 없음, `run.sh`가 `env.sh`를 통해 Keychain 값을 export)의 기존 패턴을 그대로 확장한다. 새 셸 스크립트는 전부 `ops/scripts/`에 두고, `security find-generic-password`로 Keychain을 읽는 `kc()` 헬퍼(`ops/mini/env.sh.example`과 동일 관용구)를 각 스크립트가 자기 안에 갖는다(A6 §9 "createLogger·readKeychainSecret 중복은 의도된 것" 원칙을 셸 스크립트까지 확장 — 공용 라이브러리로 뽑지 않는다). 유일한 TypeScript 태스크(US-B44)는 `packages/kernel/src/jobs/healthcheck.ts`(A3 §6 seed job 패턴)를 그대로 베낀다: `scheduler.register(name, cron, handler)` + `events.emit("cold", …)`.
+**Architecture:** Extend the existing patterns of `ops/mini/` as-is (A6 §1·§10, adjusted to what was actually measured — LaunchAgent only and no sudo, with `run.sh` exporting Keychain values through `env.sh`). Every new shell script lives in `ops/scripts/`, and each script carries its own `kc()` helper that reads the Keychain via `security find-generic-password` (the same idiom as `ops/mini/env.sh.example`) — extending A6 §9's "duplicating createLogger·readKeychainSecret is intentional" principle all the way down to shell scripts, rather than extracting a shared library. The single TypeScript task (US-B44) copies `packages/kernel/src/jobs/healthcheck.ts` (the A3 §6 seed-job pattern) verbatim: `scheduler.register(name, cron, handler)` + `events.emit("cold", …)`.
 
-**Tech Stack:** bash(`set -euo pipefail`) · `security`(macOS Keychain) · `launchctl`/`pmset`/`fdesetup`(macOS) · `pg_dump`/`pg_restore`/`psql`(Postgres 17 클라이언트) · `restic` + Backblaze B2 · `tailscale` CLI · Node 22 `node:crypto`(VAPID 키 생성, 외부 패키지 없이) · TypeScript 5.6 strict + `pg` 8.13.1 + vitest 2.1.9(`@omnis/kernel` integration 프로젝트).
+**Tech Stack:** bash (`set -euo pipefail`) · `security` (macOS Keychain) · `launchctl`/`pmset`/`fdesetup` (macOS) · `pg_dump`/`pg_restore`/`psql` (Postgres 17 client) · `restic` + Backblaze B2 · `tailscale` CLI · Node 22 `node:crypto` (VAPID key generation, no external package) · TypeScript 5.6 strict + `pg` 8.13.1 + vitest 2.1.9 (`@omnis/kernel` integration project).
 
-**Spec:** `/Users/logankim/AI-Workspaces/omnis/docs/spec/00-omnis-design.md` + 이 계획이 구현하는 부록:
-- `A6-ops-infra.md` §2(OS 설정) · §3(네트워크·Tailscale Serve) · §4(Postgres 백업) · §8(모니터링) · §9(비밀 관리)
-- `A4-agent-layer.md` §12.4(비용 미터 — US-B44가 읽는 `agent_runs` 집계 대상)
-- `A7-dev-process.md` §2(툴체인) · §4(모델 배정) · §6(커밋 규칙)
-- `2026-09-20-phase-b-backlog.md` §2 US-B16·B34·B41·B42·B43·B44 행, §4(공통 금지), B-D5(픽스처/시드로만 인수)
-- `2026-09-20-phase-b-interfaces-delta.md` §5(`@omnis/kernel` 추가 export) · §8(잡 표) · §9(환경변수·Keychain)
-- `2026-09-20-phase-a-interfaces.md` §4(`@omnis/db`) · §5(`@omnis/kernel` Scheduler/Events/Logger) · §9(공통 규약)
-- 실측 코드(스펙보다 우선): `ops/mini/RUNBOOK.md`, `ops/mini/env.sh.example`, `ops/mini/run.sh`, `ops/mini/install.sh`, `ops/mini/com.omnis.hub.plist`, `packages/kernel/src/jobs/healthcheck.ts` — A6 원문의 `/opt/omnis` + sops 설계는 실제로 `ops/mini/env.sh` + 개별 Keychain 항목으로 대체되어 있다(RUNBOOK "이 배포가 미니에 실제로 바꾼 것" 표). 이 계획은 실측 쪽을 따른다.
+**Spec:** `/Users/logankim/AI-Workspaces/omnis/docs/spec/00-omnis-design.md` + the appendices this plan implements:
+- `A6-ops-infra.md` §2 (OS settings) · §3 (network · Tailscale Serve) · §4 (Postgres backup) · §8 (monitoring) · §9 (secret management)
+- `A4-agent-layer.md` §12.4 (cost meter — the `agent_runs` aggregation US-B44 reads)
+- `A7-dev-process.md` §2 (toolchain) · §4 (model assignment) · §6 (commit rules)
+- `2026-09-20-phase-b-backlog.md` §2 rows US-B16·B34·B41·B42·B43·B44, §4 (shared prohibitions), B-D5 (accept with fixtures/seeds only)
+- `2026-09-20-phase-b-interfaces-delta.md` §5 (additional `@omnis/kernel` exports) · §8 (job table) · §9 (environment variables · Keychain)
+- `2026-09-20-phase-a-interfaces.md` §4 (`@omnis/db`) · §5 (`@omnis/kernel` Scheduler/Events/Logger) · §9 (shared conventions)
+- Measured code (takes precedence over the spec): `ops/mini/RUNBOOK.md`, `ops/mini/env.sh.example`, `ops/mini/run.sh`, `ops/mini/install.sh`, `ops/mini/com.omnis.hub.plist`, `packages/kernel/src/jobs/healthcheck.ts` — A6's original `/opt/omnis` + sops design has in practice been replaced by `ops/mini/env.sh` + individual Keychain items (RUNBOOK's "what this deployment actually changed on the mini" table). This plan follows what was measured.
 
 ---
 
 ## Global Constraints
 
-- Node 22 + pnpm workspaces. TypeScript strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`(루트 `tsconfig.base.json`, 이미 존재 — 이 계획은 만들지 않는다).
-- Postgres 17 고정. 개발 DB `omnis`(미니에서 유저 `vigor`), 테스트 DB `omnis_test`(전부 `DATABASE_URL`, 없으면 `postgres://logan@127.0.0.1:5432/omnis_test` 기본값 — 계약 §2). US-B44의 vitest integration 테스트는 이 DB를 쓰고, 파일별 트랜잭션 롤백은 없다(트리거·NOTIFY 검증 때문 — 계약 §2). Task 6이 만든 잡 row는 `afterAll`에서 직접 지운다(공유 `omnis_test`가 0006 seed 개수 단언을 깨지 않도록, `healthcheck-job.test.ts`가 이미 쓰는 패턴).
-- 버전 핀(FIXED): `vitest 2.1.9` · `zod ^3.24.1` · `pg 8.13.1` · `typescript 5.6.3` · `@rocicorp/zero 1.9.0`(exact) · `ai 7.0.107`. 이 계획은 `zod`/`zero`/`ai`를 쓰지 않는다 — `pg`(간접, `@omnis/db` 경유)와 `vitest`만.
-- 마이그레이션은 append-only 파일 `packages/db/migrations/000N_<name>.sql`, 다음 번호는 **0009+**다. 이미 다른 Phase B 계획(worktree)이 적용한 파일은 절대 고치지 않는다 — `migrate()`가 sha256 비교로 "changed after apply"를 throw한다(계약 §4). Task 6의 마이그레이션 번호 선택 근거는 Task 6 본문 참조.
-- lint는 커밋 전에 돈다: `pnpm lint`(TypeScript 파일에만 해당 — 셸 스크립트는 `bash -n`으로 문법만 확인, 이 리포에 shellcheck는 아직 안 물려 있다).
-- 비가역 tool(`send`/`delete`/`delegate`/`calendar_write`)을 승인 게이트 밖에서 배선하지 않는다 — 이 계획은 그런 tool을 전혀 만들지 않는다(전부 읽기·모니터링·백업이다).
-- provider SDK는 어댑터 안에서만 — 이 계획은 어댑터를 만들지 않는다.
-- 실계정 자격증명을 테스트에 넣지 않는다(B-D5). 모든 셸 스크립트 테스트는 `PATH`에 가짜 `security`/`tailscale`/`launchctl`/`pg_dump` 바이너리를 세워 실제 Keychain·네트워크·launchd를 건드리지 않는다.
-- 커밋 메시지: `US-Bxx: <한 줄 요약>` + 본문에 충족한 acceptance criteria + 마지막 두 줄 `Implemented-by: Claude <tier>` / `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`(세션 규칙). 브랜치 `ralph/<story-id>`.
-- Keychain 항목명은 A1/A6 §9 점 스킴 `omnis.<service>.<kind>`, account는 전부 `281932556+jinhologankim@users.noreply.github.com`(`ops/mini/env.sh.example`의 `kc()` 관용구 그대로). 값은 셸 히스토리·로그·커밋에 남기지 않는다.
-- `agent_runs`/`digests`/`jobs`/`accounts` 컬럼명은 계약 §4(Phase A) 그대로다 — 새 컬럼을 만들지 않는다(Task 6은 기존 `digests.metrics` jsonb에 병합만 한다).
+- Node 22 + pnpm workspaces. TypeScript strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` (root `tsconfig.base.json`, already present — this plan does not create it).
+- Postgres 17 pinned. Dev DB `omnis` (user `vigor` on the mini), test DB `omnis_test` (all through `DATABASE_URL`, defaulting to `postgres://logan@127.0.0.1:5432/omnis_test` when unset — contract §2). US-B44's vitest integration test uses this DB, and there is no per-file transaction rollback (because of trigger/NOTIFY verification — contract §2). The job row Task 6 creates is deleted directly in `afterAll` (so the shared `omnis_test` does not break the 0006 seed-count assertion — the pattern `healthcheck-job.test.ts` already uses).
+- Version pins (FIXED): `vitest 2.1.9` · `zod ^3.24.1` · `pg 8.13.1` · `typescript 5.6.3` · `@rocicorp/zero 1.9.0` (exact) · `ai 7.0.107`. This plan uses none of `zod`/`zero`/`ai` — only `pg` (indirect, via `@omnis/db`) and `vitest`.
+- Migrations are append-only files `packages/db/migrations/000N_<name>.sql`; the next number is **0009+**. Never modify a file another Phase B plan (worktree) has already applied — `migrate()` throws "changed after apply" from a sha256 comparison (contract §4). For the reasoning behind Task 6's migration-number choice, see the Task 6 body.
+- Lint runs before committing: `pnpm lint` (TypeScript files only — shell scripts are syntax-checked with `bash -n`; shellcheck is not wired into this repo yet).
+- Do not wire irreversible tools (`send`/`delete`/`delegate`/`calendar_write`) outside the approval gate — this plan creates no such tool at all (everything here is read, monitoring, or backup).
+- Provider SDKs only inside their adapter — this plan creates no adapter.
+- Never put real-account credentials in tests (B-D5). Every shell-script test plants fake `security`/`tailscale`/`launchctl`/`pg_dump` binaries on the `PATH` so it never touches the real Keychain, network, or launchd.
+- Commit messages: `US-Bxx: <one-line summary>` + the acceptance criteria satisfied in the body + the final two lines `Implemented-by: Claude <tier>` / `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` (session rule). Branch `ralph/<story-id>`.
+- Keychain item names use the A1/A6 §9 dotted scheme `omnis.<service>.<kind>`, with account always `281932556+jinhologankim@users.noreply.github.com` (exactly the `kc()` idiom from `ops/mini/env.sh.example`). Never leave values in shell history, logs, or commits.
+- The `agent_runs`/`digests`/`jobs`/`accounts` column names are exactly contract §4 (Phase A) — no new columns (Task 6 only merges into the existing `digests.metrics` jsonb).
 
-**`exactOptionalPropertyTypes` 함정**(Task 6에만 해당): `deps.now`가 optional이면 `const now = deps.now ?? (() => new Date())`처럼 항상 폴백을 만든다 — `{ now: undefined }`를 그대로 넘기지 않는다.
+**`exactOptionalPropertyTypes` pitfall** (applies to Task 6 only): when `deps.now` is optional, always build a fallback such as `const now = deps.now ?? (() => new Date())` — never pass `{ now: undefined }` through as-is.
 
 ---
 
 ### Task 1: VAPID Key Rotation (US-B16, tier: Haiku)
 
-**스토리 US-B16** — 목표: Web Push용 VAPID 키쌍을 생성해 Keychain에 저장하고, 이미 있으면 건드리지 않으며(`--force`로만 회전), 있는지 없는지를 `--check`로 확인한다. `omnis-run-with-secrets.sh`는 이 리포에서 `ops/mini/run.sh` + `ops/mini/env.sh`로 실측 대체되어 있다(A6 §9 원문 대신 실측 코드가 정본). 산출물: `ops/scripts/gen-vapid.sh`, `ops/mini/RUNBOOK.md`(수정, 회전 절차 6단계). 검증: `bash ops/scripts/gen-vapid.sh --check`. 티어: Haiku.
+**Story US-B16** — Goal: generate a VAPID key pair for Web Push and store it in the Keychain, leave it untouched if it already exists (rotate only with `--force`), and report presence or absence via `--check`. In this repo `omnis-run-with-secrets.sh` has in practice been replaced by `ops/mini/run.sh` + `ops/mini/env.sh` (measured code is authoritative, not A6 §9's original text). Deliverables: `ops/scripts/gen-vapid.sh`, `ops/mini/RUNBOOK.md` (modified, 6-step rotation procedure). Verification: `bash ops/scripts/gen-vapid.sh --check`. Tier: Haiku.
 
-**읽을 곳**: `ops/mini/env.sh.example`(`kc()` 관용구), 델타 §9(`OMNIS_WEBPUSH_VAPID_PUBLIC`/`…PRIVATE`, Keychain `omnis.webpush.vapid_private`/`…public`), A6 §9(회전 절차 6단계).
+**Read:** `ops/mini/env.sh.example` (the `kc()` idiom), delta §9 (`OMNIS_WEBPUSH_VAPID_PUBLIC`/`…PRIVATE`, Keychain `omnis.webpush.vapid_private`/`…public`), A6 §9 (the 6-step rotation procedure).
 
-**만들지 않을 것(YAGNI)**: `web-push` npm 패키지 — VAPID 키는 P-256 EC 키쌍(uncompressed public point + private `d`)일 뿐이라 `node:crypto`(stdlib, ladder 3단)로 충분하다. `web-push` 자체는 허브의 발송 로직(US-B17, 이 계획 밖)에서만 필요하다. 키 회전 스케줄러(cron) — 회전은 A6 §9가 "유출 의심 시 즉시 + 분기 1회, 손으로"라고 정했으므로 자동화하지 않는다.
+**Won't build (YAGNI)**: the `web-push` npm package — a VAPID key is nothing but a P-256 EC key pair (uncompressed public point + private `d`), so `node:crypto` (stdlib, ladder rung 3) is enough. `web-push` itself is only needed by the hub's send logic (US-B17, outside this plan). A key-rotation scheduler (cron) — A6 §9 specifies rotation "immediately on suspected compromise + once a quarter, by hand", so we do not automate it.
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/ops/scripts/gen-vapid.sh`
@@ -52,16 +52,16 @@
 
 **Interfaces:**
 - Consumes: `security find-generic-password`/`add-generic-password`(macOS Keychain CLI) · `node:crypto`(stdlib).
-- Produces: Keychain 항목 `omnis.webpush.vapid_public` · `omnis.webpush.vapid_private`(둘 다 base64url, account `281932556+jinhologankim@users.noreply.github.com`) — 델타 §9가 고정한 이름 그대로. 허브가 `OMNIS_WEBPUSH_VAPID_PUBLIC`/`…PRIVATE`로 읽는 값(US-B17이 그 배선을 한다, 이 계획 밖).
+- Produces: Keychain items `omnis.webpush.vapid_public` · `omnis.webpush.vapid_private` (both base64url, account `281932556+jinhologankim@users.noreply.github.com`) — exactly the names delta §9 pins. The values the hub reads as `OMNIS_WEBPUSH_VAPID_PUBLIC`/`…PRIVATE` (US-B17 does that wiring, outside this plan).
 
 #### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. 실제 Keychain을 건드리지 않도록 `PATH`에 가짜 `security`/`node`... 는 필요 없다(`node`는 진짜를 쓴다 — 순수 계산이라 안전), 가짜 `security`만 세운다.
+- [ ] 1. Write the failing test. To avoid touching the real Keychain, plant fakes on the `PATH` for `security`/`node`… not needed (use the real `node` — it is pure computation, so it is safe); plant a fake `security` only.
 
 `/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/gen-vapid.test.sh`:
 ```bash
 #!/bin/bash
-# US-B16 self-check. 프레임워크 없음 — assert 스타일(ponytail).
+# US-B16 self-check. No framework — assert style (ponytail).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SCRIPT="$ROOT/ops/scripts/gen-vapid.sh"
@@ -71,7 +71,7 @@ STORE="$(mktemp -d)/store"
 mkdir -p "$STORE"
 trap 'rm -rf "$FAKE_BIN" "$(dirname "$STORE")"' EXIT
 
-# 가짜 security: -s <service> -a <account> -w [값] 를 파일 하나당 한 서비스로 흉내낸다.
+# Fake security: emulates -s <service> -a <account> -w [value] with one file per service.
 cat > "$FAKE_BIN/security" <<'FAKESEC'
 #!/bin/bash
 store="${OMNIS_TEST_KC_STORE:?}"
@@ -94,27 +94,27 @@ chmod +x "$FAKE_BIN/security"
 export PATH="$FAKE_BIN:$PATH"
 export OMNIS_TEST_KC_STORE="$STORE"
 
-# 1) 아직 키가 없을 때 --check는 실패해야 한다.
+# 1) --check must fail while no keys are stored yet.
 if "$SCRIPT" --check >/dev/null 2>&1; then
   echo "FAIL: --check passed with no keys stored" >&2; exit 1
 fi
 echo "ok: --check fails before generation"
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && chmod +x ops/scripts/test/gen-vapid.test.sh && bash ops/scripts/test/gen-vapid.test.sh
 ```
-기대 실패: `ops/scripts/gen-vapid.sh: No such file or directory`.
+Expected failure: `ops/scripts/gen-vapid.sh: No such file or directory`.
 
-- [ ] 3. 스크립트를 쓴다.
+- [ ] 3. Write the script.
 
 `/Users/logankim/AI-Workspaces/omnis/ops/scripts/gen-vapid.sh`:
 ```bash
 #!/bin/bash
-# US-B16: Web Push VAPID 키쌍 생성 + Keychain 저장(A6 §9 회전 절차의 (1)~(2)).
-# web-push npm 패키지 없이 node:crypto로 직접 만든다 — VAPID는 P-256 EC 키쌍일 뿐이다.
+# US-B16: generate a Web Push VAPID key pair + store it in the Keychain (A6 §9 rotation steps (1)~(2)).
+# Built directly with node:crypto instead of the web-push npm package — VAPID is just a P-256 EC key pair.
 set -euo pipefail
 
 ACCOUNT="281932556+jinhologankim@users.noreply.github.com"
@@ -125,8 +125,8 @@ kc_get() { security find-generic-password -s "$1" -a "$ACCOUNT" -w 2>/dev/null; 
 kc_set() { security add-generic-password -s "$1" -a "$ACCOUNT" -w "$2" -U >/dev/null; }
 
 gen_keys() {
-  # SPKI DER의 마지막 65바이트 = uncompressed EC point(0x04 + 32바이트 x + 32바이트 y).
-  # P-256 SPKI 헤더 길이가 고정이라 안정적으로 뒤에서 자를 수 있다(node:crypto 표준 동작).
+  # The last 65 bytes of the SPKI DER = uncompressed EC point (0x04 + 32-byte x + 32-byte y).
+  # The P-256 SPKI header is a fixed length, so slicing from the end is stable (standard node:crypto behaviour).
   node -e '
     const crypto = require("node:crypto");
     const { publicKey, privateKey } = crypto.generateKeyPairSync("ec", { namedCurve: "prime256v1" });
@@ -151,7 +151,7 @@ do_check() {
 do_generate() {
   local force="${1:-}"
   if [ "$force" != "--force" ] && kc_get "$PUB_SERVICE" >/dev/null 2>&1; then
-    echo "vapid keys already exist — use --force to rotate (A6 §9 회전 절차)" >&2
+    echo "vapid keys already exist — use --force to rotate (A6 §9 rotation procedure)" >&2
     exit 1
   fi
   local json pub priv
@@ -171,33 +171,33 @@ case "${1:-}" in
 esac
 ```
 
-- [ ] 4. 실행 권한을 주고 테스트를 다시 돌려 1단계 assert가 통과함을 확인한다.
+- [ ] 4. Make it executable and re-run the test to confirm the step 1 assert passes.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && chmod +x ops/scripts/gen-vapid.sh && bash ops/scripts/test/gen-vapid.test.sh
 ```
-기대: `ok: --check fails before generation`(아직 2번째 assert는 없다 — 다음 단계에서 추가).
+Expected: `ok: --check fails before generation` (there is no second assert yet — it is added in the next step).
 
-- [ ] 5. 생성 → check 성공 → 중복 생성 거부 → `--force` 회전까지 검증하는 나머지 assert를 테스트 파일 끝에 추가한다.
+- [ ] 5. Append the remaining asserts to the end of the test file, covering generate → check succeeds → duplicate generation rejected → `--force` rotation.
 
-`/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/gen-vapid.test.sh`(파일 끝에 추가):
+`/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/gen-vapid.test.sh` (appended at end of file):
 ```bash
 
-# 2) 생성 후 --check는 성공해야 한다.
+# 2) After generation --check must succeed.
 "$SCRIPT" >/dev/null
 "$SCRIPT" --check
 echo "ok: --check passes after generation"
 
 pub1="$(cat "$STORE/$PUB_SERVICE" 2>/dev/null || true)"
 
-# 3) --force 없이 재생성하면 거부하고 기존 키를 보존해야 한다(A6 §9: 키는 손으로만 회전).
+# 3) Re-generating without --force must be rejected and must preserve the existing key (A6 §9: keys rotate by hand only).
 if "$SCRIPT" >/dev/null 2>&1; then
   echo "FAIL: re-generation without --force should be rejected" >&2; exit 1
 fi
 [ "$(cat "$STORE/$PUB_SERVICE")" = "$pub1" ] || { echo "FAIL: key mutated without --force" >&2; exit 1; }
 echo "ok: re-generation without --force is rejected and key is unchanged"
 
-# 4) --force는 키를 회전시켜야 한다.
+# 4) --force must rotate the key.
 "$SCRIPT" --force >/dev/null
 pub2="$(cat "$STORE/$PUB_SERVICE")"
 [ "$pub1" != "$pub2" ] || { echo "FAIL: --force did not rotate the key" >&2; exit 1; }
@@ -206,38 +206,38 @@ echo "ok: --force rotates the key"
 echo "PASS"
 ```
 
-여기서 `PUB_SERVICE` 변수는 테스트 스크립트 안에서도 정의해야 한다 — 1단계 헤더 근처에 `PUB_SERVICE="omnis.webpush.vapid_public"`를 추가한다(스크립트 본체와 이름이 같아야 파일 경로가 맞는다).
+The `PUB_SERVICE` variable has to be defined inside the test script too — add `PUB_SERVICE="omnis.webpush.vapid_public"` near the header in step 1 (it must match the name used in the script body, otherwise the file path will not line up).
 
-- [ ] 6. 전체 테스트를 돌려 통과를 확인한다.
+- [ ] 6. Run the full test and confirm it passes.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && bash ops/scripts/test/gen-vapid.test.sh
 ```
-기대: 마지막 줄 `PASS`, 그 앞에 `ok:` 4줄.
+Expected: final line `PASS`, preceded by four `ok:` lines.
 
-- [ ] 7. `ops/mini/RUNBOOK.md`의 "### 4) 비밀 (A6 §9)" 섹션 뒤에 VAPID 회전 절차를 추가한다(회전 6단계, A6 §9 그대로 셸 스크립트로 구체화).
+- [ ] 7. Add the VAPID rotation procedure after the "### 4) Secrets (A6 §9)" section of `ops/mini/RUNBOOK.md` (the 6 rotation steps, A6 §9 turned into a concrete shell script).
 
-`/Users/logankim/AI-Workspaces/omnis/ops/mini/RUNBOOK.md`에 다음 섹션을 "## 상태 확인" 앞에 삽입:
+Insert the following section into `/Users/logankim/AI-Workspaces/omnis/ops/mini/RUNBOOK.md` before "## Health checks":
 ```markdown
-## Web Push VAPID 키 (US-B16)
+## Web Push VAPID keys (US-B16)
 
 ```bash
-bash ops/scripts/gen-vapid.sh --check     # 있는지만 확인, 아무것도 안 바꾼다
-bash ops/scripts/gen-vapid.sh             # 없을 때만 생성
-bash ops/scripts/gen-vapid.sh --force     # 회전(유출 의심 시 즉시, 정기는 분기 1회 — A6 §9)
+bash ops/scripts/gen-vapid.sh --check     # check presence only, changes nothing
+bash ops/scripts/gen-vapid.sh             # generate only if absent
+bash ops/scripts/gen-vapid.sh --force     # rotate (immediately on suspected leak, otherwise once a quarter — A6 §9)
 ```
-회전 후에는 hub를 재기동해야 새 `OMNIS_WEBPUSH_VAPID_PUBLIC`/`…PRIVATE`를 읽는다(`launchctl kickstart -k gui/$(id -u)/com.omnis.hub`, US-B17이 이 값을 env.sh에 배선한다). 기존 구독자는 새 키로 재구독해야 하므로(VAPID 키가 바뀌면 이전 구독이 전부 무효) 회전 직후 `push_subscriptions`가 비었는지 확인한다.
+The hub must be restarted after a rotation to pick up the new `OMNIS_WEBPUSH_VAPID_PUBLIC`/`…PRIVATE` (`launchctl kickstart -k gui/$(id -u)/com.omnis.hub`; US-B17 wires these values into env.sh). Existing subscribers have to re-subscribe with the new key (changing the VAPID key invalidates every prior subscription), so check whether `push_subscriptions` is empty right after a rotation.
 ```
 
-- [ ] 8. 커밋한다.
+- [ ] 8. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B16: Web Push VAPID 키 생성·Keychain 저장
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B16: generate Web Push VAPID keys and store them in the Keychain
 
-- node:crypto만으로 P-256 VAPID 키쌍 생성(web-push 패키지 불필요)
-- --check(확인만)/기본(없을 때만 생성)/--force(회전) 3모드
-- 이미 있으면 거부, 값은 Keychain omnis.webpush.vapid_public/…private
-- RUNBOOK.md에 회전 절차 추가
+- P-256 VAPID key pair generated with node:crypto alone (no web-push package needed)
+- Three modes: --check (verify only) / default (generate only if absent) / --force (rotate)
+- Rejects regeneration when keys exist; values live in Keychain omnis.webpush.vapid_public/…private
+- Adds the rotation procedure to RUNBOOK.md
 
 Implemented-by: Claude Haiku
 
@@ -248,11 +248,11 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Task 2: Tailscale Serve Mount (US-B34, tier: Sonnet)
 
-**스토리 US-B34** — 목표: `/api/` → hub(`127.0.0.1:8787`), `/` → PWA 정적 빌드(`127.0.0.1:5173`)를 Tailscale Serve로 마운트하고, ACL 문서에 Postgres(5432)·Ollama(11434)를 `dst`에 넣지 않는 이유를 명기하고, Funnel이 항상 꺼져 있는지 확인하는 스크립트를 만든다. 산출물: `ops/mini/tailscale-serve.sh`, `ops/mini/TAILSCALE-ACL.md`. 검증: `bash ops/mini/tailscale-serve.sh --check`. 티어: Sonnet.
+**Story US-B34** — Goal: mount `/api/` → hub (`127.0.0.1:8787`) and `/` → the PWA static build (`127.0.0.1:5173`) via Tailscale Serve, document in the ACL file why Postgres (5432) and Ollama (11434) are not placed in `dst`, and write a script that verifies Funnel is always off. Deliverables: `ops/mini/tailscale-serve.sh`, `ops/mini/TAILSCALE-ACL.md`. Verification: `bash ops/mini/tailscale-serve.sh --check`. Tier: Sonnet.
 
-**읽을 곳**: A6 §3(ACL 예시, Funnel 정책), `ops/mini/RUNBOOK.md`의 "이 배포가 미니에 실제로 바꾼 것" 표(실측: `tailscale serve --bg --https=443 --set-path=/api http://127.0.0.1:8787`가 이미 미니에서 돌고 있다 — 이 태스크는 그 실측 명령을 스크립트로 승격하고 PWA 마운트를 더한다).
+**Read:** A6 §3 (ACL example, Funnel policy), the "what this deployment actually changed on the mini" table in `ops/mini/RUNBOOK.md` (measured: `tailscale serve --bg --https=443 --set-path=/api http://127.0.0.1:8787` is already running on the mini — this task promotes that measured command into a script and adds the PWA mount).
 
-**만들지 않을 것(YAGNI)**: Funnel 자동 on/off 토글 — A6 §3은 Funnel을 "상시 OFF"로 정했고 예외(Calendar watch 스파이크)는 이미 끝난 Phase 0 항목이다. `--check`는 Funnel이 켜져 있으면 **실패**해야지 꺼주면 안 된다(자동 끄기는 예상 밖의 네트워크 변경 — 사람이 확인하고 끈다).
+**Won't build (YAGNI)**: an automatic Funnel on/off toggle — A6 §3 fixes Funnel as "always OFF", and the exception (the Calendar watch spike) is a Phase 0 item that is already finished. `--check` must **fail** when Funnel is on, not turn it off (turning it off automatically is an unexpected network change — a human verifies it and turns it off).
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/ops/mini/tailscale-serve.sh`
@@ -260,12 +260,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Test: `/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/tailscale-serve.test.sh`
 
 **Interfaces:**
-- Consumes: `tailscale serve --bg --https=443 --set-path=<path> <url>` · `tailscale serve status --json` · `tailscale funnel status`(전부 Tailscale CLI, 외부 계약 없음) · `$OMNIS_WEB_PORT`(기본 `5173`, 델타 §9) · `$OMNIS_HUB_PORT`(기본 `8787`, 계약 §9).
-- Produces: 마운트 상태를 사람이 읽는 텍스트로 출력. 새 export 없음(순수 운영 스크립트).
+- Consumes: `tailscale serve --bg --https=443 --set-path=<path> <url>` · `tailscale serve status --json` · `tailscale funnel status` (all Tailscale CLI, no external contract) · `$OMNIS_WEB_PORT` (default `5173`, delta §9) · `$OMNIS_HUB_PORT` (default `8787`, contract §9).
+- Produces: a human-readable text rendering of the mount state. No new exports (a purely operational script).
 
 #### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. 가짜 `tailscale`을 세워 `serve status --json`/`funnel status`를 흉내낸다.
+- [ ] 1. Write the failing test. Plant a fake `tailscale` that emulates `serve status --json`/`funnel status`.
 
 `/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/tailscale-serve.test.sh`:
 ```bash
@@ -294,7 +294,7 @@ FAKETS
 }
 export PATH="$FAKE_BIN:$PATH"
 
-# 1) /api 마운트가 없으면 --check는 실패해야 한다.
+# 1) --check must fail when there is no /api mount.
 write_fake_tailscale '{"Web":{}}' "Funnel off."
 if "$SCRIPT" --check >/dev/null 2>&1; then
   echo "FAIL: --check passed with no /api mount" >&2; exit 1
@@ -302,20 +302,20 @@ fi
 echo "ok: --check fails when /api is not mounted"
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && chmod +x ops/scripts/test/tailscale-serve.test.sh && bash ops/scripts/test/tailscale-serve.test.sh
 ```
-기대 실패: `ops/mini/tailscale-serve.sh: No such file or directory`.
+Expected failure: `ops/mini/tailscale-serve.sh: No such file or directory`.
 
-- [ ] 3. 스크립트를 쓴다.
+- [ ] 3. Write the script.
 
 `/Users/logankim/AI-Workspaces/omnis/ops/mini/tailscale-serve.sh`:
 ```bash
 #!/bin/bash
-# US-B34: hub API + PWA를 tailnet HTTPS 하나에 마운트한다(A6 §3).
-# 실측(RUNBOOK "이 배포가 미니에 실제로 바꾼 것"): --set-path=/api가 이미 미니에서 돈다. sudo 불필요.
+# US-B34: mount the hub API + PWA onto a single tailnet HTTPS endpoint (A6 §3).
+# Measured (RUNBOOK "what this deployment actually changed on the mini"): --set-path=/api already runs on the mini. No sudo needed.
 set -euo pipefail
 
 HUB_PORT="${OMNIS_HUB_PORT:-8787}"
@@ -349,7 +349,7 @@ do_check() {
   local funnel
   funnel="$(tailscale funnel status 2>&1 || true)"
   if echo "$funnel" | grep -qi "funnel on"; then
-    echo "FAIL: Funnel is ON — A6 §3은 Funnel을 상시 OFF로 정했다. 'tailscale funnel 443 off'로 끈다." >&2
+    echo "FAIL: Funnel is ON — A6 §3 fixes Funnel as always OFF. Turn it off with 'tailscale funnel 443 off'." >&2
     exit 1
   fi
   echo "ok: funnel is off"
@@ -362,24 +362,24 @@ case "${1:-}" in
 esac
 ```
 
-- [ ] 4. 실행 권한을 주고 테스트를 다시 돌려 통과를 확인한다.
+- [ ] 4. Make it executable and re-run the test to confirm it passes.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && chmod +x ops/mini/tailscale-serve.sh && bash ops/scripts/test/tailscale-serve.test.sh
 ```
-기대: `ok: --check fails when /api is not mounted`.
+Expected: `ok: --check fails when /api is not mounted`.
 
-- [ ] 5. `/api` 마운트가 있을 때 성공하는지, Funnel이 켜져 있으면 실패하는지를 검증하는 assert를 추가한다.
+- [ ] 5. Add asserts covering the case where the `/api` mount is present, and the case where Funnel is on and must fail.
 
-`/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/tailscale-serve.test.sh`(파일 끝에 추가):
+`/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/tailscale-serve.test.sh` (appended at end of file):
 ```bash
 
-# 2) /api 마운트가 있고 Funnel이 꺼져 있으면 --check는 성공해야 한다.
+# 2) --check must succeed when the /api mount exists and Funnel is off.
 write_fake_tailscale '{"Web":{"mini.ts.net:443":{"Handlers":{"/api":{"Proxy":"http://127.0.0.1:8787"}}}}}' "Funnel off."
 "$SCRIPT" --check
 echo "ok: --check passes with /api mounted and funnel off"
 
-# 3) Funnel이 켜져 있으면 마운트가 맞아도 --check는 실패해야 한다.
+# 3) --check must fail when Funnel is on even if the mount is correct.
 write_fake_tailscale '{"Web":{"mini.ts.net:443":{"Handlers":{"/api":{"Proxy":"http://127.0.0.1:8787"}}}}}' "Funnel on."
 if "$SCRIPT" --check >/dev/null 2>&1; then
   echo "FAIL: --check passed while funnel is on" >&2; exit 1
@@ -389,20 +389,20 @@ echo "ok: --check fails when funnel is on"
 echo "PASS"
 ```
 
-- [ ] 6. 전체 테스트를 돌려 통과를 확인한다.
+- [ ] 6. Run the full test and confirm it passes.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && bash ops/scripts/test/tailscale-serve.test.sh
 ```
-기대: `PASS`.
+Expected: `PASS`.
 
-- [ ] 7. ACL 문서를 쓴다.
+- [ ] 7. Write the ACL document.
 
 `/Users/logankim/AI-Workspaces/omnis/ops/mini/TAILSCALE-ACL.md`:
 ```markdown
 # Tailscale ACL (US-B34, A6 §3)
 
-미니는 공인 인터넷에 어떤 포트도 열지 않는다. 노출은 전부 `tailscale serve`를 거친 HTTPS(443) 하나다.
+The mini opens no ports to the public internet. All exposure goes through a single `tailscale serve` HTTPS (443) endpoint.
 
 ## Grants
 
@@ -421,30 +421,30 @@ cd /Users/logankim/AI-Workspaces/omnis && bash ops/scripts/test/tailscale-serve.
 }
 \`\`\`
 
-## Postgres(5432)·Ollama(11434)를 `dst`에 넣지 않는 이유
+## Why Postgres (5432) and Ollama (11434) are not in `dst`
 
-클라이언트(맥북·아이폰)가 tailnet 너머로 직접 열어야 하는 것은 hub API(443 아래 `/api/`, `tailscale serve`가 127.0.0.1:8787로 프록시)뿐이다. Postgres와 Ollama는 hub 프로세스(또는 그 안의 local-agent 브리지)를 거쳐서만 쓰인다 — ACL에 5432/11434를 열면 클라이언트가 hub의 승인 게이트·감사 로그를 건너뛰고 DB/모델에 직접 접속하는 경로가 생긴다. 공격 표면을 hub API 하나로 좁히는 것이 A6 §3의 tailnet-only 원칙이다.
+The only thing clients (MacBook, iPhone) need to reach directly across the tailnet is the hub API (`/api/` under 443, which `tailscale serve` proxies to 127.0.0.1:8787). Postgres and Ollama are only ever used through the hub process (or the local-agent bridge inside it) — opening 5432/11434 in the ACL would create a path where clients bypass the hub's approval gate and audit log and connect straight to the DB/model. Narrowing the attack surface to the single hub API is A6 §3's tailnet-only principle.
 
 ## Funnel
 
-**상시 OFF.** `tailscale funnel status`가 "Funnel off."가 아니면 `bash ops/mini/tailscale-serve.sh --check`가 실패한다(§8 모니터링, US-B42가 이 스크립트를 healthcheck-ping.sh의 한 항목으로 물린다). Funnel은 공인 인터넷 노출이라 Calendar `events.watch` 같은 웹훅 수신이 꼭 필요한 스파이크 동안만 임시로 켰다가 즉시 끈다(A6 §3) — Phase B에는 그런 경로가 없다.
+**Always OFF.** Unless `tailscale funnel status` reports "Funnel off.", `bash ops/mini/tailscale-serve.sh --check` fails (§8 monitoring; US-B42 wires this script in as one entry of healthcheck-ping.sh). Funnel exposes the public internet, so it is turned on temporarily only during spikes that genuinely require webhook receipt such as Calendar `events.watch`, and turned off immediately afterwards (A6 §3) — Phase B has no such path.
 
-## 마운트
+## Mounting
 
 \`\`\`bash
-bash ops/mini/tailscale-serve.sh --mount   # /api -> :8787, / -> :5173 (US-B35 PWA 빌드 산출물)
-bash ops/mini/tailscale-serve.sh --check   # 마운트 + funnel off 확인만, 아무것도 안 바꾼다
+bash ops/mini/tailscale-serve.sh --mount   # /api -> :8787, / -> :5173 (US-B35 PWA build output)
+bash ops/mini/tailscale-serve.sh --check   # verify mount + funnel off only, changes nothing
 \`\`\`
 ```
 
-- [ ] 8. 커밋한다.
+- [ ] 8. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B34: Tailscale Serve 마운트 스크립트 + ACL 문서
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B34: Tailscale Serve mount script + ACL document
 
-- --mount: /api -> hub(:8787), / -> PWA(:5173), --set-path 실측 구문 그대로
-- --check: /api 마운트 존재 + Funnel off 둘 다 확인(Funnel on이면 실패)
-- TAILSCALE-ACL.md: Postgres/Ollama를 dst에 안 넣는 이유 + Funnel 상시 OFF 근거
+- --mount: /api -> hub(:8787), / -> PWA(:5173), using the measured --set-path syntax verbatim
+- --check: verifies both the /api mount and Funnel off (fails when Funnel is on)
+- TAILSCALE-ACL.md: rationale for keeping Postgres/Ollama out of dst + why Funnel is always OFF
 
 Implemented-by: Claude Sonnet
 
@@ -455,11 +455,11 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Task 3: Backup and Quarterly Restore Drill (US-B41, tier: Sonnet)
 
-**스토리 US-B41** — 목표: 매일 03:00 `pg_dump` + restic → B2 백업, forget 정책(7일/4주/6개월), 분기 복구 리허설 스크립트(스크래치 포트 5433 복원 + `items`/`threads`/`pending_approvals` row count + 최신 `sent_at` 검증) + 리허설 로그. 산출물: `ops/scripts/omnis-backup.sh`, `ops/scripts/restore-drill.sh`, `ops/mini/LaunchDaemons/*.plist`, `backup/restore-drills.md`. 검증: `bash ops/scripts/restore-drill.sh --dry-run`. 티어: Sonnet.
+**Story US-B41** — Goal: daily 03:00 `pg_dump` + restic → B2 backup, a forget policy (7 days/4 weeks/6 months), a quarterly restore drill script (restore onto scratch port 5433 + verify `items`/`threads`/`pending_approvals` row counts + the latest `sent_at`) and a drill log. Deliverables: `ops/scripts/omnis-backup.sh`, `ops/scripts/restore-drill.sh`, `ops/mini/LaunchDaemons/*.plist`, `backup/restore-drills.md`. Verification: `bash ops/scripts/restore-drill.sh --dry-run`. Tier: Sonnet.
 
-**읽을 곳**: A6 §4(백업·복구 리허설 원문 — forget 정책·명령은 이 리포 실측 규약에 맞춰 조정한다), `ops/mini/RUNBOOK.md`(DB가 `postgres://vigor@127.0.0.1:5432/omnis`라는 실측, LaunchAgent 전용 + sudo 없음 원칙).
+**Read:** A6 §4 (the backup/restore-drill source text — the forget policy and commands are adjusted to this repo's measured conventions), `ops/mini/RUNBOOK.md` (the measured fact that the DB is `postgres://vigor@127.0.0.1:5432/omnis`, and the LaunchAgent-only, no-sudo principle).
 
-**만들지 않을 것(YAGNI)**: 백업 성공/실패의 healthchecks.io ping — 그건 US-B42(Task 4)의 몫이고, 이 스크립트는 exit code로만 성공/실패를 알린다(launchd `StandardErrorPath` + US-B42가 그 exit code를 소비한다). restic 초기 `init`(리포 생성)은 사람이 1회 수동으로 한다(회전만큼 드문 일 — `restic -r ... init`, 스크립트에 넣으면 매번 존재 확인 로직이 생겨 오히려 복잡해진다).
+**Won't build (YAGNI)**: healthchecks.io pings for backup success/failure — that belongs to US-B42 (Task 4); this script signals success/failure through its exit code alone (launchd `StandardErrorPath` + US-B42 consume that exit code). The initial restic `init` (repository creation) is done by hand once (`restic -r ... init`; rare as rotation — putting it in the script would add an existence check on every run and make things more complex, not less).
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/ops/scripts/omnis-backup.sh`
@@ -467,22 +467,22 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Create: `/Users/logankim/AI-Workspaces/omnis/ops/mini/LaunchDaemons/com.omnis.backup.plist`
 - Create: `/Users/logankim/AI-Workspaces/omnis/backup/restore-drills.md`
 - Test: `/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/restore-drill.test.sh`
-- **계획 수정(2026-09-20, 리뷰 반려 반영)** — Modify: `/Users/logankim/AI-Workspaces/omnis/ops/mini/install.sh`
-  (plist를 `ops/mini/` 다음으로 `ops/mini/LaunchDaemons/`에서도 찾고, 기본 서비스 목록에 `backup`을 넣는다.
-  캘린더 잡이라 `kickstart`는 건너뛴다 — 안 그러면 설치할 때마다 백업이 통째로 돈다). 백로그가 산출물 경로를
-  `ops/mini/LaunchDaemons/*.plist`로 못박았으므로 plist를 옮기는 대신 install.sh를 넓힌다.
-- **계획 수정(같은 이유)** — Modify: `/Users/logankim/AI-Workspaces/omnis/ops/mini/RUNBOOK.md`
-  (설치·`restic init`·분기 드릴 절차. 이게 없으면 산출물에 사람이 닿는 경로가 문서에 없다),
+- **Plan revision (2026-09-20, in response to review rejection)** — Modify: `/Users/logankim/AI-Workspaces/omnis/ops/mini/install.sh`
+  (also look for the plist in `ops/mini/LaunchDaemons/` after `ops/mini/`, and add `backup` to the default service list.
+  Since it is a calendar job, `kickstart` is skipped — otherwise a full backup runs on every install). The backlog pinned the
+  deliverable path as `ops/mini/LaunchDaemons/*.plist`, so we widen install.sh instead of moving the plist.
+- **Plan revision (same reason)** — Modify: `/Users/logankim/AI-Workspaces/omnis/ops/mini/RUNBOOK.md`
+  (install · `restic init` · quarterly drill procedure. Without this, the deliverables have no human-reachable path in the docs),
   Test: `/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/omnis-backup.test.sh`
-  (launchd PATH에 `pg_dump`가 없어 03:00 잡이 첫 줄에서 죽던 회귀를 막는다).
+  (guards against the regression where the 03:00 job died on its first line because `pg_dump` was not on launchd's PATH).
 
 **Interfaces:**
-- Consumes: `pg_dump --format=custom` · `pg_restore` · `psql`(Postgres 17 클라이언트) · `restic` · Keychain `omnis.restic.repository`/`omnis.restic.password`/`omnis.b2.account_id`/`omnis.b2.account_key`(이 계획이 새로 정하는 이름, A6 §9 점 스킴을 따른다) · `$DATABASE_URL`(계약 §9).
-- Produces: `$HOME/omnis-var/backup/pg/omnis-YYYYMMDD.dump` 파일, `backup/restore-drills.md`에 분기 리허설 로그 append.
+- Consumes: `pg_dump --format=custom` · `pg_restore` · `psql` (Postgres 17 client) · `restic` · Keychain `omnis.restic.repository`/`omnis.restic.password`/`omnis.b2.account_id`/`omnis.b2.account_key` (names this plan introduces, following the A6 §9 dotted scheme) · `$DATABASE_URL` (contract §9).
+- Produces: `$HOME/omnis-var/backup/pg/omnis-YYYYMMDD.dump` files, and quarterly drill entries appended to `backup/restore-drills.md`.
 
 #### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. `pg_restore`/`psql`/`createdb`/`dropdb`를 가짜로 세워 실제 스크래치 DB 없이 `--dry-run` 경로만 검증한다(실제 복원은 통합 검증이라 미니에서 사람이 분기 1회 돌린다 — B-D5의 "픽스처/mock으로 인수" 정신).
+- [ ] 1. Write the failing test. Plant fakes for `pg_restore`/`psql`/`createdb`/`dropdb` so only the `--dry-run` path is verified without a real scratch DB (the real restore is integration verification, run by hand once a quarter on the mini — the spirit of B-D5's "accept with fixtures/mocks").
 
 `/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/restore-drill.test.sh`:
 ```bash
@@ -494,7 +494,7 @@ FAKE_BIN="$(mktemp -d)"
 BACKUP_DIR="$(mktemp -d)"
 trap 'rm -rf "$FAKE_BIN" "$BACKUP_DIR"' EXIT
 
-# 1) 덤프 파일이 하나도 없으면 --dry-run은 실패해야 한다.
+# 1) --dry-run must fail when there is not a single dump file.
 export OMNIS_BACKUP_DIR="$BACKUP_DIR"
 if "$SCRIPT" --dry-run >/dev/null 2>&1; then
   echo "FAIL: --dry-run passed with no dump files" >&2; exit 1
@@ -502,20 +502,20 @@ fi
 echo "ok: --dry-run fails when no dump exists"
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && chmod +x ops/scripts/test/restore-drill.test.sh && bash ops/scripts/test/restore-drill.test.sh
 ```
-기대 실패: `ops/scripts/restore-drill.sh: No such file or directory`.
+Expected failure: `ops/scripts/restore-drill.sh: No such file or directory`.
 
-- [ ] 3. 백업 스크립트를 쓴다(리허설 스크립트가 이 스크립트가 만드는 덤프 경로를 가정하므로 먼저 만든다).
+- [ ] 3. Write the backup script (first, because the drill script assumes the dump path this script produces).
 
 `/Users/logankim/AI-Workspaces/omnis/ops/scripts/omnis-backup.sh`:
 ```bash
 #!/bin/bash
 # US-B41: pg_dump --format=custom → restic → B2. LaunchDaemon(ops/mini/LaunchDaemons/com.omnis.backup.plist)
-# 이 03:00에 이 스크립트를 그대로 exec한다. GUI 세션 필요(Keychain 읽기, RUNBOOK "미니의 기존 설비" 절 참조).
+# execs this script as-is at 03:00. A GUI session is required (reading the Keychain — see the RUNBOOK "existing setup on the mini" section).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ACCOUNT="281932556+jinhologankim@users.noreply.github.com"
@@ -547,7 +547,7 @@ do_run() {
   restic backup "$PG_DIR" "$HOME/.omnis/self-model" "$ROOT/secrets" --tag omnis-backup
   restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune
 
-  # 로컬 덤프는 7일치만 남긴다 — restic이 원격에 장기 보관하므로 로컬은 최근 복구용 버퍼일 뿐.
+  # Keep only 7 days of local dumps — restic retains the long-term copy remotely, so locally this is just a recent-recovery buffer.
   find "$PG_DIR" -name 'omnis-*.dump' -mtime +7 -delete
   echo "backup ok: $(date -u +%FT%TZ)"
 }
@@ -559,13 +559,13 @@ case "${1:-}" in
 esac
 ```
 
-- [ ] 4. 리허설 스크립트를 쓴다.
+- [ ] 4. Write the drill script.
 
 `/Users/logankim/AI-Workspaces/omnis/ops/scripts/restore-drill.sh`:
 ```bash
 #!/bin/bash
-# US-B41: 분기 복구 리허설. --dry-run은 최신 덤프가 읽을 수 있는 파일인지만 확인한다(사람이 분기 1회
-# 인자 없이 돌려 스크래치 포트 5433에 실제로 복원하고 row count를 검증한다).
+# US-B41: quarterly restore drill. --dry-run only checks that the latest dump is a readable file; a human runs it
+# once a quarter with no argument to actually restore onto scratch port 5433 and verify the row counts.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BACKUP_DIR="${OMNIS_BACKUP_DIR:-$HOME/omnis-var/backup}"
@@ -617,21 +617,21 @@ dropdb -p "$SCRATCH_PORT" "$SCRATCH_DB"
 echo "ok: restore drill passed, logged to $LOG"
 ```
 
-- [ ] 5. 실행 권한을 주고 테스트를 다시 돌려 통과를 확인한다.
+- [ ] 5. Make them executable and re-run the test to confirm it passes.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && chmod +x ops/scripts/omnis-backup.sh ops/scripts/restore-drill.sh && bash ops/scripts/test/restore-drill.test.sh
 ```
-기대: `ok: --dry-run fails when no dump exists`.
+Expected: `ok: --dry-run fails when no dump exists`.
 
-- [ ] 6. 덤프 파일이 있을 때 `--dry-run`이 통과하는지 검증하는 assert를 추가한다(`pg_restore --list`가 진짜 custom-format 파일을 요구하므로, 최소 헤더를 흉내낸 가짜 `pg_restore`를 세운다).
+- [ ] 6. Add an assert verifying that `--dry-run` passes when a dump file exists (`pg_restore --list` demands a real custom-format file, so plant a fake `pg_restore` that fakes a minimal header).
 
-`/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/restore-drill.test.sh`(파일 끝에 추가):
+`/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/restore-drill.test.sh` (appended at end of file):
 ```bash
 
 cat > "$FAKE_BIN/pg_restore" <<'FAKEPGR'
 #!/bin/bash
-# --list 호출이면 파일 존재만 확인하고 성공한다(가짜 헤더 파싱은 하지 않는다).
+# For a --list call, only check that the file exists and succeed (no fake header parsing).
 if [ "$1" = "--list" ]; then
   [ -f "$2" ] && exit 0 || exit 1
 fi
@@ -648,22 +648,22 @@ echo "ok: --dry-run passes when a dump exists"
 echo "PASS"
 ```
 
-- [ ] 7. 전체 테스트를 돌려 통과를 확인한다.
+- [ ] 7. Run the full test and confirm it passes.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && bash ops/scripts/test/restore-drill.test.sh
 ```
-기대: `PASS`.
+Expected: `PASS`.
 
-- [ ] 8. LaunchDaemon plist와 리허설 로그 초기 파일을 만든다.
+- [ ] 8. Create the LaunchDaemon plist and the initial drill log file.
 
 `/Users/logankim/AI-Workspaces/omnis/ops/mini/LaunchDaemons/com.omnis.backup.plist`:
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- US-B41. 실측 원칙대로 LaunchAgent(gui 세션, sudo 없음) — Keychain 읽기가 GUI 세션을 요구한다
-     (RUNBOOK §4). 폴더명은 백로그 산출물 경로(ops/mini/LaunchDaemons/*.plist)를 그대로 따른다.
-     install.sh가 __OMNIS_ROOT__·__HOME__을 치환해 ~/Library/LaunchAgents에 깐다(ops/mini/install.sh 패턴). -->
+<!-- US-B41. A LaunchAgent (gui session, no sudo) per the measured principle — reading the Keychain requires a GUI
+     session (RUNBOOK §4). The folder name follows the backlog deliverable path (ops/mini/LaunchDaemons/*.plist) as
+     written. install.sh substitutes __OMNIS_ROOT__·__HOME__ and installs into ~/Library/LaunchAgents (ops/mini/install.sh pattern). -->
 <plist version="1.0">
 <dict>
   <key>Label</key><string>com.omnis.backup</string>
@@ -683,21 +683,21 @@ cd /Users/logankim/AI-Workspaces/omnis && bash ops/scripts/test/restore-drill.te
 
 `/Users/logankim/AI-Workspaces/omnis/backup/restore-drills.md`:
 ```markdown
-# 복구 리허설 로그 (US-B41)
+# Restore drill log (US-B41)
 
-분기 1회 `bash ops/scripts/restore-drill.sh`(인자 없이)를 돌려 이 파일에 결과가 자동으로 append된다.
-실패하면 다음 분기까지 미루지 않고 즉시 Sev1로 고친다(A6 §4).
+Run `bash ops/scripts/restore-drill.sh` (with no argument) once a quarter and the result is appended to this file automatically.
+If it fails, fix it immediately as Sev1 rather than deferring to the next quarter (A6 §4).
 ```
 
-- [ ] 9. 커밋한다.
+- [ ] 9. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B41: 야간 백업 + 분기 복구 리허설
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B41: nightly backup + quarterly restore drill
 
 - omnis-backup.sh: pg_dump --format=custom -> restic backup -> B2, forget 7d/4w/6mo
-- restore-drill.sh: --dry-run(덤프 파일만 확인) / 인자 없음(스크래치 5433 실복원 + row count 검증)
-- items 테이블이 비어 있으면 FAIL로 기록하고 즉시 non-zero exit
-- LaunchAgent com.omnis.backup(03:00), backup/restore-drills.md 로그 파일 신설
+- restore-drill.sh: --dry-run (checks the dump file only) / no argument (real restore to scratch 5433 + row count verification)
+- Records FAIL and exits non-zero immediately when the items table is empty
+- LaunchAgent com.omnis.backup (03:00), new backup/restore-drills.md log file
 
 Implemented-by: Claude Sonnet
 
@@ -708,11 +708,11 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Task 4: Healthcheck Ping and Dual Alerting (US-B42, tier: Sonnet)
 
-**스토리 US-B42** — 목표: healthchecks.io 체크 15종 배선(성공 `/`, 실패 `/fail`), self-hosted ntfy 2토픽(`omnis-critical`/`omnis-warning`), critical/warning은 ntfy + `items(kind='system')` 이중 노출, `newsyslog` 30일 보관 + 시크릿 마스킹 확인. 산출물: `ops/scripts/healthcheck-ping.sh`, `ops/mini/newsyslog.d/omnis.conf`. 검증: `bash ops/scripts/healthcheck-ping.sh --check` + `bash ops/scripts/test/healthcheck-ping.test.sh`(백로그의 인수 커맨드는 `--check`뿐이지만 `--check`는 프로덕션 경로를 한 줄도 돌리지 않는다 — job 파싱과 `--run`의 실패 집계·exit code는 테스트가 단언한다). 티어: Sonnet. 의존: US-B40(어댑터 헬스 — 단, 이 태스크는 B40의 TS 코드를 import하지 않는다. `accounts.state`/`last_health_at`는 이미 Phase A 스키마(0002_core_inbox.sql)에 고정돼 있으므로 SQL로 직접 읽는다 — B40이 그 컬럼을 채우는 건 이 태스크가 실행되는 시점의 전제일 뿐, 코드 의존은 아니다).
+**Story US-B42** — Goal: wire up 15 healthchecks.io checks (success `/`, failure `/fail`), 2 self-hosted ntfy topics (`omnis-critical`/`omnis-warning`), dual exposure of critical/warning through ntfy + `items(kind='system')`, and `newsyslog` 30-day retention with verified secret masking. Deliverables: `ops/scripts/healthcheck-ping.sh`, `ops/mini/newsyslog.d/omnis.conf`. Verification: `bash ops/scripts/healthcheck-ping.sh --check` + `bash ops/scripts/test/healthcheck-ping.test.sh` (the backlog's acceptance command is only `--check`, but `--check` does not execute a single line of the production path — job parsing and `--run`'s failure tally/exit code are asserted by the test). Tier: Sonnet. Depends on: US-B40 (adapter health — though this task does not import B40's TS code; `accounts.state`/`last_health_at` are already pinned in the Phase A schema (0002_core_inbox.sql), so it reads them with SQL directly. B40 populating those columns is only a precondition at the time this task runs, not a code dependency).
 
-**읽을 곳**: A6 §8(15개 job 표, ntfy 2토픽, `items(kind='system')` 이중 노출, newsyslog 30일), Phase A 계약 §4(`accounts.state`/`last_health_at`/`last_error` 컬럼), `packages/db/migrations/0002_core_inbox.sql`(`accounts_channel_ck`에 `'system'`이 이미 있다 — 새 마이그레이션 불필요).
+**Read:** A6 §8 (the 15-job table, the 2 ntfy topics, `items(kind='system')` dual exposure, newsyslog 30 days), Phase A contract §4 (`accounts.state`/`last_health_at`/`last_error` columns), `packages/db/migrations/0002_core_inbox.sql` (`'system'` is already in `accounts_channel_ck` — no new migration needed).
 
-**만들지 않을 것(YAGNI)**: TypeScript 헬퍼 — 이건 셸 + psql로 끝나는 일이라 새 패키지나 커널 export를 만들지 않는다(ladder: 이미 있는 도구로 충분). ntfy 서버 자체 설치(`ntfy serve` 데몬 기동)는 인프라 프로비저닝이라 이 스크립트 밖 — `$OMNIS_NTFY_URL`로 이미 떠 있다고 가정한다.
+**Won't build (YAGNI)**: a TypeScript helper — this is a job that shell + psql finish, so no new package or kernel export (ladder: the existing tools suffice). Installing the ntfy server itself (starting the `ntfy serve` daemon) is infrastructure provisioning and lives outside this script — we assume it is already up at `$OMNIS_NTFY_URL`.
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/ops/scripts/healthcheck-ping.sh`
@@ -720,12 +720,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Test: `/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/healthcheck-ping.test.sh`
 
 **Interfaces:**
-- Consumes: `psql`(`accounts.state`/`last_health_at`, `pg_replication_slots`) · `curl`(healthchecks.io, ntfy) · Keychain `omnis.healthchecks.<slug>`(이 계획이 정하는 이름) · `$DATABASE_URL` · `$OMNIS_NTFY_URL`(기본 `http://127.0.0.1:2586`, ntfy 기본 포트).
-- Produces: `accounts(channel='system', external_id='infra')` + `threads(kind='system')` + `items(kind='system')` 1행/경보(A6 §8 이중 노출). Keychain·DB·네트워크 어디에도 새 TypeScript export를 만들지 않는다.
+- Consumes: `psql` (`accounts.state`/`last_health_at`, `pg_replication_slots`) · `curl` (healthchecks.io, ntfy) · Keychain `omnis.healthchecks.<slug>` (names this plan introduces) · `$DATABASE_URL` · `$OMNIS_NTFY_URL` (default `http://127.0.0.1:2586`, ntfy's default port).
+- Produces: `accounts(channel='system', external_id='infra')` + `threads(kind='system')` + one `items(kind='system')` row per alert (A6 §8 dual exposure). Creates no new TypeScript export in the Keychain, the DB, or the network layer.
 
 #### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. 가짜 `curl`/`psql`/`security`를 세워 실제 네트워크·DB 없이 `--check`(설정 유효성만 확인, 핑은 안 쏜다) 경로를 검증한다.
+- [ ] 1. Write the failing test. Plant fake `curl`/`psql`/`security` so the `--check` path (validates configuration only, sends no pings) is verified without real network or DB access.
 
 `/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/healthcheck-ping.test.sh`:
 ```bash
@@ -736,7 +736,7 @@ SCRIPT="$ROOT/ops/scripts/healthcheck-ping.sh"
 FAKE_BIN="$(mktemp -d)"
 trap 'rm -rf "$FAKE_BIN"' EXIT
 
-# 가짜 security: 매 서비스마다 "not found"(healthchecks uuid 미설정 상태를 흉내낸다).
+# Fake security: "not found" for every service (emulates the state where no healthchecks uuid is configured).
 cat > "$FAKE_BIN/security" <<'FAKESEC'
 #!/bin/bash
 echo "no such keychain item" >&2
@@ -745,25 +745,25 @@ FAKESEC
 chmod +x "$FAKE_BIN/security"
 export PATH="$FAKE_BIN:$PATH"
 
-# 1) healthchecks uuid가 하나도 없어도 --check는 "설정 없음"을 경고만 하고 exit 0이어야 한다
-#    (신규 설치 직후에도 스크립트 자체는 안전하게 돌아야 한다 — 실제 핑 실패와는 다른 상태).
+# 1) Even with zero healthchecks uuids, --check must only warn about "no configuration" and exit 0
+#    (the script itself must run safely right after a fresh install — a different state from an actual ping failure).
 "$SCRIPT" --check
 echo "ok: --check succeeds even with zero configured jobs (reports, does not ping)"
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && chmod +x ops/scripts/test/healthcheck-ping.test.sh && bash ops/scripts/test/healthcheck-ping.test.sh
 ```
-기대 실패: `ops/scripts/healthcheck-ping.sh: No such file or directory`.
+Expected failure: `ops/scripts/healthcheck-ping.sh: No such file or directory`.
 
-- [ ] 3. 스크립트를 쓴다.
+- [ ] 3. Write the script.
 
 `/Users/logankim/AI-Workspaces/omnis/ops/scripts/healthcheck-ping.sh`:
 ```bash
 #!/bin/bash
-# US-B42: healthchecks.io 15종 ping + ntfy critical/warning + items(kind=system) 이중 노출(A6 §8).
+# US-B42: 15 healthchecks.io pings + ntfy critical/warning + items(kind=system) dual exposure (A6 §8).
 set -euo pipefail
 
 ACCOUNT="281932556+jinhologankim@users.noreply.github.com"
@@ -772,8 +772,8 @@ kc() { security find-generic-password -s "$1" -a "$ACCOUNT" -w 2>/dev/null; }
 NTFY_URL="${OMNIS_NTFY_URL:-http://127.0.0.1:2586}"
 DATABASE_URL="${DATABASE_URL:-postgres://vigor@127.0.0.1:5432/omnis}"
 
-# slug|check_cmd|tier(critical|warning) — A6 §8 표 그대로. check_cmd는 성공하면 exit 0.
-# check_cmd 자체가 '|'(파이프)를 품으므로 `IFS='|' read`로 자르면 안 된다 — 양 끝에서 깎는다(parse_job).
+# slug|check_cmd|tier(critical|warning) — exactly the A6 §8 table. check_cmd exits 0 on success.
+# check_cmd itself contains '|' (pipes), so `IFS='|' read` must not be used to split it — trim from both ends instead (parse_job).
 JOBS=(
   "omnis-hub|curl -fsS -m 5 http://127.0.0.1:8787/health|critical"
   "omnis-postgres|psql \"\$DATABASE_URL\" -Atc 'select 1' | grep -q 1|critical"
@@ -792,7 +792,7 @@ JOBS=(
   "omnis-tailscale-serve|bash \"\$(dirname \"\$0\")/../mini/tailscale-serve.sh\" --check|critical"
 )
 
-# slug는 첫 필드, tier는 마지막 필드, 나머지 전부가 cmd다(cmd 안의 파이프를 보존한다).
+# slug is the first field, tier is the last field, and everything in between is the cmd (preserving pipes inside the cmd).
 parse_job() {
   job_slug="${1%%|*}"
   job_tier="${1##*|}"
@@ -804,8 +804,8 @@ post_ntfy() {
   curl -fsS -m 10 -H "Title: $title" -d "$msg" "$NTFY_URL/$topic" >/dev/null 2>&1 || true
 }
 
-# A6 §8 "모든 critical/warning은 ntfy와 별개로 items(kind=system)에도 노출". thread_id/account_id가
-# NOT NULL이라 'system'/'infra' 계정·스레드를 없으면 만들고(ON CONFLICT) 그 위에 item을 쌓는다.
+# A6 §8: "every critical/warning is exposed in items(kind=system) independently of ntfy". Because thread_id/account_id
+# are NOT NULL, create the 'system'/'infra' account and thread if missing (ON CONFLICT) and stack items on top of them.
 post_system_item() {
   local subject="$1" body="$2"
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q >/dev/null <<SQL
@@ -833,7 +833,7 @@ run_check() {
   fi
   [ -n "$hc_uuid" ] && curl -fsS -m 10 --retry 3 "https://hc-ping.com/$hc_uuid/fail" >/dev/null 2>&1 || true
   post_ntfy "omnis-$tier" "$slug failed" "check failed: $cmd"
-  post_system_item "$slug 실패" "healthcheck '$slug' 실패 ($tier)"
+  post_system_item "$slug failed" "healthcheck '$slug' failed ($tier)"
   echo "FAIL: $slug" >&2
   return 1
 }
@@ -872,17 +872,17 @@ case "${1:---check}" in
 esac
 ```
 
-- [ ] 4. 실행 권한을 주고 테스트를 다시 돌려 통과를 확인한다.
+- [ ] 4. Make it executable and re-run the test to confirm it passes.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && chmod +x ops/scripts/healthcheck-ping.sh && bash ops/scripts/test/healthcheck-ping.test.sh
 ```
-기대: `ok: --check succeeds even with zero configured jobs (reports, does not ping)`.
+Expected: `ok: --check succeeds even with zero configured jobs (reports, does not ping)`.
 
-- [ ] 5. 테스트를 완성한다 — `--check`만으로는 프로덕션 경로(launchd가 실제로 부르는 `--run`)가 한 줄도 안 돌기 때문에,
-job 파싱(`check_cmd`가 파이프를 품고 있다)과 실패 집계/exit code까지 단언한다.
+- [ ] 5. Complete the test — since `--check` alone does not execute a single line of the production path (the `--run` that
+launchd actually invokes), assert job parsing (`check_cmd` contains pipes) and the failure tally/exit code as well.
 
-`/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/healthcheck-ping.test.sh`(전문):
+`/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/healthcheck-ping.test.sh` (full):
 ```bash
 #!/bin/bash
 set -euo pipefail
@@ -891,7 +891,7 @@ SCRIPT="$ROOT/ops/scripts/healthcheck-ping.sh"
 FAKE_BIN="$(mktemp -d)"
 trap 'rm -rf "$FAKE_BIN"' EXIT
 
-# 가짜 security: 매 서비스마다 "not found"(healthchecks uuid 미설정 상태를 흉내낸다).
+# Fake security: "not found" for every service (emulates the state where no healthchecks uuid is configured).
 cat > "$FAKE_BIN/security" <<'FAKESEC'
 #!/bin/bash
 echo "no such keychain item" >&2
@@ -900,8 +900,8 @@ FAKESEC
 chmod +x "$FAKE_BIN/security"
 export PATH="$FAKE_BIN:$PATH"
 
-# 1) healthchecks uuid가 하나도 없어도 --check는 "설정 없음"을 경고만 하고 exit 0이어야 한다
-#    (신규 설치 직후에도 스크립트 자체는 안전하게 돌아야 한다 — 실제 핑 실패와는 다른 상태).
+# 1) Even with zero healthchecks uuids, --check must only warn about "no configuration" and exit 0
+#    (the script itself must run safely right after a fresh install — a different state from an actual ping failure).
 "$SCRIPT" --check
 echo "ok: --check succeeds even with zero configured jobs (reports, does not ping)"
 
@@ -909,8 +909,8 @@ out="$("$SCRIPT" --check)"
 echo "$out" | grep -q "15 jobs configured" || { echo "FAIL: expected 15 jobs, got: $out" >&2; exit 1; }
 echo "ok: --check reports exactly 15 configured jobs"
 
-# 2) --list: 15행 전부 slug + tier(critical|warning)로 정확히 갈라져야 한다.
-#    check_cmd가 파이프를 품고 있어서 `IFS='|' read`로 자르면 tier에 명령 꼬리가 섞여 들어간다.
+# 2) --list: all 15 rows must split cleanly into slug + tier(critical|warning).
+#    check_cmd contains pipes, so `IFS='|' read` would smear the command tail into the tier.
 list_out="$("$SCRIPT" --list)"
 [ "$(echo "$list_out" | wc -l | tr -d ' ')" = "15" ] || { echo "FAIL: --list should print 15 rows" >&2; exit 1; }
 while IFS=$'\t' read -r slug tier; do
@@ -919,7 +919,7 @@ while IFS=$'\t' read -r slug tier; do
 done <<< "$list_out"
 echo "ok: all 15 jobs parse to a slug + exactly critical|warning"
 
-# 3) --run: 체크가 죄다 실패하면 실패 개수를 정확히 세고 non-zero로 끝나야 한다(launchd가 이 exit code를 본다).
+# 3) --run: if every check fails it must count the failures exactly and exit non-zero (launchd reads this exit code).
 CURL_LOG="$FAKE_BIN/curl.log"
 cat > "$FAKE_BIN/curl" <<FAKECURL
 #!/bin/bash
@@ -944,7 +944,7 @@ counted="$(echo "$run_out" | sed -n 's/^ran 15 checks, \([0-9]*\) failed$/\1/p')
 [ "$counted" = "$fail_lines" ] || { echo "FAIL: --run counted $counted failures but printed $fail_lines" >&2; exit 1; }
 echo "ok: --run counts $counted failures and exits non-zero"
 
-# 4) 경보는 omnis-critical / omnis-warning 두 토픽으로만 가야 한다(tier 파싱이 깨지면 여기로 샌다).
+# 4) Alerts must go to the omnis-critical / omnis-warning topics only (a broken tier parse leaks here).
 grep -o 'http://ntfy\.test/[^ ]*' "$CURL_LOG" | sort -u > "$FAKE_BIN/topics"
 [ -s "$FAKE_BIN/topics" ] || { echo "FAIL: no ntfy post captured" >&2; exit 1; }
 while read -r url; do
@@ -955,11 +955,11 @@ while read -r url; do
 done < "$FAKE_BIN/topics"
 echo "ok: alerts route only to omnis-critical / omnis-warning"
 
-# 5) check_cmd도 온전해야 한다 — 파이프 뒤 grep이 잘려 나가면 결과를 검사하지 않고 통과해 버린다.
+# 5) check_cmd must survive intact — if the grep after the pipe is truncated, the result is never inspected and passes.
 grep -q 'check failed: psql .* | grep -qx t' "$CURL_LOG" || { echo "FAIL: check_cmd lost its trailing pipe" >&2; exit 1; }
 echo "ok: check_cmd keeps the pipeline that turns a query result into pass/fail"
 
-# 6) 시크릿처럼 보이는 값(sk-, xoxb-, 40자+ 토큰)이 샘플 로그 라인에 없는지 확인한다(계약 §9).
+# 6) Confirm no secret-shaped value (sk-, xoxb-, 40+ char token) appears in the sample log line (contract §9).
 sample_log='{"ts":"2026-09-20T00:00:00Z","level":"info","pkg":"@omnis/kernel","msg":"job ok","trace_id":null}'
 if echo "$sample_log" | grep -qE 'sk-[A-Za-z0-9]{20,}|xox[bp]-[A-Za-z0-9-]{10,}'; then
   echo "FAIL: sample log line looks like it leaks a secret" >&2; exit 1
@@ -968,45 +968,45 @@ echo "ok: sample log line has no secret-shaped value"
 echo "PASS"
 ```
 
-- [ ] 6. 전체 테스트를 돌려 통과를 확인한다.
+- [ ] 6. Run the full test and confirm it passes.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && bash ops/scripts/test/healthcheck-ping.test.sh
 ```
-기대: `PASS`.
+Expected: `PASS`.
 
-- [ ] 7. newsyslog 설정을 쓴다(30일 보관 + 600 권한으로 다른 유저가 로그를 못 읽게 — 로그 자체는 JSON 한 줄이라 값에 시크릿이 안 들어가지만, 파일 권한으로 이중 방어한다).
+- [ ] 7. Write the newsyslog configuration (30-day retention + mode 600 so other users cannot read the logs — the log itself is a single JSON line, so no secret lands in a value, but file permissions are a second line of defence).
 
 `/Users/logankim/AI-Workspaces/omnis/ops/mini/newsyslog.d/omnis.conf`:
 ```
-# US-B42: omnis 로그 30일 보관, 600 권한(JSON 로그 한 줄 규약이라 시크릿 값이 키에 안 들어가지만
-# 파일 자체는 vigor 계정만 읽게 이중 방어). logfilename [owner:group] mode count size(K) when flags
+# US-B42: keep omnis logs 30 days, mode 600 (the single-line JSON log convention keeps secret
+# values out of keys, but restrict the file to the vigor account as defence in depth). logfilename [owner:group] mode count size(K) when flags
 /Users/vigor/Library/Logs/omnis/*.log        vigor:staff  600  30  *  $D0  J
 /Users/vigor/Library/Logs/omnis/*.err.log    vigor:staff  600  30  *  $D0  J
 ```
 
-- [ ] 8. 셸 문법을 확인한다(이 리포에 shellcheck는 안 물려 있다 — Global Constraints).
+- [ ] 8. Check shell syntax (shellcheck is not wired into this repo — Global Constraints).
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && bash -n ops/scripts/healthcheck-ping.sh && bash -n ops/scripts/test/healthcheck-ping.test.sh
 ```
 
-- [ ] 9. 전체 테스트를 다시 돌려 통과를 확인한다.
+- [ ] 9. Run the full test once more and confirm it passes.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && bash ops/scripts/test/healthcheck-ping.test.sh
 ```
-기대: `PASS`.
+Expected: `PASS`.
 
-- [ ] 10. 커밋한다.
+- [ ] 10. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B42: healthchecks.io 15종 ping + ntfy 이중 경보 + 로그 로테이션
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B42: 15 healthchecks.io pings + ntfy dual alerting + log rotation
 
-- healthcheck-ping.sh: --check(설정만 확인)/--run(실제 ping + 실패 시 ntfy + items(kind=system))
-- 어댑터 헬스는 accounts.state를 SQL로 직접 읽는다(B40 TS 코드에 의존하지 않음)
-- system 계정/스레드를 lazy하게 만들고 그 위에 경보 item을 쌓는다(하드 삭제 없음)
-- newsyslog.d/omnis.conf: 30일 보관 + 600 권한
+- healthcheck-ping.sh: --check (validates config only) / --run (real pings + ntfy on failure + items(kind=system))
+- Adapter health reads accounts.state directly with SQL (no dependency on B40's TS code)
+- Lazily creates the system account/thread and stacks alert items on top of them (no hard deletes)
+- newsyslog.d/omnis.conf: 30-day retention + mode 600
 
 Implemented-by: Claude Sonnet
 
@@ -1017,11 +1017,11 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Task 5: Mini Boot Preflight (US-B43, tier: Haiku)
 
-**스토리 US-B43** — 목표: FileVault 켠 채 자동 로그인 확인, `pmset` 설정, LaunchAgent 로드 상태, Ollama 모델 존재, 슬롯 헬스 1회 — 한 스크립트가 전부 검사하고 실패 항목만 출력. 산출물: `ops/mini/preflight.sh`, `ops/mini/RUNBOOK.md`(수정). 검증: `bash ops/mini/preflight.sh --check`. 티어: Haiku.
+**Story US-B43** — Goal: auto-login verified with FileVault on, `pmset` settings, LaunchAgent load state, Ollama model presence, and one slot health check — a single script checks all of it and prints only the failures. Deliverables: `ops/mini/preflight.sh`, `ops/mini/RUNBOOK.md` (modified). Verification: `bash ops/mini/preflight.sh --check`. Tier: Haiku.
 
-**읽을 곳**: A6 §2(OS 설정 절차 1~5번), A6 §4(슬롯 헬스체크 SQL), `ops/mini/install.sh`(LaunchAgent 라벨 규칙 `com.omnis.<service>`).
+**Read:** A6 §2 (OS setup procedure steps 1~5), A6 §4 (slot health-check SQL), `ops/mini/install.sh` (LaunchAgent label convention `com.omnis.<service>`).
 
-**만들지 않을 것(YAGNI)**: 자동 복구(pmset 재설정, LaunchAgent 재기동) — A6 §2.5의 "재적용 LaunchAgent"는 별도 항목(A6 소유, Phase B 스토리 목록에 없다)이고 이 스크립트는 **읽기 전용 체크**다. 잘못된 걸 고치지 않고 실패만 보고한다(부팅 체크리스트의 정의 그대로 — "실패 항목만 출력").
+**Won't build (YAGNI)**: automatic remediation (resetting `pmset`, restarting LaunchAgents) — A6 §2.5's "re-apply LaunchAgent" is a separate item (owned by A6, not in the Phase B story list) and this script is a **read-only check**. It reports failures instead of fixing what is wrong (exactly the definition of a boot checklist — "print only the failures").
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/ops/mini/preflight.sh`
@@ -1030,11 +1030,11 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `fdesetup status` · `defaults read .../loginwindow autoLoginUser` · `pmset -g` · `launchctl print gui/$(id -u)/<label>` · `curl http://127.0.0.1:11434/api/tags`(Ollama) · `psql`(`pg_replication_slots`).
-- Produces: 사람이 읽는 실패 목록. 새 export 없음.
+- Produces: a human-readable failure list. No new exports.
 
 #### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다.
+- [ ] 1. Write the failing test.
 
 `/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/preflight.test.sh`:
 ```bash
@@ -1045,7 +1045,7 @@ SCRIPT="$ROOT/ops/mini/preflight.sh"
 FAKE_BIN="$(mktemp -d)"
 trap 'rm -rf "$FAKE_BIN"' EXIT
 
-# 전부 "잘 안 됨" 상태를 흉내내는 가짜 바이너리 — 실패 목록에 6항목 전부 나와야 한다.
+# Fake binaries that all emulate a "broken" state — all 6 items must show up in the failure list.
 cat > "$FAKE_BIN/fdesetup"  <<'F'; chmod +x "$FAKE_BIN/fdesetup"
 #!/bin/bash
 echo "FileVault is Off."
@@ -1079,19 +1079,19 @@ fi
 echo "ok: preflight fails when everything is broken"
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && chmod +x ops/scripts/test/preflight.test.sh && bash ops/scripts/test/preflight.test.sh
 ```
-기대 실패: `ops/mini/preflight.sh: No such file or directory`.
+Expected failure: `ops/mini/preflight.sh: No such file or directory`.
 
-- [ ] 3. 스크립트를 쓴다.
+- [ ] 3. Write the script.
 
 `/Users/logankim/AI-Workspaces/omnis/ops/mini/preflight.sh`:
 ```bash
 #!/bin/bash
-# US-B43: 미니 부팅 체크리스트. 읽기 전용 — 고치지 않고 실패 항목만 출력한다(A6 §2).
+# US-B43: mini boot checklist. Read-only — it reports failures instead of fixing them (A6 §2).
 set -uo pipefail
 FAILS=()
 
@@ -1140,16 +1140,16 @@ printf 'FAIL: %s\n' "${FAILS[@]}" >&2
 exit 1
 ```
 
-- [ ] 4. 실행 권한을 주고 테스트를 다시 돌려 통과를 확인한다.
+- [ ] 4. Make it executable and re-run the test to confirm it passes.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && chmod +x ops/mini/preflight.sh && bash ops/scripts/test/preflight.test.sh
 ```
-기대: `ok: preflight fails when everything is broken`.
+Expected: `ok: preflight fails when everything is broken`.
 
-- [ ] 5. 전부 정상일 때 통과하는지 검증하는 assert를 추가한다.
+- [ ] 5. Add an assert verifying that it passes when everything is healthy.
 
-`/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/preflight.test.sh`(파일 끝에 추가):
+`/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/preflight.test.sh` (appended at end of file):
 ```bash
 
 cat > "$FAKE_BIN/fdesetup"  <<'F'; chmod +x "$FAKE_BIN/fdesetup"
@@ -1184,28 +1184,28 @@ echo "ok: preflight passes when everything is healthy"
 echo "PASS"
 ```
 
-- [ ] 6. 전체 테스트를 돌려 통과를 확인한다.
+- [ ] 6. Run the full test and confirm it passes.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && bash ops/scripts/test/preflight.test.sh
 ```
-기대: `PASS`.
+Expected: `PASS`.
 
-- [ ] 7. `ops/mini/RUNBOOK.md`의 "## 상태 확인" 섹션 끝에 preflight 항목을 추가한다.
+- [ ] 7. Add the preflight entry at the end of the "## Health checks" section of `ops/mini/RUNBOOK.md`.
 
-`/Users/logankim/AI-Workspaces/omnis/ops/mini/RUNBOOK.md`의 "## 상태 확인" 코드 블록 바로 뒤에 한 줄 추가:
+Add one line to `/Users/logankim/AI-Workspaces/omnis/ops/mini/RUNBOOK.md` immediately after the "## Health checks" code block:
 ```markdown
-bash ops/mini/preflight.sh --check   # FileVault·자동로그인·pmset·LaunchAgent 4종·Ollama·슬롯 한 번에(US-B43)
+bash ops/mini/preflight.sh --check   # FileVault·autologin·pmset·4 LaunchAgents·Ollama·slot in one go (US-B43)
 ```
 
-- [ ] 8. 커밋한다.
+- [ ] 8. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B43: 미니 부팅 프리플라이트 스크립트
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B43: mini boot preflight script
 
-- FileVault On + 자동 로그인 + pmset sleep=0 3종 + LaunchAgent 4종 로드 + Ollama 모델 + 복제 슬롯
-- 읽기 전용, 고치지 않고 실패 항목만 stderr에 출력
-- RUNBOOK.md 상태 확인 섹션에 명령 추가
+- FileVault On + autologin + 3 pmset sleep settings + 4 LaunchAgents loaded + Ollama model + replication slot
+- Read-only, prints only the failures to stderr instead of fixing them
+- Adds the command to the RUNBOOK health-checks section
 
 Implemented-by: Claude Haiku
 
@@ -1216,13 +1216,13 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Task 6: Monthly Cost Report Job (US-B44, tier: Sonnet)
 
-**스토리 US-B44** — 목표: `agent_runs` 집계(루프별·티어별·provider별 토큰·비용·캐시 히트율), 월 1일 `digests.metrics`에 적재, 캐시 히트율 40% 미만 루프는 경고 줄. 산출물: `packages/kernel/src/jobs/cost-report.ts`. 검증: `pnpm --filter @omnis/kernel test:integration`. 티어: Sonnet. 의존: US-B14(`agents` 계획, `@omnis/kernel/cost/governor.ts`)·US-B24(`agents` 계획, nightly digest가 매일 같은 날짜의 `digests(kind='nightly')` 행을 이미 만든다) — 둘 다 이 계획 밖이므로 **이 태스크는 그 TS 심볼을 import하지 않는다**. `agent_runs`/`digests` 컬럼은 Phase A 계약 §4가 이미 고정했으므로 SQL만으로 충분하다.
+**Story US-B44** — Goal: aggregate `agent_runs` (tokens, cost, cache hit ratio per loop, per tier, per provider), load it into `digests.metrics` on the 1st of each month, and add a warning line for loops under a 40% cache hit ratio. Deliverables: `packages/kernel/src/jobs/cost-report.ts`. Verification: `pnpm --filter @omnis/kernel test:integration`. Tier: Sonnet. Depends on: US-B14 (`agents` plan, `@omnis/kernel/cost/governor.ts`) · US-B24 (`agents` plan, the nightly digest already creates a `digests(kind='nightly')` row for the same date every day) — both are outside this plan, so **this task does not import those TS symbols**. The `agent_runs`/`digests` columns are already pinned by Phase A contract §4, so SQL alone suffices.
 
-**읽을 곳**: `packages/kernel/src/jobs/healthcheck.ts`(이 태스크가 그대로 베끼는 잡 패턴), `packages/kernel/src/scheduler.ts`(`register`가 `jobs` upsert까지 한다는 것 — 별도 seed INSERT가 필수는 아니지만 델타 §8·§6이 요구하므로 마이그레이션도 만든다), 델타 §5(`CostState`/`POLICY`는 US-B14 소유라 이 태스크는 그 타입을 쓰지 않는다 — `agent_runs.model_tier`는 원시 `text`로 그룹화한다), 델타 §8(`cost_report_monthly`, cron `10 0 1 * *`), 백로그 종료 기준 표(캐시 히트율 ≥40% 목표, US-B44 소유).
+**Read:** `packages/kernel/src/jobs/healthcheck.ts` (the job pattern this task copies verbatim), `packages/kernel/src/scheduler.ts` (note that `register` also upserts into `jobs` — a separate seed INSERT is not strictly required, but delta §8·§6 demand it, so the migration is created too), delta §5 (`CostState`/`POLICY` are owned by US-B14, so this task does not use those types — `agent_runs.model_tier` is grouped as raw `text`), delta §8 (`cost_report_monthly`, cron `10 0 1 * *`), the backlog exit-criteria table (cache hit ratio ≥40% target, owned by US-B44).
 
-**마이그레이션 번호 결정 — 2026-09-20 교차 리뷰 M1로 바뀌었다**: 이 태스크는 **마이그레이션을 만들지 않는다**. `0009`·`0011`·`0012`·`0013`이 **웨이브 0 스키마 번들**(한 워크트리·한 커밋)로 묶였고(델타 §6·§11) 그 번들의 `0012_jobs_phase_b.sql`이 `cost_report_monthly` seed를 **이미 포함한다**. 아래 스텝 6의 `0014_cost_report_job.sql`은 "공유 소유라 sha256이 충돌한다"를 피하려던 회피책이었는데, 공유 소유 자체가 없어져 불필요해졌다 — 델타 §11이 "**`0014_cost_report_job.sql`은 만들지 않는다**"로 명시한다. **스텝 6은 파일 생성이 아니라 존재 확인으로 대체한다**(스텝 본문 참조).
+**Migration-number decision — changed by cross-review M1 on 2026-09-20**: this task **creates no migration**. `0009`·`0011`·`0012`·`0013` were bundled into the **wave 0 schema bundle** (one worktree, one commit) (delta §6·§11) and that bundle's `0012_jobs_phase_b.sql` **already includes** the `cost_report_monthly` seed. Step 6's `0014_cost_report_job.sql` below was a workaround to avoid "shared ownership makes the sha256 collide", but shared ownership itself is gone, making it unnecessary — delta §11 states explicitly that "**`0014_cost_report_job.sql` is not created**". **Step 6 is therefore replaced by an existence check rather than file creation** (see the step body).
 
-**만들지 않을 것(YAGNI)**: `CostState`/`POLICY`(US-B14 소유) 재구현 — 이 잡은 비용 상태 판정이 아니라 순수 집계+리포트만 한다. `digests.kind`에 새 값(`'monthly'` 등) 추가 — CHECK 제약이 `('morning','nightly')`뿐이고(0004 실측) 새 값을 넣으려면 마이그레이션으로 제약을 바꿔야 하는데, 델타 §6은 "기존 마이그레이션은 건드리지 않는다"고 못박았다. 대신 기존 `nightly` 행의 `metrics` jsonb에 `monthly_report` 키로 병합한다.
+**Won't build (YAGNI)**: reimplementing `CostState`/`POLICY` (owned by US-B14) — this job does pure aggregation + reporting, not cost-state decisions. Adding a new value to `digests.kind` (such as `'monthly'`) — the CHECK constraint allows only `('morning','nightly')` (measured in 0004), and introducing a new value would require a migration to change the constraint, while delta §6 pins "do not touch existing migrations". Instead, merge into the `metrics` jsonb of the existing `nightly` row under the `monthly_report` key.
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/jobs/cost-report.ts`
@@ -1230,12 +1230,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Test: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/cost-report-job.test.ts`
 
 **Interfaces:**
-- Consumes: `one`/`query`(`@omnis/db`) · `Events`, `Scheduler`, `Logger`(Phase A `@omnis/kernel`, 이미 존재) · `agent_runs`/`digests` 테이블(계약 §4).
+- Consumes: `one`/`query` (`@omnis/db`) · `Events`, `Scheduler`, `Logger` (Phase A `@omnis/kernel`, already present) · `agent_runs`/`digests` tables (contract §4).
 - Produces(`@omnis/kernel`): `COST_REPORT_JOB_NAME = "cost_report_monthly"` · `COST_REPORT_CRON = "10 0 1 * *"` · `LOW_CACHE_HIT_RATIO = 0.4` · `interface CostReportRow` · `interface MonthlyCostReport` · `buildMonthlyCostReport(pool: Pool, monthStart: Date, monthEnd: Date): Promise<MonthlyCostReport>` · `attachReportToDigest(pool: Pool, report: MonthlyCostReport, forDate: Date): Promise<void>` · `registerCostReportJob(scheduler: Scheduler, deps: { pool: Pool; events: Events; now?: () => Date }): void`.
 
 #### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다.
+- [ ] 1. Write the failing test.
 
 `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/cost-report-job.test.ts`:
 ```ts
@@ -1272,8 +1272,8 @@ async function seedRun(loop: string, tier: string, provider: string, tokensIn: n
 beforeAll(async () => {
   pool = createPool();
   events = createEvents({ pool, logger: createLogger("@omnis/kernel") });
-  await seedRun("draft", "T1", "deepseek", 1000, 500, 0.12);   // 50% cache hit — 정상
-  await seedRun("note_route", "T0", "local", 1000, 100, 0.01); // 10% cache hit — 경고 대상
+  await seedRun("draft", "T1", "deepseek", 1000, 500, 0.12);   // 50% cache hit — normal
+  await seedRun("note_route", "T0", "local", 1000, 100, 0.01); // 10% cache hit — warning target
   await query(
     pool,
     `INSERT INTO digests (kind, for_date, body, metrics) VALUES ('nightly', '2026-08-31', 'existing body', '{"foo":1}'::jsonb)
@@ -1321,7 +1321,7 @@ describe("cost_report_monthly job", () => {
       pool,
       "SELECT body, metrics FROM digests WHERE kind = 'nightly' AND for_date = '2026-08-31'",
     );
-    expect(digest.body).toBe("existing body");   // 병합이지 덮어쓰기가 아니다
+    expect(digest.body).toBe("existing body");   // merge, not overwrite
     const report = digest.metrics.monthly_report as { month: string; lowCacheHitLoops: string[] };
     expect(report.month).toBe("2026-08");
     expect(report.lowCacheHitLoops).toContain("note_route");
@@ -1335,14 +1335,14 @@ describe("cost_report_monthly job", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대 실패: `does not provide an export named 'buildMonthlyCostReport'`.
+Expected failure: `does not provide an export named 'buildMonthlyCostReport'`.
 
-- [ ] 3. 잡을 쓴다.
+- [ ] 3. Write the job.
 
 `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/jobs/cost-report.ts`:
 ```ts
@@ -1353,7 +1353,7 @@ import type { Scheduler } from "../scheduler.js";
 
 export const COST_REPORT_JOB_NAME = "cost_report_monthly";
 export const COST_REPORT_CRON = "10 0 1 * *";
-/** A4 §12.4·백로그 종료 기준: 초안 루프 캐시 히트율 ≥40% 목표. 이 잡은 미달 루프를 경고로만 낸다. */
+/** A4 §12.4 · backlog exit criteria: target cache hit ratio ≥40% for draft loops. This job only warns about loops that fall short. */
 export const LOW_CACHE_HIT_RATIO = 0.4;
 
 export interface CostReportRow {
@@ -1375,7 +1375,7 @@ export interface MonthlyCostReport {
   lowCacheHitLoops: string[];
 }
 
-/** [monthStart, monthEnd) 반열린 구간의 agent_runs를 loop/tier/provider로 집계한다. */
+/** Aggregates agent_runs over the half-open interval [monthStart, monthEnd) by loop/tier/provider. */
 export async function buildMonthlyCostReport(
   pool: Pool,
   monthStart: Date,
@@ -1440,10 +1440,10 @@ export async function buildMonthlyCostReport(
   };
 }
 
-/** US-B24(다른 계획)가 만든 그 날짜의 nightly digest에 metrics만 병합한다 — body는 안 건드린다.
- *  ponytail: nightly digest 행이 아직 없으면(잡 실패 등) 빈 body로라도 만들어 metrics를 잃지 않는다 —
- *  나중에 nightlyDigestLoop이 같은 (kind, for_date)로 다시 돌면 body만 채워 넣으면 된다(metrics는
- *  jsonb || 병합이라 안전). 상한 없음, 승격 지점: digests.kind에 'monthly'가 생기면 그때 독립 행으로. */
+/** Merges only metrics into the nightly digest for that date, created by US-B24 (another plan) — body is untouched.
+ *  ponytail: if the nightly digest row does not exist yet (job failure, etc.), create it with an empty body rather
+ *  than losing the metrics — when nightlyDigestLoop later runs again for the same (kind, for_date) it just fills in
+ *  the body (metrics are safe because of the jsonb || merge). No ceiling; upgrade point: once digests.kind gains 'monthly', make it an independent row. */
 export async function attachReportToDigest(
   pool: Pool,
   report: MonthlyCostReport,
@@ -1460,8 +1460,8 @@ export async function attachReportToDigest(
   );
 }
 
-/** US-B44: 매월 1일 00:10 KST, 전월 agent_runs를 집계해 전날(=전월 마지막 날) nightly digest에 붙인다.
- *  그 digest는 nightly_digest 잡(US-B24, 23:00 KST)이 전날 밤에 이미 만들어 뒀다. */
+/** US-B44: at 00:10 KST on the 1st of each month, aggregate the previous month's agent_runs and attach them to the
+ *  previous day's (= last day of the previous month) nightly digest, which the nightly_digest job (US-B24, 23:00 KST) already built the night before. */
 export function registerCostReportJob(
   scheduler: Scheduler,
   deps: { pool: Pool; events: Events; now?: () => Date },
@@ -1472,7 +1472,7 @@ export function registerCostReportJob(
     const today = now();
     const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
     const monthEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
-    const forDate = new Date(monthEnd.getTime() - 86_400_000); // 전월 마지막 날
+    const forDate = new Date(monthEnd.getTime() - 86_400_000); // last day of the previous month
 
     const report = await buildMonthlyCostReport(pool, monthStart, monthEnd);
     await attachReportToDigest(pool, report, forDate);
@@ -1488,9 +1488,9 @@ export function registerCostReportJob(
 }
 ```
 
-- [ ] 4. 배럴에 추가한다.
+- [ ] 4. Add it to the barrel.
 
-`/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/index.ts`에 추가:
+Add to `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/index.ts`:
 ```ts
 export {
   COST_REPORT_CRON,
@@ -1503,45 +1503,45 @@ export {
 export type { CostReportRow, MonthlyCostReport } from "./jobs/cost-report.js";
 ```
 
-- [ ] 5. 테스트를 다시 돌려 통과를 확인한다.
+- [ ] 5. Re-run the test and confirm it passes.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대: `cost-report-job.test.ts`의 3개 `it` 전부 통과(`buildMonthlyCostReport` 1개 + `cost_report_monthly job` 2개... 실제로는 `describe` 2개에 `it` 2개, 위 파일 기준 통과 케이스는 2개).
+Expected: all 3 `it` blocks in `cost-report-job.test.ts` pass (`buildMonthlyCostReport` ×1 + `cost_report_monthly job` ×2... in practice there are 2 `describe` blocks holding 2 `it` blocks; by the file above, 2 passing cases).
 
-- [ ] 6. **마이그레이션을 만들지 않는다**(교차 리뷰 M1). `cost_report_monthly` seed가 W0 번들의 `0012_jobs_phase_b.sql`에 있는지 확인만 한다.
+- [ ] 6. **Do not create a migration** (cross-review M1). Only verify that the `cost_report_monthly` seed is present in the W0 bundle's `0012_jobs_phase_b.sql`.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && grep -n "cost_report_monthly" packages/db/migrations/0012_jobs_phase_b.sql && test ! -e packages/db/migrations/0014_cost_report_job.sql && echo "0014 없음 — 정상"
+cd /Users/logankim/AI-Workspaces/omnis && grep -n "cost_report_monthly" packages/db/migrations/0012_jobs_phase_b.sql && test ! -e packages/db/migrations/0014_cost_report_job.sql && echo "no 0014 — as expected"
 ```
 
-기대 출력: `cost_report_monthly` seed 1줄 + `0014 없음 — 정상`. `0012`가 아직 없으면 W0 번들이 머지되기 전이므로 **여기서 만들지 말고** 기다린다 — 스케줄러의 `register`가 `jobs` upsert를 하므로 이 태스크의 나머지(잡 핸들러 + 테스트)는 seed 없이도 돈다.
+Expected output: 1 line with the `cost_report_monthly` seed + `no 0014 — as expected`. If `0012` does not exist yet, the W0 bundle has not been merged — **do not create it here**, just wait, since the scheduler's `register` upserts into `jobs` and the rest of this task (job handler + test) runs without the seed.
 
-- [ ] 7. 잡 핸들러가 두 번 돌아도 같은 결과인지 확인한다(`digests.metrics` 병합이 멱등이어야 한다).
+- [ ] 7. Verify that the job handler is idempotent across two runs (the `digests.metrics` merge must be idempotent).
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && DATABASE_URL=postgres://logan@127.0.0.1:5432/omnis_test pnpm db:migrate && DATABASE_URL=postgres://logan@127.0.0.1:5432/omnis_test pnpm db:migrate
 ```
-기대: 두 번째 실행의 `applied` 배열이 비어 있다(이 태스크가 새 마이그레이션을 더하지 않으므로 앞뒤가 같다).
+Expected: the second run's `applied` array is empty (this task adds no new migration, so both runs are identical).
 
-- [ ] 8. 전체 커널 테스트를 한 번 더 돌려 회귀가 없는지 확인한다.
+- [ ] 8. Run the whole kernel test suite once more to confirm there are no regressions.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대: 기존 `healthcheck-job.test.ts` 등 다른 파일 전부 그대로 통과 + `cost-report-job.test.ts` 통과.
+Expected: every other file such as the existing `healthcheck-job.test.ts` still passes + `cost-report-job.test.ts` passes.
 
-- [ ] 9. 커밋한다.
+- [ ] 9. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B44: 월간 비용·사용량 리포트 잡
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B44: monthly cost and usage report job
 
-- buildMonthlyCostReport: agent_runs를 loop/tier/provider로 집계, 캐시 히트율 계산
-- LOW_CACHE_HIT_RATIO=0.4 미만 루프는 lowCacheHitLoops에 경고로 담긴다
-- attachReportToDigest: 전월 마지막 날 nightly digest의 metrics에 병합(body는 안 건드림)
-- registerCostReportJob: cron 10 0 1 * *, cost.report_monthly cold 이벤트
-- 마이그레이션 없음: cost_report_monthly seed는 W0 스키마 번들의 0012_jobs_phase_b.sql이 갖는다(교차 리뷰 M1)
+- buildMonthlyCostReport: aggregates agent_runs by loop/tier/provider and computes the cache hit ratio
+- Loops below LOW_CACHE_HIT_RATIO=0.4 are surfaced as warnings in lowCacheHitLoops
+- attachReportToDigest: merges into the metrics of the previous month's last nightly digest (body untouched)
+- registerCostReportJob: cron 10 0 1 * *, cost.report_monthly cold event
+- No migration: the cost_report_monthly seed lives in the W0 schema bundle's 0012_jobs_phase_b.sql (cross-review M1)
 
 Implemented-by: Claude Sonnet
 
@@ -1550,16 +1550,16 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## Self-check (계획 작성자)
+## Self-check (plan author)
 
-- 스토리 커버리지: US-B16(Task 1) · US-B34(Task 2) · US-B41(Task 3) · US-B42(Task 4) · US-B43(Task 5) · US-B44(Task 6) — 6개 전부 ≥1 태스크.
-- 금지 패턴 스캔: `TBD`/`TODO`/"나중에 구현"/"적절한 에러 처리"/"Task N과 비슷하게"/코드 없는 스텝/미정의 심볼 — 없음(각 스텝이 실행 가능한 전체 코드 블록을 담고 있고, 반복되는 셸 관용구(`kc()`, JOBS 배열, 가짜 바이너리 세팅)는 매번 전체를 다시 적었다).
-- 실계정 없이 검증 가능(B-D5): 6개 태스크 전부 가짜 `security`/`tailscale`/`launchctl`/`pg_restore`/`curl`/`psql` 바이너리로 PATH를 덮어써 테스트한다. 유일한 실제 연결 지점(Task 6의 vitest integration)은 로컬 `omnis_test` DB만 쓴다.
-- 소비한 심볼 출처: `one`/`query`/`createPool`(계약 §4, 이미 존재) · `Events`/`Scheduler`/`Logger`/`createEvents`/`createScheduler`/`createLogger`(계약 §5, 이미 존재) · `agent_runs`/`digests`/`accounts`/`jobs` 컬럼(계약 §4, Phase A 마이그레이션 실측) · Keychain `kc()` 관용구(`ops/mini/env.sh.example` 실측) — Task 6이 만드는 `buildMonthlyCostReport`/`attachReportToDigest`/`registerCostReportJob`/`COST_REPORT_*`/`LOW_CACHE_HIT_RATIO`는 전부 이 문서 안(Task 6 자신)에서 정의된다. B14(`CostState`/`POLICY`)·B40(`recordAdapterHealth`)·B24(`nightlyDigestLoop`)는 **import하지 않는다** — 각각 SQL 직접 조회 또는 "그 잡이 미리 만들어 둔 행을 병합만" 방식으로 코드 의존을 끊었다(본문에 근거 명기).
+- Story coverage: US-B16 (Task 1) · US-B34 (Task 2) · US-B41 (Task 3) · US-B42 (Task 4) · US-B43 (Task 5) · US-B44 (Task 6) — all 6 have ≥1 task.
+- Prohibited-pattern scan: `TBD`/`TODO`/"implement later"/"appropriate error handling"/"similar to Task N"/steps without code/undefined symbols — none found (every step carries a complete, executable code block, and the recurring shell idioms (`kc()`, the JOBS array, fake-binary setup) are re-written in full every time).
+- Verifiable without real accounts (B-D5): all 6 tasks test by overriding `PATH` with fake `security`/`tailscale`/`launchctl`/`pg_restore`/`curl`/`psql` binaries. The only real connection point (Task 6's vitest integration) uses only the local `omnis_test` DB.
+- Sources of consumed symbols: `one`/`query`/`createPool` (contract §4, already present) · `Events`/`Scheduler`/`Logger`/`createEvents`/`createScheduler`/`createLogger` (contract §5, already present) · `agent_runs`/`digests`/`accounts`/`jobs` columns (contract §4, measured from the Phase A migrations) · the Keychain `kc()` idiom (measured from `ops/mini/env.sh.example`) — everything Task 6 creates (`buildMonthlyCostReport`/`attachReportToDigest`/`registerCostReportJob`/`COST_REPORT_*`/`LOW_CACHE_HIT_RATIO`) is defined inside this document (Task 6 itself). B14 (`CostState`/`POLICY`) · B40 (`recordAdapterHealth`) · B24 (`nightlyDigestLoop`) are **not imported** — each code dependency is severed either by querying SQL directly or by "merely merging into a row that job already created" (the reasoning is stated in the body).
 
 ## Open Questions
 
-1. ~~**마이그레이션 0012 공유 충돌**~~ **닫힘(2026-09-20 교차 리뷰 M1)**: "한 사람이 한 커밋에 몰아서" 쪽으로 정해졌다 — `0009`·`0011`·`0012`·`0013`은 **웨이브 0 스키마 번들**(단일 워크트리·단일 커밋)이고 `packages/kernel/src/settings.ts`를 같이 낸다(델타 §6). 다섯 계획 중 어느 것도 이 파일들을 만들지 않으며(예외: memory-ingestion의 `0010`), 이 계획의 `0014_cost_report_job.sql`은 **폐기**됐다(델타 §11). W0가 W1보다 먼저 머지되므로 웨이브 순서와도 모순되지 않는다.
-2. **`omnis.healthchecks.<slug>` / `omnis.restic.*` / `omnis.b2.*` Keychain 이름은 이 계획이 새로 정했다** — A1/A6 §9 원문에 healthchecks.io·restic·B2 항목 이름이 없어서(원문은 서비스 자체가 아니라 채널/DB 시크릿만 다룬다) 점 스킴을 그대로 확장했다. 다른 계획이 같은 값을 다른 이름으로 이미 썼다면 여기 맞춰 정정 필요.
-3. **`items(kind='system')` "이중 노출"의 일반 인프라 경로**: 델타는 어댑터별 시스템 아이템을 `recordAdapterHealth`(US-B40, kernel export)로 명시했지만, hub/Postgres/슬롯 같은 **비-어댑터** 인프라 경보의 시스템 아이템 생성 경로는 어느 계약에도 TS 함수로 고정돼 있지 않다. 이 계획은 Task 4에서 `healthcheck-ping.sh`가 psql로 직접 INSERT하는 방식으로 메웠다 — US-B40이 나중에 `recordAdapterHealth`와 통일된 헬퍼(예: `recordInfraHealth`)를 커널에 추가하면 이 스크립트의 SQL 블록을 그 호출로 교체하는 게 더 낫다.
-4. **`ops/scripts/omnis-backup.sh`의 restic 리포지토리 최초 `init`**은 이 계획 밖(사람이 1회 수동)이다 — 실제 미니 배포 시 `RUNBOOK.md` "설치(처음 1회)" 절차에 `restic init` 한 줄을 추가할 시점을 US-B41 실행자가 잡아야 한다.
+1. ~~**Migration 0012 shared collision**~~ **Closed (2026-09-20 cross-review M1)**: the decision went the way of "one person lands it in a single commit" — `0009`·`0011`·`0012`·`0013` are the **wave 0 schema bundle** (single worktree, single commit) and they ship `packages/kernel/src/settings.ts` alongside (delta §6). None of the five plans creates these files (exception: memory-ingestion's `0010`), and this plan's `0014_cost_report_job.sql` is **retired** (delta §11). Because W0 merges before W1, this is not in conflict with the wave order either.
+2. **The `omnis.healthchecks.<slug>` / `omnis.restic.*` / `omnis.b2.*` Keychain names were introduced by this plan** — the A1/A6 §9 source text has no item names for healthchecks.io, restic, or B2 (it only covers channel/DB secrets, not the services themselves), so the dotted scheme was extended as-is. If another plan already uses the same values under different names, this needs to be corrected to match.
+3. **The general infrastructure path for `items(kind='system')` "dual exposure"**: the delta specifies per-adapter system items via `recordAdapterHealth` (US-B40, a kernel export), but the system-item creation path for **non-adapter** infrastructure alerts such as the hub, Postgres, or the slot is not pinned to a TS function in any contract. This plan fills that gap in Task 4 by having `healthcheck-ping.sh` INSERT directly with psql — once US-B40 later adds a helper unified with `recordAdapterHealth` (for example `recordInfraHealth`) to the kernel, replacing this script's SQL block with that call would be better.
+4. **The initial restic repository `init` for `ops/scripts/omnis-backup.sh`** is outside this plan (done by hand once) — the US-B41 implementer should pick the moment to add a single `restic init` line to the "Install (first time)" procedure in `RUNBOOK.md` during the actual mini deployment.
