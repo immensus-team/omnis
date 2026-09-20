@@ -93,3 +93,12 @@ export {
   taskLoop,
   type TaskOutputT,
 } from "./loops/task.js";
+export { renderBrief, type BriefInput } from "./delegate/brief.js";
+export {
+  AUTONOMY_MAX_MINUTES,
+  DelegateOutput,
+  autonomyAllows,
+  delegateLoop,
+  type AutonomyRule,
+  type DelegateOutputT,
+} from "./loops/delegate.js";
