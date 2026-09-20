@@ -1,0 +1,6 @@
+{
+  "name": "gate-13-zero-column-types-spike",
+  "private": true,
+  "type": "module",
+  "dependencies": { "@rocicorp/zero": "1.9.0", "pg": "8.13.1" }
+}

@@ -1,0 +1,20 @@
+=== mode (a): claude-ds -p --bare --settings out/hooks-settings.json --permission-mode manual (cwd=fresh fixture worktree w/ its own .claude/settings.json PreToolUse hook) ===
+driver: claude-ds (= `exec claude "$@"` with ANTHROPIC_AUTH_TOKEN exported; API-key auth, model deepseek-flash). Claude Code 2.1.274.
+
+--- mode-a.log (CLI stdout+stderr) ---
+"deepseek-flash" isn't described by this version's model catalog; update Claude Code, or map it with behavesAs on a modelPicker row (or modelOverrides, if it is a provider id of a model this version knows). Until then auto-compact keeps this session within 200k tokens (the context window it assumes); if the model accepts more, append [1m] to the model name for 1M, or set CLAUDE_CODE_MAX_CONTEXT_TOKENS to its real window; CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT=1 restores the previous wait-for-the-API behavior.
+[claude-code:unrecognized_model] {"model":"deepseek-flash","query_source":"sdk"}
+The command ran and printed:
+
+```
+GATE11_PROBE_MARKER
+```
+
+Nothing else was executed or modified.
+
+--- mode-a.debug.log: PreToolUse hook activity (grep 'Hook PreToolUse') ---
+(ZERO matches — no hook of any kind executed, omnis or project)
+
+--- mode-a.debug.log: proof the run REACHED and PASSED the tool stage ---
+75:2026-09-20T02:48:49.740Z [INFO] [Stall] tool_dispatch_start tool=Bash toolUseId=call_00_nD60McuUeEIqBxVi1daR9219 permissionDecisionMs=3
+85:2026-09-20T02:48:50.300Z [INFO] [Stall] tool_dispatch_end tool=Bash toolUseId=call_00_nD60McuUeEIqBxVi1daR9219 outcome=ok durationMs=560

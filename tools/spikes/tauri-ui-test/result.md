@@ -1,0 +1,22 @@
+# Spike: Tauri UI 테스트 도구 (A7-D4, A7-2)
+
+- **질문**: tauri-driver + WebdriverIO로 Tauri 2 앱 UI 스모크가 되는가
+- **소유 부록**: A7(A7-D4)
+- **Owner**: agent
+- **Host**: macbook
+- **실행일**: 2026-09-20
+- **결과(Pass/Fail)**: FAIL — `tauri-driver`가 macOS에서 세션 자체를 열지 않는다.
+- **측정치/근거**:
+  - `cargo install tauri-driver` → 성공(`tauri-driver v2.0.6` 설치, `/Users/logankim/.cargo/bin/tauri-driver`).
+  - `tauri-driver --version` 실행 결과: `tauri-driver is not supported on this platform`(즉시 종료, 버전 출력 없음). A7-D4 원문이 명시한 "알려진 리스크"(Linux(WebKitWebDriver)/Windows(msedgedriver) 중심, macOS 공식 지원 없음)가 그대로 재현됨.
+  - `create-tauri-app@latest --template vanilla --manager pnpm` 스크래치 앱 생성 성공, `npx tauri build --debug` 성공(`Finished dev profile ... BUILD_EXIT=0`, 바이너리 `scratch-app/src-tauri/target/debug/scratch-app` 24MB 생성 확인, `.app`/`.dmg` 번들까지 완료).
+  - `npx wdio run wdio.conf.ts` 실행(exit code 1): `wdio.conf.ts`의 `beforeSession`이 `tauri-driver`를 spawn하지만 위 이유로 즉시 종료되어 `127.0.0.1:4444`에 아무것도 바인딩되지 않음 → WebdriverIO의 `POST /session`이 `ECONNREFUSED`로 3회 재시도 후 실패 → `Unable to connect to "http://127.0.0.1:4444/", make sure browser driver is running on that address.` → `Spec Files: 0 passed, 1 failed, 1 total`(전체 로그 `run.log`).
+  - **`smoke.test.ts`의 단 한 줄도 실행되지 않았다.** 실패 지점이 세션 생성(`POST /session`)이라 spec 파일은 로드만 되고(`RUNNING in undefined - file:///smoke.test.ts`) 바로 `FAILED`로 끝난다 — 실행된 테스트는 0건이고, 로그에 mocha의 개별 테스트 결과 라인이 한 줄도 없다. 따라서 이 스파이크가 실측으로 확인한 범위는 "앱 빌드 + 바이너리 생성 + WebdriverIO 러너 기동/설정 로드"까지이며, 셀렉터·클릭·assertion을 포함한 **스모크 시나리오 자체는 한 번도 검증되지 않았다**(pass 기준 "버튼 클릭 1건 성공"은 도달 불가).
+  - 차단 지점은 `tauri-driver`의 macOS 미지원 하나로 특정된다(그 앞 단계인 빌드·러너 기동은 정상). 다만 그 뒤 단계(WebDriver 프로토콜 동작, DOM 조작, assertion)는 실행된 적이 없으므로 "정상"이라고 말할 근거가 없다.
+- **decided_by**: agent(unattended spike, Task 17 절차 7단계 그대로 적용)
+- **비고**:
+  - 채택 결정(M14 Fail 규칙 그대로): `apps/desktop`(Tauri)의 **e2e 스모크 계층만** `apps/desktop`을 Tauri 런타임 없이 `vite build`한 순수 웹 번들 + **Playwright**로 대체한다(US-A25 이후 태스크가 이 스크립트를 만든다). `tauri-driver`+WebdriverIO는 채택하지 않는다.
+  - 컴포넌트 단위 테스트는 이 결과와 무관 — `2026-09-20-phase-a-desktop.md`가 이미 확정한 vitest + `@testing-library/react` + jsdom을 그대로 쓴다(재검토 대상 아님).
+  - 재현 증거: `tools/spikes/tauri-ui-test/run.log`(전체 wdio 실행 로그 — gate-14와 동일 관례로 루트 `.gitignore`의 `*.log` 규칙에 걸려 커밋 대상은 아니고 로컬에만 남는다, 핵심 라인은 위 "측정치/근거"에 그대로 인용됨), `tools/spikes/tauri-ui-test/scratch-app/`(스크래치 Tauri vanilla 앱, `node_modules`/`target`/`dist`는 루트 `.gitignore`로 제외됨 — 버릴 코드, `apps/desktop`과 무관).
+  - `smoke.test.ts`의 Greet 버튼 셀렉터는 플랜 5단계가 적은 `#greet-button`이 아니라 `#greet-form button[type="submit"]`을 쓴다 — `create-tauri-app@latest --template vanilla`가 실제로 생성한 `scratch-app/src/index.html`의 버튼에는 id가 없고(`<form id="greet-form"><input id="greet-input"><button type="submit">Greet</button></form><p id="greet-msg">`), 플랜의 "vanilla 템플릿의 실제 DOM id는 `greet-input`/`greet-button`/`greet-msg`다"라는 전제가 현재 템플릿과 맞지 않는다. 생성물 HTML을 읽어 셀렉터를 맞췄을 뿐 **실행으로 검증하지는 못했다**(위와 같은 이유로 spec이 돌지 않음).
+  - `pnpm install`을 `scratch-app/`에서 실행하면 pnpm이 상위 디렉터리를 걸어 올라가 레포 루트의 `pnpm-workspace.yaml`(`packages/*`/`apps/*`만 포함, `tools/spikes`는 미포함)을 워크스페이스 루트로 잡아 `node_modules`를 만들지 않는 부작용이 있었다(계획 문서가 예견하지 못한 부분) → `pnpm install --ignore-workspace` / `pnpm add -D --ignore-workspace`로 우회(이 스파이크 디렉터리에만 적용, 실제 코드 경로에는 영향 없음).
