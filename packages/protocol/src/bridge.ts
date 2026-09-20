@@ -217,6 +217,7 @@ export const SessionSummary = z.object({
     )
     .max(10),
 });
+export type SessionSummary = z.infer<typeof SessionSummary>;
 
 // --- 메서드 목록과 에러 코드 (A2 §3.2~3.4) ---
 /** hub → bridge 요청 (A2 §3.2) */
