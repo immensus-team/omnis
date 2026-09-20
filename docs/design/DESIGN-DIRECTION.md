@@ -17,3 +17,16 @@
 ## 구현 원칙
 - 직접 만들지 않는다: 브랜드 아이콘 `react-icons/si`, 스레드·컴포저·AI 패널은 `cloudflare/agentic-inbox` 패턴, 에이전트 상태 UI는 `AltanS/collie`·`herdr-radar` 패턴, 명령/검색은 기존 `cmdk`, 토큰은 shadcn 테마 프리미티브.
 - 요약은 T1(DeepSeek Flash) 한 줄, 실패·미생성 시 subject 또는 본문 첫 줄 폴백. `threads.meta.summary`에 저장하고 매 실행을 `agent_runs`에 기록.
+
+## 추가 지시 (Logan, 2026-09-20 저녁)
+
+- **UI/UX를 깎는 반복 작업은 DeepSeek V4.1 Flash가 주력이다.** UI 스토리는 DeepSeek 티어로 배정하고 Sonnet 드라이버가 실행·검증한다. 리뷰어는 스크린샷을 아래 레퍼런스와 대조해 "AI-slop처럼 보이면" 거절한다(균일한 카드 그리드, 보라 그라데이션 남발, 과한 그림자, 의미 없는 아이콘, 밋밋한 기본 폰트, 정적인 전환은 전부 슬롭 신호).
+- **오픈소스 디자인 스킬을 계속 리서치·설치해 쓴다.** 설치 목록과 사용법은 `docs/design/SKILLS.md`(리서치 후 생성)에 유지한다.
+- **애플답고 glassy하게, 모션은 자연스럽게.** Liquid Glass는 sidebar/toolbar/sheet/팔레트/플로팅 패널에만, 리스트·본문은 불투명(기존 규칙 유지). 모션은 spring 기반(진입 160ms, 전환 240ms, 레이어 등장 320ms; 과장 금지), reduced-motion 존중.
+
+### 레퍼런스 3장 (`reference/`)
+| 파일 | 가져올 디테일 |
+|---|---|
+| `ref-glass-mail-ai-panel.webp` | 배경 위 유리질 사이드바(반투명 + blur + 은은한 틴트), 스마트 폴더 트리와 카운트, 상단 탭 필, 플로팅 **AI 채팅 패널**(제안 액션 "Draft a reply / Summarize / Extract", 모델 선택기 Auto/Claude/Gemini/GPT, 첨부·@ 멘션 입력창). omnis의 ask 바를 이 패널로 확장한다. |
+| `ref-issue-tracker-density.webp` | 필터 칩 바("Priority is any of 2 priorities"), 상태별 그룹 헤더(pill + 카운트 + +), 서브아이템 들여쓰기, 호버 카드, 체크박스 드롭다운. omnis의 Tasks·Needs-approval 뷰의 밀도와 상태 pill 문법. |
+| `ref-dashboard-detail-card.webp` | 왼쪽 아이콘 레일(선택 상태 미세 배경), 상단 제목 + 서브라인, 토글·세그먼트 컨트롤, 우측 상세 카드(사진 + 배지 + 키-값 헤어라인 표). omnis의 상세 패널·Network 사람 카드·Settings의 타이포 기준. |
