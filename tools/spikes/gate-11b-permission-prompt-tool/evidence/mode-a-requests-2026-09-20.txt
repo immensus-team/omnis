@@ -1,0 +1,1 @@
+{"ts":"2026-09-20T06:48:57.174Z","tool_name":"Bash","input":{"command":"touch /tmp/gate11b_probe_marker.txt","description":"Create empty probe marker file"},"decision":"deny"}

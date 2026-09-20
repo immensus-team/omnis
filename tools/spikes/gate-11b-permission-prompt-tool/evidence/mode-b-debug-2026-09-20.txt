@@ -1,0 +1,100 @@
+2026-09-20T06:49:03.642Z [DEBUG] MDM settings load completed in 1ms
+2026-09-20T06:49:03.654Z [DEBUG] Broken symlink or missing file encountered for settings.json at path: /Library/Application Support/ClaudeCode/managed-settings.json
+2026-09-20T06:49:03.655Z [DEBUG] Broken symlink or missing file encountered for settings.json at path: /private/var/folders/80/qxyf3m794618x57grczjs0g80000gn/T/tmp.eCkZ7zBhEC/gate11b-project-fixture/.claude/settings.local.json
+2026-09-20T06:49:03.655Z [DEBUG] CA certs: Config fallback - globalEnv keys: , settingsEnv keys: CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
+2026-09-20T06:49:03.669Z [DEBUG] [init] configureGlobalMTLS starting
+2026-09-20T06:49:03.669Z [DEBUG] [init] configureGlobalMTLS complete
+2026-09-20T06:49:03.669Z [DEBUG] [init] configureGlobalAgents starting
+2026-09-20T06:49:03.669Z [DEBUG] CA certs: stores=bundled,system, extraCertsPath=undefined
+2026-09-20T06:49:03.669Z [DEBUG] CA certs: Loaded 121 bundled root certificates
+2026-09-20T06:49:03.684Z [DEBUG] CA certs: Loaded 8 system CA certificates
+2026-09-20T06:49:03.684Z [DEBUG] mTLS: Creating HTTPS agent with custom certificates
+2026-09-20T06:49:03.684Z [DEBUG] [init] configureGlobalAgents complete
+2026-09-20T06:49:03.685Z [DEBUG] Git remote URL: null
+2026-09-20T06:49:03.685Z [DEBUG] No git remote URL found
+2026-09-20T06:49:03.685Z [DEBUG] Error log sink initialized
+2026-09-20T06:49:03.688Z [DEBUG] [Claude in Chrome] Disabled: OAuth token has no scope accepted by /api/oauth/validate (needs user:profile, user:office, or user:ccr_inference; env-var and setup-token sessions default to user:inference only)
+2026-09-20T06:49:03.694Z [DEBUG] Applying permission update: Adding 4 deny rule(s) to destination 'userSettings': ["Bash(rm:*)","Bash(rmdir:*)","Bash(shred:*)","Bash(dd:*)"]
+2026-09-20T06:49:03.694Z [DEBUG] [ToolSearch:optimistic] disabled: ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic is not a first-party Anthropic host. Set ENABLE_TOOL_SEARCH=true (or auto / auto:N) if your proxy forwards tool_reference blocks.
+2026-09-20T06:49:03.694Z [DEBUG] [STARTUP] Loading MCP configs...
+2026-09-20T06:49:03.696Z [DEBUG] [STARTUP] Running setup()...
+2026-09-20T06:49:03.697Z [DEBUG] [TeammateModeSnapshot] Captured from config: in-process
+2026-09-20T06:49:03.697Z [DEBUG] Broken symlink or missing file encountered for settings.json at path: /Library/Application Support/ClaudeCode/managed-settings.json
+2026-09-20T06:49:03.699Z [DEBUG] Broken symlink or missing file encountered for settings.json at path: /private/var/folders/80/qxyf3m794618x57grczjs0g80000gn/T/tmp.eCkZ7zBhEC/gate11b-project-fixture/.claude/settings.local.json
+2026-09-20T06:49:03.700Z [DEBUG] Error log sink initialized
+2026-09-20T06:49:03.701Z [DEBUG] Loading skills from: managed=/Library/Application Support/ClaudeCode/.claude/skills, user=/Users/logankim/.claude/skills, project=[]
+2026-09-20T06:49:03.701Z [DEBUG] [reduced mode] Skipping skill dir discovery
+2026-09-20T06:49:03.701Z [DEBUG] Acquired PID lock for 2.1.274 (PID 12082)
+2026-09-20T06:49:03.702Z [DEBUG] Acquired PID lock on running version: /Users/logankim/.local/share/claude/versions/2.1.274
+2026-09-20T06:49:03.702Z [DEBUG] [STARTUP] setup() completed in 6ms
+2026-09-20T06:49:03.702Z [DEBUG] Cleared mTLS configuration cache
+2026-09-20T06:49:03.702Z [DEBUG] Cleared proxy agent cache
+2026-09-20T06:49:03.702Z [DEBUG] mTLS: Creating HTTPS agent with custom certificates
+2026-09-20T06:49:03.705Z [DEBUG] [STARTUP] Loading commands and agents...
+2026-09-20T06:49:03.706Z [DEBUG] getSkills returning: 0 skill dir commands, 0 plugin skills, 40 bundled skills, 0 builtin plugin skills
+2026-09-20T06:49:03.720Z [DEBUG] Loaded 23 installed plugins from /Users/logankim/.claude/plugins/installed_plugins.json
+2026-09-20T06:49:03.729Z [DEBUG] Read hooks.json for plugin codex (enabled=true): /Users/logankim/.claude/plugins/cache/openai-codex/codex/1.0.4/hooks/hooks.json
+2026-09-20T06:49:03.729Z [DEBUG] Read hooks.json for plugin superpowers (enabled=true): /Users/logankim/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/hooks/hooks.json
+2026-09-20T06:49:03.729Z [DEBUG] Read hooks.json for plugin ralph-loop (enabled=true): /Users/logankim/.claude/plugins/cache/claude-plugins-official/ralph-loop/1.0.0/hooks/hooks.json
+2026-09-20T06:49:03.729Z [DEBUG] Read hooks.json for plugin explanatory-output-style (enabled=true): /Users/logankim/.claude/plugins/cache/claude-plugins-official/explanatory-output-style/1.0.0/hooks/hooks.json
+2026-09-20T06:49:03.730Z [DEBUG] Read manifest hooks for plugin ponytail (enabled=true): ./hooks/claude-codex-hooks.json
+2026-09-20T06:49:03.730Z [DEBUG] Read hooks.json for plugin vercel (enabled=true): /Users/logankim/.claude/plugins/cache/claude-plugins-official/vercel/0.49.2/hooks/hooks.json
+2026-09-20T06:49:03.730Z [DEBUG] Read hooks.json for plugin oh-my-claudecode (enabled=true): /Users/logankim/.claude/plugins/cache/omc/oh-my-claudecode/4.14.5/hooks/hooks.json
+2026-09-20T06:49:03.731Z [DEBUG] Found 23 plugins (23 enabled, 0 disabled)
+2026-09-20T06:49:03.731Z [DEBUG] Total plugin workflows loaded: 0
+2026-09-20T06:49:03.734Z [DEBUG] [STARTUP] Commands and agents loaded in 29ms
+2026-09-20T06:49:03.736Z [DEBUG] Skipping startup prefetches, last ran 1789886944s ago
+2026-09-20T06:49:03.749Z [DEBUG] [STARTUP] MCP configs resolved in 1ms (awaited at +55ms)
+2026-09-20T06:49:03.751Z [DEBUG] Cleared mTLS configuration cache
+2026-09-20T06:49:03.751Z [DEBUG] Cleared proxy agent cache
+2026-09-20T06:49:03.751Z [DEBUG] mTLS: Creating HTTPS agent with custom certificates
+2026-09-20T06:49:03.752Z [DEBUG] Fast mode unavailable: Fast mode is not available in the Agent SDK
+2026-09-20T06:49:03.752Z [DEBUG] [MCP] --mcp-config servers running fully async (nonblocking)
+2026-09-20T06:49:03.752Z [DEBUG] [MCP] claude.ai connectors running fully async (nonblocking)
+2026-09-20T06:49:03.753Z [DEBUG] [auto-mode] verifyAutoModeGateAccess: enabledState=enabled disabledBySettings=false model=deepseek-flash modelSupported=true disableFastModeBreakerFires=false carouselAvailable=true canEnterAuto=true
+2026-09-20T06:49:03.755Z [DEBUG] [Perfetto] initializePerfettoTracing called, env value: undefined
+2026-09-20T06:49:03.755Z [DEBUG] [3P telemetry] isTelemetryEnabled=false (CLAUDE_CODE_ENABLE_TELEMETRY=undefined)
+2026-09-20T06:49:03.761Z [DEBUG] [ScheduledTasks] scheduler start() — enabled=false, hasTasks=false
+2026-09-20T06:49:03.762Z [DEBUG] session.start: raised (surface none, not interactive)
+2026-09-20T06:49:03.765Z [WARN] [3P telemetry] Event dropped (no event logger initialized): plugin_loaded
+2026-09-20T06:49:03.767Z [DEBUG] mcp runtime arm: v2 (source: default)
+2026-09-20T06:49:03.776Z [DEBUG] MCP server "omnis_gate11b": Starting connection with timeout of 30000ms
+2026-09-20T06:49:03.784Z [DEBUG] Git remote URL: null
+2026-09-20T06:49:03.784Z [DEBUG] No git remote URL found
+2026-09-20T06:49:03.786Z [DEBUG] [sessionRegistry] sweep permitted (domain darwin)
+2026-09-20T06:49:03.900Z [DEBUG] MCP server "omnis_gate11b": Successfully connected (transport: stdio) in 126ms
+2026-09-20T06:49:03.900Z [DEBUG] MCP server "omnis_gate11b": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":false,"hasResourceSubscribe":false,"serverVersion":{"name":"omnis-gate11b-permission","version":"0.0.1"},"protocolEra":"legacy","negotiatedProtocolVersion":"2025-11-25"}
+2026-09-20T06:49:03.900Z [DEBUG] [MCP] Server "omnis_gate11b" connected with subscribe=false
+2026-09-20T06:49:03.907Z [DEBUG] Fast mode unavailable: Fast mode is not available in the Agent SDK
+2026-09-20T06:49:03.908Z [DEBUG] [session-notices] advertise=false mode=default flag=false(disabled) pollChannel=false remote=false remoteEnv=false nonInteractive=true
+2026-09-20T06:49:03.908Z [DEBUG] [engine] turn 1 start
+2026-09-20T06:49:03.910Z [DEBUG] autocompact: tokens=[REDACTED] level=ok effectiveWindow=180000
+2026-09-20T06:49:03.914Z [DEBUG] attribution header x-anthropic-billing-header: cc_version=2.1.274.0b4; cc_entrypoint=sdk-cli;
+2026-09-20T06:49:03.914Z [DEBUG] Fast mode unavailable: Fast mode is not available in the Agent SDK
+2026-09-20T06:49:03.915Z [DEBUG] Fast mode unavailable: Fast mode is not available in the Agent SDK
+2026-09-20T06:49:03.916Z [DEBUG] Fast mode unavailable: Fast mode is not available in the Agent SDK
+2026-09-20T06:49:03.916Z [DEBUG] [API:timing] dispatching to firstParty model=deepseek-flash
+2026-09-20T06:49:03.917Z [DEBUG] [API REQUEST] /anthropic/v1/messages source=sdk
+2026-09-20T06:49:04.165Z [DEBUG] Stream started - received first chunk
+2026-09-20T06:49:04.165Z [DEBUG] [API:timing] first byte after 249ms
+2026-09-20T06:49:05.007Z [DEBUG] "Permission suggestions for Bash: [\n  {\n    \"type\": \"addDirectories\",\n    \"directories\": [\n      \"/tmp\"\n    ],\n    \"destination\": \"session\"\n  },\n  {\n    \"type\": \"setMode\",\n    \"mode\": \"acceptEdits\",\n    \"destination\": \"session\"\n  }\n]"
+2026-09-20T06:49:05.007Z [DEBUG] executePermissionRequestHooks called for tool: Bash
+2026-09-20T06:49:05.008Z [DEBUG] MCP server "omnis_gate11b": Calling MCP tool: approval_prompt
+2026-09-20T06:49:05.012Z [DEBUG] MCP server "omnis_gate11b": Tool 'approval_prompt' completed successfully in 4ms
+2026-09-20T06:49:05.013Z [DEBUG] Bash tool permission denied
+2026-09-20T06:49:05.014Z [DEBUG] autocompact: tokens=[REDACTED] level=ok effectiveWindow=180000
+2026-09-20T06:49:05.015Z [DEBUG] attribution header x-anthropic-billing-header: cc_version=2.1.274.0b4; cc_entrypoint=sdk-cli;
+2026-09-20T06:49:05.015Z [DEBUG] Fast mode unavailable: Fast mode is not available in the Agent SDK
+2026-09-20T06:49:05.015Z [DEBUG] Fast mode unavailable: Fast mode is not available in the Agent SDK
+2026-09-20T06:49:05.016Z [DEBUG] Fast mode unavailable: Fast mode is not available in the Agent SDK
+2026-09-20T06:49:05.016Z [DEBUG] [API:timing] dispatching to firstParty model=deepseek-flash
+2026-09-20T06:49:05.016Z [DEBUG] [API REQUEST] /anthropic/v1/messages source=sdk
+2026-09-20T06:49:05.205Z [DEBUG] Stream started - received first chunk
+2026-09-20T06:49:05.205Z [DEBUG] [API:timing] first byte after 189ms
+2026-09-20T06:49:06.455Z [DEBUG] [engine] turn 1 end (turns=2 usage in=1647 out=220 cost=$0.0144 api=2533ms stop=end_turn resultLen=408)
+2026-09-20T06:49:06.455Z [DEBUG] Fast mode unavailable: Fast mode is not available in the Agent SDK
+2026-09-20T06:49:06.457Z [DEBUG] MCP server "omnis_gate11b": Sending SIGINT to MCP server process
+2026-09-20T06:49:06.460Z [DEBUG] MCP server "omnis_gate11b": UNKNOWN connection closed after 2s (cleanly)
+2026-09-20T06:49:06.460Z [DEBUG] MCP server "omnis_gate11b": Cleared connection cache for reconnection
+2026-09-20T06:49:06.509Z [DEBUG] MCP server "omnis_gate11b": MCP server process exited cleanly
+2026-09-20T06:49:06.513Z [DEBUG] Released PID lock for 2.1.274

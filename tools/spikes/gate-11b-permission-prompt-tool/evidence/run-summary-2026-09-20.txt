@@ -1,0 +1,13 @@
+=== fixture: fresh worktree cwd with its own .claude/settings.json project hook ===
+=== mode_a: driver=claude extra_flags=[] cwd=fixture worktree ===
+mode_a_latency_ms=10005
+mode_a_permission_tool_invoked_for_bash=true
+mode_a_bash_denied=true
+mode_a_project_hook_fired=true
+mode_a_debug_shows_mcp_tool_call=true
+=== mode_b: driver=claude-ds extra_flags=[--bare] cwd=fixture worktree ===
+mode_b_latency_ms=2965
+mode_b_permission_tool_invoked_for_bash=true
+mode_b_bash_denied=true
+mode_b_project_hook_fired=false
+mode_b_debug_shows_mcp_tool_call=true
