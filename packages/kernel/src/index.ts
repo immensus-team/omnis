@@ -11,6 +11,13 @@ export {
   registerHealthcheckJob,
 } from "./jobs/healthcheck.js";
 export {
+  ADAPTER_HEALTH_FAIL_THRESHOLD,
+  recordAdapterHealth,
+  resetAdapterHealthCounters,
+  sendNtfy,
+} from "./adapter-health.js";
+export type { AdapterHealthDeps, NtfyDeps } from "./adapter-health.js";
+export {
   COST_DAILY_CRON,
   COST_DAILY_JOB_NAME,
   registerCostDailyJob,
