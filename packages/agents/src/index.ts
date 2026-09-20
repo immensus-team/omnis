@@ -130,3 +130,62 @@ export {
   type FollowupOutputT,
   type InactiveCandidate,
 } from "./loops/followup.js";
+export {
+  AUTO_ARCHIVE_RULES,
+  AutoArchiveOutput,
+  T1_ARCHIVE_CONFIDENCE_MIN,
+  autoArchiveLoop,
+  hardGate,
+  nonHumanSender,
+  sweepAutoArchive,
+  type AutoArchiveOutputT,
+  type HardGateResult,
+} from "./loops/auto-archive.js";
+export {
+  SECTION_CAPS,
+  rankBriefItems,
+  type BriefCandidate,
+  type BriefItem,
+  type BriefSection,
+  type BriefSectionId,
+  type MorningBriefing,
+} from "./digest/rank.js";
+export {
+  MORNING_DIGEST_CRON,
+  MorningDigestOutput,
+  morningCandidates,
+  morningDigestLoop,
+  type MorningDigestOutputT,
+} from "./loops/digest-morning.js";
+export {
+  NIGHTLY_DIGEST_CRON,
+  NightlyDigestOutput,
+  nightlyDigestLoop,
+  nightlyGroups,
+  undoTokenFor,
+  type DigestGroup,
+  type NightlyDigest,
+  type NightlyDigestOutputT,
+} from "./loops/digest-nightly.js";
+export {
+  ANTHROPIC_BATCH_MODEL,
+  ANTHROPIC_BATCH_URL,
+  MEMORY_CONSOLIDATE_CRON,
+  MEMORY_HARVEST_CRON,
+  harvestConsolidation,
+  submitConsolidation,
+  type ConsolidationRequest,
+  type ConsolidationResult,
+} from "./memory/consolidate.js";
+export {
+  MAX_PATCHES,
+  MAX_PATCH_LINES,
+  SELF_MODEL_CRON,
+  SUPPRESSION_WEEKS,
+  diffHash,
+  isSuppressed,
+  proposeSelfModelPatches,
+  suppressPatch,
+  validatePatch,
+  type SelfModelPatch,
+} from "./self-model/propose.js";

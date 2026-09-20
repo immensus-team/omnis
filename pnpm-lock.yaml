@@ -316,6 +316,9 @@ importers:
       '@omnis/db':
         specifier: workspace:*
         version: link:../db
+      '@omnis/memory':
+        specifier: workspace:*
+        version: link:../memory
       '@omnis/protocol':
         specifier: workspace:*
         version: link:../protocol
