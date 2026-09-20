@@ -400,21 +400,21 @@ export function Inbox({
   if (channelFilter && onChannelFilterChange) {
     chips.push({
       id: "channel",
-      fieldLabel: "채널",
-      text: `채널은 ${CHANNEL_LABEL[channelFilter]}`,
+      field: "채널",
+      value: CHANNEL_LABEL[channelFilter],
       onRemove: () => onChannelFilterChange(null),
     });
   }
   if (selectedLabelIds.size > 0) {
     chips.push({
       id: "labels",
-      fieldLabel: "라벨",
+      field: "라벨",
       // 레퍼런스의 필터 DSL도 값이 하나면 수량사를 접는다("Channel is Slack") —
-      // "라벨은 1개 중 하나"는 사람이 쓰지 않는 문장이라 채널 칩과 같은 문법으로 떨어뜨린다.
-      text:
+      // "1개 중 하나"는 사람이 쓰지 않는 말이라 채널 칩과 같이 이름만 남긴다.
+      value:
         selectedLabelIds.size === 1
-          ? `라벨은 ${labels.find((l) => selectedLabelIds.has(l.id))?.name ?? "1개"}`
-          : `라벨은 ${selectedLabelIds.size}개 중 하나`,
+          ? (labels.find((l) => selectedLabelIds.has(l.id))?.name ?? "1개")
+          : `${selectedLabelIds.size}개 중 하나`,
       onRemove: () => setSelectedLabelIds(new Set()),
     });
   }

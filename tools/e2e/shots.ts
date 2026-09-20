@@ -161,10 +161,11 @@ async function main(): Promise<void> {
     await page.waitForTimeout(2500);
 
     // 1) needs-approval — 탭 pill 안의 대기 건수 + 승인 대기 행들 + 필터 칩 바.
-    //    이름이 정확히 "needs-approval"이 아니다: 탭이 카운트를 달고 있어 "needs-approval 6"이다.
+    //    파일 이름이 "approvals-density"였는데 이 뷰에는 상태 pill도 그룹 헤더도 없다
+    //    (아래 2번이 그 둘을 담는 뷰다) — 화면 이름 그대로 needs-approval.png로 부른다.
     await page.getByRole("radio", { name: /^needs-approval/ }).click();
     await page.waitForTimeout(800);
-    await page.screenshot({ path: join(OUT, "approvals-density.png") });
+    await page.screenshot({ path: join(OUT, "needs-approval.png") });
 
     // 2) agents — 상태 그룹 순서(확인 필요 → 작업 중 → 대기 → 완료)
     await page.getByRole("radio", { name: "agents" }).click();

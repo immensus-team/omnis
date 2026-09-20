@@ -117,6 +117,13 @@ const renderInbox = (props: ComponentProps<typeof Inbox> = {}) =>
 const rowNames = (): string[] =>
   [...document.querySelectorAll(".inbox-row__name")].map((el) => el.textContent ?? "");
 
+/** 칩은 필드 칸 + 값 칸이다(레퍼런스의 필터 DSL) — 한 덩어리 문자열로 읽지 않는다. */
+const chipCells = (): (string | null | undefined)[][] =>
+  [...document.querySelectorAll(".filter-chip")].map((chip) => [
+    chip.querySelector(".filter-chip__field")?.textContent,
+    chip.querySelector(".filter-chip__value")?.textContent,
+  ]);
+
 const addTrigger = () => screen.getByRole("button", { name: "+ 라벨" });
 const optionIn = (label: string) => within(screen.getByRole("dialog")).getByText(label);
 
@@ -140,17 +147,17 @@ describe("Inbox 라벨 필터 칩 (US-D02)", () => {
 
   // 칩 문구는 이 화면의 나머지(보관됨/대기/확인 필요)와 같은 언어여야 한다 — 레퍼런스의
   // 영어 필터 DSL("Label is any of 2 labels")을 그대로 옮기면 한 칩 안에 두 언어가 섞인다.
-  // 레퍼런스도 값이 하나면 수량사를 접는다("Channel is Slack") — "라벨은 1개 중 하나"는
-  // 사람이 쓰지 않는 문장이라 1개일 때는 채널 칩과 같은 문법(`라벨은 <이름>`)으로 떨어진다.
-  it("라벨이 하나면 이름을, 둘 이상이면 개수를 말한다", () => {
+  // 레퍼런스도 값이 하나면 수량사를 접는다("Channel is Slack") — "1개 중 하나"는 사람이
+  // 쓰지 않는 말이라 1개일 때는 채널 칩과 같이 이름만 값 칸에 남는다.
+  it("라벨이 하나면 이름을, 둘 이상이면 개수를 값 칸에 말한다", () => {
     renderInbox();
     fireEvent.click(addTrigger());
     expect(document.querySelector(".filter-chip")).toBeNull();
 
     fireEvent.click(optionIn("Integrations"));
-    expect(screen.getByText("라벨은 Integrations")).toBeInTheDocument();
+    expect(chipCells()).toEqual([["라벨", "Integrations"]]);
     fireEvent.click(optionIn("Billing"));
-    expect(screen.getByText("라벨은 2개 중 하나")).toBeInTheDocument();
+    expect(chipCells()).toEqual([["라벨", "2개 중 하나"]]);
   });
 
   it("워크스페이스에 라벨이 하나도 없으면 빈 바를 그리지 않는다", () => {
@@ -172,7 +179,7 @@ describe("Inbox 채널 필터 칩 (US-D02)", () => {
     const onChannelFilterChange = vi.fn();
     renderInbox({ channelFilter: "gmail", onChannelFilterChange });
 
-    expect(screen.getByText("채널은 Gmail")).toBeInTheDocument();
+    expect(chipCells()).toEqual([["채널", "Gmail"]]);
     fireEvent.click(screen.getByRole("button", { name: "채널 필터 제거" }));
     expect(onChannelFilterChange).toHaveBeenCalledWith(null);
   });

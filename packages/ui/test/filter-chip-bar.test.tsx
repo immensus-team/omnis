@@ -27,15 +27,23 @@ function addOptions(over: Partial<{ selectedIds: string[]; onToggle: (id: string
 }
 
 describe("FilterChipBar (US-D02)", () => {
-  it("renders each chip's text", () => {
+  // 레퍼런스(ref-issue-tracker-density.webp)의 칩은 한 덩어리 문장이 아니라 채움이 번갈아 드는
+  // 칸들이다 — `[▣ Priority][is any of][2 priorities][×]`. 그 구조가 이 컴포넌트의 계약이다.
+  it("draws each chip as a field cell and a value cell, not one flat string", () => {
     const chips: FilterChip[] = [
-      { id: "channel", fieldLabel: "Channel", text: "Channel is Slack", onRemove: vi.fn() },
-      { id: "labels", fieldLabel: "Label", text: "Label is any of 2개 라벨", onRemove: vi.fn() },
+      { id: "channel", field: "Channel", value: "Slack", onRemove: vi.fn() },
+      { id: "labels", field: "Label", value: "2개 중 하나", onRemove: vi.fn() },
     ];
-    render(<FilterChipBar chips={chips} />);
+    const { container } = render(<FilterChipBar chips={chips} />);
 
-    expect(screen.getByText("Channel is Slack")).toBeInTheDocument();
-    expect(screen.getByText("Label is any of 2개 라벨")).toBeInTheDocument();
+    const cells = [...container.querySelectorAll(".filter-chip")].map((chip) => [
+      chip.querySelector(".filter-chip__field")?.textContent,
+      chip.querySelector(".filter-chip__value")?.textContent,
+    ]);
+    expect(cells).toEqual([
+      ["Channel", "Slack"],
+      ["Label", "2개 중 하나"],
+    ]);
   });
 
   it("clicking a chip's × calls that chip's onRemove", () => {
@@ -44,8 +52,8 @@ describe("FilterChipBar (US-D02)", () => {
     render(
       <FilterChipBar
         chips={[
-          { id: "channel", fieldLabel: "Channel", text: "Channel is Slack", onRemove: channel },
-          { id: "labels", fieldLabel: "Label", text: "Label is any of 2개 라벨", onRemove: labels },
+          { id: "channel", field: "Channel", value: "Slack", onRemove: channel },
+          { id: "labels", field: "Label", value: "2개 중 하나", onRemove: labels },
         ]}
       />,
     );
@@ -75,6 +83,18 @@ describe("FilterChipBar (US-D02)", () => {
     expect(onToggle).toHaveBeenCalledWith("l1");
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("Billing")).toBeInTheDocument();
+  });
+
+  // 레퍼런스의 필터 팝오버 입력은 맨 왼쪽에 돋보기가 서고 아래 헤어라인 한 줄이 목록을
+  // 끊는다. 그 크롬이 없으면 placeholder가 목록 위에 맨몸으로 떠 입력칸으로 안 읽힌다.
+  it("gives the popover input a search glyph and a rule above the list", () => {
+    render(<FilterChipBar chips={[]} addOptions={addOptions()} />);
+    fireEvent.click(screen.getByRole("button", { name: "+ Label" }));
+
+    const search = screen.getByRole("dialog").querySelector(".filter-chip-popover__search");
+    expect(search).not.toBeNull();
+    expect(search?.querySelector("svg")).not.toBeNull();
+    expect(search?.contains(screen.getByPlaceholderText("Label 검색"))).toBe(true);
   });
 
   it("shows the ✓ only on the selected options", () => {

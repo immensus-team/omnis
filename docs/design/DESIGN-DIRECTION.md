@@ -31,15 +31,21 @@
 | `ref-issue-tracker-density.webp` | 필터 칩 바("Priority is any of 2 priorities"), 상태별 그룹 헤더(pill + 카운트 + +), 서브아이템 들여쓰기, 호버 카드, 체크박스 드롭다운. omnis의 Tasks·Needs-approval 뷰의 밀도와 상태 pill 문법. |
 | `ref-dashboard-detail-card.webp` | 왼쪽 아이콘 레일(선택 상태 미세 배경), 상단 제목 + 서브라인, 토글·세그먼트 컨트롤, 우측 상세 카드(사진 + 배지 + 키-값 헤어라인 표). omnis의 상세 패널·Network 사람 카드·Settings의 타이포 기준. |
 
-## 반경 스케일 (US-D02 4회차)
+## 반경 스케일 (US-D02 4회차, 5회차에 실측으로 교정)
 
 한 화면에 여러 반경이 공존하는 건 의도다(균일 반경은 SaaS 카드킷 텔이다). 다만 고를 때는
-아래에서 고른다 — 새 값을 즉흥으로 만들지 않는다.
+아래에서 고른다 — 새 값을 즉흥으로 만들지 않는다. 이 표는 `apps/desktop/src/app.css`의
+`border-radius` 선언 전수(`grep -o 'border-radius: [^;]*' | sort | uniq -c`)와 일치한다;
+값을 더하거나 뺄 때 이 표도 같이 고친다.
 
 | 값 | 쓰는 곳 |
 |---|---|
 | `999px` | 필 — 탭 pill, 행 라벨 칩, 상태 배지 |
+| `22px` | 채널 레일 플레이트(`.channel-rail__plate`) |
+| `20px` | 화면을 채우는 큰 면 — `.inbox-card`, `.ask-panel` |
 | `12px` | 떠 있는 면 — 상태 pill, 호버 카드, 필터 팝오버 |
+| `10px` | 큰 면 안의 한 단 작은 블록 — ask 패널 액션, 보관 배너 |
 | `8px` | 리스트 표면 — 선택/호버 행, 필터 칩, 칩 추가 버튼 |
 | `6px` | 필 안에 드는 작은 것 — 그룹 헤더 카운트, 칩 × 버튼 |
+| `50%` | 원 — 아바타, 안읽음/승인 점, 상태 pill 점 |
 | `30%` | 런타임 아바타 스퀘클 |

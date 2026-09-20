@@ -1,10 +1,11 @@
 import * as Popover from "@radix-ui/react-popover";
 import { Command } from "cmdk";
 import { useState } from "react";
+import { LuSearch } from "react-icons/lu";
 
-/** US-D02: 리스트 위에 얹는 필터 칩 바(ref-issue-tracker-density.webp의 "Priority is any of 2
- *  priorities ×" 문법). 칩 텍스트는 호출자가 완성된 문장으로 만들어 넘긴다 — 이 컴포넌트는
- *  "채널이냐 라벨이냐"를 모른다(Inbox 말고도 Tasks·Needs-approval이 같은 바를 쓴다). */
+/** US-D02: 리스트 위에 얹는 필터 칩 바(ref-issue-tracker-density.webp의 필터 DSL 칩).
+ *  칩은 필드 칸과 값 칸으로 갈린다 — 문장을 통째로 받지 않는다. 무엇을 거는지(채널/라벨)는
+ *  여전히 호출자가 정한다: Inbox 말고도 Tasks·Needs-approval이 같은 바를 쓴다. */
 
 export interface FilterChipOption {
   id: string;
@@ -13,10 +14,10 @@ export interface FilterChipOption {
 
 export interface FilterChip {
   id: string;
-  /** 칩의 접근성 이름에 쓰는 필드명(예: "Label"). 화면에는 안 그린다 — text 안에 이미 들어 있다. */
-  fieldLabel: string;
-  /** 완성된 칩 문구(예: `Channel is Slack`). 만드는 건 호출자 몫이다. */
-  text: string;
+  /** 왼쪽(옅은) 칸 = 무엇을 거는가. 칩 ×의 접근성 이름도 여기서 나온다. 예: "라벨". */
+  field: string;
+  /** 오른쪽(틴트) 칸 = 무엇으로 거는가. 조사·수량사까지 포함한 완성 어구. 예: "2개 중 하나". */
+  value: string;
   onRemove: () => void;
 }
 
@@ -33,16 +34,20 @@ export interface FilterChipBarProps {
 
 export function FilterChipBar({ chips, addOptions }: FilterChipBarProps) {
   return (
-    // 레퍼런스의 칩은 한 덩어리 라벨 + 별도 × 하나다 — 안쪽을 3조각으로 쪼개지 않는다.
+    // 레퍼런스의 칩은 `[▣ Priority][is any of][2 priorities][×]` — 칸마다 채움이 번갈아 들고
+    // 가운데 연산자 칸만 옅다. 한국어는 조사가 명사에 붙어("라벨은", "2개 중 하나") 연산자를
+    // 따로 떼면 문장이 깨지므로 칸을 셋이 아니라 둘로 나눈다. 번갈이 채움은 그대로 가져와
+    // 필드 칸을 옅게, 값 칸을 틴트로 둔다 — 칩이 한 덩어리 태그로 뭉개지지 않는 게 핵심이다.
     <div className="filter-chip-bar">
       {chips.map((chip) => (
         <span key={chip.id} className="filter-chip">
-          {chip.text}
+          <span className="filter-chip__field">{chip.field}</span>
+          <span className="filter-chip__value">{chip.value}</span>
           <button
             type="button"
             // 브리프 문구는 "필터 제거" 하나였지만, 칩이 둘 이상이면 접근성 이름이 같아져
             // 스크린리더가 어느 ×인지 구분할 수 없다 — 필드명을 앞에 붙인다.
-            aria-label={`${chip.fieldLabel} 필터 제거`}
+            aria-label={`${chip.field} 필터 제거`}
             onClick={chip.onRemove}
           >
             ×
@@ -82,7 +87,12 @@ function AddFilterPopover({
           sideOffset={6}
         >
           <Command label={`${fieldLabel} 필터`}>
-            <Command.Input placeholder={`${fieldLabel} 검색`} autoFocus />
+            {/* 레퍼런스의 필터 팝오버와 같은 입력 크롬: 돋보기 + 아래 헤어라인 한 줄.
+                맨몸 placeholder는 목록 위에 뜬 회색 글자일 뿐 입력칸으로 안 읽힌다. */}
+            <div className="filter-chip-popover__search">
+              <LuSearch aria-hidden="true" />
+              <Command.Input placeholder={`${fieldLabel} 검색`} autoFocus />
+            </div>
             <Command.List>
               <Command.Empty>결과가 없어요</Command.Empty>
               {options.map((option) => (

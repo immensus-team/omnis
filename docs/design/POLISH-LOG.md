@@ -140,7 +140,7 @@
 `tools/e2e/shots.ts`(1회성 캡처 스크립트, e2e 스택 + seed 위에 밀도만 더한다)로 다시 찍었다.
 1회차 스크린샷은 pill 하나 · 행 하나 · 빈 흰 공간 600px이라 "밀도 시스템"을 증명하지 못했다.
 
-- `screens/approvals-density.png` — 대기 6건, pill + 별도 카운트 칩 + 밀도 있는 행들.
+- `screens/needs-approval.png` — 대기 6건, pill + 별도 카운트 칩 + 밀도 있는 행들.
 - `screens/agents-density.png` (신규) — 확인 필요 → 작업 중 → 대기 → 완료 4그룹. 그룹 **순서**가
   실제로 보이는 화면은 여기다(`inbox-grouping.test.tsx`가 단언하는 그 순서).
 - `screens/filter-chips.png` — 라벨 2개를 실제로 고른 뒤: 칩 `라벨은 2개 중 하나 ×` + 팝오버의 ✓ 2개.
@@ -171,7 +171,7 @@
    채움이 한다). 선택된 행은 이미 흰 카드로 떠 있어 회색을 덧대지 않는다.
 4. **needs-approval의 그룹 헤더를 뺐다.** 이 뷰는 `pending_approvals`를
    `.where("state","=","pending")`로만 쿼리해서 그룹이 **언제나 하나**다 — 헤더 띠가 방금 고른
-   탭 이름을 한 번 더 말할 뿐 정보를 싣지 못했다(`approvals-density.png`의 "● 대기 6" 띠).
+   탭 이름을 한 번 더 말할 뿐 정보를 싣지 못했다(`needs-approval.png`의 "● 대기 6" 띠).
    숫자만 탭 pill 안으로 접었다.
 5. **도달할 수 없는 라이프사이클 코드를 지웠다.** `approvalPillState`의 5개 분기,
    `APPROVAL_GROUP_ORDER` 6항목, `ApprovalStatusPill` 6상태 — 전부 위 쿼리가 만들 수 없는
@@ -213,7 +213,7 @@
 
 - `screens/agents-density.png` — 확인 필요 2 → 작업 중 2 → 대기 2 → 완료 2. 상태어는 헤더에만,
   행 우측은 전부 채널 글리프. 헤더 pill의 앰버가 (같은 화면 `all` 탭의) 행 배지 앰버와 같은 값이다.
-- `screens/approvals-density.png` — 헤더 띠 없음, 탭이 `needs-approval 6`, 행에 중복 점 없음.
+- `screens/needs-approval.png` — 헤더 띠 없음, 탭이 `needs-approval 6`, 행에 중복 점 없음.
 - `screens/filter-chips.png` — `라벨은 2개 중 하나 ×` + 팝오버 ✓ 2개, 탭 카운트가 칩 범위를 따라간다.
 - `screens/row-hover-card.png` — 호버한 행에 회색 채움, 카드가 그 행에 붙어 나온다.
 
@@ -253,9 +253,10 @@
 
 ### 반경(radius)에 대한 메모
 
-한 화면에 999px / 12px / 8px / 6px / 4px / 30%가 공존한다. 각각 이유가 주석에 달려 있고
-균일-반경 텔의 반대편이라 그대로 두지만, **명시된 스케일이 없어서 다음 사람이 반올림할 데가
-없다** — `DESIGN-DIRECTION.md`에 한 줄로 적어 둔다.
+한 화면에 999px / 50% / 30% / 22px / 20px / 12px / 10px / 8px / 6px가 공존한다. 각각 이유가
+주석에 달려 있고 균일-반경 텔의 반대편이라 그대로 두지만, **명시된 스케일이 없어서 다음
+사람이 반올림할 데가 없다** — `DESIGN-DIRECTION.md`에 표로 적어 둔다(5회차에 `app.css`
+전수와 대조해 22/20/10px·50%를 채우고, 이미 사라진 4px을 이 문장에서 뺐다).
 
 ### 증거
 
