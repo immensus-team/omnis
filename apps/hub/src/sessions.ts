@@ -1,14 +1,15 @@
-// 브리지가 올린 세션·턴 이벤트를 인박스 row로 영속화하는 곳(A2 §1.3 / §4.1, A3 §4).
-// bridge.ts는 와이어만 다루고, 여기는 SQL만 다룬다.
+// Persists the session/turn events the bridge raises as inbox rows (A2 §1.3 / §4.1, A3 §4).
+// bridge.ts deals only with the wire; this file deals only with SQL.
 import { one, query, tx } from "@omnis/db";
 import { BRIDGE_ERRORS, BridgeError, type HostId, type RuntimeKind } from "@omnis/protocol";
 import type { Pool } from "pg";
 
 /**
- * A2 §1.3. herdr의 pane 상태 모델(idle/working/blocked/done — research/30 §1)을 0004의
- * agent_sessions.state CHECK 값에 얹는다. done과 idle이 같은 값으로 접히는 것은 의도다:
- * "턴이 끝났다"는 신호는 스레드의 마지막 item이지 세션 상태가 아니고, CHECK의 'ended'는
- * 세션 종료(session.close) 자리라 재사용하면 닫힌 세션과 구분이 사라진다.
+ * A2 §1.3. Maps herdr's pane state model (idle/working/blocked/done — research/30 §1) onto the
+ * agent_sessions.state CHECK values from 0004. Folding done and idle onto the same value is
+ * intentional: "the turn finished" is a signal carried by the thread's last item, not by session
+ * state, and the CHECK's 'ended' is reserved for session.close — reusing it would erase the
+ * distinction from a closed session.
  */
 export const HERDR_STATE = {
   idle: "idle",
@@ -30,16 +31,17 @@ export function purposeOf(sessionKey: string): string {
   return sessionKey.split(":")[3] ?? sessionKey;
 }
 
-/** turn.* 알림은 session_key만 싣는다 — 런타임 종류는 키에서 읽는다(A2-D1). */
+/** turn.* notifications carry only the session_key — the runtime kind is read from the key (A2-D1). */
 export function runtimeOf(sessionKey: string): string {
   return sessionKey.split(":")[1] ?? "";
 }
 
 /**
- * 런타임 tool 이름 → master §11 팔레트 키(packages/ui TOOL_LABELS). ToolCallBadge는 모르는
- * 이름에 throw하므로 매핑에 없는 도구는 읽기로 접는다 — 팔레트에 쓰기 계열 도구가 없어서
- * 여기서 만들어 낼 수도 없다.
- * ponytail: 하드코딩 표. 런타임이 늘면 표를 늘린다(팔레트 자체가 바뀔 일은 master §11이 막는다).
+ * Runtime tool name → master §11 palette key (packages/ui TOOL_LABELS). ToolCallBadge throws on
+ * an unknown name, so tools missing from the map fold to read — and since the palette has no
+ * write-class tools, we cannot invent one here either.
+ * ponytail: hardcoded table. Add rows as runtimes are added (master §11 prevents the palette
+ * itself from changing).
  */
 const TOOL_PALETTE: Readonly<Record<string, string>> = {
   Bash: "read",
@@ -72,8 +74,9 @@ export interface EnsureSessionInput {
 }
 
 /**
- * 세션 = thread(A3 §4). 허브가 session.create로 열든 브리지가 session.registered로 알려 오든
- * 같은 row에 수렴해야 하므로 입구를 하나로 둔다 — 전부 멱등 upsert다.
+ * Session = thread (A3 §4). Whether the hub opens it via session.create or the bridge announces
+ * it via session.registered, both must converge on the same row, so there is a single entry point
+ * — every statement here is an idempotent upsert.
  */
 export async function ensureSession(pool: Pool, a: EnsureSessionInput): Promise<SessionRow> {
   return await tx(pool, async (c) => {
@@ -105,8 +108,8 @@ export async function ensureSession(pool: Pool, a: EnsureSessionInput): Promise<
        RETURNING id`,
       [account.id, a.sessionKey, `${String(a.runtime)} · ${purposeOf(a.sessionKey)}`],
     );
-    // 이미 있는 세션의 thread_id는 건드리지 않는다: 런타임이 session_id를 회전시켜도
-    // session_key와 thread는 유지된다(A2-D1).
+    // The thread_id of an existing session is left alone: rotating session_id in the runtime
+    // keeps both session_key and thread (A2-D1).
     const session = await one<{ id: string; thread_id: string }>(
       c,
       `INSERT INTO agent_sessions (runtime_id, thread_id, session_key, session_id, cwd, state)
@@ -144,7 +147,7 @@ export async function setSessionState(
   );
 }
 
-/** blocked에서 done으로 내려가지 않게 하는 유일한 판정(A2 §1.3). */
+/** The one check that keeps a session from dropping out of blocked into done (A2 §1.3). */
 export async function hasPendingApproval(pool: Pool, threadId: string): Promise<boolean> {
   const rows = await query<{ one: number }>(
     pool,
@@ -156,7 +159,7 @@ export async function hasPendingApproval(pool: Pool, threadId: string): Promise<
 
 export interface AgentItemInput {
   session: SessionRow;
-  /** items.external_id. 같은 item이 started → completed로 두 번 오므로 멱등 키가 필요하다. */
+  /** items.external_id. The same item arrives twice, started → completed, so it needs an idempotency key. */
   externalId: string;
   kind: "agent_turn" | "tool_call" | "system";
   body: string;
@@ -165,7 +168,7 @@ export interface AgentItemInput {
 
 export async function writeAgentItem(pool: Pool, i: AgentItemInput): Promise<void> {
   await tx(pool, async (c) => {
-    // body를 빈 문자열로 덮어쓰지 않는다: started는 body가 없고 completed가 채운다.
+    // Do not overwrite body with an empty string: started has no body, completed fills it in.
     await query(
       c,
       `INSERT INTO items (thread_id, account_id, external_id, kind, status, author_agent_id,

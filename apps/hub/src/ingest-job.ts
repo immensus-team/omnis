@@ -1,4 +1,4 @@
-// A4 §6.1: drive_poll(10분)에 로컬·Drive가 동승하고 github_poll(15분)은 따로 돈다.
+// A4 §6.1: local and Drive ride along on drive_poll (10 min); github_poll (15 min) runs separately.
 import { t1Model } from "@omnis/agents";
 import { type Logger, type Scheduler, getSetting } from "@omnis/kernel";
 import {
@@ -24,7 +24,8 @@ export async function registerIngestJobs(deps: {
 }): Promise<() => void> {
   const { pool, logger, scheduler, bridge } = deps;
 
-  // OMNIS_OPENROUTER_API_KEY가 없으면 T1 추출은 꺼지고 T0 임베딩만 돈다 — 그래도 검색은 산다.
+  // Without OMNIS_OPENROUTER_API_KEY, T1 extraction stays off and only T0 embedding runs — search
+  // still works.
   try {
     setExtractor(createT1Extractor(t1Model()));
   } catch (e) {
@@ -50,16 +51,18 @@ export async function registerIngestJobs(deps: {
       repos,
     }),
   );
-  // Drive provider는 OAuth 토큰 공급자(US-B34, Keychain omnis.gmail.<email> + refresh)가
-  // 아직 없다 — 그때 createDriveProvider를 여기에 한 줄 더한다(계획 "열린 항목" #2).
+  // The Drive provider has no OAuth token supplier yet (US-B34, Keychain
+  // omnis.gmail.<email> + refresh) — add one createDriveProvider line here when it lands
+  // (open item #2 in the plan).
 
   scheduler.register("drive_poll", "*/10 * * * *", async () => {
     await runIngest({ pool, logger, kind: "file" });
     await runIngest({ pool, logger, kind: "calendar" });
     await runIngest({ pool, logger, kind: "drive" });
-    // A4 §10.5가 약속한 "다음 주기에 줍는다"를 실제로 부르는 유일한 자리. Ollama가 죽어 있던
-    // 동안 embedding=NULL로 들어간 행은 여기서만 살아난다. 임베딩 모델·프리픽스가 바뀌어
-    // 기존 벡터를 버려야 할 때도 이 틱이 되메운다(ops/mini/RUNBOOK.md "임베딩 재생성").
+    // The only place that actually calls the "pick it up next cycle" A4 §10.5 promised. Rows that
+    // landed with embedding=NULL while Ollama was down only come back to life here. This tick also
+    // backfills when the embedding model or prefix changes and existing vectors must be dropped
+    // (ops/mini/RUNBOOK.md, "re-embedding").
     const filled = await reembedNulls(pool);
     if (filled > 0) logger.info("reembedded memories", { filled });
   });
@@ -67,10 +70,10 @@ export async function registerIngestJobs(deps: {
     await runIngest({ pool, logger, kind: "github" });
   });
 
-  // A4 §10.6: 주간 제외 규칙 점검. **--gate-only가 필수다** — 채점 모드는 DATABASE_URL이
-  // 가리키는 DB에 골든 세트 50건을 시드하는데, 허브의 DATABASE_URL은 실 DB(omnis)라서
-  // 가짜 기억이 영구히 검색에 섞인다. recall 채점은 CI/개발 DB의 몫이다.
-  // 실패해도 허브를 죽이지 않는다 — 결과는 로그와 다음 브리핑이 알린다.
+  // A4 §10.6: weekly deny-pattern check. **--gate-only is mandatory** — scoring mode seeds 50
+  // golden rows into whatever DB DATABASE_URL points at, and the hub's DATABASE_URL is the real DB
+  // (omnis), so fake memories would be mixed into search permanently. Recall scoring belongs to a
+  // CI/dev DB. A failure does not kill the hub — the log and the next briefing report it.
   scheduler.register("eval_weekly", "0 22 * * 0", async () => {
     const { execFile } = await import("node:child_process");
     const { promisify } = await import("node:util");
@@ -85,9 +88,10 @@ export async function registerIngestJobs(deps: {
     }
   });
 
-  // A4 §10.1: 미니는 FSEvents 실시간 + 부팅 시 1회 재스캔. 통지는 다음 틱을 당기지 않고
-  // 로그만 남긴다 — 10분 틱이면 충분하고, 저장 폭풍마다 임베딩을 돌릴 이유가 없다.
-  // ponytail: 즉시성이 필요해지면 여기서 디바운스된 runIngest를 부른다.
+  // A4 §10.1: the mini uses real-time FSEvents plus one rescan at boot. A notification does not
+  // pull the next tick forward, it only logs — a 10-minute tick is enough, and there is no reason
+  // to run embeddings on every save storm.
+  // ponytail: when immediacy is needed, call a debounced runIngest from here.
   return watchLocalRoots({
     roots: miniRoots,
     logger,
