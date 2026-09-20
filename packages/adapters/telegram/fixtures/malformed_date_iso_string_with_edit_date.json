@@ -28,7 +28,7 @@
         },
         "body": "date가 ISO 문자열로 직렬화된 raw",
         "attachments": [],
-        "sentAt": "2023-11-14T22:21:40.000Z",
+        "sentAt": "2023-11-14T22:13:20.000Z",
         "status": "received",
         "sourceHash": "1001:9101",
         "threadMeta": {
@@ -41,7 +41,7 @@
               "displayName": "Dana Lee"
             }
           ],
-          "lastItemAt": "2023-11-14T22:21:40.000Z",
+          "lastItemAt": "2023-11-14T22:13:20.000Z",
           "archivedAt": null
         }
       }

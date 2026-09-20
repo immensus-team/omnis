@@ -214,15 +214,24 @@ function tgAttachmentKind(type: string | undefined): Attachment["kind"] {
 /** Telegram의 date는 초 단위 unix 정수지만, raw로 오는 건 항상 그렇진 않다 — JSON을 한 번 왕복한
  *  mtcute 메시지는 Date가 ISO 문자열로 직렬화되고, 게이트웨이를 거친 raw는 숫자 문자열로 온다.
  *  그대로 곱하면 NaN이 되고 toISOString()이 RangeError를 던진다 — normalize()는 backfill()/subscribe()
- *  루프 안에서 메시지마다 불리므로 그 메시지 하나가 스트림 전체를 죽인다. 숫자로 읽히는 후보
- *  (date → editDate)를 쓰고, 다 실패하면 원래 기본값 0으로 물러난다(Gmail internalDate / Outlook
- *  sentDateTime 폴백과 같은 원칙). now()가 아니라 0인 건 기존 기본값을 보존하고 픽스처를 결정적으로
- *  만들기 위해서다. */
+ *  루프 안에서 메시지마다 불리므로 그 메시지 하나가 스트림 전체를 죽인다. 그래서 후보(date → editDate)
+ *  마다 타입을 보고 읽는다: 숫자는 초 단위(unix)로, 문자열은 먼저 ISO-8601로 파싱한다(이 결과는 이미
+ *  ms라 1000을 곱하지 않는다). ISO로 안 읽히는 문자열만 초 단위 숫자 문자열로 본다 — 순서를 뒤집으면
+ *  ISO 문자열("2023-11-14T22:13:20.000Z")이 실패해 editDate(수정 시각)로 미끄러지므로, 보낸 시각을
+ *  복구하려면 ISO를 먼저 시도해야 한다. 그렇게도 유한한 값이 안 나오면 다음 후보로 넘어가고, 전부
+ *  실패하면 원래 기본값 0으로 물러난다(Gmail internalDate / Outlook sentDateTime 폴백과 같은 원칙).
+ *  now()가 아니라 0인 건 기존 기본값을 보존하고 픽스처를 결정적으로 만들기 위해서다. 빈/공백 문자열은
+ *  숫자로도 읽히지 않게 건너뛴다 — Number("")는 0이라 그냥 두면 epoch으로 확정돼 버린다. */
 function parseSentAt(date?: number | string, editDate?: number | string): string {
-  const secs = [date, editDate]
-    .map((v) => (typeof v === "string" && v.trim() === "" ? Number.NaN : Number(v)))
+  const ms = [date, editDate]
+    .map((v) => {
+      if (typeof v === "number") return v * 1000; // raw 숫자는 초 단위 unix
+      if (typeof v !== "string" || v.trim() === "") return Number.NaN;
+      const iso = new Date(v).getTime(); // ISO-8601은 ms 그대로 파싱된다
+      return Number.isFinite(iso) ? iso : Number(v) * 1000; // 아니면 초 단위 숫자 문자열
+    })
     .find((n) => Number.isFinite(n));
-  return new Date((secs ?? 0) * 1000).toISOString();
+  return new Date(ms ?? 0).toISOString();
 }
 
 export function normalize(raw: unknown): NormalizedItem[] {
