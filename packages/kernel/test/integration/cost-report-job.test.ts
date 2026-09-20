@@ -5,6 +5,7 @@ import {
   type Events,
   LOW_CACHE_HIT_RATIO,
   type Scheduler,
+  attachReportToDigest,
   buildMonthlyCostReport,
   createEvents,
   createLogger,
@@ -59,7 +60,8 @@ afterAll(async () => {
     "DELETE FROM agent_runs WHERE loop IN ('draft','note_route') AND model = 'test-model'",
   );
   await query(pool, "DELETE FROM digests WHERE kind = 'nightly' AND for_date = '2026-08-31'");
-  await query(pool, "DELETE FROM jobs WHERE name = $1", [COST_REPORT_JOB_NAME]);
+  // The cost_report_monthly jobs row is seeded by 0012_jobs_phase_b.sql, not by this test — deleting
+  // it would strip a migration row other suites assert on (packages/db schema-0006).
   await events.close();
   await pool.end();
 });
@@ -80,6 +82,26 @@ describe("buildMonthlyCostReport", () => {
     expect(report.lowCacheHitLoops).toContain("note_route");
     expect(report.lowCacheHitLoops).not.toContain("draft");
     expect(LOW_CACHE_HIT_RATIO).toBe(0.4);
+  });
+});
+
+describe("attachReportToDigest", () => {
+  it("merges idempotently — a second run leaves metrics unchanged and keeps sibling keys", async () => {
+    const report = await buildMonthlyCostReport(pool, AUG.start, AUG.end);
+    const forDate = new Date("2026-08-31T00:00:00Z");
+    const read = async () =>
+      (
+        await one<{ metrics: Record<string, unknown> }>(
+          pool,
+          "SELECT metrics FROM digests WHERE kind = 'nightly' AND for_date = '2026-08-31'",
+        )
+      ).metrics;
+
+    await attachReportToDigest(pool, report, forDate);
+    const first = await read();
+    await attachReportToDigest(pool, report, forDate);
+    expect(await read()).toEqual(first);
+    expect(first.foo).toBe(1); // the merge kept the key the digest already had
   });
 });
 

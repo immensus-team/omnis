@@ -1230,7 +1230,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 #### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다.
+- [x] 1. 실패하는 테스트를 쓴다.
 
 `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/cost-report-job.test.ts`:
 ```ts
@@ -1330,14 +1330,14 @@ describe("cost_report_monthly job", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [x] 2. 테스트를 돌려 실패를 확인한다.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
 기대 실패: `does not provide an export named 'buildMonthlyCostReport'`.
 
-- [ ] 3. 잡을 쓴다.
+- [x] 3. 잡을 쓴다.
 
 `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/jobs/cost-report.ts`:
 ```ts
@@ -1483,7 +1483,7 @@ export function registerCostReportJob(
 }
 ```
 
-- [ ] 4. 배럴에 추가한다.
+- [x] 4. 배럴에 추가한다.
 
 `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/index.ts`에 추가:
 ```ts
@@ -1498,14 +1498,14 @@ export {
 export type { CostReportRow, MonthlyCostReport } from "./jobs/cost-report.js";
 ```
 
-- [ ] 5. 테스트를 다시 돌려 통과를 확인한다.
+- [x] 5. 테스트를 다시 돌려 통과를 확인한다.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
 기대: `cost-report-job.test.ts`의 3개 `it` 전부 통과(`buildMonthlyCostReport` 1개 + `cost_report_monthly job` 2개... 실제로는 `describe` 2개에 `it` 2개, 위 파일 기준 통과 케이스는 2개).
 
-- [ ] 6. **마이그레이션을 만들지 않는다**(교차 리뷰 M1). `cost_report_monthly` seed가 W0 번들의 `0012_jobs_phase_b.sql`에 있는지 확인만 한다.
+- [x] 6. **마이그레이션을 만들지 않는다**(교차 리뷰 M1). `cost_report_monthly` seed가 W0 번들의 `0012_jobs_phase_b.sql`에 있는지 확인만 한다.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && grep -n "cost_report_monthly" packages/db/migrations/0012_jobs_phase_b.sql && test ! -e packages/db/migrations/0014_cost_report_job.sql && echo "0014 없음 — 정상"
@@ -1513,21 +1513,23 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "cost_report_monthly" packages
 
 기대 출력: `cost_report_monthly` seed 1줄 + `0014 없음 — 정상`. `0012`가 아직 없으면 W0 번들이 머지되기 전이므로 **여기서 만들지 말고** 기다린다 — 스케줄러의 `register`가 `jobs` upsert를 하므로 이 태스크의 나머지(잡 핸들러 + 테스트)는 seed 없이도 돈다.
 
-- [ ] 7. 잡 핸들러가 두 번 돌아도 같은 결과인지 확인한다(`digests.metrics` 병합이 멱등이어야 한다).
+- [x] 7. 잡 핸들러가 두 번 돌아도 같은 결과인지 확인한다(`digests.metrics` 병합이 멱등이어야 한다).
+
+구현 정정: 원래 적힌 명령은 `pnpm db:migrate`를 두 번 돌리는 것이었는데, 그건 마이그레이션 재적용 여부를 볼 뿐 핸들러 멱등성과 무관하다. 스텝 1의 테스트 파일에 `attachReportToDigest`를 같은 인자로 두 번 호출하는 `it`을 추가해 실제로 검증한다.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && DATABASE_URL=postgres://logan@127.0.0.1:5432/omnis_test pnpm db:migrate && DATABASE_URL=postgres://logan@127.0.0.1:5432/omnis_test pnpm db:migrate
+cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration -t "merges idempotently"
 ```
-기대: 두 번째 실행의 `applied` 배열이 비어 있다(이 태스크가 새 마이그레이션을 더하지 않으므로 앞뒤가 같다).
+기대: 두 번째 병합 후 `digests.metrics`가 첫 번째와 동일하고, 원래 있던 `foo` 키가 살아 있다.
 
-- [ ] 8. 전체 커널 테스트를 한 번 더 돌려 회귀가 없는지 확인한다.
+- [x] 8. 전체 커널 테스트를 한 번 더 돌려 회귀가 없는지 확인한다.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
 기대: 기존 `healthcheck-job.test.ts` 등 다른 파일 전부 그대로 통과 + `cost-report-job.test.ts` 통과.
 
-- [ ] 9. 커밋한다.
+- [x] 9. 커밋한다.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B44: 월간 비용·사용량 리포트 잡
