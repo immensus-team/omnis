@@ -1,0 +1,76 @@
+{
+  "scenario": "html_only_no_plain_part",
+  "raw": {
+    "id": "18c2f4a1b2d3f503",
+    "threadId": "18c2f4a1b2d3f503",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/html",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "no-reply@notifications.example.com"
+        },
+        {
+          "name": "To",
+          "value": "281932556+jinhologankim@users.noreply.github.com"
+        },
+        {
+          "name": "Subject",
+          "value": "Your monthly usage report"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId013@notifications.example.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 13:40:00 +0000"
+        }
+      ],
+      "body": {
+        "size": 74,
+        "data": "PGh0bWw-PGJvZHk-PGgxPlVzYWdlPC9oMT48cD44NCU8L3A-PC9ib2R5PjwvaHRtbD4"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f503",
+        "externalId": "18c2f4a1b2d3f503",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "no-reply@notifications.example.com"
+        },
+        "body": "Subject: Your monthly usage report\n\n<html><body><h1>Usage</h1><p>84%</p></body></html>",
+        "attachments": [],
+        "sentAt": "2023-11-15T13:40:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId013@notifications.example.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f503",
+          "kind": "email",
+          "title": "Your monthly usage report",
+          "participants": [
+            {
+              "externalId": "no-reply@notifications.example.com",
+              "displayName": "no-reply@notifications.example.com"
+            },
+            {
+              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "displayName": "281932556+jinhologankim@users.noreply.github.com"
+            }
+          ],
+          "lastItemAt": "2023-11-15T13:40:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "scenario": "mailer_daemon_bounce_notification",
+  "note": "Automated bounce: the display name is worth resolving as a participant even though the mailbox is mailer-daemon.",
+  "raw": {
+    "id": "18c2f4a1b2d3f506",
+    "threadId": "18c2f4a1b2d3f506",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Mail Delivery Subsystem <mailer-daemon@googlemail.com>"
+        },
+        {
+          "name": "To",
+          "value": "281932556+jinhologankim@users.noreply.github.com"
+        },
+        {
+          "name": "Subject",
+          "value": "Delivery Status Notification (Failure)"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId016@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 15:00:00 +0000"
+        },
+        {
+          "name": "Auto-Submitted",
+          "value": "auto-replied"
+        }
+      ],
+      "body": {
+        "size": 96,
+        "data": "QWRkcmVzcyBub3QgZm91bmQuIFlvdXIgbWVzc2FnZSB3YXNuJ3QgZGVsaXZlcmVkIHRvIGdob3N0QGV4YW1wbGUuY29tLg"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f506",
+        "externalId": "18c2f4a1b2d3f506",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Mail Delivery Subsystem <mailer-daemon@googlemail.com>"
+        },
+        "body": "Subject: Delivery Status Notification (Failure)\n\nAddress not found. Your message wasn't delivered to ghost@example.com.",
+        "attachments": [],
+        "sentAt": "2023-11-15T15:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId016@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f506",
+          "kind": "email",
+          "title": "Delivery Status Notification (Failure)",
+          "participants": [
+            {
+              "externalId": "mailer-daemon@googlemail.com",
+              "displayName": "Mail Delivery Subsystem"
+            },
+            {
+              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "displayName": "281932556+jinhologankim@users.noreply.github.com"
+            }
+          ],
+          "lastItemAt": "2023-11-15T15:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

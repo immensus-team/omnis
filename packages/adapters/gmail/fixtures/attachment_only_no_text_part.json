@@ -1,0 +1,93 @@
+{
+  "scenario": "attachment_only_no_text_part",
+  "note": "Attachment-only message (no text part, empty snippet). body is the Subject line; attachments is [] by design.",
+  "raw": {
+    "id": "18c2f4a1b2d3f518",
+    "threadId": "18c2f4a1b2d3f518",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "multipart/mixed",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "scanner@office.example.com"
+        },
+        {
+          "name": "To",
+          "value": "281932556+jinhologankim@users.noreply.github.com"
+        },
+        {
+          "name": "Subject",
+          "value": "Scan from office MFP"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId029@office.example.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 19:40:00 +0000"
+        }
+      ],
+      "body": {
+        "size": 0
+      },
+      "parts": [
+        {
+          "partId": "0",
+          "mimeType": "image/jpeg",
+          "filename": "scan-0001.jpg",
+          "headers": [
+            {
+              "name": "Content-Disposition",
+              "value": "attachment; filename=\"scan-0001.jpg\""
+            }
+          ],
+          "body": {
+            "size": 512000,
+            "attachmentId": "att-scan-1"
+          }
+        }
+      ]
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f518",
+        "externalId": "18c2f4a1b2d3f518",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "scanner@office.example.com"
+        },
+        "body": "Subject: Scan from office MFP\n\n",
+        "attachments": [],
+        "sentAt": "2023-11-15T19:40:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId029@office.example.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f518",
+          "kind": "email",
+          "title": "Scan from office MFP",
+          "participants": [
+            {
+              "externalId": "scanner@office.example.com",
+              "displayName": "scanner@office.example.com"
+            },
+            {
+              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "displayName": "281932556+jinhologankim@users.noreply.github.com"
+            }
+          ],
+          "lastItemAt": "2023-11-15T19:40:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

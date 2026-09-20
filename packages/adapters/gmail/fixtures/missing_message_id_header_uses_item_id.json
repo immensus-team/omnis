@@ -1,0 +1,64 @@
+{
+  "scenario": "missing_message_id_header_uses_item_id",
+  "note": "No Message-Id → sourceHash falls back to the Gmail message id.",
+  "raw": {
+    "id": "18c2f4a1b2d3f50e",
+    "threadId": "18c2f4a1b2d3f50e",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Dana Lee <dana@example.com>"
+        },
+        {
+          "name": "Subject",
+          "value": "No Message-Id header"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 18:30:00 +0000"
+        }
+      ],
+      "body": {
+        "data": "RHJhZnRpbmcgYXJ0aWZhY3RzIHNvbWV0aW1lcyBsYWNrIE1lc3NhZ2UtSWQu"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f50e",
+        "externalId": "18c2f4a1b2d3f50e",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Dana Lee <dana@example.com>"
+        },
+        "body": "Subject: No Message-Id header\n\nDrafting artifacts sometimes lack Message-Id.",
+        "attachments": [],
+        "sentAt": "2023-11-15T18:30:00.000Z",
+        "status": "received",
+        "sourceHash": "18c2f4a1b2d3f50e",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f50e",
+          "kind": "email",
+          "title": "No Message-Id header",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2023-11-15T18:30:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

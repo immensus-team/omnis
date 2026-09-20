@@ -1,0 +1,72 @@
+{
+  "scenario": "latin1_charset_body_not_decoded_as_utf8",
+  "note": "charset=iso-8859-1 body containing 0xE9. decodeGmailBody always decodes as UTF-8, so the byte becomes U+FFFD. Pinned as-is: the mimeType charset parameter is not consulted.",
+  "raw": {
+    "id": "18c2f4a1b2d3f516",
+    "threadId": "18c2f4a1b2d3f516",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain; charset=\"iso-8859-1\"",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Pierre <pierre@example.fr>"
+        },
+        {
+          "name": "Subject",
+          "value": "Cafe meeting"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId027@example.fr>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 19:20:00 +0000"
+        },
+        {
+          "name": "Content-Type",
+          "value": "text/plain; charset=\"iso-8859-1\""
+        }
+      ],
+      "body": {
+        "data": "Q2Fm6SBhdCAxMA"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f516",
+        "externalId": "18c2f4a1b2d3f516",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Pierre <pierre@example.fr>"
+        },
+        "body": "Subject: Cafe meeting\n\nCaf� at 10",
+        "attachments": [],
+        "sentAt": "2023-11-15T19:20:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId027@example.fr>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f516",
+          "kind": "email",
+          "title": "Cafe meeting",
+          "participants": [
+            {
+              "externalId": "pierre@example.fr",
+              "displayName": "Pierre"
+            }
+          ],
+          "lastItemAt": "2023-11-15T19:20:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

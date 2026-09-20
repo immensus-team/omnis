@@ -1,0 +1,64 @@
+{
+  "scenario": "minimal_headers_plain_text_only",
+  "note": "No To, no Cc, no attachments array, no HTML part, no labelIds — only the headers Gmail always emits.",
+  "raw": {
+    "id": "18c2f4a1b2d3f50b",
+    "threadId": "18c2f4a1b2d3f50b",
+    "payload": {
+      "mimeType": "text/plain",
+      "headers": [
+        {
+          "name": "From",
+          "value": "alerts@example.com"
+        },
+        {
+          "name": "Subject",
+          "value": "Nightly job finished"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId020@example.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 18:00:00 +0000"
+        }
+      ],
+      "body": {
+        "size": 31,
+        "data": "Sm9iIGZpbmlzaGVkIGluIDQxMiBzZWNvbmRzLg"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f50b",
+        "externalId": "18c2f4a1b2d3f50b",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "alerts@example.com"
+        },
+        "body": "Subject: Nightly job finished\n\nJob finished in 412 seconds.",
+        "attachments": [],
+        "sentAt": "2023-11-15T18:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId020@example.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f50b",
+          "kind": "email",
+          "title": "Nightly job finished",
+          "participants": [
+            {
+              "externalId": "alerts@example.com",
+              "displayName": "alerts@example.com"
+            }
+          ],
+          "lastItemAt": "2023-11-15T18:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

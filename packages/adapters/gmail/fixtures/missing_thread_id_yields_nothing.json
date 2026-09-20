@@ -1,0 +1,31 @@
+{
+  "scenario": "missing_thread_id_yields_nothing",
+  "note": "id present, threadId absent — normalize() returns [] (an item with an empty threadExternalId would break the thread model).",
+  "raw": {
+    "id": "18c2f4a1b2d3f50f",
+    "labelIds": ["INBOX"],
+    "payload": {
+      "mimeType": "text/plain",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Dana Lee <dana@example.com>"
+        },
+        {
+          "name": "Subject",
+          "value": "Orphaned message"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 18:40:00 +0000"
+        }
+      ],
+      "body": {
+        "data": "VW50aHJlYWRlZC4"
+      }
+    }
+  },
+  "expected": {
+    "items": []
+  }
+}

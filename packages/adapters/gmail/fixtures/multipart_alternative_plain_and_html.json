@@ -1,0 +1,98 @@
+{
+  "scenario": "multipart_alternative_plain_and_html",
+  "note": "multipart/alternative with plain + HTML. normalize() reads only the top-level payload body (empty for multipart), so the plain-text alternative is not surfaced.",
+  "raw": {
+    "id": "18c2f4a1b2d3f502",
+    "threadId": "18c2f4a1b2d3f502",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "multipart/alternative",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Priya Raman <priya@example.com>"
+        },
+        {
+          "name": "To",
+          "value": "Logan Kim <281932556+jinhologankim@users.noreply.github.com>"
+        },
+        {
+          "name": "Subject",
+          "value": "Notes from the sync"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId012@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 13:05:00 +0000"
+        }
+      ],
+      "body": {
+        "size": 0
+      },
+      "parts": [
+        {
+          "partId": "0",
+          "mimeType": "text/plain",
+          "filename": "",
+          "headers": [],
+          "body": {
+            "size": 46,
+            "data": "QWN0aW9uIGl0ZW1zIGFyZSBpbiB0aGUgc2hhcmVkIGRvYy4"
+          }
+        },
+        {
+          "partId": "1",
+          "mimeType": "text/html",
+          "filename": "",
+          "headers": [],
+          "body": {
+            "size": 92,
+            "data": "PHA-QWN0aW9uIGl0ZW1zIGFyZSBpbiB0aGUgPGI-c2hhcmVkIGRvYzwvYj4uPC9wPg"
+          }
+        }
+      ]
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f502",
+        "externalId": "18c2f4a1b2d3f502",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Priya Raman <priya@example.com>"
+        },
+        "body": "Subject: Notes from the sync\n\n",
+        "attachments": [],
+        "sentAt": "2023-11-15T13:05:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId012@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f502",
+          "kind": "email",
+          "title": "Notes from the sync",
+          "participants": [
+            {
+              "externalId": "priya@example.com",
+              "displayName": "Priya Raman"
+            },
+            {
+              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T13:05:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

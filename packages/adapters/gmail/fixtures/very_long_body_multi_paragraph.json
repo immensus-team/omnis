@@ -1,0 +1,77 @@
+{
+  "scenario": "very_long_body_multi_paragraph",
+  "note": "Long body (~5KB) to pin that no truncation happens in normalize().",
+  "raw": {
+    "id": "18c2f4a1b2d3f50a",
+    "threadId": "18c2f4a1b2d3f50a",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Dana Lee <dana@example.com>"
+        },
+        {
+          "name": "To",
+          "value": "281932556+jinhologankim@users.noreply.github.com"
+        },
+        {
+          "name": "Subject",
+          "value": "Q4 handoff — full checklist"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId019@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 17:00:00 +0000"
+        }
+      ],
+      "body": {
+        "size": 5200,
+        "data": "WzAxXSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMSBjb3ZlcnMgc2NoZW1hIHBhcml0eSwgcm9sbGJhY2sgcmVoZWFyc2FsLCBhbmQgdGhlIG9uLWNhbGwgaGFuZG9mZiBub3Rlcy4g7J6Q7IS47ZWcIOuCtOyaqeydgCDssqjrtoDtlZwg66y47ISc66W8IOywuOqzoO2VtCDso7zshLjsmpQuCgpbMDJdIOu2hOq4sOuzhCDsnbjsiJjsnbjqs4Qg66y47ISc66W8IOygleumrO2WiOyKteuLiOuLpC4gVGhlIG1pZ3JhdGlvbiBjaGVja2xpc3QgaXRlbSAyIGNvdmVycyBzY2hlbWEgcGFyaXR5LCByb2xsYmFjayByZWhlYXJzYWwsIGFuZCB0aGUgb24tY2FsbCBoYW5kb2ZmIG5vdGVzLiDsnpDshLjtlZwg64K07Jqp7J2AIOyyqOu2gO2VnCDrrLjshJzrpbwg7LC46rOg7ZW0IOyjvOyEuOyalC4KClswM10g67aE6riw67OEIOyduOyImOyduOqzhCDrrLjshJzrpbwg7KCV66as7ZaI7Iq164uI64ukLiBUaGUgbWlncmF0aW9uIGNoZWNrbGlzdCBpdGVtIDMgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzA0XSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gNCBjb3ZlcnMgc2NoZW1hIHBhcml0eSwgcm9sbGJhY2sgcmVoZWFyc2FsLCBhbmQgdGhlIG9uLWNhbGwgaGFuZG9mZiBub3Rlcy4g7J6Q7IS47ZWcIOuCtOyaqeydgCDssqjrtoDtlZwg66y47ISc66W8IOywuOqzoO2VtCDso7zshLjsmpQuCgpbMDVdIOu2hOq4sOuzhCDsnbjsiJjsnbjqs4Qg66y47ISc66W8IOygleumrO2WiOyKteuLiOuLpC4gVGhlIG1pZ3JhdGlvbiBjaGVja2xpc3QgaXRlbSA1IGNvdmVycyBzY2hlbWEgcGFyaXR5LCByb2xsYmFjayByZWhlYXJzYWwsIGFuZCB0aGUgb24tY2FsbCBoYW5kb2ZmIG5vdGVzLiDsnpDshLjtlZwg64K07Jqp7J2AIOyyqOu2gO2VnCDrrLjshJzrpbwg7LC46rOg7ZW0IOyjvOyEuOyalC4KClswNl0g67aE6riw67OEIOyduOyImOyduOqzhCDrrLjshJzrpbwg7KCV66as7ZaI7Iq164uI64ukLiBUaGUgbWlncmF0aW9uIGNoZWNrbGlzdCBpdGVtIDYgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzA3XSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gNyBjb3ZlcnMgc2NoZW1hIHBhcml0eSwgcm9sbGJhY2sgcmVoZWFyc2FsLCBhbmQgdGhlIG9uLWNhbGwgaGFuZG9mZiBub3Rlcy4g7J6Q7IS47ZWcIOuCtOyaqeydgCDssqjrtoDtlZwg66y47ISc66W8IOywuOqzoO2VtCDso7zshLjsmpQuCgpbMDhdIOu2hOq4sOuzhCDsnbjsiJjsnbjqs4Qg66y47ISc66W8IOygleumrO2WiOyKteuLiOuLpC4gVGhlIG1pZ3JhdGlvbiBjaGVja2xpc3QgaXRlbSA4IGNvdmVycyBzY2hlbWEgcGFyaXR5LCByb2xsYmFjayByZWhlYXJzYWwsIGFuZCB0aGUgb24tY2FsbCBoYW5kb2ZmIG5vdGVzLiDsnpDshLjtlZwg64K07Jqp7J2AIOyyqOu2gO2VnCDrrLjshJzrpbwg7LC46rOg7ZW0IOyjvOyEuOyalC4KClswOV0g67aE6riw67OEIOyduOyImOyduOqzhCDrrLjshJzrpbwg7KCV66as7ZaI7Iq164uI64ukLiBUaGUgbWlncmF0aW9uIGNoZWNrbGlzdCBpdGVtIDkgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzEwXSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMTAgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzExXSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMTEgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzEyXSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMTIgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzEzXSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMTMgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzE0XSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMTQgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzE1XSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMTUgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzE2XSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMTYgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzE3XSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMTcgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzE4XSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMTggY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzE5XSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMTkgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzIwXSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMjAgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzIxXSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMjEgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzIyXSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMjIgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzIzXSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMjMgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzI0XSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMjQgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzI1XSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMjUgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzI2XSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMjYgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzI3XSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMjcgY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULgoKWzI4XSDrtoTquLDrs4Qg7J247IiY7J246rOEIOusuOyEnOulvCDsoJXrpqztlojsirXri4jri6QuIFRoZSBtaWdyYXRpb24gY2hlY2tsaXN0IGl0ZW0gMjggY292ZXJzIHNjaGVtYSBwYXJpdHksIHJvbGxiYWNrIHJlaGVhcnNhbCwgYW5kIHRoZSBvbi1jYWxsIGhhbmRvZmYgbm90ZXMuIOyekOyEuO2VnCDrgrTsmqnsnYAg7LKo67aA7ZWcIOusuOyEnOulvCDssLjqs6DtlbQg7KO87IS47JqULg"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f50a",
+        "externalId": "18c2f4a1b2d3f50a",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Dana Lee <dana@example.com>"
+        },
+        "body": "Subject: Q4 handoff — full checklist\n\n[01] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 1 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[02] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 2 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[03] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 3 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[04] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 4 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[05] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 5 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[06] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 6 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[07] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 7 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[08] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 8 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[09] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 9 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[10] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 10 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[11] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 11 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[12] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 12 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[13] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 13 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[14] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 14 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[15] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 15 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[16] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 16 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[17] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 17 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[18] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 18 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[19] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 19 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[20] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 20 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[21] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 21 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[22] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 22 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[23] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 23 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[24] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 24 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[25] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 25 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[26] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 26 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[27] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 27 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.\n\n[28] 분기별 인수인계 문서를 정리했습니다. The migration checklist item 28 covers schema parity, rollback rehearsal, and the on-call handoff notes. 자세한 내용은 첨부한 문서를 참고해 주세요.",
+        "attachments": [],
+        "sentAt": "2023-11-15T17:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId019@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f50a",
+          "kind": "email",
+          "title": "Q4 handoff — full checklist",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "displayName": "281932556+jinhologankim@users.noreply.github.com"
+            }
+          ],
+          "lastItemAt": "2023-11-15T17:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

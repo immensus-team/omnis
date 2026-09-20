@@ -1,0 +1,68 @@
+{
+  "scenario": "draft_edited_not_yet_sent",
+  "note": "Drafts are fetched like any other message. labelIds is ignored by normalize(), so an unsent draft is reported as status 'received'.",
+  "raw": {
+    "id": "18c2f4a1b2d3e4fc",
+    "threadId": "18c2f4a1b2d3e4fc",
+    "labelIds": ["DRAFT"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Logan Kim <281932556+jinhologankim@users.noreply.github.com>"
+        },
+        {
+          "name": "Subject",
+          "value": "Draft: pricing follow-up"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId006@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 09:14:00 +0000"
+        }
+      ],
+      "body": {
+        "data": "U3RpbGwgZWRpdGluZyDigJQgZG8gbm90IHNlbmQgeWV0Lg"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3e4fc",
+        "externalId": "18c2f4a1b2d3e4fc",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Logan Kim <281932556+jinhologankim@users.noreply.github.com>"
+        },
+        "body": "Subject: Draft: pricing follow-up\n\nStill editing — do not send yet.",
+        "attachments": [],
+        "sentAt": "2023-11-15T09:14:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId006@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3e4fc",
+          "kind": "email",
+          "title": "Draft: pricing follow-up",
+          "participants": [
+            {
+              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T09:14:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

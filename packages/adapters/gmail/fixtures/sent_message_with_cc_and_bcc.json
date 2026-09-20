@@ -1,0 +1,88 @@
+{
+  "scenario": "sent_message_with_cc_and_bcc",
+  "note": "Sender's own copy of a sent message: SENT label, To + Cc + Bcc. normalize() builds participants from From/To/Cc only — Bcc is not parsed, so a Bcc-only recipient never becomes a participant. Pinned as-is.",
+  "raw": {
+    "id": "18c2f4a1b2d3e4fd",
+    "threadId": "18c2f4a1b2d3e4fd",
+    "labelIds": ["SENT"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Logan Kim <281932556+jinhologankim@users.noreply.github.com>"
+        },
+        {
+          "name": "To",
+          "value": "Dana Lee <dana@example.com>"
+        },
+        {
+          "name": "Cc",
+          "value": "Priya Raman <priya@example.com>"
+        },
+        {
+          "name": "Bcc",
+          "value": "\"Kim, Minji\" <minji@example.com>"
+        },
+        {
+          "name": "Subject",
+          "value": "Deploy window Thursday 10:00 KST"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId007@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 10:00:00 +0000"
+        }
+      ],
+      "body": {
+        "data": "TG9ja2luZyB0aGUgd2luZG93LiBGcmVlemUgc3RhcnRzIGF0IDA5OjMwIEtTVC4"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3e4fd",
+        "externalId": "18c2f4a1b2d3e4fd",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Logan Kim <281932556+jinhologankim@users.noreply.github.com>"
+        },
+        "body": "Subject: Deploy window Thursday 10:00 KST\n\nLocking the window. Freeze starts at 09:30 KST.",
+        "attachments": [],
+        "sentAt": "2023-11-15T10:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId007@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3e4fd",
+          "kind": "email",
+          "title": "Deploy window Thursday 10:00 KST",
+          "participants": [
+            {
+              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "displayName": "Logan Kim"
+            },
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "priya@example.com",
+              "displayName": "Priya Raman"
+            }
+          ],
+          "lastItemAt": "2023-11-15T10:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}
