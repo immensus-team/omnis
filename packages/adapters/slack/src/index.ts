@@ -214,6 +214,7 @@ interface SlackFile {
 }
 interface SlackMessageEvent {
   type?: string;
+  subtype?: string;
   channel?: string;
   user?: string;
   text?: string;
@@ -237,6 +238,7 @@ export function normalize(raw: unknown): NormalizedItem[] {
   // call), so requiring it would drop every item backfill.test.ts yields. Realtime
   // events (Events API / Socket Mode) do carry `channel`, which is used when present.
   if (m.type !== "message" || !m.ts) return [];
+  if (m.subtype === "message_changed" || m.subtype === "message_deleted") return [];
 
   const attachments: Attachment[] = (m.files ?? []).map((f) => ({
     kind: mimeToAttachmentKind(f.mimetype),
