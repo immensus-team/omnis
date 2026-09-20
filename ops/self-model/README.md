@@ -1,20 +1,20 @@
-# self-model 레포 (`~/.omnis/self-model/`)
+# self-model repo (`~/.omnis/self-model/`)
 
-USER.md · VOICE.md · PROJECTS.md 세 파일이 전부다. 모든 T1/T2 호출의 캐시 프리픽스에 그대로 들어간다(A4 §1.3).
+Three files and that is all: USER.md, VOICE.md, PROJECTS.md. They go verbatim into the cache prefix of every T1/T2 call (A4 §1.3).
 
-| 항목 | 값 |
+| Item | Value |
 |---|---|
-| 경로 | `~/.omnis/self-model/` (`OMNIS_SELF_MODEL_DIR`로 덮어쓴다) |
-| 버전 관리 | 로컬 git 레포 1개. 원격 없음 — 이 내용은 미니 밖으로 나가지 않는다 |
-| 토큰 상한 | USER.md 1,200 · VOICE.md 1,500 · PROJECTS.md 1,500 (A4 §12.3) |
-| 누가 쓰나 | 사람은 직접 편집한다. 에이전트는 `propose_self_model_patch` → 승인 → `applySelfModelPatch()`만 (A4 §13.3) |
-| 백업 | restic 대상에 `~/.omnis/`가 이미 포함된다 (A6 §4) |
+| Path | `~/.omnis/self-model/` (overridden by `OMNIS_SELF_MODEL_DIR`) |
+| Version control | One local git repo. No remote — this content never leaves the mini |
+| Token caps | USER.md 1,200 · VOICE.md 1,500 · PROJECTS.md 1,500 (A4 §12.3) |
+| Who writes it | Humans edit it directly. Agents only go through `propose_self_model_patch` → approval → `applySelfModelPatch()` (A4 §13.3) |
+| Backup | `~/.omnis/` is already included in the restic target (A6 §4) |
 
-## 초기화
+## Initialization
 
-허브가 부팅 때 `ensureSelfModelRepo()`를 부르므로 보통은 할 게 없다. 상한을 넘으면 일요일 21:00 잡(`self_model_weekly`, US-B25)이 "이 항목들을 memories로 내리자"는 패치를 제안한다.
+The hub calls `ensureSelfModelRepo()` at boot, so there is usually nothing to do. If a cap is exceeded, the Sunday 21:00 job (`self_model_weekly`, US-B25) proposes a patch to "demote these items to memories."
 
-## 되돌리기
+## Reverting
 
-    git -C ~/.omnis/self-model log --oneline     # 패치 히스토리
-    git -C ~/.omnis/self-model revert <sha>      # 되돌린 뒤 허브를 재기동하면 캐시가 비워진다
+    git -C ~/.omnis/self-model log --oneline     # patch history
+    git -C ~/.omnis/self-model revert <sha>      # after reverting, restart the hub and the cache is cleared
