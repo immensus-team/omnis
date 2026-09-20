@@ -186,14 +186,14 @@ ${rows(p)}
 
 ## 읽는 법 (이 리포트가 주장하지 않는 것)
 
-- **Inbox는 스레드가 아니라 item 목록이다.** A1의 13행은 시드된 item 13개이고, 한 스레드의
-  여러 메시지가 각자 행으로 선다. 행 제목은 스레드 제목이다 — Phase A의 커널 IngestSink는
-  author_person_id를 의도적으로 비워 두고(person 신원 해석은 Phase B) Slack 메시지에는
-  subject가 없기 때문이다. A2b가 그 제목이 실제로 화면에 있는지 본다.
-- **A2는 접근성 이름이 아니라 보이는 글리프를 본다.** 원래 main의 \`.inbox-row__channel\`은
-  aria-label만 있고 내용도 CSS도 없어서 눈에는 아무것도 안 보였다 — 이 브랜치의 커밋
-  \`fix(desktop): render the Inbox channel icon…\`에서 고쳤고(채널 모노그램 + 미읽음/승인
-  점 CSS), A2가 글리프 텍스트까지 확인한다.
+- **Inbox는 U2(kinso 대화 행)부터 스레드 목록이다.** 한 스레드의 여러 메시지는 행 하나로
+  합쳐지고(가장 최근 item), 행 제목은 사람 표시명 → 스레드 제목 → 채널 핸들 순으로 정해진다 —
+  Phase A의 커널 IngestSink는 author_person_id를 의도적으로 비워 두어(person 신원 해석은
+  Phase B) 모든 시드 행이 스레드 제목으로 떨어진다. A1이 스레드 수를, A2b가 그 제목이 실제로
+  화면에 있는지 본다.
+- **A2는 접근성 이름이 아니라 눈에 보이는 아이콘을 본다.** 채널 아이콘은 react-icons/si
+  SVG다(U2 이전엔 모노그램 텍스트였다) — A2가 svg 자식 노드와 non-zero bounding box로
+  "정말 뭔가 그려져 있다"를 확인한다.
 - **T1(DeepSeek/OpenRouter) 호출은 강제로 막혀 있다.** 시드가 classify()를 부르기 전에
   OMNIS_OPENROUTER_API_KEY를 비운다 — 규칙 1단이 안 맞아 3단까지 흘러내려도 t1Model()이
   fetch 전에 던진다. A10은 그와 별개로 기록된 run이 tier=T0인지 본다.

@@ -4,8 +4,8 @@ import {
   CommandPalette,
   type PaletteAction,
   type RailSelection,
+  type UiChannel,
 } from "@omnis/ui";
-import type { UiChannel } from "@omnis/ui/components/inbox-row";
 import { ZeroProvider, useQuery } from "@rocicorp/zero/react";
 import { useEffect, useMemo, useState } from "react";
 import { ApprovalCard } from "./components/ApprovalCard.js";

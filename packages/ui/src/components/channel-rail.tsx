@@ -1,28 +1,10 @@
-import { ChevronDown, Inbox as InboxGlyph, Settings, Sparkles, User } from "lucide-react";
-import type { ElementType } from "react";
-import { FaLinkedin, FaSlack } from "react-icons/fa6";
-import { PiMicrosoftOutlookLogo } from "react-icons/pi";
-import { SiGmail, SiGooglecalendar, SiKakaotalk, SiTelegram, SiWhatsapp } from "react-icons/si";
+import { ChevronDown, Inbox as InboxGlyph, Settings, User } from "lucide-react";
 import { cn } from "../lib/cn.js";
+import { CHANNEL_ICON, CHANNEL_LABEL } from "../lib/row-meta.js";
 import type { UiChannel } from "../types.js";
-import { CHANNEL_LABEL } from "./inbox-row.js";
 
-/** U1: kinso 좌측 레일의 브랜드 마크. simple-icons(react-icons/si)에 Slack/LinkedIn/Outlook 로고가
- *  없어(상표 정책으로 빠짐) fa6/pi에서 채운다 — "직접 만들지 않는다" 원칙은 세트 하나로 못 지킨다.
- *  ElementType(제네릭 없이): lucide와 react-icons가 각자 다른 propTypes 제네릭을 선언해
- *  props를 좁혀 통일하면 exactOptionalPropertyTypes가 구조적으로 튕긴다. */
-const CHANNEL_ICON: Record<UiChannel, ElementType> = {
-  gmail: SiGmail,
-  slack: FaSlack,
-  linkedin: FaLinkedin,
-  whatsapp: SiWhatsapp,
-  telegram: SiTelegram,
-  kakaotalk: SiKakaotalk,
-  outlook: PiMicrosoftOutlookLogo,
-  gcal: SiGooglecalendar,
-  agent: Sparkles,
-  system: Sparkles,
-};
+// U2: 브랜드 아이콘 맵(CHANNEL_ICON)과 한글 라벨(CHANNEL_LABEL)은 이제 lib/row-meta.ts 공용이다
+// (inbox-row.tsx도 U2에서 같은 아이콘이 필요해져 여기 두면 순환 import가 생긴다).
 
 /** null = "Inbox" 타일(전체 보기). Agents 타일도 다른 채널 타일과 같은 필터 문법
  *  (레일 선택 = channelFilter)을 쓰되, 계정 연결 여부와 무관한 레일 고정 요소다. */

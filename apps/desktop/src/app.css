@@ -217,12 +217,18 @@ body {
   border-color: transparent;
 }
 
+/* U2: kinso 대화 행 — 아바타 | (이름·시간 / 요약·칩) | (채널아이콘 또는 상태배지). 3칼럼×2행 그리드,
+   우측 슬롯은 두 행에 걸쳐 세로 중앙 정렬(kinso 실측 — 행 전체 기준 우측 끝 고정, 23 §2). */
 .inbox-row {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 2px 8px;
-  padding: 10px 16px;
-  /* U1: 리스트에서 헤어라인 구분선을 뺀다(23 §2 — kinso는 padding만으로 행을 나눈다).
+  grid-template-columns: 40px 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  row-gap: 4px;
+  align-items: center;
+  /* U1/U2: 넉넉한 행 높이 — kinso는 10px보다 훨씬 여유 있는 패딩으로 밀도를 낮춘다. */
+  padding: 14px 16px;
+  /* 헤어라인 구분선을 뺀다(23 §2 — kinso는 padding만으로 행을 나눈다).
      선택된 행만 .inbox-row--selected의 카드+그림자로 구분된다. */
   cursor: pointer;
 }
@@ -233,58 +239,115 @@ body {
   box-shadow: var(--shadow-row-selected);
 }
 
-.inbox-row__meta {
+.inbox-row__avatar {
+  grid-row: 1 / span 2;
+  grid-column: 1;
   display: flex;
-  justify-content: space-between;
-  font-weight: 600;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 590;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  flex: 0 0 auto;
+}
+
+.inbox-row__avatar--runtime {
+  background: var(--gray-950, #14141a);
+  color: var(--gray-000, #fff);
+}
+
+.inbox-row__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.inbox-row__meta {
+  grid-row: 1;
+  grid-column: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.inbox-row__name {
+  font-weight: 400;
+  /* U2: unread는 이름을 볼드로 — 읽은 행은 일반 굵기(kinso, DESIGN-DIRECTION U2). */
+}
+
+.inbox-row__name[data-unread="true"] {
+  font-weight: 590;
+}
+
+.inbox-row__unread-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: 0 0 auto;
 }
 
 .inbox-row__timestamp {
+  margin-left: auto;
   color: var(--text-secondary);
-  font-weight: 400;
+  font-size: 12px;
 }
 
-.inbox-row__preview {
-  grid-column: 1 / -1;
+.inbox-row__summary-line {
+  grid-row: 2;
+  grid-column: 2 / span 2;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.inbox-row__summary {
+  flex: 1 1 auto;
+  min-width: 0;
   color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.inbox-row__summary[data-draft="true"] {
+  color: var(--accent);
+}
+
 .inbox-row__chips {
-  grid-column: 1 / -1;
+  flex: 0 0 auto;
   display: flex;
   gap: 4px;
 }
 
-.inbox-row__channel {
-  /* .inbox-row의 두 번째(auto) 칼럼은 이 배지 자리다 — 안 쓰면 행 맨 아래로 흘러내린다. */
-  grid-row: 1;
-  grid-column: 2;
+.inbox-row__side {
+  grid-row: 1 / span 2;
+  grid-column: 3;
   display: flex;
   align-items: center;
   gap: 6px;
+  justify-self: end;
 }
 
 .inbox-row__channel-icon {
-  border: var(--hairline);
-  border-radius: 999px;
-  padding: 0 6px;
-  font-size: 11px;
-  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
   color: var(--text-secondary);
 }
 
-.inbox-row__unread,
 .inbox-row__approval-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--accent);
-}
-
-.inbox-row__approval-dot {
   background: var(--warn-500);
 }
 
@@ -296,6 +359,12 @@ body {
   padding: 0 8px;
   font-size: 12px;
   color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.status-badge--agent[data-agent-state="blocked"] {
+  border-color: var(--warn-500);
+  color: var(--warn-500);
 }
 
 .app-shell__detail {
