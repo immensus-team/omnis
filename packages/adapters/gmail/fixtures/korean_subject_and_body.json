@@ -1,5 +1,6 @@
 {
   "scenario": "korean_subject_and_body",
+  "note": "Korean subject, body and display names are the input under test — kept verbatim, since the adapter must round-trip non-ASCII text unchanged.",
   "raw": {
     "id": "18c2f4a1b2d3f508",
     "threadId": "18c2f4a1b2d3f508",

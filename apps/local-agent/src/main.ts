@@ -54,7 +54,7 @@ export async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<void
       logger,
       host: config.host,
       turnCap: new TurnCap({ max: hostProfile(config.host).maxActiveTurns }),
-      // 런타임 이벤트 → 허브 알림 → items(A2 §4.1). client는 이 클로저가 불릴 때 이미 있다.
+      // runtime event → hub notification → items (A2 §4.1). The client already exists by the time this closure fires.
       sinkFor: (session, turnId): EventSink =>
         createHubSink({ client, session, turnId, logger, outbox, registry }),
     }),

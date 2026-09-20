@@ -1,5 +1,6 @@
 {
   "scenario": "korean_title_with_emoji",
+  "note": "Korean summary, description, location and attendee name with an emoji — the non-ASCII input under test, kept verbatim.",
   "raw": {
     "kind": "calendar#event",
     "id": "evt_korean_emoji",

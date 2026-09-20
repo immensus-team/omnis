@@ -76,8 +76,8 @@ describe("buildClaudeArgs (A2-D5)", () => {
     ).not.toContain("--bare");
   });
 
-  it("lets the bare flag override the origin default in both directions (게이트 ⑪ 미확정)", () => {
-    // 구독 인증으로 위임을 돌리는 쪽으로 게이트 ⑪이 정해지면 bare:false
+  it("lets the bare flag override the origin default in both directions (Gate ⑪ undecided)", () => {
+    // if Gate ⑪ settles on running delegation under subscription auth, bare:false
     expect(
       buildClaudeArgs({
         prompt: "x",
@@ -88,7 +88,7 @@ describe("buildClaudeArgs (A2-D5)", () => {
         bare: false,
       }),
     ).not.toContain("--bare");
-    // API 키로 human 턴까지 격리하는 쪽으로 정해지면 bare:true
+    // if it settles on isolating even human turns behind an API key, bare:true
     expect(
       buildClaudeArgs({
         prompt: "x",
@@ -123,7 +123,7 @@ describe("permissionModeFor (A2 §7.1)", () => {
     expect(permissionModeFor("workspace", "delegation")).toBe("manual");
     expect(permissionModeFor("trusted", "human")).toBe("bypassPermissions");
     for (const mode of Object.values(PERMISSION_MODE)) expect(CLI_MODES).toContain(mode);
-    expect(Object.values(PERMISSION_MODE)).not.toContain("default"); // claude 2.1.274에 없는 값
+    expect(Object.values(PERMISSION_MODE)).not.toContain("default"); // a value claude 2.1.274 does not have
   });
 
   it("never yields bypassPermissions outside trusted+human", () => {
@@ -160,7 +160,7 @@ describe("parseClaudeCapabilities", () => {
   });
 });
 
-// --- 어댑터 기본 실행 모드 (마스터 §19 Q13 / 계약 §8) ---
+// --- adapter default execution mode (master §19 Q13 / contract §8) ---
 
 function fakeSpawn(captured: string[][]): typeof spawn {
   return ((_bin: string, args: readonly string[]) => {
@@ -237,7 +237,7 @@ describe("ClaudeCodeAdapter run mode defaults", () => {
   });
 });
 
-// --- 승인 표면은 실행 모드를 따라간다 (게이트 ⑪ FAIL mode a) ---
+// --- the approval surface follows the execution mode (Gate ⑪ FAIL mode a) ---
 
 function fakeVersionSpawn(version: string): typeof spawn {
   return ((_bin: string, _args: readonly string[]) => {
@@ -258,7 +258,7 @@ describe("probe reports the approval surface the run mode actually has", () => {
       apiKey: "k",
       spawnFn: fakeVersionSpawn("2.1.274 (Claude Code)"),
     });
-    // --bare는 --settings의 hook 선언도 --permission-mode도 무시한다 → 승인 경로 없음
+    // --bare ignores both the --settings hook declaration and --permission-mode → no approval path
     expect((await ds.probe()).capabilities.approvals).toBe("none");
 
     const cc = new ClaudeCodeAdapter({
@@ -269,7 +269,7 @@ describe("probe reports the approval surface the run mode actually has", () => {
     });
     expect((await cc.probe()).capabilities.approvals).toBe("hook");
 
-    // 파서 자체는 그대로다(플랜 계약)
+    // the parser itself is unchanged (plan contract)
     expect(parseClaudeCapabilities("2.1.274 (Claude Code)").capabilities.approvals).toBe("hook");
   });
 });

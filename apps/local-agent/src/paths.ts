@@ -2,7 +2,7 @@ import { realpathSync } from "node:fs";
 import { resolve, sep } from "node:path";
 import { BRIDGE_ERRORS, BridgeError } from "@omnis/protocol";
 
-/** A2-D12: 허브가 보낸 cwd는 브리지가 재검증한다. 심볼릭 링크는 realpath 후 재검사. */
+/** A2-D12: the bridge re-validates the cwd the hub sent. Symlinks are re-checked after realpath. */
 export function assertPathAllowed(cwd: string, allowedRoots: string[]): string {
   let real: string;
   try {

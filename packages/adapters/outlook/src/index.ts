@@ -18,7 +18,7 @@ export const CHANNEL = "outlook" as const;
 const CAPABILITIES: Capabilities = {
   read: true,
   write: true,
-  realtime: false, // delta 폴링이지 push가 아니다(A1 §2.4 "webhook 전 단계")
+  realtime: false, // delta polling, not push (A1 §2.4 "the step before webhooks")
   history: true,
   media: true,
   markRead: true,
@@ -44,9 +44,9 @@ interface GraphMessage {
   "@removed"?: { reason?: string };
 }
 
-/** ponytail: 정규식 태그 제거만 한다 — 완전한 HTML→텍스트 변환이 필요해지면(표·리스트 서식 깨짐이
- *  체감되면) 그때 라이브러리로 승격한다. Gmail/Graph 둘 다 body를 그대로 저장하고 검색은
- *  `items.search_tsv`(plain 텍스트)가 하므로 v1은 이걸로 충분하다. */
+/** ponytail: only regex tag removal — when a full HTML→text conversion becomes necessary (broken table/list
+ *  formatting becomes noticeable) promote it to a library then. Both Gmail and Graph store the body as is and search
+ *  runs off `items.search_tsv` (plain text), so this is enough for v1. */
 function stripHtml(html: string): string {
   return html
     .replace(/<[^>]+>/g, " ")
@@ -75,8 +75,8 @@ function parseSentAt(receivedDateTime?: string, sentDateTime?: string): string {
 
 export function normalize(raw: unknown): NormalizedItem[] {
   const m = raw as GraphMessage;
-  // delta tombstone: 삭제된 메시지를 알리는 행이라 콘텐츠가 없다. items를 지우지 않는다(A3 §11) —
-  // 그냥 아이템을 만들지 않을 뿐이다.
+  // delta tombstone: a row announcing a deleted message, so there is no content. It does not delete items (A3 §11) —
+  // it simply produces no item.
   if (m["@removed"] !== undefined) return [];
   if (!m.id || !m.conversationId) return [];
 
@@ -90,7 +90,7 @@ export function normalize(raw: unknown): NormalizedItem[] {
     .filter((p): p is { externalId: string; displayName: string } => p !== null)
     .filter((p, i, all) => all.findIndex((o) => o.externalId === p.externalId) === i);
   const sentAt = parseSentAt(m.receivedDateTime, m.sentDateTime);
-  const attachments: Attachment[] = []; // 다운로드는 /attachments 개별 호출(A1 §2.4) — Gmail과 동일 원칙
+  const attachments: Attachment[] = []; // downloads go through the per-message /attachments call (A1 §2.4) — the same principle as Gmail
 
   return [
     {
@@ -140,9 +140,9 @@ export function mapApiError(cause: unknown): AdapterError {
   return new AdapterError("retryable_network", CHANNEL, "Graph API call failed", undefined, cause);
 }
 
-/** 이 어댑터가 실제로 부르는 부분집합만 duck-typing한다 — `@microsoft/microsoft-graph-client`의
- *  `Client` 인스턴스가 구조적으로 이 인터페이스를 만족하므로 실제 SDK와 테스트 mock 둘 다 통과한다
- *  (Gmail의 OAuth2Client 이중 타입 회피와 같은 이유, packages/adapters/gmail/src/index.ts 상단 주석 참고). */
+/** Duck-types only the subset this adapter actually calls — a `@microsoft/microsoft-graph-client`
+ *  `Client` instance structurally satisfies this interface, so both the real SDK and the test mock pass
+ *  (same reason as Gmail's OAuth2Client double-type avoidance; see the top comment in packages/adapters/gmail/src/index.ts). */
 export interface GraphClientLike {
   api(path: string): {
     get(): Promise<Record<string, unknown>>;
@@ -183,7 +183,7 @@ export interface OutlookAdapterDeps {
   oauthClientId: string;
   graphClient?: GraphClientLike;
   fetchFn?: typeof fetch;
-  pollIntervalMs?: number; // subscribe() delta 폴링 간격, 기본 5분(jobs.outlook_delta_poll 주기와 동일)
+  pollIntervalMs?: number; // subscribe() delta polling interval, 5 minutes by default (same as the jobs.outlook_delta_poll period)
   sink?: (thread: ThreadRef, draft: Outbound) => Promise<SendResult>;
   now?: () => Date;
 }
@@ -204,8 +204,8 @@ export function createOutlookAdapter(deps: OutlookAdapterDeps): Adapter {
     async connect(auth: AuthRef): Promise<void> {
       try {
         if (deps.graphClient !== undefined) {
-          // 테스트 주입 경로: 이미 자격증명이 설정된 클라이언트를 그대로 쓴다(Keychain 조회 없음,
-          // google-calendar 어댑터와 동일 패턴 — packages/adapters/google-calendar/src/index.ts connect()).
+          // Test injection path: uses a client that already has credentials configured (no Keychain lookup,
+          // same pattern as the google-calendar adapter — packages/adapters/google-calendar/src/index.ts connect()).
           graphClient = deps.graphClient;
         } else {
           const refreshToken = await readKeychainSecret(
@@ -280,7 +280,7 @@ export function createOutlookAdapter(deps: OutlookAdapterDeps): Adapter {
           } catch (cause) {
             const err = cause as { statusCode?: number };
             if (err.statusCode === 410) {
-              link = BASE; // delta token 만료 → 풀 재동기화(A1 §2.4)
+              link = BASE; // delta token expired → full resync (A1 §2.4)
               continue;
             }
             throw mapApiError(cause);
@@ -297,7 +297,7 @@ export function createOutlookAdapter(deps: OutlookAdapterDeps): Adapter {
       return poll();
     },
 
-    // 승인 게이트(US-A07, Phase A에 이미 존재) 전까지 실제 sendMail은 절대 호출하지 않는다.
+    // Until the approval gate (US-A07, already present in Phase A) exists, the real sendMail is never called.
     async send(thread: ThreadRef, draft: Outbound): Promise<SendResult> {
       const sink =
         deps.sink ??

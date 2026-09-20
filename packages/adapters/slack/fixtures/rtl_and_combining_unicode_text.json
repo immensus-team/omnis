@@ -1,5 +1,6 @@
 {
   "scenario": "rtl_and_combining_unicode_text",
+  "note": "RTL Arabic and Hebrew, a decomposed Hangul jamo sequence, a combining acute and a zero-width pair — the Unicode input under test, kept verbatim. The jamo are deliberately not composed into syllables.",
   "raw": {
     "type": "message",
     "channel": "C07OMNISEN",

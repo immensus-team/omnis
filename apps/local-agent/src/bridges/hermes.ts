@@ -23,9 +23,9 @@ export interface HermesCapabilitiesResponse {
   models?: string[];
 }
 
-/** A2 §4.4: 승인은 Phase B에서 발생할 여지가 없다(origin='human'만, 위임 대상 제외, A2-D9).
- *  `resume`/`stream_deltas`는 `09` VERIFIED(session_key/session_id 분리, SSE keepalive). 나머지는
- *  Hermes가 원문으로 자기기술하지 않는 필드라 Phase B 스코프에 맞춰 보수적으로 고정한다. */
+/** A2 §4.4: approvals cannot arise in Phase B (origin='human' only, delegation excluded, A2-D9).
+ *  `resume`/`stream_deltas` are VERIFIED by `09` (session_key/session_id split, SSE keepalive). The rest are
+ *  fields Hermes does not self-describe verbatim, so they are pinned conservatively to match the Phase B scope. */
 export function parseHermesCapabilities(raw: HermesCapabilitiesResponse): RuntimeCapabilities {
   return {
     resume: true,
@@ -40,9 +40,9 @@ export function parseHermesCapabilities(raw: HermesCapabilitiesResponse): Runtim
   };
 }
 
-/** A2 §2.1: session_key_header가 session_header_mode('hermes_v1' = X-Hermes-Session-Key)와
- *  다르면 이 런타임을 degraded로 등록하고 세션을 열지 않는다 — probe()를 부르는 쪽(브리지 기동 코드,
- *  이 플랜 밖)이 이 에러를 잡아 AgentRuntime.state='degraded'로 내린다. */
+/** A2 §2.1: if session_key_header differs from session_header_mode ('hermes_v1' = X-Hermes-Session-Key),
+ *  this runtime is registered as degraded and no session is opened — the caller of probe() (bridge bootstrap code,
+ *  outside this plan) catches the error and drops AgentRuntime.state to 'degraded'. */
 export class HermesSessionHeaderMismatchError extends Error {
   constructor(readonly got: string) {
     super(
@@ -54,9 +54,9 @@ export class HermesSessionHeaderMismatchError extends Error {
 
 const EXPECTED_SESSION_KEY_HEADER = "X-Hermes-Session-Key";
 
-/** A2-D9: 프로세스를 spawn하지 않는 HTTP형 RuntimeAdapter. session_key를
- *  X-Hermes-Session-Key에 1:1로 얹고, 응답의 X-Hermes-Session-Id를 다음 턴의
- *  previous_response_id 체이닝에 쓴다(§4.4 "이 매핑이 1:1이라 어댑터가 제일 얇다"). */
+/** A2-D9: an HTTP-shaped RuntimeAdapter that spawns no process. It maps session_key
+ *  one-to-one onto X-Hermes-Session-Key and uses the response's X-Hermes-Session-Id for the next turn's
+ *  previous_response_id chaining (§4.4: "this mapping is 1:1, so this adapter is the thinnest"). */
 export class HermesAdapter implements RuntimeAdapter {
   readonly kind: RuntimeKind = "hermes";
   readonly #lastResponseId = new Map<string, string>();
@@ -114,7 +114,7 @@ export class HermesAdapter implements RuntimeAdapter {
         `Hermes /v1/responses failed: ${res.status}`,
       );
     }
-    // §4.4: 다음 턴은 이 id로 체인한다(session_key는 그대로, session_id만 갈린다).
+    // §4.4: the next turn chains on this id (session_key stays, only session_id differs).
     const sessionId = res.headers.get("X-Hermes-Session-Id");
     if (sessionId !== null) this.#lastResponseId.set(s.session_key, sessionId);
 
@@ -130,9 +130,9 @@ export class HermesAdapter implements RuntimeAdapter {
     };
   }
 
-  /** gate-hermes-sse: 필드명 한 벌에 고정하지 않는다 — `type`이 `delta`로 끝나면 델타,
-   *  `done`/`completed`로 끝나면 종료. 본문은 `text ?? delta`. 모르는 `type`과 `: keepalive`
-   *  주석은 조용히 버린다(A2 §4.4 — keepalive는 이벤트로 올리지 않는다). */
+  /** gate-hermes-sse: do not pin to one set of field names — a `type` ending in `delta` is a delta,
+   *  one ending in `done`/`completed` is the end. The body is `text ?? delta`. An unknown `type` and a `: keepalive`
+   *  comment are dropped silently (A2 §4.4 — keepalives are not raised as events). */
   async #pump(
     body: ReadableStream<Uint8Array>,
     sessionKey: string,
@@ -156,7 +156,7 @@ export class HermesAdapter implements RuntimeAdapter {
       try {
         ev = JSON.parse(payload) as typeof ev;
       } catch {
-        return; // 미지 형식이 파서를 죽이지 않는다(claude-code.ts stream-json 파서와 동일 원칙)
+        return; // an unknown shape must not kill the parser (same principle as the claude-code.ts stream-json parser)
       }
       const type = ev.type ?? "";
       if (type.endsWith("delta")) {
@@ -172,8 +172,8 @@ export class HermesAdapter implements RuntimeAdapter {
           channel: "output",
         });
       } else if (!done && (type.endsWith("done") || type.endsWith("completed"))) {
-        // Responses 호환 스트림은 종료 이벤트를 둘(`…output_text.done` + `response.completed`)
-        // 보낼 수 있다 — 턴 종료는 한 번만 올린다.
+        // A Responses-compatible stream may carry two terminal events (`…output_text.done` + `response.completed`),
+        // so the turn completion is raised only once.
         done = true;
         sink.itemCompleted({
           session_key: sessionKey,
@@ -204,7 +204,7 @@ export class HermesAdapter implements RuntimeAdapter {
         nl = buf.indexOf("\n");
       }
     }
-    handleLine(buf); // 개행 없이 끝난 마지막 줄도 흘리지 않는다
+    handleLine(buf); // the final line, ending without a newline, is not dropped either
   }
 
   async cancel(h: TurnHandle, reason: string): Promise<boolean> {
@@ -212,6 +212,6 @@ export class HermesAdapter implements RuntimeAdapter {
   }
 
   async close(): Promise<void> {
-    /* HTTP 클라이언트라 닫을 상주 자원이 없다(A2 §4.4 — 프로세스를 spawn하지 않는다) */
+    /* an HTTP client has no resident resource to close (A2 §4.4 — no process is spawned) */
   }
 }

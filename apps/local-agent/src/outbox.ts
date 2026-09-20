@@ -8,7 +8,7 @@ export interface OutboxEntry {
   at?: string;
 }
 
-/** A2 §2.2: durable만 쌓는다. ephemeral 델타는 버린다. approval.requested는 절대 안 버린다. */
+/** A2 §2.2: only durable events are queued. Ephemeral deltas are dropped. approval.requested is never dropped. */
 export class Outbox {
   readonly #path: string;
   readonly #maxBytes: number;
@@ -46,7 +46,7 @@ export class Outbox {
     return Buffer.byteLength(this.#serialise(), "utf8");
   }
 
-  /** 순서대로 보내고 성공한 것만 지운다. 던지면 남은 것은 파일에 그대로 남는다. */
+  /** Sends in order and removes only what succeeded. If it throws, the rest stays in the file as is. */
   async drain(send: (e: OutboxEntry) => Promise<void>): Promise<void> {
     while (this.#buf.length > 0) {
       const head = this.#buf[0] as OutboxEntry;

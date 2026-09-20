@@ -1,6 +1,6 @@
 import type { RuntimeCapabilities, RuntimeState } from "@omnis/protocol";
 
-/** A2-D6. 핀 해제는 계약 테스트 전량 통과 시에만, 사람이 한다. */
+/** A2-D6. Unpinning happens only once the full contract-test suite passes, and a human does it. */
 export const CODEX_PINNED_VERSION = "rust-v0.155.1";
 
 export const CODEX_CAPABILITIES: RuntimeCapabilities = {
@@ -24,7 +24,7 @@ export function probeCodexVersion(
   return {
     version: `codex ${found}`,
     state: drifted ? "degraded" : "online",
-    // 세션은 계속 뜨지만 허브가 위임 대상 후보에서 뺄 수 있게 플래그만 싣는다.
+    // The session still starts, but only a flag is carried so the hub can drop it from the delegation candidates.
     capabilities: drifted
       ? { ...CODEX_CAPABILITIES, features: ["version_mismatch"] }
       : CODEX_CAPABILITIES,

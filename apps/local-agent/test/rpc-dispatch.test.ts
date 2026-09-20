@@ -48,10 +48,10 @@ describe("rpc dispatcher", () => {
     ).rejects.toMatchObject({ code: -32010 });
   });
 
-  // US-B10: Phase A 게이트(-32601)가 걷혔다 — ingest.scan은 이제 실제 핸들러로 간다.
+  // US-B10: the Phase A gate (-32601) is gone — ingest.scan now goes to the real handler.
   it("routes ingest.scan to a real result instead of the Phase A gate", async () => {
-    // dispatch()의 allowedRoots는 codex → ["/tmp"]로 고정돼 있으니, /tmp 아래에 직접 판다
-    // (os.tmpdir()은 macOS에서 /tmp가 아니라 $TMPDIR이라 allowlist를 벗어난다).
+    // dispatch()'s allowedRoots are fixed at codex → ["/tmp"], so the fixture is dug directly under /tmp
+    // (on macOS os.tmpdir() is $TMPDIR, not /tmp, so it falls outside the allowlist).
     const root = await mkdtemp(join("/tmp", "omnis-rpc-ingest-"));
     const res = (await dispatch()("ingest.scan", withMeta({ roots: [root] }))) as {
       files: unknown[];

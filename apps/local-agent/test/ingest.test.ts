@@ -20,8 +20,8 @@ const logger = {
 };
 
 beforeEach(async () => {
-  // realpath로 정규화한다 — assertPathAllowed가 realpath 재검사를 하므로(A2-D12), macOS의
-  // $TMPDIR(/var/folders/...)처럼 그 자체가 심볼릭 링크인 경우 비교 기준이 갈린다.
+  // normalized with realpath — because assertPathAllowed re-checks realpath (A2-D12), on macOS a
+  // path like $TMPDIR (/var/folders/...) that is itself a symlink ends up with a different comparison basis.
   allowed = await realpath(await mkdtemp(join(tmpdir(), "omnis-allowed-")));
   outside = await realpath(await mkdtemp(join(tmpdir(), "omnis-outside-")));
 });
@@ -29,8 +29,8 @@ beforeEach(async () => {
 describe("handleIngestScan (A2 §3.2)", () => {
   it("lists files under a root that is inside allowed_roots", async () => {
     await mkdir(join(allowed, "sub"), { recursive: true });
-    await writeFile(join(allowed, "a.md"), "본문 A");
-    await writeFile(join(allowed, "sub", "b.md"), "본문 B");
+    await writeFile(join(allowed, "a.md"), "body A");
+    await writeFile(join(allowed, "sub", "b.md"), "body B");
 
     const res = await handleIngestScan({ roots: [allowed] }, { allowedRoots: [allowed], logger });
     expect(res.files.map((f) => f.path).sort()).toEqual(
@@ -44,7 +44,7 @@ describe("handleIngestScan (A2 §3.2)", () => {
     }
   });
 
-  // 상한 1: allowlist ∩ allowed_roots 교집합. 허브가 뭘 보내든 브리지가 다시 자른다.
+  // bound 1: allowlist ∩ allowed_roots intersection. Whatever the hub sends, the bridge re-cuts it.
   it("rejects a root outside allowed_roots with PATH_NOT_ALLOWED", async () => {
     await expect(
       handleIngestScan({ roots: [outside] }, { allowedRoots: [allowed], logger }),
@@ -52,7 +52,7 @@ describe("handleIngestScan (A2 §3.2)", () => {
   });
 
   it("drops the disallowed root and keeps the allowed one when both are sent", async () => {
-    await writeFile(join(allowed, "a.md"), "본문");
+    await writeFile(join(allowed, "a.md"), "body");
     const res = await handleIngestScan(
       { roots: [allowed, outside] },
       { allowedRoots: [allowed], logger, skipDisallowedRoots: true },
@@ -61,7 +61,7 @@ describe("handleIngestScan (A2 §3.2)", () => {
   });
 
   it("filters by since", async () => {
-    await writeFile(join(allowed, "a.md"), "본문");
+    await writeFile(join(allowed, "a.md"), "body");
     const future = new Date(Date.now() + 60_000).toISOString();
     const res = await handleIngestScan(
       { roots: [allowed], since: future },
@@ -70,16 +70,16 @@ describe("handleIngestScan (A2 §3.2)", () => {
     expect(res.files).toEqual([]);
   });
 
-  // 상한 2: 비밀 파일 무조건 거부.
+  // bound 2: secret files are always rejected.
   it("never lists a denied path even when it is inside an allowed root", async () => {
     await writeFile(join(allowed, ".env"), "SECRET=1");
-    await writeFile(join(allowed, "ok.md"), "괜찮음");
+    await writeFile(join(allowed, "ok.md"), "ok");
     const res = await handleIngestScan({ roots: [allowed] }, { allowedRoots: [allowed], logger });
     expect(res.files.map((f) => f.path)).toEqual([join(allowed, "ok.md")]);
   });
 
   it("sets truncated when it hits the file cap", async () => {
-    for (let i = 0; i < 5; i += 1) await writeFile(join(allowed, `f${i}.md`), `본문 ${i}`);
+    for (let i = 0; i < 5; i += 1) await writeFile(join(allowed, `f${i}.md`), `body ${i}`);
     const res = await handleIngestScan(
       { roots: [allowed] },
       { allowedRoots: [allowed], logger, maxFiles: 3 },
@@ -91,18 +91,18 @@ describe("handleIngestScan (A2 §3.2)", () => {
 
 describe("handleIngestRead (A2 §3.2)", () => {
   it("returns base64 content with the byte count and mtime", async () => {
-    await writeFile(join(allowed, "a.md"), "본문 A");
+    await writeFile(join(allowed, "a.md"), "body A");
     const res = await handleIngestRead(
       { path: join(allowed, "a.md"), max_bytes: 1_048_576 },
       { allowedRoots: [allowed], logger },
     );
-    expect(Buffer.from(res.content_b64, "base64").toString("utf8")).toBe("본문 A");
-    expect(res.bytes).toBe(Buffer.byteLength("본문 A"));
+    expect(Buffer.from(res.content_b64, "base64").toString("utf8")).toBe("body A");
+    expect(res.bytes).toBe(Buffer.byteLength("body A"));
     expect(res.truncated).toBe(false);
     expect(res.path).toBe(join(allowed, "a.md"));
   });
 
-  // 상한 3: 1MB 절단.
+  // bound 3: 1MB truncation.
   it("truncates at max_bytes and says so", async () => {
     await writeFile(join(allowed, "big.md"), "A".repeat(5000));
     const res = await handleIngestRead(
@@ -115,7 +115,7 @@ describe("handleIngestRead (A2 §3.2)", () => {
   });
 
   it("refuses a path outside allowed_roots", async () => {
-    await writeFile(join(outside, "a.md"), "본문");
+    await writeFile(join(outside, "a.md"), "body");
     await expect(
       handleIngestRead(
         { path: join(outside, "a.md"), max_bytes: 1000 },
@@ -154,9 +154,9 @@ describe("handleIngestRead (A2 §3.2)", () => {
   });
 });
 
-describe("createDispatcher — ingest 메서드가 더 이상 Phase B 게이트에 막히지 않는다", () => {
+describe("createDispatcher — ingest methods are no longer blocked by the Phase B gate", () => {
   it("routes ingest.scan to the handler", async () => {
-    await writeFile(join(allowed, "a.md"), "본문");
+    await writeFile(join(allowed, "a.md"), "body");
     const dispatch = createDispatcher({
       registry: { get: () => undefined } as never,
       adapters: new Map(),

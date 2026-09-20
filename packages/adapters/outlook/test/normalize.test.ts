@@ -54,6 +54,6 @@ describe("Outlook normalize()", () => {
     expect(normalize({ id: "x", conversationId: "c", "@removed": { reason: "deleted" } })).toEqual(
       [],
     );
-    expect(normalize({ id: "x" })).toEqual([]); // conversationId 없음
+    expect(normalize({ id: "x" })).toEqual([]); // no conversationId
   });
 });

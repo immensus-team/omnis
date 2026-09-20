@@ -1,5 +1,6 @@
 {
   "scenario": "korean_zwj_family_emoji_and_combining_marks",
+  "note": "Korean text mixed with ZWJ sequences, skin-tone modifiers, a regional indicator and combining marks — the Unicode input under test, kept verbatim.",
   "raw": {
     "kind": "calendar#event",
     "id": "evt_korean_zwj_emoji",

@@ -1,7 +1,7 @@
 import type { HostId, RuntimeKind } from "@omnis/protocol";
 import { HOST_DEFAULTS } from "./config.js";
 
-/** Phase A에 어댑터가 존재하는 런타임. hermes(Phase B)와 omnis(어댑터 없음)는 빠진다. */
+/** The runtimes that have an adapter in Phase A. hermes (Phase B) and omnis (no adapter) are left out. */
 export const PHASE_A_RUNTIMES: readonly RuntimeKind[] = ["claude_code", "codex", "claude_ds"];
 
 export interface HostProfile {
@@ -31,7 +31,7 @@ export function hostProfile(host: HostId): HostProfile {
   return HOST_PROFILES[host];
 }
 
-/** 이 호스트가 Phase A에 실제로 등록하는 런타임. */
+/** The runtimes this host actually registers in Phase A. */
 export function phaseARuntimesFor(host: HostId): RuntimeKind[] {
   return HOST_PROFILES[host].exposedRuntimes.filter((r) => PHASE_A_RUNTIMES.includes(r));
 }

@@ -15,14 +15,14 @@ export interface HubSinkDeps {
   session: SessionRecord;
   turnId: string;
   logger: Logger;
-  /** A2 §2.2: 끊겨 있는 동안 durable만 쌓는다. 없으면 durable도 버린다(테스트·시드용). */
+  /** A2 §2.2: while disconnected only durable events are queued. Without one, durable events are dropped too (for tests and seeding). */
   outbox?: Outbox;
   registry?: SessionRegistry;
 }
 
 /**
- * 어댑터의 EventSink → 허브 브리지 알림(A2 §3.3). 런타임 이벤트가 인박스 item이 되는 유일한
- * 프로덕션 경로다 — 여기서 쏜 것을 apps/hub/src/bridge.ts가 items에 쓴다.
+ * The adapter's EventSink → hub bridge notification (A2 §3.3). The only production path by which a
+ * runtime event becomes an inbox item — what is fired here is written into items by apps/hub/src/bridge.ts.
  */
 export function createHubSink(deps: HubSinkDeps): EventSink {
   const { client, logger, session, turnId } = deps;
@@ -38,16 +38,16 @@ export function createHubSink(deps: HubSinkDeps): EventSink {
     try {
       client.notify(method, params);
     } catch {
-      /* A2-D4: 델타는 저장도 재전송도 하지 않는다 */
+      /* A2-D4: deltas are neither stored nor resent */
     }
   };
 
   return {
     itemStarted: (e) => {
-      // ClaudeCodeAdapter는 session.registered와 health도 이 칸으로 흘린다(claude-code.ts의
-      // `sink.itemStarted(emit.params)`) — EventSink에 그 둘을 위한 칸이 없어서다. 모양으로 가른다.
-      // ponytail: 제대로 된 수리는 EventSink에 notify(method, params)를 더하는 것이지만
-      // 어댑터 2종 + 테스트 sink 3벌을 같이 고쳐야 한다. 실제로 세 번째 유사 이벤트가 생기면 그때.
+      // ClaudeCodeAdapter also funnels session.registered and health through this slot (the
+      // `sink.itemStarted(emit.params)` call in claude-code.ts) — EventSink has no slot for those two. It is split by shape.
+      // ponytail: the proper fix is adding notify(method, params) to EventSink, but that means touching
+      // 2 adapters + 3 test sinks at once. When a third similar event actually appears, do it then.
       if (typeof e.session_id === "string") {
         durable("session.registered", {
           runtime: session.runtime,
