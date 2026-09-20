@@ -2,6 +2,8 @@
   <img src="docs/assets/omnis-banner.png" alt="omnis — Inbox that works with you" width="100%">
 </p>
 
+# omnis 📯
+
 <p align="center">
   <a href="docs/spec/00-omnis-design.md">Design Spec</a> | <a href="docs/design/DESIGN-DIRECTION.md">Design Direction</a> | <a href="docs/superpowers/plans/README.md">Plans</a>
 </p>
