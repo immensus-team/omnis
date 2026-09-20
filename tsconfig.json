@@ -6,6 +6,9 @@
     { "path": "./packages/kernel" },
     { "path": "./apps/hub" },
     { "path": "./packages/agents" },
+    { "path": "./packages/adapters/slack" },
+    { "path": "./packages/adapters/gmail" },
+    { "path": "./packages/adapters/google-calendar" },
     { "path": "./apps/local-agent" }
   ]
 }
