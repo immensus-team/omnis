@@ -15,3 +15,7 @@ Channels (v1): Slack, Gmail, Outlook, Google Calendar, Telegram, WhatsApp, Kakao
 Topology now: a Mac mini hub over Tailscale, a macOS app (Tauri 2) and an iPhone client (PWA → native). Later: standalone on a MacBook + iPhone.
 
 The launch README with demos and architecture visuals is planned in `docs/spec/A8-readme-blueprint.md`.
+
+### Zero 동기화 (Phase A)
+
+`ops/zero-cache.env.example`을 복사해 값을 채우고 `pnpm dlx @rocicorp/zero@1.9.0 zero-cache --env-file ops/zero-cache.env`로 띄운다. 허브는 부팅 시 `zero_omnis` publication이 `packages/kernel/src/zero-schema.ts`와 일치하는지 검사하고, 어긋나면 기동을 거부한다.
