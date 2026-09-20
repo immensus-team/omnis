@@ -29,13 +29,16 @@ body {
 }
 
 body {
-  /* U1: warm off-white canvas with a faint grid/gradient behind it (DESIGN-DIRECTION.md, 23 §2,
-     measured approximation). Under data-theme="dark", tokens.css clears --canvas-grid to none and
-     the canvas becomes a plain flat colour. */
+  /* U1: warm off-white canvas with a faint grid behind it (DESIGN-DIRECTION.md, 23 §2, measured
+     approximation). Under data-theme="dark", tokens.css clears --canvas-grid to none and the canvas
+     becomes a plain flat colour.
+     US-D06 §1.3: the peach/mint radials are gone (monotone base), and with them the four-value
+     background-repeat list that was written against a four-layer image — what is left is a
+     two-layer image, so one value applies to all layers. */
   background-color: var(--bg-canvas);
   background-image: var(--canvas-grid);
   background-size: var(--canvas-grid-size);
-  background-repeat: repeat, repeat, no-repeat, no-repeat;
+  background-repeat: repeat;
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: 14px;
@@ -52,6 +55,29 @@ body {
   gap: 16px;
   padding: 16px;
   box-sizing: border-box;
+  /* US-D06 §1.3: the canvas film grain. It is a static painted pseudo-element on the non-scrolling
+     shell rather than a `position: fixed` blended layer over the viewport: a full-viewport
+     mix-blend-mode layer would force the compositor to re-blend on every scroll of the virtualized
+     inbox underneath it. `.app-shell` is height:100% and does not itself scroll (its children are the
+     scrollers), so this layer is painted once.
+     `isolation: isolate` is required, not decorative — without it the z-index:-1 child escapes behind
+     <body> and paints under the canvas. No mix-blend-mode in either theme: film grain is
+     bidirectional, so plain alpha reads correctly on both paper and ink and costs nothing. */
+  position: relative;
+  isolation: isolate;
+}
+
+.app-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--grain);
+  background-size: 160px 160px;
+  /* The 3.5% ceiling from ACCENT-DIRECTION §5.3 guard 2. If the noise is legible as texture rather
+     than felt as film, it is too strong. */
+  opacity: 0.035;
 }
 
 .app-shell--with-detail {
@@ -865,8 +891,12 @@ body {
   overflow: hidden;
 }
 
+/* US-D06 §1.4 row 7: this used to be `color: var(--accent)`. With a graphite accent a draft summary
+   came out the same weight as --text-secondary, i.e. indistinguishable from a normal summary. Italic
+   is banned for emphasis (SKILLS.md anti-slop item 4), so a draft reads darker and heavier instead. */
 .inbox-row__summary[data-draft="true"] {
-  color: var(--accent);
+  color: var(--text-primary);
+  font-weight: 500;
 }
 
 .inbox-row__chips {
@@ -1051,11 +1081,16 @@ body {
   font-size: 12px;
 }
 
+/* US-D06 §1.4 row 8: this is a text-only affordance whose only signal was the accent's hue. At
+   graphite it is plain body copy and reads as a label rather than a control, so the underline carries
+   the affordance instead of the colour. */
 .thread-screen__archived-banner button {
   border: none;
   background: none;
   padding: 0;
   color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
   font: inherit;
   cursor: pointer;
 }
@@ -1425,9 +1460,14 @@ body {
   color: var(--text-secondary);
 }
 
+/* US-D06 §1.4 row 9: this used to derive from --accent. At graphite, chroma 0.008 collapses to grey
+   and the pill becomes visually identical to [data-tone="neutral"] directly above it. It no longer
+   derives from the accent at all: info is distinguished from neutral by *shape* (outlined vs filled),
+   not by hue, which is the monotone-safe answer. */
 .status-pill[data-tone="info"] {
-  background: oklch(from var(--accent) 0.92 calc(c * 0.25) h);
-  color: oklch(from var(--accent) 0.44 c h);
+  background: transparent;
+  border: 1px solid var(--border-hairline-strong);
+  color: var(--text-primary);
 }
 
 /* The group-header pill (12px radius) and the row badge (999px capsule) differ in shape but share
@@ -1520,10 +1560,10 @@ body {
   overflow: hidden;
   padding-right: 2px;
   font-size: 12px;
-  /* There is exactly one tint grammar in this file — after the comment above .status-pill spends
-     a paragraph on color-mix's hue rotation, reaching for color-mix again here would leave the
-     next reader unsure which to believe. */
-  background: oklch(from var(--accent) 0.97 calc(c * 0.18) h);
+  /* US-D06 §1.4 row 11: this used to be `oklch(from var(--accent) 0.97 calc(c * 0.18) h)`, which at
+     graphite becomes L0.97 near-white on an L0.98 canvas — an invisible tint pretending to be one.
+     The chip's fill is a real surface token now. */
+  background: var(--bg-elevated);
 }
 .filter-chip__field,
 .filter-chip__value {

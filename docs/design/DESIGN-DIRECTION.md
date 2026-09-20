@@ -3,7 +3,7 @@
 **The baseline is kinso.** References: `reference/kinso-inbox.webp`, detailed teardown `../research/23-gap-kinso-visual-teardown.md`, OSS borrowing plan `../research/30-herdr-and-oss-ui-borrow.md`.
 
 ## What we follow as-is
-- **Light theme by default** (warm off-white canvas, subtle grid/gradient background). Dark is an option, and A5's "dark-first" is dropped.
+- **Light theme by default** (warm off-white canvas + faint grid + film grain; the peach/mint gradient wash is retired by the 2026-09-21 monotone directive — colour lives only on the three aurora surfaces in `ACCENT-DIRECTION.md`). Dark is an option, and A5's "dark-first" is dropped.
 - **Left channel rail**: vertical squircle tiles. Inbox tile at the top (black), channel brand icons below it (Gmail, Slack, LinkedIn, WhatsApp, Telegram, KakaoTalk, Outlook, Calendar), agent tile, collapse arrow. My avatar and settings at the bottom.
 - **Top "Start typing to ask or search" bar**: an input that keeps the ⌘K palette always visible. omnis orb (gradient bead) on the left, gradient stroke on focus.
 - **Inbox row = conversation (person) unit**: circular avatar + bold name + gray relative time (3m, 2w, 4 Aug) + **one-line AI summary** ("Wants you to share a sales contract from Brightstone Realty …") + fixed channel brand icon on the right. No hairlines, generous row height, only the selected row elevates into a white card + soft shadow.

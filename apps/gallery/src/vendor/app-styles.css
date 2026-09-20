@@ -4,23 +4,47 @@
    .approval-card, .tool-call-badge, .status-badge, cmdk's [cmdk-dialog]/[cmdk-item]/…)
    have to be copied here for the demos to render styled. If apps/desktop/src/app.css
    changes, re-copy the whole file below this comment — verbatim, do not hand-pick a
-   subset, or demos composing an unlisted selector will silently lose their styling. */
-/* 셸 레이아웃만. 색·타이포는 @omnis/ui/tokens.css의 토큰을 그대로 쓴다(A5 §1).
-   react-virtuoso는 스크롤러가 실제 높이를 가져야 한 행도 그리므로 여기서 높이 사슬을 잇는다. */
+/* Shell layout only. Colour and type come from @omnis/ui/tokens.css (A5 §1).
+   react-virtuoso needs its scroller to have a real height before it draws even one row, so the
+   height chain is joined here. */
 html,
-body,
+body {
+  height: 100%;
+  margin: 0;
+  /* There is deliberately no `overflow-x` on the root. `html, body { overflow-x: clip }` used to
+     sit here described as "belt and braces", and it was the opposite: it pins
+     `documentElement.scrollWidth` to `clientWidth`, which is the exact number every
+     no-horizontal-overflow guard in tools/e2e used to read — so all of them reported 0 whether or
+     not the page really overflowed (a probe with a 2000px child at 390px read 1610 without the
+     rule and 0 with it). The container queries below are what keep each tier inside its box; the
+     guards exist to catch the day one stops doing that, and they cannot do it if the root clips
+     the evidence away. tools/e2e/overflow.ts measures `body.scrollWidth` for the same reason. */
+}
+
+/* US-D02b: the shell responds to its own box, not the viewport — hence @container rather than
+   @media (the same shell has to keep its rules when it is embedded in a smaller webview frame).
+   `container-type: inline-size` makes #root a size container, and as a side effect applies layout
+   containment, which makes #root the containing block for fixed descendants. That is why the
+   `position: fixed` in the narrow tiers below (the detail sheet, the bottom bar) is placed against
+   #root rather than the viewport — here #root is the whole screen, so the two agree. */
 #root {
   height: 100%;
   margin: 0;
+  container-type: inline-size;
+  container-name: shell;
 }
 
 body {
-  /* U1: 따뜻한 오프화이트 캔버스 + 옅은 그리드/그라데이션 배경(DESIGN-DIRECTION.md, 23 §2 실측 근사).
-     다크 테마(data-theme="dark")에서는 tokens.css가 --canvas-grid를 none으로 지워 평범한 단색이 된다. */
+  /* U1: warm off-white canvas with a faint grid behind it (DESIGN-DIRECTION.md, 23 §2, measured
+     approximation). Under data-theme="dark", tokens.css clears --canvas-grid to none and the canvas
+     becomes a plain flat colour.
+     US-D06 §1.3: the peach/mint radials are gone (monotone base), and with them the four-value
+     background-repeat list that was written against a four-layer image — what is left is a
+     two-layer image, so one value applies to all layers. */
   background-color: var(--bg-canvas);
   background-image: var(--canvas-grid);
   background-size: var(--canvas-grid-size);
-  background-repeat: repeat, repeat, no-repeat, no-repeat;
+  background-repeat: repeat;
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: 14px;
@@ -29,13 +53,37 @@ body {
 
 .app-shell {
   display: grid;
-  /* kinso: 레일 + 메인 컬럼. 상세 패널은 열렸을 때만 세 번째 칼럼으로 붙는다(App.tsx). */
+  /* kinso: rail + main column. The detail pane only becomes a third column when it is open
+     (App.tsx). */
   grid-template-columns: 76px minmax(0, 1fr);
   align-items: stretch;
   height: 100%;
   gap: 16px;
   padding: 16px;
   box-sizing: border-box;
+  /* US-D06 §1.3: the canvas film grain. It is a static painted pseudo-element on the non-scrolling
+     shell rather than a `position: fixed` blended layer over the viewport: a full-viewport
+     mix-blend-mode layer would force the compositor to re-blend on every scroll of the virtualized
+     inbox underneath it. `.app-shell` is height:100% and does not itself scroll (its children are the
+     scrollers), so this layer is painted once.
+     `isolation: isolate` is required, not decorative — without it the z-index:-1 child escapes behind
+     <body> and paints under the canvas. No mix-blend-mode in either theme: film grain is
+     bidirectional, so plain alpha reads correctly on both paper and ink and costs nothing. */
+  position: relative;
+  isolation: isolate;
+}
+
+.app-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--grain);
+  background-size: 160px 160px;
+  /* The 3.5% ceiling from ACCENT-DIRECTION §5.3 guard 2. If the noise is legible as texture rather
+     than felt as film, it is too strong. */
+  opacity: 0.035;
 }
 
 .app-shell--with-detail {
@@ -50,8 +98,12 @@ body {
   padding: 12px 0;
 }
 
-/* kinso의 레일 타일은 캔버스가 아니라 흰 레일 플레이트 위에 얹혀 있다 — 이 플레이트가 없으면
-   --bg-elevated와 --bg-canvas의 명도차(1%)가 너무 작아 타일이 그냥 안 보인다. */
+/* kinso's rail tiles sit on a rail plate, not straight on the canvas — without the plate the 1%
+   lightness gap between --bg-elevated and --bg-canvas is too small for a tile to read at all.
+   US-D01: the `background: var(--bg-base)` + `box-shadow: var(--shadow-row-selected)` that used to
+   live here made the surface opaque again and killed the glass (app.css loads after tokens.css and
+   wins at equal specificity). Removing them brings .glass-surface's blur, tint and --shadow-glass
+   back — which is why nothing is re-declared here. What is left is the plate's own shape. */
 .channel-rail__plate {
   display: flex;
   flex-direction: column;
@@ -59,8 +111,6 @@ body {
   gap: 4px;
   padding: 8px 6px;
   border-radius: 22px;
-  background: var(--bg-base);
-  box-shadow: var(--shadow-row-selected);
 }
 
 .channel-rail__tile,
@@ -116,8 +166,60 @@ body {
   border-radius: 30%;
 }
 
+/* Account and Settings have no screen behind them yet. They are disabled rather than silently
+   inert, and they read as gated at the same 0.55 floor the ask panel's un-wired actions use — any
+   fainter and it stops looking gated and starts looking erased. */
+.channel-rail__avatar:disabled,
+.channel-rail__icon-button:disabled,
+.channel-rail__popover-row:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .channel-rail__spacer {
   flex: 1 1 auto;
+}
+
+/* US-D02b: the narrow shell's More popover — the tiles that did not fit in the bottom bar, plus
+   the avatar and settings. It is a floating panel, so it is glass (.glass-surface + the palette
+   slot come from the TSX). Rows are icon + text label: unlike the 44px bar tiles there is room for
+   words here. */
+.channel-rail__popover {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 176px;
+  padding: 6px;
+  /* The floating-surface radius (DESIGN-DIRECTION radius scale) — same value as the filter
+     popover. */
+  border-radius: 12px;
+}
+
+.channel-rail__popover-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* State on glass darkens rather than lightens — the same token .ask-panel__action uses. */
+.channel-rail__popover-row:hover {
+  background: var(--state-hover);
+}
+
+.channel-rail__popover-row svg {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
 }
 
 .app-shell__main {
@@ -127,12 +229,23 @@ body {
   min-height: 0;
 }
 
-/* U1 ask/search pill — CommandPalette mode="inline"이 렌더한다.
-   .glass-surface의 기본 hairline 보더 대신 흰 pill + 포커스 시 그라데이션 스트로크. */
+/* U1 ask/search pill — rendered by CommandPalette mode="inline".
+   A gradient stroke instead of .glass-surface's default hairline border (--ask-gradient on
+   focus). */
 .ask-bar {
   position: relative;
 }
 
+/* US-D01: the fill stays with .glass-surface (--bg-overlay + blur); this rule only gives shape.
+   The old two-layer "padding-box fill + border-box gradient" trick is gone — it only holds while
+   the fill is opaque, and the moment the fill became glass (78%) the border-box layer showed
+   through at 22%, so the gradient washed the whole ~820px pill instead of drawing a 1.5px stroke.
+   DESIGN-DIRECTION asks for a gradient *stroke* on focus, not a decorative wash — so the ::after
+   ring below owns the stroke by itself.
+   box-shadow is gone: .glass-surface's --shadow-glass already lifts the surface.
+   position + z-index: backdrop-filter creates a stacking context, so the model menu inside cannot
+   rise above the panel (z 5) on its own z-index — the pill itself has to stand above the panel for
+   the menu to cover it the way the reference does. */
 .ask-bar__pill {
   display: flex;
   align-items: center;
@@ -140,17 +253,32 @@ body {
   height: 44px;
   padding: 0 16px;
   border-radius: 999px;
-  border: 1.5px solid transparent;
-  background: linear-gradient(var(--bg-base), var(--bg-base)) padding-box,
-    linear-gradient(var(--border-hairline), var(--border-hairline)) border-box;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow: 0 1px 2px oklch(0 0 0 / 0.04);
+  position: relative;
+  z-index: 6;
 }
 
-.ask-bar__pill:focus-within {
-  background: linear-gradient(var(--bg-base), var(--bg-base)) padding-box, var(--ask-gradient)
-    border-box;
+/* A gradient ring that follows the rounded corner. border-image cannot follow border-radius and
+   outline cannot take a gradient — a 1.5px border with its inside masked out is what is left.
+   `inset: -1px` covers .glass-surface's own 1px hairline exactly, so the two lines do not double
+   up. */
+.ask-bar__pill::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 999px;
+  padding: 1.5px;
+  background: var(--ask-gradient);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-spring);
+  pointer-events: none;
+}
+
+.ask-bar__pill:focus-within::after {
+  opacity: 1;
 }
 
 .ask-bar__orb {
@@ -161,20 +289,318 @@ body {
   background: var(--ask-gradient);
 }
 
+/* min-width: 0 — without releasing an input's default min-content (about 20 characters), the bar
+   with its composer affordances pushes the viewport wider at 320px (the no-horizontal-scroll rule
+   on mobile). */
 .ask-bar__pill [cmdk-input] {
   padding: 0;
+  min-width: 0;
 }
 
-.ask-bar__dropdown {
+.ask-bar__chip {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Composer icon buttons (@ mention + attach) — in the reference the two stand side by side at the
+   same size and the same weight. */
+.ask-bar__composer-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.ask-bar__composer-button:not(:disabled):hover {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}
+
+/* 0.55 is the floor for a disabled signal (hallmark slop-test) — any fainter reads as broken UI
+   rather than a gated control. */
+.ask-bar__composer-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ask-bar__model {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.ask-bar__model-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ask-bar__model-toggle:hover {
+  color: var(--text-primary);
+}
+
+/* Deliberately opaque: stacking glass on glass (apple-design §12) collapses legibility. The model
+   dropdown in the reference (ref-glass-mail-ai-panel.webp) is clearly more opaque than its panel
+   too. */
+.ask-bar__model-menu {
   position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
+  top: calc(100% + 8px);
   right: 0;
-  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 168px;
+  padding: 4px;
+  border: var(--hairline);
   border-radius: 12px;
-  padding: 8px;
-  max-height: 320px;
+  background: var(--bg-base);
+  box-shadow: var(--shadow-glass);
+}
+
+.ask-bar__model-menu button {
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ask-bar__model-menu button:hover {
+  background: var(--bg-elevated);
+}
+
+.ask-bar__model-menu button[aria-pressed="true"] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* US-D01: the floating glass panel that unfolds under the ask bar (.glass-surface + the palette
+   slot). The reference's AI chat panel (ref-glass-mail-ai-panel.webp): anchored directly below the
+   bar, entering downward from it. */
+.ask-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  /* The reference's panel is a card standing under the orb, not a dropdown that eats the bar's
+     full width — stretched across the bar at 1440px it becomes a 4.4:1 empty band. */
+  width: min(420px, 100%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px;
+  border-radius: 20px;
+  /* The command-list tab can get long — capped here so the panel never outgrows the viewport. */
+  max-height: min(60vh, 420px);
   overflow-y: auto;
+  transform-origin: top left;
+  /* Spring entrance (320ms — the layer rung of DESIGN-DIRECTION's ladder, --ease-spring). Under
+     reduce the duration drops to the shared fade and the travelled transform is stripped by the
+     consolidated @media block at the end of this file (US-D04). */
+  animation: ask-panel-in var(--dur-panel) var(--ease-spring);
+}
+
+@keyframes ask-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* It leaves the way it arrived (apple-design §7, spatial consistency): the entrance path,
+   reversed. CommandPalette holds the panel in the DOM for --dur-panel (useClosingSpring). */
+.ask-panel--closing {
+  animation: ask-panel-out var(--dur-panel) var(--ease-spring) forwards;
+  pointer-events: none;
+}
+
+@keyframes ask-panel-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+}
+
+.ask-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 2px 8px;
+}
+
+.ask-panel__tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.ask-panel__tabs button {
+  border: 0;
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  /* US-D04: tab switch. The active tab is a filled pill that moves between segments, so the fill and
+     the label colour cross-fade over the entry rung (160ms) — the darker fill arriving while the
+     previous one leaves is what makes the switch read as one pill moving. */
+  transition: background var(--dur-base) var(--ease-spring), color var(--dur-base)
+    var(--ease-spring);
+}
+
+/* Laying --bg-base (L 0.99) over glass (--bg-overlay = --gray-000 at 78%, L≈0.988) leaves a 0.15%
+   lightness difference, so the state is invisible. State on glass darkens rather than lightens:
+   fills use --bg-elevated (L 0.97) and hover uses --state-hover (text colour at 6%). Both are
+   tokens that already exist. */
+.ask-panel__tabs button[aria-pressed="true"] {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.ask-panel__tabs button:not([aria-pressed="true"]):hover {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}
+
+.ask-panel__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.ask-panel__close:hover {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}
+
+.ask-panel__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ask-panel__action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ask-panel__action:not(:disabled):hover {
+  background: var(--state-hover);
+}
+
+/* An un-wired Phase B action does not pretend to be pressable — not-allowed cursor, disabled, and
+   a tag on the right. 0.55 is the floor for the fade (hallmark slop-test): below it the row stops
+   reading as a gated feature and starts reading as an erased screen. */
+.ask-panel__action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* So the row does not end after using 15% of its width — the reason it cannot be pressed is said
+   at the row's right edge. */
+.ask-panel__tag {
+  margin-left: auto;
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+.ask-panel__action svg {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+}
+
+/* The line that says what the panel is working on — the reference puts its conversation area
+   here. */
+.ask-panel__context {
+  margin: 0 0 8px;
+  padding: 10px 10px 11px;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+}
+
+.ask-panel__context-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  /* A long title must not stretch the panel (fixed 420px width). */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ask-panel__context-body {
+  margin: 3px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ask-panel__context-body--muted {
+  color: var(--text-tertiary);
 }
 
 .inbox-card {
@@ -186,12 +612,20 @@ body {
   border-radius: 20px;
   box-shadow: var(--shadow-row-selected);
   overflow: hidden;
+  /* US-D02b: a second container nested *inside* the shell (#root, container-name: shell). With
+     the detail pane open the list pane is narrower than the window, so "narrow" is measured
+     against this pane's own width, not the window's. The `@container list (…)` blocks below read
+     this — which is why their numbers need not match the shell breakpoints (560px means 560px of
+     pane). */
+  container-type: inline-size;
+  container-name: list;
 }
 
+/* US-D02b: the title line, and nothing else. The filter pills and the Archived toggle used to
+   share it, so at narrow widths the three fought each other (that is the screenshot where
+   "Archived" broke across two lines). The whole filter UI moved down into the single strip
+   below. */
 .inbox-card__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   padding: 14px 16px 8px;
 }
 
@@ -201,9 +635,55 @@ body {
   font-weight: 600;
 }
 
+/* US-D02b: the whole filter UI — radio pills, the Archived toggle and the label chips on one
+   line. Narrow does not wrap it, it **slides** (horizontal scroll). Every child is `flex: 0 0
+   auto`, so none of them shrinks or folds — folding is the original three-line bug.
+   The mask lets scrolled content fade out instead of being hard-clipped by the pane's rounded
+   corner (a scroll container's mask is anchored to its box, so the fade stays at the edges). */
+.inbox-card__filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  /* Scrolling is the behaviour; a scrollbar is not part of this screen's grammar — no grey bar
+     under the chip row. */
+  scrollbar-width: none;
+  /* `overflow-x: auto` forces the computed `overflow-y` to `auto` as well, so anything drawn
+     outside a child's box — a focus ring above all — is clipped by this 40px strip. The vertical
+     padding is that ring's room: 4px above and 6px below clears `outline-offset: 1px` + a 2px
+     outline while the strip stays within its 40px budget. */
+  padding: 4px 16px 6px;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 16px,
+    black calc(100% - 16px),
+    transparent
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 16px,
+    black calc(100% - 16px),
+    transparent
+  );
+}
+
+.inbox-card__filter-row::-webkit-scrollbar {
+  display: none;
+}
+
+/* The filter row now owns the chip bar's outer spacing, so inside it the bar's own padding is
+   reset to 0 — the component's default padding is left alone because other screens use it. */
+.inbox-card__filter-row .filter-chip-bar {
+  padding: 0;
+}
+
 .inbox-card__pills {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex: 0 0 auto;
   gap: 4px;
 }
 
@@ -225,6 +705,9 @@ body {
 }
 
 .inbox-card__archived-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: var(--hairline);
   border-radius: 999px;
   padding: 1px 8px;
@@ -233,6 +716,20 @@ body {
   font: inherit;
   font-size: 11px;
   cursor: pointer;
+  /* Same as the filter row's other children — this button does not shrink as the pane does. */
+  flex: 0 0 auto;
+}
+
+/* Keyboard focus was indistinguishable from hover across this strip: the chips only swapped in
+   `--state-hover`, which is the hover value, and the view pills and the Archived toggle had no
+   focus treatment at all. One ring, one offset, every control in the strip — `--accent` is the
+   only colour in the row that hover never uses. */
+.inbox-card__pills button:focus-visible,
+.inbox-card__archived-pill:focus-visible,
+.inbox-card__filter-row .filter-chip button:focus-visible,
+.inbox-card__filter-row .filter-chip-bar__add:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .inbox-card__archived-pill[aria-pressed="true"] {
@@ -241,27 +738,51 @@ body {
   border-color: transparent;
 }
 
-/* U2: kinso 대화 행 — 아바타 | (이름·시간 / 요약·칩) | (채널아이콘 또는 상태배지). 3칼럼×2행 그리드,
-   우측 슬롯은 두 행에 걸쳐 세로 중앙 정렬(kinso 실측 — 행 전체 기준 우측 끝 고정, 23 §2). */
+/* The icon stands in for the word only in a narrow pane (@container list below) — wide keeps the
+   word alone. */
+.inbox-card__archived-icon {
+  display: none;
+}
+
+/* U2: the kinso conversation row — avatar | (name·time / summary·chips) | (channel mark or status
+   badge). A 3-column x 2-row grid whose right slot spans both rows and centres vertically
+   (measured from kinso — pinned to the row's right edge, 23 §2). */
 .inbox-row {
   display: grid;
-  grid-template-columns: 40px 1fr auto;
+  /* US-D02b: the middle column must be minmax(0, 1fr) — a bare 1fr has a min-content minimum, so
+     a long title widens the row (horizontal scroll) and wraps to two lines instead of
+     ellipsizing. That one word is most of this fix. */
+  grid-template-columns: 40px minmax(0, 1fr) auto;
   grid-template-rows: auto auto;
   column-gap: 12px;
   row-gap: 4px;
   align-items: center;
-  /* U1/U2/U5: 넉넉한 행 높이 — kinso는 10px보다 훨씬 여유 있는 패딩으로 밀도를 낮춘다.
-     P1(kinso polish): 12px 세로 리듬으로 맞춘다(DESIGN-DIRECTION P1). */
-  padding: 12px 16px;
-  /* 헤어라인 구분선을 뺀다(23 §2 — kinso는 padding만으로 행을 나눈다).
-     선택된 행만 .inbox-row--selected의 카드+그림자로 구분된다. */
+  /* U1/U2/U5: generous row height — kinso lowers density with padding well beyond 10px.
+     P1 (kinso polish): settled on a 12px vertical rhythm (DESIGN-DIRECTION P1).
+     US-D04: the vertical half is a named value because the archive collapse has to take the padding
+     down with the height — the row is border-box, so a row at `height: 0` with 12px padding still
+     occupies 24px and the list closes over a 24px hole. Declared once here, read once in
+     @keyframes inbox-row-leave below. */
+  --row-pad-y: 12px;
+  padding: var(--row-pad-y) 16px;
+  /* No hairline separators (23 §2 — kinso divides rows with padding alone). Only the selected row
+     is set apart, by .inbox-row--selected's card and shadow. */
   cursor: pointer;
+  /* US-D04: the selection elevation. A row does not blink into a card — the fill, the radius and
+     the shadow travel together over the entry rung (160ms, --dur-base) so pointing at a row and
+     choosing it read as the same gesture finishing rather than two different states.
+     These three are the properties .inbox-row:hover and .inbox-row--selected already set, named
+     one per line; the shorthand `transition: all` would also sweep up the leaving row's height and
+     padding, and the two animations would fight over the property. */
+  transition: background var(--dur-base) var(--ease-spring), border-radius var(--dur-base)
+    var(--ease-spring), box-shadow var(--dur-base) var(--ease-spring);
 }
 
 .inbox-row--selected {
   background: var(--bg-base);
-  /* P1: kinso는 선택 카드 라운드가 얕다(8px) — 이전 14px은 다른 카드류(inbox-card 20px,
-     channel-rail__plate 22px)에 맞춰 너무 컸다. */
+  /* P1: kinso's selection card has a shallow radius (8px) — the previous 14px was sized against
+     the other cards (inbox-card 20px, channel-rail__plate 22px) and was far too large for a
+     row. */
   border-radius: 8px;
   box-shadow: var(--shadow-row-selected);
 }
@@ -286,7 +807,8 @@ body {
 .inbox-row__avatar--runtime {
   background: var(--gray-950, #14141a);
   color: var(--gray-000, #fff);
-  /* P1: 사람 아바타(원)와 구분되는 "런타임 로고 타일" — channel-rail 타일과 같은 스쿼클. */
+  /* P1: a runtime logo tile, told apart from a person's circular avatar by shape — the same
+     squircle the channel-rail tiles use. */
   border-radius: 30%;
 }
 
@@ -302,13 +824,26 @@ body {
   display: flex;
   align-items: baseline;
   gap: 6px;
+  /* A flex item's default min-width is auto — without this line the name refuses to shrink and
+     widens the meta line, which pushes the row out (both the two-line title and the drifting time
+     start here). */
+  min-width: 0;
 }
 
 .inbox-row__name {
-  /* P1: kinso 이름은 15px semibold(DESIGN-DIRECTION P1) — unread는 그보다 한 단계 더 굵게
-     구분한다(U2 결정 유지, kinso 자체엔 안읽음 개념이 없어 omnis가 얹은 것). */
+  /* P1: kinso's name is 15px semibold (DESIGN-DIRECTION P1) — unread goes one weight heavier
+     (the U2 decision, kept: kinso has no unread concept, this is omnis's addition). */
   font-size: 15px;
   font-weight: 600;
+  /* The name is what shrinks, not the time — and when it does it ends in an ellipsis rather than
+     wrapping to a second line. It must not *grow*: growing pushes the time to the far end of the
+     row, which is the arrangement POLISH-LOG recorded removing (kinso sets the time next to the
+     name: "Natasha Corwin 3m"). */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .inbox-row__name[data-unread="true"] {
@@ -324,15 +859,25 @@ body {
 }
 
 .inbox-row__timestamp {
-  /* P1: kinso는 시간을 이름 바로 뒤에 붙인다("Natasha Corwin 3m") — 행 끝까지 미는
-     margin-left:auto는 예전(U2) 추정이었고 실측(kinso-inbox.webp)과 달랐다. */
+  /* The time sits right after the name, as POLISH-LOG (2026-09-20) decided and the kinso reference
+     shows; the far-right column holds only the brand mark. The drift this story reported came from
+     titles wrapping to two lines, which `minmax(0, 1fr)` + the ellipsis above fixed at the source —
+     pushing the time to the row's end was treating the symptom. `tabular-nums` and the min-width
+     keep "3m" and "4 Aug" from re-measuring the gap on every row. */
   color: var(--text-secondary);
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+  min-width: 32px;
 }
 
 .inbox-row__summary-line {
   grid-row: 2;
-  grid-column: 2 / span 2;
+  /* Column 3 belongs to .inbox-row__side alone (it is grid-row 1 / span 2 with align center, so
+     its lower half lands exactly over this line). Spilling to `2 / span 2` here buries the label
+     chips under the channel mark, the approval dot and the archive button — the spot that had
+     been broken ever since US-A33. The chips end in column 2. */
+  grid-column: 2;
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -343,13 +888,21 @@ body {
   flex: 1 1 auto;
   min-width: 0;
   color: var(--text-secondary);
+  /* US-D02b: the AI summary really does use two lines — clamped to one it breaks mid-sentence and
+     stops being readable. In a narrow pane (479.98px and below) it drops back to one line (see
+     @container list further down). */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
+/* US-D06 §1.4 row 7: this used to be `color: var(--accent)`. With a graphite accent a draft summary
+   came out the same weight as --text-secondary, i.e. indistinguishable from a normal summary. Italic
+   is banned for emphasis (SKILLS.md anti-slop item 4), so a draft reads darker and heavier instead. */
 .inbox-row__summary[data-draft="true"] {
-  color: var(--accent);
+  color: var(--text-primary);
+  font-weight: 500;
 }
 
 .inbox-row__chips {
@@ -365,6 +918,9 @@ body {
   align-items: center;
   gap: 6px;
   justify-self: end;
+  /* The hover-only Archive/Restore button is absolute inside this slot (see
+     .inbox-row__action) — this is its containing block. */
+  position: relative;
 }
 
 .inbox-row__channel-icon {
@@ -376,8 +932,22 @@ body {
   color: var(--text-secondary);
 }
 
-/* US-A36: 보관/되살리기는 hover(와 키보드 포커스) 때만 나타난다 — 행이 늘 버튼을 이고 있지 않는다. */
+/* US-A36: archive/restore appears on hover (and keyboard focus) only — a row does not carry a
+   button at all times.
+   US-D02b: it is taken out of flow as well as faded. `opacity: 0` alone still laid the button
+   out, so column 3 (`auto`) was sized to include it and every row paid ~65px of its width for a
+   control nobody could see — width the title and the summary only get back here. Absolute inside
+   `.inbox-row__side` means the grid column is sized by the brand mark alone; the pill floats over
+   the mark's end of the row while hovered, which is legible because it carries `--bg-base` over
+   the row's `--state-hover` fill. `pointer-events` rides along with `opacity` so the invisible
+   pill is not a click target — this also keeps it reachable by keyboard, which `display: none`
+   would not (a display:none button is not focusable, so the row's `:focus-within` rule could
+   never fire). The narrow tier still switches it off entirely; see the <900px block. */
 .inbox-row__action {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
   border: var(--hairline);
   border-radius: 999px;
   padding: 1px 8px;
@@ -387,11 +957,65 @@ body {
   font-size: 11px;
   cursor: pointer;
   opacity: 0;
+  pointer-events: none;
+}
+
+/* US-D02: the row's own hover fill. What shows that the 400ms hover card came out of *this* row
+   is the row, not the card — without a fill the card looks anchored to nothing. The fill is the
+   same --state-hover every other interactive element on this screen uses, and the radius is the
+   selected row's 8px exactly: the row must not change shape between pointing at it and choosing
+   it. The fill does the distinguishing, not the shape (hover = grey fill / selected = white card
+   + shadow). */
+.inbox-row:hover {
+  background: var(--state-hover);
+  border-radius: 8px;
+}
+
+/* The selected row already floats as a white card with a shadow (.inbox-row--selected) — laying a
+   grey fill over it only muddies the selection. */
+.inbox-row--selected:hover {
+  background: var(--bg-base);
+}
+
+/* US-D04: an archived row leaves by collapsing, not by disappearing. Without this the row is gone
+   on the frame the click lands: `pendingArchive` filters it out of the list and there is nothing
+   left to animate, so the rows below jump up by one row's height with no explanation of where the
+   row went. Inbox.tsx holds the row in the list for --dur-move (motion.ts's LEAVE_MS) while this
+   runs, then lets it go.
+   Height is a measured pixel value, not `auto`: `height: auto` cannot interpolate without
+   `interpolate-size: allow-keywords`, which macOS's WKWebView does not ship — inbox-row.tsx writes
+   --row-collapse-h from getBoundingClientRect() the moment `leaving` turns on. Padding collapses
+   with it (see the note on --row-pad-y above) and overflow clips the grid rows as they fold. */
+.inbox-row--leaving {
+  height: var(--row-collapse-h, auto);
+  overflow: hidden;
+  /* The row is still in the list but is no longer a thing to press — pointer-events is switched off
+     on the same frame the archive click lands, so a second click during the 240ms cannot re-archive
+     or re-open what is already on its way out. */
+  pointer-events: none;
+  will-change: height, opacity;
+  animation: inbox-row-leave var(--dur-move) var(--ease-spring) forwards;
+}
+
+@keyframes inbox-row-leave {
+  from {
+    opacity: 1;
+    height: var(--row-collapse-h);
+    padding-top: var(--row-pad-y);
+    padding-bottom: var(--row-pad-y);
+  }
+  to {
+    opacity: 0;
+    height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
 }
 
 .inbox-row:hover .inbox-row__action,
 .inbox-row:focus-within .inbox-row__action {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .inbox-row__approval-dot {
@@ -411,8 +1035,19 @@ body {
   white-space: nowrap;
 }
 
-/* P1: 상태 배지는 라벨 칩(outline)과 달리 "soft pill" — 테두리 대신 은은한 채운 배경
-   (DESIGN-DIRECTION P1). blocked만 accent 톤으로 눈에 띄게(herdr "내가 봐야 함" 신호). */
+/* US-D02b: label names are written by the user — a cap keeps one long name from pushing the chip
+   line out (how many chips to show is already decided in JS by inbox-row.tsx's pickChips: two plus
+   "+N"). */
+.inbox-row__chip {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* P1: unlike the outlined label chips, the status badge is a soft pill — a faint filled
+   background instead of a border (DESIGN-DIRECTION P1). Only `blocked` takes a tone colour, as
+   herdr's "this one is mine to look at" signal — and that colour comes from the shared
+   .status-pill[data-tone="warning"] rule rather than from here (one state, one colour). */
 .status-badge {
   border: 0;
   border-radius: 999px;
@@ -421,11 +1056,6 @@ body {
   color: var(--text-secondary);
   background: var(--bg-elevated);
   white-space: nowrap;
-}
-
-.status-badge--agent[data-agent-state="blocked"] {
-  color: var(--accent);
-  background: color-mix(in oklch, var(--accent) 16%, var(--bg-elevated));
 }
 
 .app-shell__detail {
@@ -444,7 +1074,7 @@ body {
   margin-bottom: 12px;
 }
 
-/* US-A36 / A5 §3.8: 오프라인 배너와 같은 톤의 상단 고정 바. */
+/* US-A36 / A5 §3.8: a pinned top bar in the same tone as the offline banner. */
 .thread-screen__archived-banner {
   display: flex;
   align-items: center;
@@ -457,11 +1087,16 @@ body {
   font-size: 12px;
 }
 
+/* US-D06 §1.4 row 8: this is a text-only affordance whose only signal was the accent's hue. At
+   graphite it is plain body copy and reads as a label rather than a control, so the underline carries
+   the affordance instead of the colour. */
 .thread-screen__archived-banner button {
   border: none;
   background: none;
   padding: 0;
   color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
   font: inherit;
   cursor: pointer;
 }
@@ -505,8 +1140,227 @@ body {
   cursor: pointer;
 }
 
-/* cmdk의 Command.Dialog는 스타일이 없는 채로 문서 끝에 붙는다 — 셸이 띄우는 오버레이이므로
-   위치만 여기서 잡는다(칩·유리 표면 등 시각 토큰은 @omnis/ui가 계속 소유한다). */
+/* US-D03 — the approval stack. It used to be a wall: every pending approval drew the identical
+   12px-radius card with the identical four buttons, so three of them read as one object repeated
+   and the eye had nowhere to land. Now one approval is the expanded card (elevated, so it is
+   visibly the surface you are working on) and the rest are one-line rows under a count. */
+.approval-stack {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+}
+
+/* The elevation is the same decision the selected inbox row makes (only the selected thing
+   elevates) — the card lifts off the pane, the rows stay flat on it. */
+.approval-stack__card {
+  border-radius: 12px;
+  box-shadow: var(--shadow-row-selected);
+}
+
+.approval-stack__header {
+  margin: 14px 0 6px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  /* The caption scale of the typography pass, and the one place a letterfit is doing real work:
+     12px is where an untracked label starts to close up. */
+  letter-spacing: 0.02em;
+}
+
+.approval-stack__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* A collapsed row is still a button — it promotes itself to the expanded card — but it does not
+   wear a card's clothes until it is the one being looked at. */
+.approval-stack__row:hover {
+  background: var(--state-hover);
+}
+
+.approval-stack__row-action {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.approval-stack__row-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.approval-stack__risk {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 1px 7px;
+  background: color-mix(in oklch, var(--danger-500) 18%, transparent);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+/* ---- the thread detail header (ref-dashboard-detail-card.webp's title + subline + toggles) ---- */
+.thread-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.thread-header__main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.thread-header__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  /* A title that is a sentence (a mail subject) is clipped, not wrapped to four lines — the
+     subline and the segments below it are what the header is for. */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.thread-header__subline {
+  margin: 3px 0 0;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  /* The channel · people · time line. It can get long at a narrow width, so it wraps rather than
+     forcing the pane to scroll sideways. */
+  overflow-wrap: anywhere;
+}
+
+/* The right-aligned icon actions. Ghost buttons: they are secondary to the title, and an outlined
+   row of three at the top of the pane would read as a toolbar rather than as actions on this
+   thread. */
+.thread-header__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+}
+
+.thread-header__action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.thread-header__action:hover {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}
+
+.thread-header__action[aria-pressed="true"] {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+/* The panel the Label and More actions disclose: the thread's labels and the thread's own facts,
+   inline under the header rather than in a popover floating over the thing being described. Two
+   closures of the same kind, so one container with a gap between them. */
+.thread-header__labels {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+/* The segments sit under the title/subline as their own row (the reference puts "Price | PPSF" on
+   the line below the title, not beside it). */
+.thread-header__segments {
+  margin-bottom: 14px;
+}
+
+.segmented-control {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+}
+
+.segmented-control__segment {
+  border: none;
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  /* US-D04: the detail pane's tab switch (Conversation / Summary / Notes). Same treatment as the ask
+     panel's tabs — the inverted pill cross-fades between segments over the entry rung (160ms)
+     rather than appearing and disappearing. */
+  transition: background var(--dur-base) var(--ease-spring), color var(--dur-base)
+    var(--ease-spring);
+}
+
+/* The active segment is the inverted black pill — the same "this one is selected" move the rail's
+   Inbox tile makes (--gray-950 tile, --gray-000 mark), so selection looks the same wherever it
+   appears. */
+.segmented-control__segment[aria-checked="true"] {
+  background: var(--gray-950, #14141a);
+  color: var(--gray-000, #fff);
+  font-weight: 600;
+}
+
+/* The Summary and Notes panels: prose, at the body size of the 15/13/12 scale, on the pane's own
+   background — no card, because a card here would be a container around a paragraph. */
+.thread-panel {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.thread-panel__empty {
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.thread-panel__note {
+  margin-bottom: 12px;
+}
+
+.thread-panel__note-time {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+/* The thread's own facts (the "More details" disclosure) are the same KeyValueTable as everything
+   else rather than a second way of printing a fact list — the disclosure is inline under the
+   header, so it needs no surface of its own. */
+
+/* cmdk's Command.Dialog attaches unstyled at the end of the document — it is an overlay the shell
+   raises, so only its position is set here (@omnis/ui keeps owning the visual tokens: chips, glass
+   surfaces and the rest). */
 [cmdk-overlay] {
   position: fixed;
   inset: 0;
@@ -553,4 +1407,790 @@ body {
 
 [cmdk-item][data-selected="true"] {
   background: var(--bg-elevated);
+}
+
+/* US-D02: the tinted pill for group headers and filters in a dense list — measured from
+   ref-issue-tracker-density.webp (28px tall, 12px radius, 13px/590 label, leading 8px dot,
+   trailing count in grey).
+   In the reference the status pill is a full capsule and the filter chip is a bordered rounded
+   rect (an older comment here had the two the wrong way round — the pixels were fine, but this is
+   the record the next person reads, so it is corrected). The 12px radius comes from the brief's
+   measured spec (28px/12px/13px) rather than from the reference, and doubles as a reason not to
+   share a shape with .status-badge's 999px capsule.
+   The count is a separate grey chip outside the pill (.group-header__count) — the reference takes
+   the number out of the pill too. Flat: no border, no shadow, as in the reference.
+   Both the tone background and the label are built with relative colour syntax
+   (oklch(from … L c h)) rather than color-mix. `color-mix(in oklch, tone, --bg-elevated)`
+   interpolates the hue angle as well and spins the hue: --bg-elevated sits at h260, so warn (h80)
+   is exactly 180 degrees away and lands on cyan, while danger (h25) and success (h150) are pulled
+   toward magenta and blue (measured: all four tone tints came out as #d?e?f? blues). Contrast
+   still passes at 7:1, so it is the kind of bug the numbers alone never catch. Relative colour
+   syntax inherits h untouched, so a tint only raises L and lowers chroma, and a label only lowers
+   L. The label's L=0.44 is there because the raw tone values (accent L0.62, warn L0.75) sit at
+   2.4:1 on their own tint, which 13px text cannot carry — measured 5.5–6.4:1, past WCAG AA
+   (4.5:1). */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 590;
+  white-space: nowrap;
+  /* US-D04: a pill's tone is a state change, not a repaint. When a session goes working -> blocked
+     the tint and the dot cross-fade over the entry rung (160ms) instead of snapping between two
+     colours — the same "one state, one colour" rule the tone selectors below enforce, now with the
+     change animated. */
+  transition: background var(--dur-base) var(--ease-spring), color var(--dur-base)
+    var(--ease-spring);
+}
+
+.status-pill__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: 0 0 auto;
+}
+
+/* ponytail: no data-theme="dark" override — light is this project's decision
+   (DESIGN-DIRECTION.md) and nothing sets data-theme="dark" yet (tokens.css only holds the block).
+   On the day dark actually turns on, the four tone labels land at L0.4 against an L0.25 tint,
+   which is 1.8:1, so add
+   `:root[data-theme="dark"] .status-pill[data-tone="…"] { color: oklch(from currentColor 0.8 c h); }`
+   four times below, one per tone. */
+.status-pill[data-tone="neutral"] {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+/* US-D06 §1.4 row 9: this used to derive from --accent. At graphite, chroma 0.008 collapses to grey
+   and the pill becomes visually identical to [data-tone="neutral"] directly above it. It no longer
+   derives from the accent at all: info is distinguished from neutral by *shape* (outlined vs filled),
+   not by hue, which is the monotone-safe answer. */
+.status-pill[data-tone="info"] {
+  background: transparent;
+  border: 1px solid var(--border-hairline-strong);
+  color: var(--text-primary);
+}
+
+/* The group-header pill (12px radius) and the row badge (999px capsule) differ in shape but share
+   **one colour**: the same "needs approval" reading red in a header and blue in a row 700px to its
+   right was the second round's rejection. Two selectors, one set of values — a single rule cannot
+   diverge. Why `blocked` is a warning tone is explained in status-pill.tsx's AGENT_META comment
+   (it means "your turn", not "error"). */
+.status-pill[data-tone="warning"],
+.status-badge--agent[data-agent-state="blocked"] {
+  background: oklch(from var(--warn-500) 0.92 calc(c * 0.25) h);
+  color: oklch(from var(--warn-500) 0.44 c h);
+}
+
+.status-pill[data-tone="danger"] {
+  background: oklch(from var(--danger-500) 0.92 calc(c * 0.25) h);
+  color: oklch(from var(--danger-500) 0.44 c h);
+}
+
+.status-pill[data-tone="success"] {
+  background: oklch(from var(--success-500) 0.92 calc(c * 0.25) h);
+  color: oklch(from var(--success-500) 0.44 c h);
+}
+
+/* US-D02: the number inside the needs-approval tab pill. Why it lives here rather than in a group
+   header is in Inbox.tsx's `grouped` comment (this view queries only pending, so there is always
+   exactly one group). Inside a tab it has nothing to shift against, so it needs no tabular-nums,
+   and it inherits the current label colour instead of going grey so it reads as part of the
+   tab. */
+.inbox-card__pill-count {
+  margin-left: 5px;
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+}
+
+/* US-D02: the Agents view's per-state group header (ref-issue-tracker-density.webp, "In review 6
+   +"). The asymmetric vertical padding (10/6) is deliberate — the header has to look attached to
+   the rows below it, not the ones above, to read as that group's label. No card chrome (border,
+   background, shadow): a header is list grammar, not another surface, which also rules out an
+   accent ribbon such as a tone-coloured left stripe (the pill already says the state). */
+.group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* 20px above, 6px below. Pressed against the filter chip row, the header reads as a fourth
+     filter chip — the space above has to beat the row gap (12px) to signal that the previous
+     group ended. */
+  padding: 20px 16px 6px;
+}
+
+/* The [6] in the reference's "In review [6] +" — a neutral grey chip outside the pill. The pill
+   spends the tone colour; the number only carries density. */
+.group-header__count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  text-align: center;
+}
+
+/* US-D02: the filter chip bar — directly under the list header, laid over the rows. A chip is not
+   a capsule (999px) but a bordered rect with an 8px radius that keeps its corners, exactly as in
+   ref-issue-tracker-density.webp. Shape and fill both differ from the status pill (tint only, no
+   border) so the two grammars never blur together.
+   The reference's chip is split into cells with alternating fills — that structure is carried over
+   into two cells (why two and not three is in filter-chip-bar.tsx's comment). */
+.filter-chip-bar {
+  display: flex;
+  /* US-D02b: in the inbox this bar is a child of the horizontally scrolling filter row, so it
+     must not wrap — the moment it does, the three-line chip pile is back. Other screens use the
+     same bar, and sliding beats wrapping there too when width runs out (the reference's filter
+     DSL is one line as well). */
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px 10px;
+  flex: 0 0 auto;
+}
+.filter-chip {
+  display: inline-flex;
+  align-items: stretch;
+  flex: 0 0 auto;
+  height: 28px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  /* Cells are clipped to the chip's rounded corner rather than each carrying its own radius. */
+  overflow: hidden;
+  padding-right: 2px;
+  font-size: 12px;
+  /* US-D06 §1.4 row 11: this used to be `oklch(from var(--accent) 0.97 calc(c * 0.18) h)`, which at
+     graphite becomes L0.97 near-white on an L0.98 canvas — an invisible tint pretending to be one.
+     The chip's fill is a real surface token now. */
+  background: var(--bg-elevated);
+}
+.filter-chip__field,
+.filter-chip__value {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+}
+/* The pale cell = what is being filtered on (the constant). In the reference this is the slot
+   `is any of` occupied. */
+.filter-chip__field {
+  background: var(--bg-base);
+  color: var(--text-secondary);
+}
+/* The tinted cell = what it is filtered to (the value). It reuses the chip background, so no fill
+   is declared again. */
+.filter-chip__value {
+  color: var(--text-primary);
+}
+.filter-chip button {
+  border: none;
+  background: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* The painted area is 20px — inside a 28px chip that leaves 3px above and below so it never
+     touches the border (28 chip − 2 border − 20 paint = 3px x 2). Only the pointer target is
+     widened, to 28x28, by ::after. */
+  width: 20px;
+  height: 20px;
+  align-self: center;
+  margin-left: 2px;
+  position: relative;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 1;
+  font-size: 13px;
+  transition: background var(--dur-base) var(--ease-spring), color var(--dur-base)
+    var(--ease-spring);
+}
+.filter-chip button::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+}
+.filter-chip button:hover,
+.filter-chip button:focus-visible {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}
+.filter-chip button:active {
+  transform: scale(0.9);
+}
+.filter-chip-bar__add {
+  /* "+" and the label word as one unit — when the word goes in a narrow pane, the "+" stays. */
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: var(--hairline);
+  border-radius: 8px;
+  padding: 3px 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background var(--dur-base) var(--ease-spring), color var(--dur-base)
+    var(--ease-spring);
+}
+.filter-chip-bar__add:hover,
+.filter-chip-bar__add:focus-visible {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}
+.filter-chip-bar__add:active {
+  transform: scale(0.97);
+}
+/* The chip-editing popover is a floating panel, so it is glass (.glass-surface). Only its width
+   is set here. */
+.filter-chip-popover {
+  width: 240px;
+  border-radius: 12px;
+  padding: 6px;
+}
+/* [cmdk-item]'s default layout is built for the palette (name left, shortcut right,
+   space-between). Here the check mark and the label both belong on the left, so it is overridden
+   inside this popover only — the palette keeps its own. */
+.filter-chip-popover [cmdk-item] {
+  justify-content: flex-start;
+  gap: 8px;
+}
+/* The reference's filter-popover input: a magnifier, and one hairline underneath separating it
+   from the list. */
+.filter-chip-popover__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px 6px;
+  margin-bottom: 4px;
+  border-bottom: var(--hairline);
+  color: var(--text-tertiary);
+}
+.filter-chip-popover__search svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.filter-chip-popover__search [cmdk-input] {
+  /* [cmdk-input]'s default 8px padding is sized for the palette's width — in a 240px popover it
+     opens a gap between the magnifier and the placeholder, and the two stop reading as one field.
+     Only the horizontal padding is reset. */
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 0;
+}
+.filter-chip-popover__check {
+  width: 12px;
+  color: var(--accent);
+  font-size: 12px;
+}
+
+/* US-D02: the inbox row's hover card. A floating panel, so it wears the glass surface (the TSX
+   supplies .glass-surface). Its density follows the reference (the lower-left card in
+   ref-issue-tracker-density.webp): a compact card of a title plus a few key-value lines, not a
+   detail pane. */
+.row-hover-card {
+  /* US-D03: the card's body is a PersonCard now (avatar + badge row + key-value table), so it is
+     a little wider than the four-line <dl> it used to hold — at 220px the table's label and value
+     columns had nowhere to sit. */
+  min-width: 240px;
+  max-width: 300px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  /* The card appears to the row's right, so it grows from the corner nearest its trigger and
+     looks as though it came out of the row (apple-design §7, spatial consistency: a floating
+     thing starts at its trigger). Radix fills this variable from the trigger's position and its
+     collision handling, so the origin flips when the side does — the fallback is the
+     side="right" value. */
+  transform-origin: var(--radix-hover-card-content-transform-origin, left center);
+}
+/* The entrance is the same set the ask panel uses (@keyframes + --dur-panel + --ease-spring) —
+   this repo does not grow a different grammar per floating panel. Radix Popper keeps an inline
+   `animation: none` on the element until it has been placed, so this animation only starts once
+   the position is settled (Radix's own guard against a panel flying in from the wrong side). Under
+   reduce both states fall back to the shared fade pair (US-D04, end of file) — and they stay two
+   *different* names, which is what Radix Presence keys its unmount on. */
+.row-hover-card[data-state="open"] {
+  animation: row-hover-card-in var(--dur-panel) var(--ease-spring);
+}
+
+@keyframes row-hover-card-in {
+  from {
+    opacity: 0;
+    /* The ask panel drops 6px from above; this card comes in from the row's right — the same
+       6px/0.98, with only the axis turned to match the direction of travel (§7: it leaves the way
+       it arrived). */
+    transform: translateX(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The exit retraces the entrance (apple-design §7 — it leaves the way it arrived). Unlike the ask
+   panel this needs no JS spring hook (useClosingSpring): Radix Presence holds the node and
+   unmounts it on animationend. That decision is made from a **change in the computed
+   animation-name**, so the closed state must carry a different name (row-hover-card-out) from the
+   open one — with the same name Presence sees "nothing changed" and unmounts immediately, with no
+   animation. fill-mode is left alone here because Presence manages it.
+   (Before placement, Radix Popper's inline `animation: none` means Presence unmounts at once —
+   which is right: there is no reason to hold a card that was never visible.) */
+.row-hover-card[data-state="closed"] {
+  animation: row-hover-card-out var(--dur-panel) var(--ease-spring);
+}
+
+@keyframes row-hover-card-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-6px) scale(0.98);
+  }
+}
+
+.row-hover-card__title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+/* The full summary that the row had to ellipsize — this card's body. It stops at five lines so
+   the card never grows into a detail pane (the reference card stops at a three-line title). */
+.row-hover-card__summary {
+  margin: 0 0 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  line-clamp: 5;
+  overflow: hidden;
+}
+/* ==========================================================================================
+   US-D03 — the detail pane's pieces, taken from ref-dashboard-detail-card.webp
+   (the right-hand card: title + subline, a photo with a badge row, then a hairline key-value
+   table). The typography here is the reference's scale — 15 / 13 / 12 — and it is the scale the
+   detail pane and the person card share.
+   ========================================================================================== */
+
+/* The one place in the product where hairlines are allowed (DESIGN-DIRECTION: list rows carry
+   none; only the selected row elevates as a card). A table of facts is not a list of things, and
+   the reference draws exactly this rule under each row. */
+.key-value-table {
+  margin: 0;
+  font-size: 13px;
+}
+
+.key-value-table__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 0;
+  border-top: var(--hairline);
+}
+
+/* The first row has nothing above it to be separated from — a hairline there is a rule with no
+   content on one side. */
+.key-value-table__row:first-child {
+  border-top: none;
+}
+
+.key-value-table__label {
+  /* The reference's labels are the palest thing in the card; the values carry the ink. */
+  color: var(--text-tertiary);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.key-value-table__value {
+  margin: 0;
+  color: var(--text-primary);
+  font-weight: 500;
+  text-align: right;
+  /* A long value (a full label list, a contract name) wraps instead of pushing the row past the
+     card's edge — nothing overflows horizontally at any width. */
+  overflow-wrap: anywhere;
+}
+
+/* Times and counts. Tabular figures are what make a column of them line up ("3m" over "11m" over
+   "4 Aug" is ragged in a proportional face). */
+.key-value-table__row[data-numeric] .key-value-table__value {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The person card — the hover card's body today, the Network screen's block later. One card for
+   both, so it is a self-contained column: head (avatar + name), badge row, then the table. */
+.person-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.person-card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.person-card__avatar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  /* Circles are avatars (DESIGN-DIRECTION radius scale) — a person's photo is round, a runtime's
+     logo tile is the 30% squircle. */
+  border-radius: 50%;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.person-card__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.person-card__name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  /* The reference's name sits tight against its own line height rather than the body's 1.5. */
+  line-height: 1.3;
+}
+
+.person-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.person-card__badge {
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  /* Captions take a little tracking (the typography pass) — they are the smallest type on the
+     surface and the letterfit is what keeps them from smudging. */
+  letter-spacing: 0.02em;
+}
+
+/* VIP is the one badge with weight behind it: persons.vip is a decision somebody made, not a
+   classification the system guessed. */
+.person-card__badge[data-tone="vip"] {
+  background: color-mix(in oklch, var(--warn-500) 22%, transparent);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* ==========================================================================================
+   US-D02b responsive shell — it responds to its own width (@container shell; #root above is the
+   container). Three tiers: >=1280 (today's three columns), 900–1279.98 (two columns, with the
+   detail pane as a floating glass sheet) and <900 (one column, the rail folded into a bottom bar,
+   the detail pane a near-full-width sheet).
+   The .98 on each boundary keeps two blocks from matching at the very same pixel (1279.98,
+   899.98) — where they overlap, which one wins comes down to source order.
+   ========================================================================================== */
+
+/* >=1280: the layout as it has always been. Here the detail pane is a grid column rather than a
+   floating surface, so it takes the glass off — glass belongs to the sidebar, toolbar, sheet,
+   palette and floating panels only (DESIGN-DIRECTION). The TSX attaches .glass-surface
+   unconditionally because it cannot know the width, so this override undoes it (there is nothing
+   to undo for position/inset — `fixed` only appears in the blocks below). */
+@container shell (min-width: 1280px) {
+  .app-shell__detail {
+    background: var(--bg-base);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: none;
+    box-shadow: none;
+  }
+}
+
+/* <=1279.98: the detail pane becomes a glass sheet floating over the list (the glass itself
+   already comes from the TSX's .glass-surface). 900–1279 is two columns and below 900 is one, but
+   the sheet's skeleton is the same in both — only its width is overridden by the <900 block. */
+@container shell (max-width: 1279.98px) {
+  .app-shell__detail {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    bottom: 16px;
+    width: min(420px, calc(100% - 32px));
+    /* The "large surface that fills the screen" radius (DESIGN-DIRECTION radius scale). */
+    border-radius: 20px;
+    z-index: 20;
+    /* Spring entrance (320ms — the layer rung, --ease-spring). Under reduce the transform is
+       stripped by the consolidated @media block at the end of this file (US-D04).
+       @keyframes rather than a transition because the sheet is rendered conditionally
+       (`{detail && …}`) and therefore has no closed state — with no starting value to move from,
+       a transition does nothing (a freshly mounted element's transform is already none).
+       @starting-style is the right answer, but this repo's CSS parser (Biome 1.9.4) cannot read a
+       nested @starting-style yet and lint breaks. So it uses the same set as the ask panel and
+       the hover card — the same rule about not inventing a new entrance grammar per panel. */
+    animation: detail-sheet-in var(--dur-panel) var(--ease-spring);
+  }
+}
+
+@keyframes detail-sheet-in {
+  from {
+    /* It slides in from the right, which is the edge the sheet attaches to (apple-design §7: a
+       floating thing starts where it will live). */
+    transform: translateX(16px);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* 900–1279.98: two columns, rail + list. No third column is created even with the detail pane
+   open (.app-shell--with-detail is covered by the same rule rather than left to source order,
+   since the two selectors have equal specificity). */
+@container shell (min-width: 900px) and (max-width: 1279.98px) {
+  .app-shell,
+  .app-shell--with-detail {
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+}
+
+/* <900: one column for the list. The rail folds into a bottom bar (only in this tier does
+   ChannelRail draw four tiles plus More and move the avatar and settings into the More popover —
+   its JS breakpoint is channel-rail.tsx's NARROW_RAIL_QUERY and must match this number), and the
+   detail pane becomes a full-width sheet with 16px of margin each side. */
+@container shell (max-width: 899.98px) {
+  .app-shell,
+  .app-shell--with-detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* This is the tier where the rail has already collapsed to a bottom bar, i.e. the coarse-pointer
+     layout: `:hover` is not something a finger does, and there is no swipe or long-press standing
+     in for it, so the hover-only Archive/Restore button is not merely hidden here, it is
+     unreachable — and a pill that fades in over the brand mark is worse than nothing on a screen
+     where it can never legitimately appear. Switching it off entirely also keeps the row's grid
+     column free of it, which is what the responsive sweep asserts at these widths.
+     (It does not need switching off to stop taking layout — `.inbox-row__action` is absolute at
+     every width now, so the column is sized by the brand mark alone. This is purely about a
+     control that cannot be operated.) Archiving from a touch layout goes through the thread itself
+     until there is a gesture for it. */
+  .inbox-row__action {
+    display: none;
+  }
+
+  /* Keeps the fixed bar off the last row and the ask bar — the bar's 56px plus room to
+     breathe. */
+  .app-shell__main {
+    padding-bottom: 72px;
+  }
+
+  /* There is no room to keep 420px — full width, with 16px of margin each side. */
+  .app-shell__detail {
+    width: calc(100% - 32px);
+  }
+
+  /* The rail has gone from a column to a toolbar, and a toolbar is a place glass belongs
+     (DESIGN-DIRECTION). The values are .glass-surface's own set, copied rather than reinvented as
+     a new blur/tint. The border is the one exception — a single top line: a four-sided hairline
+     on a bar flush with the bottom and both side edges leaves a drawn border around the
+     viewport. */
+  .channel-rail {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 56px;
+    flex-direction: row;
+    align-items: center;
+    /* One rhythm, not two. The Inbox tile lives outside the plate in the DOM, so spacing the nav
+       and the plate separately gave the Inbox tile one pitch and the other five another (the 768px
+       screenshot: Inbox hard left, then a ~142px stretch across the rest). The plate goes
+       `display: contents` below, which dissolves its box and makes all six tiles direct children
+       here — one gap, one centred group, capped so a wide bar does not stretch 18px marks apart. */
+    justify-content: center;
+    gap: min(5vw, 24px);
+    padding: 0 8px;
+    z-index: 20;
+    background: var(--bg-overlay);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    border: none;
+    border-top: var(--hairline);
+    box-shadow: inset 0 1px 0 var(--glass-highlight), var(--shadow-glass);
+  }
+
+  /* The bar already is the glass (above), so the plate has no surface left to carry — and a second
+     glass layer on top of glass is exactly what apple-design warns about. `display: contents`
+     removes the plate's box entirely: its tiles become children of the bar's own flex row, so they
+     share the bar's gap instead of being distributed a second time inside a stretched child. It
+     also retires the pill outline the vertical column's 22px radius used to leave mid-bar. */
+  .channel-rail__plate {
+    display: contents;
+  }
+
+  /* Margin that only makes sense in the vertical column — in a horizontal bar it just shoves the
+     tile 2px upward. */
+  .channel-rail__tile--inbox {
+    margin-bottom: 0;
+  }
+}
+
+/* <=419.98: the ask pill's avatar comes off the line. Below this the pill is down to the input and
+   its two composer affordances, and the orb is the only thing on it that carries no information —
+   the placeholder already says what the field is. Removing it is what stops the placeholder from
+   having to ellipsize ("Start typing to ask or se…") at 390px, which reads as a broken control
+   rather than a narrow one. The composer buttons and the model toggle stay: they are controls. */
+@container shell (max-width: 419.98px) {
+  .ask-bar__orb {
+    display: none;
+  }
+}
+
+/* The pill is a flex row whose natural width is placeholder + orb + composer + model toggle. The
+   input's own min-width: 0 (below, `[cmdk-input]`) is not enough on its own: every other child is
+   `flex: 0 0 auto`, so their sum is still the row's min-content and the shell's grid column has to
+   be at least that wide. Releasing it here is what keeps the ask bar at one viewport width instead
+   of pushing `documentElement.scrollWidth` past it. */
+.ask-bar,
+.ask-bar__pill {
+  min-width: 0;
+}
+
+/* ==========================================================================================
+   US-D02b responsive list pane — it responds to **the list pane's own** width, not the shell's
+   (@container list; .inbox-card above is the container). With the detail pane open the list pane
+   is narrower than the window, so these numbers are not window widths: 560px means 560px of pane.
+   Measured against the window, the rules would never fire in the three-column layout even though
+   the pane is already narrow.
+   The .98 on each boundary is there for the same reason as in the shell block — so two blocks
+   never match at the same pixel.
+   ========================================================================================== */
+
+/* <=559.98: two buttons in the filter row drop their words and keep only their icons. The row
+   does slide horizontally, but five tabs + Archived + a chip + "+" simply do not fit on one
+   screen below 560px — collapsing the two that carry the least information ("Label" in "+ Label",
+   and the word "Archived") cuts how far there is to scroll in the first place.
+   The height still has to hold: the buttons become 32px in this block, so the bottom padding
+   comes down to keep the whole row inside 40px. */
+@container list (max-width: 559.98px) {
+  .filter-chip-bar__add-label,
+  .inbox-card__archived-label {
+    display: none;
+  }
+
+  .inbox-card__archived-icon {
+    display: block;
+  }
+
+  /* An icon-only button keeps a target of at least 32px — the padding takes back what the word
+     gave up. The five view pills come with them: this is the phone tier, they are its primary
+     control, and 19px is half the touch floor. The strip still measures 40px (4 + 32 + 4). */
+  .inbox-card__pills button,
+  .filter-chip-bar__add,
+  .inbox-card__archived-pill {
+    min-height: 32px;
+    min-width: 32px;
+    justify-content: center;
+  }
+
+  /* The controls grow to a 32px touch target here, so the strip gives back two of its six bottom
+     pixels to stay inside the same 40px budget (4 + 32 + 4). */
+  .inbox-card__filter-row {
+    padding-bottom: 4px;
+  }
+}
+
+/* <=479.98: the summary drops to one line too. Holding the two-line clamp makes row height vary
+   with summary length, and at this width a row has no vertical slack to spend. */
+@container list (max-width: 479.98px) {
+  .inbox-row__summary {
+    -webkit-line-clamp: 1;
+  }
+
+  /* The chips were `flex: 0 0 auto` on the same line as the summary, so every pixel they took came
+     out of the summary — at 390px that left the AI summary about two characters wide ("Draft: ...").
+     The summary is the row's reason to exist and the chips repeat what the filter strip already
+     says, so at this width the chips step off the line rather than starving it. */
+  .inbox-row__chips {
+    display: none;
+  }
+}
+
+/* ── US-D04: the reduced-motion half of the motion pass ────────────────────────────────────────────
+   tokens.css collapses all five durations onto the shared 80ms fade. This block strips the travel,
+   because a shortened slide is still a slide — apple-design §14 asks for "a gentler, non-vestibular
+   equivalent", not for the same movement played faster. Together they are the whole contract: fade
+   yes, movement no.
+   Why `animation-name` rather than `animation: none`: two of these exits are timed by JavaScript
+   that unmounts the node on `animationend` (the ask panel's useClosingSpring, Radix Presence on the
+   hover card). Switching the animation off entirely would delete that event and strand the node
+   mounted forever. Re-pointing the name at a fade keeps the end event and keeps the cross-fade;
+   only the movement goes.
+   fade-in/fade-out are shared across all five call sites on purpose — under reduce there is exactly
+   one entrance and one exit, which is the point. Note that in and out stay two *different* names:
+   Radix Presence decides to unmount from the name changing between the open and closed states, and
+   collapsing them into one would make the hover card vanish with no exit at all. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The ask panel: 320ms of lift-and-scale becomes a cross-fade. */
+  .ask-panel {
+    animation-name: fade-in;
+  }
+
+  .ask-panel--closing {
+    animation-name: fade-out;
+  }
+
+  /* The row hover card: 320ms in from the row's right, and back out the same way. */
+  .row-hover-card[data-state="open"] {
+    animation-name: fade-in;
+  }
+
+  .row-hover-card[data-state="closed"] {
+    animation-name: fade-out;
+  }
+
+  /* The detail sheet's 320ms slide in from the right edge. */
+  .app-shell__detail {
+    animation-name: fade-in;
+  }
+
+  /* The archived row. It keeps its height and fades: the collapse is the part with the movement in
+     it, and the list closing the gap is a one-frame change of position, not an animation. */
+  .inbox-row--leaving {
+    animation-name: fade-out;
+  }
 }

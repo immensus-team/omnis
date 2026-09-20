@@ -1,52 +1,64 @@
-/* packages/ui/src/tokens.css — A5 §1.1~§1.4 + U1 (the kinso design direction, 2026-09-20: light becomes the default) */
+/* packages/ui/src/tokens.css — A5 §1.1~§1.4 + U1 (the kinso design direction, 2026-09-20: light becomes the default)
+   US-D06 (2026-09-21): the base is monotone. Every neutral is warm — hue 80, chroma ≤ 0.005, which is
+   enough that white reads as paper and not enough to read as "beige". Two things this replaces: the
+   old cool base (hue 260) and the peach/mint canvas wash. Colour now appears in exactly three places
+   (ACCENT-DIRECTION.md §1.1): the brand channel glyphs, the three semantic tones (--danger/--warn/
+   --success), and the aurora surfaces further down this file. */
 :root {
-  --gray-950: oklch(0.14 0.005 260);
-  --gray-900: oklch(0.17 0.006 260);
-  --gray-850: oklch(0.19 0.006 260);
-  --gray-700: oklch(0.32 0.006 260);
-  --gray-500: oklch(0.55 0.006 260);
-  --gray-300: oklch(0.78 0.004 260);
-  --gray-100: oklch(0.94 0.002 260);
-  --gray-000: oklch(0.99 0.001 260);
-  --accent-500: oklch(0.7 0.15 230);
-  --accent-600: oklch(0.62 0.16 230);
+  --gray-950: oklch(0.145 0.004 80);
+  --gray-900: oklch(0.175 0.004 80);
+  --gray-850: oklch(0.195 0.004 80);
+  --gray-700: oklch(0.325 0.004 80);
+  --gray-500: oklch(0.555 0.004 80);
+  --gray-300: oklch(0.785 0.003 80);
+  --gray-100: oklch(0.945 0.003 80);
+  --gray-000: oklch(0.992 0.002 80);
+  /* US-D06 §1.4: the accent used to be blue (hue 230). In a monotone app a blue accent competes with
+     the aurora and reads as stock-SaaS, so the accent goes to graphite — a value, not a hue. These
+     two are referenced only by --accent in the two theme blocks below. */
+  --ink-500: oklch(0.93 0.004 80);
+  --ink-600: oklch(0.26 0.008 80);
   --danger-500: oklch(0.62 0.19 25);
-  --warn-500: oklch(0.75 0.15 80);
+  /* US-D06: nudged warmer (hue 80 → 72) so `blocked` sits in the same family as the aurora bloom.
+     Semantic tones keep their hue — they are signals, not decoration. */
+  --warn-500: oklch(0.74 0.16 72);
   --success-500: oklch(0.68 0.14 150);
   /* U1: light is the default (DESIGN-DIRECTION.md, "light theme by default" — A5's "dark first" is
      retired). The values that used to sit in the light-theme override block are promoted to the
      defaults unchanged. */
   --bg-base: var(--gray-000);
-  --bg-elevated: oklch(0.97 0.002 260);
+  --bg-elevated: oklch(0.972 0.003 80);
   --bg-overlay: color-mix(in oklch, var(--gray-000) 78%, transparent);
   /* US-D01: hover/pressed states on a glass surface. A colour lighter than the glass (--bg-overlay,
      L≈0.988) leaves a lightness gap in the 0.1% range, so the state simply vanishes — on glass we
      go darker. Laying the text colour over it faintly keeps light and dark on one line (in dark,
      --text-primary is a light colour, so it flips on its own). */
   --state-hover: color-mix(in oklch, var(--text-primary) 6%, transparent);
-  --border-hairline: oklch(0 0 0 / 0.08);
-  --border-hairline-strong: oklch(0 0 0 / 0.14);
-  --text-primary: oklch(0.2 0.006 260);
-  --text-secondary: oklch(0.42 0.006 260);
-  --text-tertiary: oklch(0.55 0.006 260 / 0.75);
-  --accent: var(--accent-600);
-  --accent-fg: oklch(0.99 0 0);
+  /* US-D06: a warm hairline at the same weight as the old black one. Shadows and highlights stay
+     pure `oklch(0 0 0 / a)` / `oklch(1 0 0 / a)` — they are opacity, not colour. */
+  --border-hairline: oklch(0.2 0.004 80 / 0.09);
+  --border-hairline-strong: oklch(0.2 0.004 80 / 0.15);
+  --text-primary: oklch(0.205 0.004 80);
+  --text-secondary: oklch(0.435 0.004 80);
+  --text-tertiary: oklch(0.56 0.004 80 / 0.75);
+  --accent: var(--ink-600);
+  --accent-fg: oklch(0.992 0.002 80);
   --shadow-row-selected: 0 4px 16px oklch(0 0 0 / 0.1), 0 1px 2px oklch(0 0 0 / 0.08);
   /* Approximating the gradient stops measured in the kinso teardown (23) — for the ask bar's orb
      and focus stroke only. The "one accent" rule still holds for --accent itself; this gradient is
      the exception (one decorative place). */
   --ask-gradient: linear-gradient(135deg, oklch(0.68 0.1 190), oklch(0.72 0.16 55));
-  /* Canvas background: a faint grid over a warm off-white plus peach/mint gradients (approximating
-     the measurements in 23 §2). */
+  /* Canvas background: a faint grid over a warm off-white. US-D06 §1.3 removes the two radials
+     (peach at 15%/0%, mint at 100%/20%) that used to wash the canvas — the 2026-09-21 monotone
+     directive supersedes them; colour lives on the aurora surfaces only. The film grain that used to
+     be part of that wash is painted by `.app-shell::before` in apps/desktop/src/app.css. */
   --bg-canvas: oklch(0.98 0.004 80);
   /* background-image takes a list of layers and nothing else — mixing in a position/size clause
      such as `0 0 / 32px 32px` discards the whole declaration (measured: computed
      backgroundImage === "none"). The size is split out into the token below. */
-  --canvas-grid: linear-gradient(90deg, oklch(0 0 0 / 0.035) 1px, transparent 1px),
-    linear-gradient(0deg, oklch(0 0 0 / 0.035) 1px, transparent 1px),
-    radial-gradient(60% 50% at 15% 0%, oklch(0.85 0.05 55 / 0.35), transparent 60%),
-    radial-gradient(55% 45% at 100% 20%, oklch(0.85 0.06 190 / 0.3), transparent 60%);
-  --canvas-grid-size: 32px 32px, 32px 32px, auto, auto;
+  --canvas-grid: linear-gradient(90deg, oklch(0.2 0.004 80 / 0.03) 1px, transparent 1px),
+    linear-gradient(0deg, oklch(0.2 0.004 80 / 0.03) 1px, transparent 1px);
+  --canvas-grid-size: 32px 32px, 32px 32px;
   --font-sans: "Pretendard Variable", "Inter Variable", -apple-system, BlinkMacSystemFont,
     "SF Pro Text", system-ui, sans-serif;
   --hairline: 1px solid var(--border-hairline);
@@ -69,6 +81,14 @@
      — no per-surface declarations. */
   --glass-highlight: oklch(1 0 0 / 0.55);
   --shadow-glass: 0 8px 24px oklch(0 0 0 / 0.08), 0 1px 3px oklch(0 0 0 / 0.06);
+  /* Film grain (ACCENT-DIRECTION.md §2.2). One 160px tile of feTurbulence noise, shared by the
+     canvas (app.css `.app-shell::before`, 3.5%) and by every aurora surface (8%). The two non-obvious
+     parts are both load-bearing:
+       - `feColorMatrix type='saturate' values='0'` — feTurbulence emits RGBA noise, so without it the
+         grain is rainbow speckle inside a spec whose entire premise is a monotone base.
+       - `color-interpolation-filters='sRGB'` — the CSS/SVG default is linearRGB and Chrome honours
+         it, so the tile renders materially darker than authored. Safari/WKWebView differs. Pin it. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 /* Dark is optional (data-theme="dark") — the old :root defaults moved over unchanged. */
 :root[data-theme="dark"] {
@@ -79,9 +99,11 @@
   --border-hairline-strong: oklch(1 0 0 / 0.14);
   --text-primary: var(--gray-100);
   --text-secondary: var(--gray-500);
-  --text-tertiary: oklch(0.55 0.006 260 / 0.7);
-  --accent: var(--accent-500);
-  --accent-fg: oklch(0.14 0 0);
+  /* US-D06: easy to miss — this is the second declaration of --text-tertiary, and only the :root one
+     is in the §1.2 table's first column. Both move to hue 80. */
+  --text-tertiary: oklch(0.56 0.004 80 / 0.7);
+  --accent: var(--ink-500);
+  --accent-fg: oklch(0.145 0.004 80);
   --shadow-row-selected: 0 4px 16px oklch(0 0 0 / 0.35), 0 1px 2px oklch(0 0 0 / 0.4);
   --bg-canvas: var(--gray-950);
   --canvas-grid: none;
