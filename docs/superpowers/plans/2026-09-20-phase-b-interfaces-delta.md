@@ -219,7 +219,7 @@ export type Extractor = (chunk: Chunk) => Promise<unknown>;
 export function setExtractor(e: Extractor): void;             // provider SDK 격리 유지(§1 의존 규칙)
 export function createT1Extractor(model: unknown): Extractor;
 export function parseExtractOutput(raw: unknown): { memories: MemoryInput[]; entities: EntityInput[] };
-export function chunkCalendarEvent(ev: unknown): Chunk[];     // 1이벤트 = 1청크 (A4 §10.3)
+export function chunkCalendarEvent(e: CalendarChunkInput): Chunk;  // 1이벤트 = 1청크 (A4 §10.3)
 export function writeIngestSystemItem(pool: Pool, msg: string): Promise<void>;
 export const DEAD_LETTER_THRESHOLD: 3;                        // A4 §10.5
 ```
