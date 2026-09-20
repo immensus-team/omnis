@@ -8,12 +8,7 @@ import {
 import { groupBy } from "@omnis/ui/components/command-palette";
 import { GroupHeader } from "@omnis/ui/components/group-header";
 import { InboxRow, type LabelChip, type RowAvatar } from "@omnis/ui/components/inbox-row";
-import {
-  type AgentPillState,
-  AgentStatusPill,
-  type ApprovalPillState,
-  ApprovalStatusPill,
-} from "@omnis/ui/components/status-pill";
+import { type AgentPillState, AgentStatusPill } from "@omnis/ui/components/status-pill";
 import { formatRelativeTime } from "@omnis/ui/lib/relative-time";
 import {
   type AgentRuntimeKind,
@@ -42,8 +37,6 @@ export interface InboxQueryItem {
   id: string;
   scope: "work" | "personal" | "unknown";
   hasPendingApproval: boolean;
-  /** US-D02: 그룹 헤더가 묶는 표시 상태. null = 이 스레드에는 승인이 아예 없다. */
-  approvalState: ApprovalPillState | null;
   authorKind: "person" | "agent" | "system";
 }
 
@@ -111,24 +104,6 @@ export function threadSummary(row: {
   return "";
 }
 
-/** A3 approvals_state_ck(pending/decided/executing/executed/failed/expired) + decision
- * (accept/edit/respond/ignore) → StatusPill 표시 상태. DB에 "rejected" state는 없다: 거절은
- * decision='ignore'다. 실행 실패(state='failed')와 역제안(decision='respond')을 거절로 접지
- * 않는 이유는 그게 사실이 아니라서다 — 내가 승인한 건이 실행 중 실패한 걸 "거절됨"이라고
- * 쓰면 하지 않은 행동을 했다고 말하는 셈이다. */
-export function approvalPillState(row: {
-  state: string;
-  decision?: string | null;
-}): ApprovalPillState {
-  if (row.state === "pending") return "pending";
-  if (row.state === "expired") return "expired";
-  if (row.state === "failed") return "failed";
-  // decided / executing / executed
-  if (row.decision === "accept" || row.decision === "edit") return "approved";
-  if (row.decision === "respond") return "responded";
-  return "rejected"; // ignore / unknown decision
-}
-
 export interface ArchivableRow {
   threadId: string;
   /** threads.archived_at (ms). null이면 인박스에 남는다(A5 §3.1의 기본 쿼리). */
@@ -163,32 +138,6 @@ export function sortInboxRows<T extends SortableInboxRow>(rows: T[]): T[] {
   const needsAttention = (r: SortableInboxRow) =>
     r.hasPendingApproval || r.agentState === "blocked";
   return [...rows].sort((a, b) => Number(needsAttention(b)) - Number(needsAttention(a)));
-}
-
-/** 그룹 헤더 순서는 "내가 지금 해야 하는 것" 우선(pending → approved → rejected → expired).
- *  빈 그룹은 헤더도 만들지 않는다 — 데이터 없는 섹션은 소음이다. */
-const APPROVAL_GROUP_ORDER: ApprovalPillState[] = [
-  "pending",
-  "approved",
-  "responded",
-  "rejected",
-  "failed",
-  "expired",
-];
-
-export function groupByApprovalState<T extends { approvalState: ApprovalPillState | null }>(
-  rows: T[],
-): Array<{ state: ApprovalPillState; rows: T[] }> {
-  const groups = groupBy(
-    rows.filter((r): r is T & { approvalState: ApprovalPillState } => r.approvalState !== null),
-    (r) => r.approvalState,
-  );
-  // flatMap인 이유: `groups[s]?.length` 가드는 noUncheckedIndexedAccess 아래에서 인덱싱 결과를
-  // 좁혀 주지 못한다(map + ! 필요). 빈 그룹을 여기서 흘려보내는 편이 캐스트 없이 정직하다.
-  return APPROVAL_GROUP_ORDER.flatMap((s) => {
-    const rows = groups[s];
-    return rows?.length ? [{ state: s, rows }] : [];
-  });
 }
 
 /** blocked(내 응답 필요)가 맨 위 — DESIGN-DIRECTION.md의 herdr 상태 모델 순서 그대로. */
@@ -338,8 +287,8 @@ export function Inbox({
       const isAgentSession = item.thread?.kind === "agent_session";
       const session = sessionByThread.get(item.thread_id);
       const agentState = isAgentSession && session ? agentSessionKinsoState(session.state) : null;
-      const approval = approvalByThread.get(item.thread_id);
-      const approvalState = approval ? approvalPillState(approval) : null;
+      // 쿼리가 state='pending'만 받으므로(위 pending_approvals) 존재 = 내 결정 대기다.
+      const hasPendingApproval = approvalByThread.has(item.thread_id);
       const runtime = session ? runtimeById.get(session.runtime_id) : undefined;
       const authorKind: InboxQueryItem["authorKind"] = isAgentSession
         ? "agent"
@@ -359,8 +308,7 @@ export function Inbox({
         agentSession: isAgentSession,
         scope: item.scope as InboxQueryItem["scope"],
         authorKind,
-        hasPendingApproval: approvalState === "pending",
-        approvalState,
+        hasPendingApproval,
         title,
         summary: threadSummary({
           metaSummary: (item.thread?.meta as { summary?: string } | null)?.summary ?? null,
@@ -478,23 +426,13 @@ export function Inbox({
       }),
   };
 
-  // US-D02: 그룹핑은 인박스의 needs-approval/agents 두 뷰에서만. Archived는 평평하게 둔다
-  // (보관 시각 역순이라는 자체 정렬 축이 있고, 그 위에 상태 그룹을 얹으면 두 기준이 싸운다).
-  // 나머지 필터(all/work/personal)도 예전과 완전히 같은 평평한 배열을 그대로 받는다.
-  const grouped = view === "inbox" && (filter === "needs-approval" || filter === "agents");
+  // US-D02: 그룹핑은 agents 뷰에서만. needs-approval은 pending만 쿼리해서(위 pending_approvals
+  // `.where(state,pending)`) 그룹이 언제나 "대기" 하나뿐이고, 그러면 헤더 띠는 방금 고른 탭
+  // 이름을 한 번 더 말할 뿐 정보를 싣지 못한다 — 숫자만 탭 pill로 접었다(아래 pendingCount).
+  // Archived도 평평하게 둔다(보관 시각 역순이라는 자체 정렬 축 위에 상태 그룹을 얹으면 싸운다).
+  const grouped = view === "inbox" && filter === "agents";
   const listItems = useMemo<FlatItem[]>(() => {
     if (!grouped) return filtered.map((row) => ({ kind: "row", row }));
-    if (filter === "needs-approval") {
-      return groupByApprovalState(filtered).flatMap((g) => [
-        {
-          kind: "header" as const,
-          key: `approval-${g.state}`,
-          count: g.rows.length,
-          pill: <ApprovalStatusPill state={g.state} />,
-        },
-        ...g.rows.map((row) => ({ kind: "row" as const, row })),
-      ]);
-    }
     // agents: 세션 상태가 없는 행(agent가 보낸 Slack 메시지 등)은 헤더 없이 맨 뒤에 붙인다.
     const { groups, ungrouped } = groupByAgentState(filtered);
     return [
@@ -509,7 +447,17 @@ export function Inbox({
       ]),
       ...ungrouped.map((row) => ({ kind: "row" as const, row })),
     ];
-  }, [filtered, grouped, filter]);
+  }, [filtered, grouped]);
+
+  // needs-approval 탭의 카운트. 탭이 선택돼 있든 아니든 같은 수라야 의미가 있으므로 pill 필터
+  // **이전** 단계(labelFiltered)에서 센다. 0이면 아예 안 그린다 — 큐가 비었다는 건 배지가 아니라
+  // 빈 리스트가 말한다.
+  const pendingCount = useMemo(
+    () =>
+      applyArchiveView(labelFiltered, view, pendingArchive).filter((r) => r.hasPendingApproval)
+        .length,
+    [labelFiltered, view, pendingArchive],
+  );
 
   return (
     <OpaqueSurface className="inbox-card">
@@ -526,6 +474,9 @@ export function Inbox({
               onClick={() => setFilter(f)}
             >
               {f}
+              {f === "needs-approval" && pendingCount > 0 && (
+                <span className="inbox-card__pill-count">{pendingCount}</span>
+              )}
             </button>
           ))}
         </div>
@@ -558,7 +509,10 @@ export function Inbox({
               isDraft={item.row.isDraft}
               avatar={item.row.avatar}
               channel={item.row.channel}
-              agentState={item.row.agentState}
+              // 그룹 헤더가 바로 위에서 상태를 말할 때 행이 같은 말을 다시 하지 않는다
+              // (ref-issue-tracker-density.webp도 상태어는 헤더에만 둔다). 배지가 빠진
+              // 우측 슬롯은 채널 글리프가 채운다 — 헤더는 상태, 행은 채널.
+              agentState={grouped ? null : item.row.agentState}
               timestamp={item.row.timestamp}
               unread={item.row.unread}
               unreadCount={item.row.unreadCount}

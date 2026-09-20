@@ -1,5 +1,8 @@
-// US-D02 스크린샷 캡처용 1회성 스크립트(커밋하지 않는다). e2e 스택을 그대로 올리고
-// seed.ts 위에 "밀도"를 더한 뒤(승인 대기 여러 건 + 에이전트 세션 4상태) Playwright로 찍는다.
+// docs/design/screens/*.png 캡처 스크립트. e2e 스택을 그대로 올리고 seed.ts 위에 "밀도"를
+// 더한 뒤(승인 대기 여러 건 + 에이전트 세션 4상태) Playwright로 찍는다.
+// 커밋한다: 디자인 스크린샷은 라운드마다 다시 찍어야 하고, 그때 화면에 무엇이 있었는지가
+// 스크린샷만큼 증거다(어떤 픽스처가 그 밀도를 만들었는지는 densify()에만 적혀 있다).
+// 실행: pnpm tsx tools/e2e/shots.ts (e2e와 같은 포트를 쓰므로 e2e와 동시에 돌리지 않는다).
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "@playwright/test";

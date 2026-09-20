@@ -690,6 +690,22 @@ body {
   opacity: 0;
 }
 
+/* US-D02: 행 자체의 hover 채움. 400ms 호버 카드가 이 행에서 나왔다는 걸 보여 주는 건 카드가
+   아니라 행이다 — 채움이 없으면 카드가 아무 데도 안 붙어 떠 있는 것처럼 보인다. 채움은 이
+   화면의 다른 인터랙티브 요소들과 같은 --state-hover고, 반경은 선택 행 카드와 똑같은 8px다 —
+   가리켰다가 고르는 동안 행 모양이 바뀌면 안 된다. 구분은 모양이 아니라 채움이 한다
+   (호버 = 회색 채움 / 선택 = 흰 카드 + 섀도). */
+.inbox-row:hover {
+  background: var(--state-hover);
+  border-radius: 8px;
+}
+
+/* 선택 행은 이미 흰 카드 + 섀도로 떠 있다(.inbox-row--selected) — 그 위에 회색 채움을 덧대면
+   선택이 흐려진다. */
+.inbox-row--selected:hover {
+  background: var(--bg-base);
+}
+
 .inbox-row:hover .inbox-row__action,
 .inbox-row:focus-within .inbox-row__action {
   opacity: 1;
@@ -713,7 +729,8 @@ body {
 }
 
 /* P1: 상태 배지는 라벨 칩(outline)과 달리 "soft pill" — 테두리 대신 은은한 채운 배경
-   (DESIGN-DIRECTION P1). blocked만 accent 톤으로 눈에 띄게(herdr "내가 봐야 함" 신호). */
+   (DESIGN-DIRECTION P1). blocked만 톤 컬러로 눈에 띄게(herdr "내가 봐야 함" 신호) — 그 색은
+   여기가 아니라 .status-pill[data-tone="warning"] 규칙이 함께 준다(한 상태 = 한 색). */
 .status-badge {
   border: 0;
   border-radius: 999px;
@@ -722,11 +739,6 @@ body {
   color: var(--text-secondary);
   background: var(--bg-elevated);
   white-space: nowrap;
-}
-
-.status-badge--agent[data-agent-state="blocked"] {
-  color: var(--accent);
-  background: color-mix(in oklch, var(--accent) 16%, var(--bg-elevated));
 }
 
 /* U5: ChannelGlyph의 타일 배경 변형(현재 KakaoTalk만) — 브랜드 옐로 위 검정 글리프.
@@ -902,14 +914,6 @@ body {
   flex: 0 0 auto;
 }
 
-/* 카운트만 톤 컬러에서 빠져 회색이 된다 — 라벨이 의미를 지고 숫자는 밀도만 담당한다(레퍼런스 실측:
-   "In review 6"의 6은 파랑이 아니라 회색). --text-tertiary(alpha .75)는 틴트 위에서 2.2:1이라
-   안 읽혀서 한 단계 진한 --text-secondary로 내렸다. */
-.status-pill__count {
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
 /* ponytail: 다크(data-theme="dark") 오버라이드 없음 — 라이트 기본이 이 프로젝트의 결정이고
    (DESIGN-DIRECTION.md), data-theme="dark"를 세팅하는 코드가 아직 없다(tokens.css에 블록만 존재).
    다크가 실제로 켜지는 날 4개 톤 라벨이 L0.4 vs 틴트 L0.25로 1.8:1이 되니 그때 여기 아래에
@@ -925,7 +929,12 @@ body {
   color: oklch(from var(--accent) 0.44 c h);
 }
 
-.status-pill[data-tone="warning"] {
+/* 그룹 헤더 pill(12px 라운드)과 행 배지(999px 캡슐)는 모양이 다르지만 **색은 하나**다: 같은
+   "확인 필요"가 헤더에선 빨강, 700px 옆 행에선 파랑으로 갈렸던 게 2회차 거절 사유였다.
+   선택자 두 개에 값 한 벌 — 규칙이 하나면 갈라질 수가 없다. blocked가 warning인 이유는
+   status-pill.tsx의 AGENT_META 주석에 있다(내 차례지 에러가 아니다). */
+.status-pill[data-tone="warning"],
+.status-badge--agent[data-agent-state="blocked"] {
   background: oklch(from var(--warn-500) 0.92 calc(c * 0.25) h);
   color: oklch(from var(--warn-500) 0.44 c h);
 }
@@ -940,7 +949,16 @@ body {
   color: oklch(from var(--success-500) 0.44 c h);
 }
 
-/* US-D02: Needs-approval/Agents 뷰의 상태별 그룹 헤더(ref-issue-tracker-density.webp "In review 6 +").
+/* US-D02: needs-approval 탭 pill 안의 숫자. 그룹 헤더가 아니라 여기 사는 이유는 Inbox.tsx의
+   `grouped` 주석에 있다(이 뷰는 pending만 쿼리해 그룹이 언제나 하나다). 탭 안이라 --tabular-nums
+   없이도 흔들릴 일이 없고, 회색 대신 현재 라벨 색을 물려받아 "탭의 일부"로 읽힌다. */
+.inbox-card__pill-count {
+  margin-left: 5px;
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+}
+
+/* US-D02: Agents 뷰의 상태별 그룹 헤더(ref-issue-tracker-density.webp "In review 6 +").
    세로 패딩이 비대칭(10/6)인 건 의도다 — 헤더가 위가 아니라 아래 행들에 붙어 보여야 "이 묶음의
    라벨"로 읽힌다. 카드 크롬(테두리·배경·그림자)은 두지 않는다: 헤더는 또 하나의 서피스가 아니라
    리스트 문법이라, 톤 컬러 좌측 스트라이프 같은 강조 리본도 쓰지 않는다(pill이 이미 상태를 말한다). */
@@ -965,35 +983,6 @@ body {
   font-weight: 500;
   line-height: 20px;
   text-align: center;
-}
-
-/* 호버 채움은 --state-hover로 통일 — 인박스의 다른 인터랙티브 요소 4곳과 같은 토큰이다.
-   focus는 UA 기본 링에 맡긴다(outline을 끄는 규칙이 이 코드베이스에 없다). */
-.group-header__add {
-  border: var(--hairline);
-  border-radius: 6px;
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: 13px;
-  line-height: 1;
-  cursor: pointer;
-  transition: background var(--dur-base) var(--ease-spring), color var(--dur-base)
-    var(--ease-spring);
-}
-
-.group-header__add:hover,
-.group-header__add:focus-visible {
-  background: var(--state-hover);
-  color: var(--text-primary);
-}
-.group-header__add:active {
-  transform: scale(0.94);
 }
 
 /* US-D02: 필터 칩 바 — 리스트 헤더 바로 아래, 행들 위에 얹힌다. 칩은 캡슐(999px)이 아니라

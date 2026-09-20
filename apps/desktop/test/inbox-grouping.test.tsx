@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
-// US-D02: Needs-approval 뷰는 "지금 내 결정을 기다리는" 건만 담는 액션 큐고(그래서 그룹은
-// 대기 하나다), Agents 뷰는 세션 상태(blocked → working → idle → done → failed)별로 묶인다.
-// 라이프사이클 정렬 자체는 groupByApprovalState 순수 함수로 따로 고정한다.
+// US-D02: Agents 뷰만 그룹 헤더를 쓴다(blocked → working → idle → done → failed). Needs-approval은
+// pending만 쿼리해서 그룹이 언제나 하나뿐이라 헤더 대신 탭 pill의 숫자로 센다.
 // archive-inbox.test.tsx의 테이블 태깅 목을 그대로 쓴다 — Inbox는 쿼리마다 다른 행이 필요하다.
 import "./setup";
 
@@ -11,9 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 
 const THREADS = {
   pending: "11111111-1111-1111-1111-111111111111",
-  approved: "22222222-2222-2222-2222-222222222222",
-  expired: "33333333-3333-3333-3333-333333333333",
-  failed: "44444444-4444-4444-4444-444444444444",
+  decided: "22222222-2222-2222-2222-222222222222",
   pending2: "88888888-8888-8888-8888-888888888888",
   blocked: "55555555-5555-5555-5555-555555555555",
   working: "66666666-6666-6666-6666-666666666666",
@@ -64,9 +61,7 @@ function agentItem(threadId: string, title: string) {
 const store: Record<string, unknown[]> = {
   items: [
     item(THREADS.pending, "대기 건"),
-    item(THREADS.approved, "승인 건"),
-    item(THREADS.expired, "만료 건"),
-    item(THREADS.failed, "실패 건"),
+    item(THREADS.decided, "결정된 건"),
     item(THREADS.pending2, "대기 건 2"),
     agentItem(THREADS.blocked, "막힌 세션"),
     agentItem(THREADS.working, "도는 세션"),
@@ -74,19 +69,18 @@ const store: Record<string, unknown[]> = {
     item(THREADS.agentEmail, "에이전트 메일", { author_agent_id: "agent-1" }),
   ],
   accounts: [{ id: "acct-1", channel: "gmail" }],
-  // A3 라이프사이클: 대기 2건 / 실행 완료(accept) / 만료 / 실행 실패.
+  // 대기 2건 + 이미 실행된 1건. 실행된 건은 Inbox의 `.where("state","=","pending")`이 걸러 내고,
+  // 아래 목이 그 where를 실제로 적용한다 — 그래야 이 픽스처가 프로덕션과 같은 행을 먹인다.
   pending_approvals: [
     { id: "ap-1", thread_id: THREADS.pending, state: "pending", decision: null, created_at: 1 },
     { id: "ap-5", thread_id: THREADS.pending2, state: "pending", decision: null, created_at: 5 },
     {
       id: "ap-2",
-      thread_id: THREADS.approved,
+      thread_id: THREADS.decided,
       state: "executed",
       decision: "accept",
       created_at: 2,
     },
-    { id: "ap-3", thread_id: THREADS.expired, state: "expired", decision: null, created_at: 3 },
-    { id: "ap-4", thread_id: THREADS.failed, state: "failed", decision: null, created_at: 4 },
   ],
   labels: [],
   thread_labels: [],
@@ -111,15 +105,39 @@ const store: Record<string, unknown[]> = {
   agent_runtimes: [{ id: "rt-1", runtime: "claude_code" }],
 };
 
-/** zero.query.<table>....(체인) → { __table }. 체인 메서드는 전부 자기 자신을 돌려준다. */
-function taggedQuery(table: string): unknown {
+/** zero.query.<table>....(체인) → 태그 + 누적된 where 절.
+ *  where를 버리는 목은 프로덕션 쿼리가 절대 만들 수 없는 행을 화면에 먹일 수 있다(2회차에
+ *  실제로 그랬다: 승인 라이프사이클 전체를 넣고 그룹이 여럿 나온다고 단언했다). `=` 하나만
+ *  해석한다 — Inbox가 쓰는 연산자가 그것뿐이고, 모르는 연산자는 던져서 조용히 새지 않게 한다. */
+type Where = [string, string, unknown];
+function taggedQuery(table: string, wheres: Where[] = []): unknown {
   const proxy: unknown = new Proxy(
     {},
-    { get: (_t, prop) => (prop === "__table" ? table : () => proxy) },
+    {
+      get: (_t, prop) => {
+        if (prop === "__table") return table;
+        if (prop === "__wheres") return wheres;
+        if (prop === "where")
+          return (field: string, op: string, value: unknown) =>
+            taggedQuery(table, [...wheres, [field, op, value]]);
+        return () => proxy;
+      },
+    },
   );
   return proxy;
 }
 const zero = { query: new Proxy({}, { get: (_t, table) => taggedQuery(String(table)) }) };
+
+function runQuery(q: { __table: string; __wheres: Where[] }): unknown[] {
+  const rows = store[q.__table] ?? [];
+  return rows.filter((row) =>
+    q.__wheres.every(([field, op, value]) => {
+      if (op !== "=" && op !== "!=") throw new Error(`목이 모르는 연산자: ${op}`);
+      const actual = (row as Record<string, unknown>)[field];
+      return op === "=" ? actual === value : actual !== value;
+    }),
+  );
+}
 
 vi.mock("../src/zero-client.js", () => ({
   initZero: () => zero,
@@ -127,7 +145,7 @@ vi.mock("../src/zero-client.js", () => ({
   loadZeroToken: async () => {},
 }));
 vi.mock("@rocicorp/zero/react", () => ({
-  useQuery: (q: { __table: string }) => [store[q.__table] ?? [], { type: "complete" }],
+  useQuery: (q: { __table: string; __wheres: Where[] }) => [runQuery(q), { type: "complete" }],
   useZero: () => zero,
   ZeroProvider: ({ children }: { children: unknown }) => children,
 }));
@@ -160,27 +178,15 @@ const headerLabels = (container: HTMLElement): string[] =>
 const headerCounts = (container: HTMLElement): string[] =>
   [...container.querySelectorAll(".group-header__count")].map((el) => el.textContent ?? "");
 
-const filterBy = (name: string) => fireEvent.click(screen.getByRole("radio", { name }));
+const rowNames = (): string[] =>
+  screen.getAllByRole("option").map((r) => r.querySelector(".inbox-row__name")?.textContent ?? "");
+
+// needs-approval pill의 접근 이름에는 카운트가 붙는다("needs-approval 2") — 앞부분으로 찾는다.
+const filterTab = (name: string) =>
+  screen.getByRole("radio", { name: (n: string) => n.startsWith(name) });
+const filterBy = (name: string) => fireEvent.click(filterTab(name));
 
 describe("Inbox 그룹 헤더 (US-D02)", () => {
-  it("needs-approval 뷰는 대기 중인 건만, 대기 헤더 하나로 묶는다", () => {
-    const { container } = renderInbox();
-    filterBy("needs-approval");
-
-    expect(headerLabels(container)).toEqual(["대기"]);
-    expect(headerCounts(container)).toEqual(["2"]);
-  });
-
-  // 이 탭은 액션 큐다 — 결정·만료된 건이 남으면 탭이 영원히 비워지지 않는다.
-  it("결정·만료·실패한 건은 needs-approval 뷰에 남지 않는다", () => {
-    renderInbox();
-    filterBy("needs-approval");
-    const names = screen
-      .getAllByRole("option")
-      .map((r) => r.querySelector(".inbox-row__name")?.textContent ?? "");
-    expect(names).toEqual(["대기 건", "대기 건 2"]);
-  });
-
   it("agents 뷰는 확인 필요(blocked)를 작업 중(working)보다 위에 둔다", () => {
     const { container } = renderInbox();
     filterBy("agents");
@@ -195,10 +201,32 @@ describe("Inbox 그룹 헤더 (US-D02)", () => {
 
     // 헤더는 2개뿐 — ungrouped 행에는 상태 라벨을 붙일 수 없다.
     expect(container.querySelectorAll(".group-header")).toHaveLength(2);
-    const names = screen
-      .getAllByRole("option")
-      .map((r) => r.querySelector(".inbox-row__name")?.textContent ?? "");
-    expect(names).toEqual(["막힌 세션", "도는 세션", "에이전트 메일"]);
+    expect(rowNames()).toEqual(["막힌 세션", "도는 세션", "에이전트 메일"]);
+  });
+
+  // 헤더가 바로 위에서 상태를 말하는데 행이 같은 말을 되풀이하면 화면이 "확인 필요 / 확인 필요"로
+  // 읽힌다(2회차 거절 사유). 그룹일 때 우측 슬롯은 채널 글리프가 가진다.
+  it("그룹일 때 행은 상태 배지를 반복하지 않는다", () => {
+    const { container } = renderInbox();
+    filterBy("agents");
+    expect(container.querySelectorAll(".status-badge--agent")).toHaveLength(0);
+  });
+
+  it("그룹이 없는 뷰에서는 행이 상태 배지를 그대로 보여준다", () => {
+    const { container } = renderInbox();
+    filterBy("all");
+    expect(container.querySelectorAll(".status-badge--agent")).toHaveLength(2);
+  });
+
+  // needs-approval은 pending만 쿼리해 그룹이 언제나 하나다 — 헤더 띠는 방금 고른 탭 이름을
+  // 되풀이할 뿐이라, 숫자만 탭 pill로 접었다.
+  it("needs-approval은 헤더 대신 탭 pill에 대기 건수를 단다", () => {
+    const { container } = renderInbox();
+    expect(filterTab("needs-approval")).toHaveTextContent("2");
+
+    filterBy("needs-approval");
+    expect(container.querySelectorAll(".group-header")).toHaveLength(0);
+    expect(rowNames()).toEqual(["대기 건", "대기 건 2"]);
   });
 
   // 나머지 필터와 Archived는 평평해야 한다 — 그룹핑이 그쪽으로 새면 회귀다.
@@ -211,8 +239,8 @@ describe("Inbox 그룹 헤더 (US-D02)", () => {
       expect(container.querySelectorAll(".group-header")).toHaveLength(0);
     }
 
-    filterBy("needs-approval");
-    expect(container.querySelectorAll(".group-header")).toHaveLength(1);
+    filterBy("agents");
+    expect(container.querySelectorAll(".group-header")).toHaveLength(2);
     fireEvent.click(screen.getByRole("button", { name: "보관됨" }));
     expect(container.querySelectorAll(".group-header")).toHaveLength(0);
   });
