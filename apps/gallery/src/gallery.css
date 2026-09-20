@@ -58,9 +58,6 @@ body {
   padding: 16px;
   background: var(--bg-elevated);
 }
-.gallery-pane[data-theme="dark"] {
-  background: var(--gray-950, #14161c);
-}
 .gallery-pane h3 {
   font-size: 12px;
   text-transform: uppercase;

@@ -11,14 +11,18 @@ const ACTIONS: PaletteAction[] = [
 ];
 
 /** 두 인스턴스가 각자 open 상태를 갖는다 — 한쪽을 닫아도 다른 쪽은 그대로다.
- *  기본 open=true라 정적 스크린샷에도 내용이 잡힌다. */
+ *  inline은 기본 open=true라 정적 스크린샷에도 내용이 잡힌다. dialog는 고정 오버레이라
+ *  기본 열림이면 갤러리 전체를 덮으므로 버튼으로 연다. */
 export function CommandPaletteDemo() {
-  const [dialogOpen, setDialogOpen] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [inlineOpen, setInlineOpen] = useState(true);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <section>
         <h3>dialog mode</h3>
+        <button type="button" onClick={() => setDialogOpen(true)}>
+          Open ⌘K dialog
+        </button>
         <CommandPalette open={dialogOpen} onOpenChange={setDialogOpen} actions={ACTIONS} />
       </section>
       <section>
