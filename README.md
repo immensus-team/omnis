@@ -130,7 +130,7 @@ Evidence lands in [`tools/e2e/REPORT.md`](tools/e2e/REPORT.md). Without a hub, t
 
 **Phase B — W0 through W5 merged.** Migrations 0009–0013, the memory layer and identity resolution, local/Drive/GitHub ingestion, the loop runtime and tool palette, auto-archive and notifications, tasks, drafts, network, the nightly digest, cost reporting, settings, transcripts, unified search, and the hub's adapter registry. W4b — the remaining screens — is in progress.
 
-**Evidence on main.** 183 test files / 1,461 tests passing; `pnpm lint` and `pnpm typecheck` clean; `pnpm e2e:phase-a` 38/38 across two consecutive runs, which is the idempotence check. Per-story status: [`docs/superpowers/plans/README.md`](docs/superpowers/plans/README.md).
+**Evidence on main.** 193 test files / 1,568 tests passing; `pnpm lint` and `pnpm typecheck` clean; `pnpm e2e:phase-a` 38/38 across two consecutive runs, which is the idempotence check. Per-story status: [`docs/superpowers/plans/README.md`](docs/superpowers/plans/README.md).
 
 **Not yet true.** No message in this repo ever came from a live account. The iPhone client is a planned PWA, not a shipped binary. What is real is the gate: anything that would leave the machine is blocked on your approval, and that is implemented rather than aspirational.
 
