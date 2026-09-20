@@ -78,7 +78,7 @@ describe("0006_kernel", () => {
       pool,
       "SELECT name, schedule FROM jobs ORDER BY name",
     );
-    expect(rows.length).toBeGreaterThanOrEqual(16); // 0009~0011(다른 플랜)이 없는 워크트리에서도 통과
+    expect(rows.length).toBeGreaterThanOrEqual(16); // passes in worktrees without 0009-0011 too
     const byName = new Map(rows.map((r) => [r.name, r.schedule]));
     expect(byName.get("morning_digest")).toBe("30 6 * * *");
     expect(byName.get("nightly_digest")).toBe("0 23 * * *");

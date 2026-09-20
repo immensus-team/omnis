@@ -72,20 +72,21 @@ describe("0005_memory", () => {
 
     await query(
       pool,
-      `INSERT INTO memories (content, embedding, kind) VALUES ('logan prefers 한국어', $1::vector, 'preference')`,
+      `INSERT INTO memories (content, embedding, kind) VALUES ('logan prefers tea', $1::vector, 'preference')`,
       [unit768],
     );
-    // ponytail: 통합 테스트는 omnis_test 한 DB를 공유하고, 앞서 돈 파일들이 memories에
-    // 수백 건을 넣었다 지운다. HNSW는 죽은 원소를 그래프에 남겨 두므로 ef_search(기본 40)가
-    // 죽은 원소만 훑고 끝나 살아 있는 행 하나를 못 찾는 일이 생긴다(스캔이 0행을 돌려준다).
-    // VACUUM으로 죽은 인덱스 엔트리를 걷어내고 재면 앞 파일이 뭘 했든 결과가 같다.
+    // ponytail: the integration tests share one omnis_test DB, and files that ran earlier insert
+    // then delete hundreds of rows in memories. HNSW leaves dead elements in the graph, so
+    // ef_search (default 40) can scan only dead elements, stop, and miss the one live row (the
+    // scan returns 0 rows). VACUUM sweeps the dead index entries, so the measurement is the same
+    // no matter what earlier files did.
     await query(pool, "VACUUM memories");
     const hit = await query<{ content: string }>(
       pool,
       "SELECT content FROM memories WHERE invalidated_at IS NULL ORDER BY embedding <=> $1::vector LIMIT 1",
       [unit768],
     );
-    expect(hit[0]?.content).toContain("한국어");
+    expect(hit[0]?.content).toContain("tea");
 
     await expect(
       query(pool, `INSERT INTO memories (content, kind) VALUES ('x','rumor')`),
