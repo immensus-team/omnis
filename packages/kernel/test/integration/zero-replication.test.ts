@@ -1,12 +1,12 @@
-// 0008의 publication 정의를 "무엇이 실제로 WAL에 실리는가"로 확인한다. 컬럼 리스트가
-// 어긋나면 pg_publication_tables 대조(zero-publication.test.ts)는 통과해도 비밀이 샐 수 있다.
+// Verify 0008's publication definition by "what actually lands in the WAL". The column list
+// may satisfy the pg_publication_tables check (zero-publication.test.ts) yet still leak secrets.
 import { createPool, one, query } from "@omnis/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const pool = createPool();
 const SLOT = "omnis_test_zero_slot";
 
-// 슬롯이 남으면 WAL이 무한 적재된다. 테스트가 죽어도 손으로 지울 수 있게 이름을 고정한다:
+// A leftover slot grows WAL unbounded. Fixed name lets you drop it by hand if the test dies:
 //   psql -d <testdb> -c "SELECT pg_drop_replication_slot('omnis_test_zero_slot')"
 async function dropSlot(): Promise<void> {
   await query(
@@ -55,7 +55,7 @@ describe("durable Item row replication", () => {
          ON CONFLICT (account_id, external_id) DO UPDATE SET kind = EXCLUDED.kind RETURNING id`,
       [account.id],
     );
-    await drain(); // 준비 INSERT는 버린다
+    await drain(); // discard the setup INSERTs
 
     await query(
       pool,

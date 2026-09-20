@@ -19,7 +19,7 @@ const vapid = { publicKey: "pub", privateKey: "priv", subject: "mailto:x@example
 const payload = {
   kind: "approval" as const,
   title: "omnis",
-  body: "승인 대기 1건",
+  body: "1 pending approval",
   deep_link: "omnis://thread/abc",
   approval_id: "11111111-1111-1111-1111-111111111111",
 };
@@ -84,7 +84,7 @@ describe("sendWebPush (A5 §4.4)", () => {
   });
 });
 
-describe("vapidFromEnv (델타 §9)", () => {
+describe("vapidFromEnv (delta §9)", () => {
   it("reads the three env vars and defaults the subject", async () => {
     const { vapidFromEnv } = await import("../../src/notify/webpush.js");
     expect(
