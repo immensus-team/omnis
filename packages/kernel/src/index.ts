@@ -20,12 +20,35 @@ export {
   registerHealthcheckJob,
 } from "./jobs/healthcheck.js";
 export {
+  ADAPTER_HEALTH_FAIL_THRESHOLD,
+  recordAdapterHealth,
+  resetAdapterHealthCounters,
+  sendNtfy,
+} from "./adapter-health.js";
+export type { AdapterHealthDeps, NtfyDeps } from "./adapter-health.js";
+export {
   COST_DAILY_CRON,
   COST_DAILY_JOB_NAME,
   registerCostDailyJob,
   runCostDaily,
 } from "./jobs/cost-daily.js";
 export type { CostDailyDeps } from "./jobs/cost-daily.js";
+export {
+  TOKEN_REFRESH_CRON,
+  TOKEN_REFRESH_JOB_NAME,
+  TOKEN_REFRESH_WINDOW_MINUTES,
+  registerTokenRefreshJob,
+} from "./jobs/token-refresh.js";
+export type { TokenRefreshDeps, TokenRefresher } from "./jobs/token-refresh.js";
+export {
+  GMAIL_REWATCH_CRON,
+  GMAIL_REWATCH_JOB_NAME,
+  GRAPH_SUB_RENEW_CRON,
+  GRAPH_SUB_RENEW_JOB_NAME,
+  registerGmailRewatchJob,
+  registerGraphSubRenewJob,
+} from "./jobs/rewatch.js";
+export type { RewatchDeps, RewatchFn } from "./jobs/rewatch.js";
 export { KillSwitchError, createKillSwitch, killSwitchStatus } from "./kill-switch.js";
 export type { KillSwitch, KillSwitchDeps } from "./kill-switch.js";
 export { createLogger } from "./logger.js";
