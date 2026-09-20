@@ -78,9 +78,11 @@ test("Phase A seeded smoke", async ({ page }) => {
     },
   );
 
-  // 접근성 이름만 보면 빈 div도 통과한다(실제로 그랬다 — 앞 커밋의 fix(desktop) 참고).
-  // U2부터 채널 아이콘은 모노그램 텍스트가 아니라 실제 react-icons/si SVG다 — "보이는 무언가가
-  // 있다"는 주장은 이제 svg 자식 노드 존재 + non-zero bounding box로 확인한다.
+  // An accessible name alone is satisfied by an empty div (it once was — see the fix(desktop) in an
+  // earlier commit). Since US-D02b the channel mark is the official brand PNG rather than a
+  // react-icons SVG, so "there is something visible here" is checked as: an <img> child, a non-zero
+  // bounding box, and a non-zero naturalWidth — the last one is what fails if the asset 404s, which
+  // a bounding box alone would not catch.
   const CHANNEL_LABELS = ["Slack message", "Gmail message", "Google Calendar message"];
   await check("A2 Inbox rows show a visible channel icon for all three channels", async () => {
     for (const label of CHANNEL_LABELS) {
@@ -89,12 +91,14 @@ test("Phase A seeded smoke", async ({ page }) => {
         .toBeGreaterThan(0);
       const icon = page.getByLabel(label).first();
       await expect(icon).toBeVisible();
-      const svg = icon.locator("svg");
-      await expect(svg).toHaveCount(1);
-      const box = await svg.boundingBox();
+      const mark = icon.locator("img");
+      await expect(mark).toHaveCount(1);
+      const box = await mark.boundingBox();
       if (!box || box.width === 0 || box.height === 0) {
-        throw new Error(`${label} icon svg has zero size`);
+        throw new Error(`${label} brand mark has zero size`);
       }
+      const loaded = await mark.evaluate((el) => (el as HTMLImageElement).naturalWidth);
+      if (loaded === 0) throw new Error(`${label} brand mark did not load (naturalWidth 0)`);
     }
     return CHANNEL_LABELS.join(" / ");
   });
@@ -113,10 +117,11 @@ test("Phase A seeded smoke", async ({ page }) => {
     await expect(page.getByLabel("topic label: launch").first()).toBeVisible();
   });
 
-  // U1/U2 셸 크롬: kinso 레퍼런스의 두 고정 요소(왼쪽 채널 레일, 상단 ask/search 필바)가
-  // 실제로 떠 있는지 본다 — 01-inbox.png가 "kinso처럼 보인다"는 주장의 절반이 이 둘이다.
+  // U1/U2 shell chrome: the two fixed elements of the kinso reference (the left channel rail, the
+  // top ask/search pill bar) are actually on screen — half of 01-inbox.png's "this looks like
+  // kinso" claim is these two.
   await check("A2c kinso shell: channel rail tiles + ask/search bar", async () => {
-    const rail = page.getByRole("navigation", { name: "채널" });
+    const rail = page.getByRole("navigation", { name: "Channels" });
     await expect(rail).toBeVisible();
     for (const tile of ["Inbox", "Slack", "Gmail", "Google Calendar", "Agent"]) {
       await expect(rail.getByRole("button", { name: tile, exact: true })).toBeVisible();
@@ -125,14 +130,15 @@ test("Phase A seeded smoke", async ({ page }) => {
     return "rail: Inbox/Slack/Gmail/Google Calendar/Agent + ask bar";
   });
 
-  // 행 해부(U2): 아바타 · 이름 · 상대시간 · AI 한 줄 요약이 한 행 안에 다 있는지.
-  // A1/A2/A2b는 각각 개수·아이콘·제목만 보므로, 요약 줄이 통째로 빠져도 전부 통과한다.
+  // Row anatomy (U2): avatar, name, relative time and the one-line AI summary all present in one
+  // row. A1/A2/A2b look only at counts, icons and titles, so all three pass with the summary line
+  // missing entirely.
   await check("A2d a conversation row has avatar + name + relative time + summary", async () => {
     const row = rows.first();
     await expect(row.locator(".inbox-row__avatar")).toHaveCount(1);
     await expect(row.locator(".inbox-row__name")).not.toBeEmpty();
     const time = (await row.locator(".inbox-row__timestamp").textContent()) ?? "";
-    // formatRelativeTime의 출력 문법: now / 3m / 2w / 4 Aug (절대 ISO 타임스탬프가 아니다).
+    // formatRelativeTime's output grammar: now / 3m / 2w / 4 Aug (never an absolute ISO stamp).
     if (!/^(now|\d+[mhdw]|\d{1,2} [A-Za-z]{3}( \d{4})?)$/.test(time.trim())) {
       throw new Error(`timestamp "${time}" is not a kinso relative time`);
     }
@@ -142,9 +148,9 @@ test("Phase A seeded smoke", async ({ page }) => {
   });
   await shot(page, "01-inbox.png");
 
-  // U2부터 행이 item이 아니라 thread 단위라 "work와 personal의 개수가 다르다"는 더 이상
-  // 보장되지 않는다(시드는 work 스레드 1개 · personal 스레드 1개다) — 개수 대신 신원을 본다:
-  // 두 필터의 행 집합은 겹치지 않고, 둘 다 all의 진부분집합이다.
+  // Since U2 a row is a thread rather than an item, so "work and personal have different counts"
+  // no longer holds (the seed has one work thread and one personal thread) — identity is checked
+  // instead: the two filters' row sets are disjoint, and both are proper subsets of all.
   await check("A4 work/personal filter pills change the list", async () => {
     const names = async (): Promise<string[]> =>
       (await rows.locator(".inbox-row__name").allTextContents()).map((n) => n.trim()).sort();
@@ -163,7 +169,8 @@ test("Phase A seeded smoke", async ({ page }) => {
     return `all=${all.length} work=[${work.join(", ")}] personal=[${personal.join(", ")}]`;
   });
 
-  // 레일 타일도 필터다(U1: 레일 선택 AND pill 필터) — 클릭 한 번이 실제로 목록을 좁히는지.
+  // A rail tile is a filter too (U1: rail selection AND pill filter) — whether one click really
+  // narrows the list.
   await check("A4b channel rail tile filters the list, Inbox tile restores it", async () => {
     const all = await rows.count();
     await page
@@ -184,7 +191,8 @@ test("Phase A seeded smoke", async ({ page }) => {
   await page.getByRole("radio", { name: "all", exact: true }).click();
 
   await check("A5 Thread screen renders seeded items with status badges", async () => {
-    // 초안 행은 sent_at=now()라 목록 맨 위에 있다 — Virtuoso 스크롤 없이 바로 누를 수 있다.
+    // The draft row has sent_at=now(), so it is at the top of the list — clickable without making
+    // Virtuoso scroll.
     await rows.filter({ hasText: "Draft:" }).first().click();
     const detail = page.getByTestId("detail-pane");
     await expect(detail.locator(".status-badge").first()).toBeVisible({ timeout: 20_000 });
@@ -196,7 +204,7 @@ test("Phase A seeded smoke", async ({ page }) => {
   await shot(page, "03-thread.png");
 
   await check("A6 Agent Session screen shows turns and a ToolCallBadge", async () => {
-    await rows.filter({ hasText: "✓ 턴 완료" }).first().click();
+    await rows.filter({ hasText: "✓ Turn complete" }).first().click();
     const detail = page.getByTestId("detail-pane");
     await expect(detail.locator(".tool-call-badge").first()).toBeVisible({ timeout: 20_000 });
     await expect(detail.locator(".agent-session-screen__turn").first()).toBeVisible();

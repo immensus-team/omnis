@@ -16,14 +16,14 @@ export interface CostDailyDeps {
   now?: Date;
 }
 
-/** A4 §12.4 상태 표의 임계 그대로. `Policy.note`는 "무엇이 멈췄나"만 말하므로
- *  "왜 지금 바뀌었나"를 한 문장 앞에 붙인다. */
+/** The thresholds of the A4 §12.4 state table as-is. `Policy.note` only says "what stopped", so a
+ *  sentence saying "why it changed now" is put in front of it. */
 const HEADLINE: Record<CostState, string> = {
-  normal: "LLM 비용이 정상 범위로 돌아왔습니다",
-  warn: "이번 달 LLM 비용이 월 상한의 60%를 넘었습니다",
-  degraded: "이번 달 LLM 비용이 월 상한의 80%를 넘었습니다",
-  reserve_only: "일반 예산이 소진되어 VIP·민감 예비비만 남았습니다",
-  frozen: "월 상한을 전부 소진했습니다",
+  normal: "LLM spend is back in the normal range",
+  warn: "This month's LLM spend has passed 60% of the monthly cap",
+  degraded: "This month's LLM spend has passed 80% of the monthly cap",
+  reserve_only: "The general budget is spent; only the VIP/sensitive reserve is left",
+  frozen: "The monthly cap is fully spent",
 };
 
 async function lastState(pool: Pool): Promise<CostState | null> {
@@ -54,11 +54,11 @@ export async function runCostDaily(deps: CostDailyDeps): Promise<CostState> {
     before: { from: previous },
     after: { to: state, mtdUsd, reserveUsd },
   });
-  const body = `${HEADLINE[state]}(이번 달 $${mtdUsd.toFixed(2)}, 예비비 $${reserveUsd.toFixed(2)}).${
+  const body = `${HEADLINE[state]} (month to date $${mtdUsd.toFixed(2)}, reserve $${reserveUsd.toFixed(2)}).${
     policy.note === null ? "" : ` ${policy.note}`
   }`;
-  // ponytail: @omnis/kernel은 @omnis/agents를 의존할 수 없어 writeSystemItem을 쓰지 못한다.
-  // 같은 형태의 INSERT — 의도된 중복이다(계약 §12).
+  // ponytail: @omnis/kernel cannot depend on @omnis/agents, so writeSystemItem is out of reach.
+  // The same INSERT in the same shape — a deliberate duplication (contract §12).
   await query(
     pool,
     `WITH acc AS (

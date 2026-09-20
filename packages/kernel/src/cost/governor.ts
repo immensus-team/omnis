@@ -44,7 +44,7 @@ export const POLICY: Record<CostState, Policy> = {
     draftsNonVip: true,
     draftsVipSensitive: true,
     digestCron: "daily",
-    note: "이번 달 LLM 비용이 상한의 60%입니다.",
+    note: "This month's LLM spend is at 60% of the cap.",
   },
   degraded: {
     allowT2NonSensitive: false,
@@ -52,7 +52,7 @@ export const POLICY: Record<CostState, Policy> = {
     draftsNonVip: true,
     draftsVipSensitive: true,
     digestCron: "alternate",
-    note: "비민감 작업의 T2 에스컬레이션을 중단했습니다(T1으로 생성). VIP·민감 초안은 예비비로 계속됩니다.",
+    note: "T2 escalation is stopped for non-sensitive work (generated with T1). VIP and sensitive drafts continue on the reserve.",
   },
   reserve_only: {
     allowT2NonSensitive: false,
@@ -60,7 +60,7 @@ export const POLICY: Record<CostState, Policy> = {
     draftsNonVip: false,
     draftsVipSensitive: true,
     digestCron: "alternate",
-    note: "일반 예산이 소진되어 비VIP 초안 생성을 중단했습니다. 분류·라벨·투두 추출·자동 보관은 계속되고, VIP·민감 초안은 예비비로 계속됩니다.",
+    note: "The general budget is spent, so non-VIP draft generation is stopped. Classification, labels, todo extraction and auto-archive continue, and VIP and sensitive drafts continue on the reserve.",
   },
   frozen: {
     allowT2NonSensitive: false,
@@ -68,7 +68,7 @@ export const POLICY: Record<CostState, Policy> = {
     draftsNonVip: false,
     draftsVipSensitive: false,
     digestCron: "off",
-    note: "예비비까지 소진되어 모든 초안 생성을 중단했습니다. 분류·라벨·투두 추출·자동 보관은 계속됩니다.",
+    note: "The reserve is spent too, so all draft generation is stopped. Classification, labels, todo extraction and auto-archive continue.",
   },
 };
 

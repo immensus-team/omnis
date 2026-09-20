@@ -254,7 +254,7 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
         session,
         externalId: `${sessionKey}|${turnId}|turn`,
         kind: "system",
-        body: ok ? "✓ 턴 완료" : "⚠ 턴 실패",
+        body: ok ? "✓ Turn complete" : "⚠ Turn failed",
         tool: null,
       });
       session.turnOpen = false;

@@ -44,6 +44,24 @@ const NARROW_WIDTHS = [390, 768];
 const RAIL_HEIGHT = 56;
 /** The filter row must not grow past this — it is one line of controls, not a stack. */
 const FILTER_ROW_MAX = 40;
+/** Overflow-only widths. No screenshot, no layout assertions — these are the four sizes the
+ *  anti-slop checklist (docs/design/SKILLS.md #11) names, and 320px is the narrowest thing the
+ *  list has to survive. Cheap enough to sweep on every run. */
+const OVERFLOW_ONLY_WIDTHS = [320, 375, 414];
+/** Below the 560px list pane the strip's own controls come up to this — the min-height the narrow
+ *  block sets on the view pills, the Archived toggle and the "+ Label" trigger. */
+const TOUCH_TARGET_MIN = 32;
+/** The floor for everything else in the strip. The chip's × is 20px painted inside a 28px chip
+ *  with its pointer target widened to 28x28 by `::after { inset: -4px }` (US-D02 round 4 measured
+ *  this: growing the button itself grows the chip to 32px and the strip past its 40px cap). So the
+ *  sweep measures the expanded target, not the painted box, and holds it to 28. */
+const CHIP_TARGET_MIN = 28;
+/** The controls TOUCH_TARGET_MIN applies to — the ones the narrow block actually raises. */
+const RAISED_CONTROLS =
+  ".inbox-card__pills button, .inbox-card__archived-pill, .filter-chip-bar__add";
+/** The boundary of `@container list (max-width: 559.98px)` — the tier where the strip's controls
+ *  collapse to icons and come up to TOUCH_TARGET_MIN. Measured off the pane, not the window. */
+const NARROW_LIST_PANE = 560;
 /** --dur-panel is the longest transition on these screens (240ms); 400ms clears it. */
 const SETTLE_MS = 400;
 
@@ -218,8 +236,84 @@ async function sweep(page: Page, suffix: string): Promise<ShotResult[]> {
         );
       }
     }
+    // The <900px tiers are the coarse-pointer layout, so two things the string-matching unit tests
+    // cannot see are measured here instead.
+    if (NARROW_WIDTHS.includes(width)) {
+      // 1. Nothing in the row reserves space for the hover-only Archive/Restore button. It is
+      //    `opacity: 0` in the wide tier, which keeps its box — ~65px of dead gutter per row, out
+      //    of a 390px viewport, for a control a finger has no way to reveal.
+      const actionBoxes = await page.evaluate(() =>
+        [...document.querySelectorAll(".inbox-row__action")].map(
+          (el) => el.getBoundingClientRect().width,
+        ),
+      );
+      const laidOut = actionBoxes.filter((w) => w > 0);
+      if (laidOut.length > 0) {
+        throw new Error(
+          `${laidOut.length} row action button(s) still take layout at ${width}px (widest ${Math.max(...laidOut).toFixed(1)}px) — the narrow tier must give that column back to the title`,
+        );
+      }
+
+      // 2. Every control in the filter strip clears the touch floor — but only once the list pane
+      //    itself is inside the `list` query, which is what raises them. At 768px the shell has
+      //    collapsed while the pane is still ~736px wide, so the pane is measured, not the window.
+      const paneWidth = await page.evaluate(
+        () => document.querySelector(".inbox-card")?.getBoundingClientRect().width ?? 0,
+      );
+      if (paneWidth >= NARROW_LIST_PANE) {
+        results.push({ width, overflow: over, filterRow });
+        continue;
+      }
+      const targets = await page.evaluate((raised) => {
+        const buttons = [
+          ...document.querySelectorAll(".inbox-card__filter-row button"),
+        ] as HTMLElement[];
+        return buttons.map((el) => {
+          const rect = el.getBoundingClientRect();
+          // A control may widen its pointer target with an absolutely positioned `::after` on a
+          // negative inset rather than growing its own box. That is the real target, so grow the
+          // measured box by however far that pseudo-element reaches above and below.
+          const after = getComputedStyle(el, "::after");
+          const bleed =
+            after.content === "none" ? 0 : Math.max(0, -Number.parseFloat(after.top || "0") || 0);
+          return {
+            label: el.getAttribute("aria-label") ?? el.textContent?.trim() ?? "?",
+            height: rect.height + bleed * 2,
+            raised: el.matches(raised),
+          };
+        });
+      }, RAISED_CONTROLS);
+      if (targets.length === 0) throw new Error(`no filter-strip buttons at ${width}px`);
+
+      for (const target of targets) {
+        const floor = target.raised ? TOUCH_TARGET_MIN : CHIP_TARGET_MIN;
+        if (target.height < floor) {
+          throw new Error(
+            `"${target.label}" has a ${target.height.toFixed(1)}px target at ${width}px (min ${floor}px)`,
+          );
+        }
+      }
+      const worst = targets.reduce((a, b) => (b.height < a.height ? b : a));
+      console.log(
+        `  ${width}px: ${targets.length} strip controls, smallest target "${worst.label}" ${worst.height.toFixed(1)}px`,
+      );
+    }
+
     results.push({ width, overflow: over, filterRow });
   }
+
+  for (const width of OVERFLOW_ONLY_WIDTHS) {
+    await page.setViewportSize({ width, height: HEIGHT });
+    await page.waitForTimeout(SETTLE_MS);
+    const over = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    console.log(
+      `[${suffix === "" ? "unfiltered" : "filtered"}] width ${width}: overflow ${over}px`,
+    );
+    if (over > 0) throw new Error(`horizontal overflow at ${width}px: ${over}px`);
+  }
+
   return results;
 }
 

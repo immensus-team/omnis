@@ -5,6 +5,12 @@ html,
 body {
   height: 100%;
   margin: 0;
+  /* Belt and braces for hallmark's responsive gate: the container queries below are what actually
+     keep every tier inside its box (measured 0px overflow at 320-1440), but nothing should be able
+     to turn a single mis-sized child into a scrolling page. `clip` rather than `hidden` because
+     `hidden` on the root would make the page a scroll container and break `position: sticky`
+     inside it. */
+  overflow-x: clip;
 }
 
 /* US-D02b: the shell responds to its own box, not the viewport — hence @container rather than
@@ -1527,6 +1533,18 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* The hover-only Archive/Restore button is `opacity: 0`, which still takes its box — ~65px of
+     every row's right column for a control that is invisible. This is the tier where the rail has
+     already collapsed to a bottom bar, i.e. the coarse-pointer layout: `:hover` is not something a
+     finger does, and there is no swipe or long-press standing in for it, so here the control is
+     not merely hidden, it is unreachable. Hiding it hands that column back to the title and the
+     summary (at 390px it was 17% of the viewport). Scoped to this tier rather than global, because
+     in the wide tier `:focus-within` still reveals it for the keyboard. Archiving from a touch
+     layout goes through the thread itself until there is a gesture for it. */
+  .inbox-row__action {
+    display: none;
+  }
+
   /* Keeps the fixed bar off the last row and the ask bar — the bar's 56px plus room to
      breathe. */
   .app-shell__main {
@@ -1584,6 +1602,27 @@ body {
   }
 }
 
+/* <=419.98: the ask pill's avatar comes off the line. Below this the pill is down to the input and
+   its two composer affordances, and the orb is the only thing on it that carries no information —
+   the placeholder already says what the field is. Removing it is what stops the placeholder from
+   having to ellipsize ("Start typing to ask or se…") at 390px, which reads as a broken control
+   rather than a narrow one. The composer buttons and the model toggle stay: they are controls. */
+@container shell (max-width: 419.98px) {
+  .ask-bar__orb {
+    display: none;
+  }
+}
+
+/* The pill is a flex row whose natural width is placeholder + orb + composer + model toggle. The
+   input's own min-width: 0 (below, `[cmdk-input]`) is not enough on its own: every other child is
+   `flex: 0 0 auto`, so their sum is still the row's min-content and the shell's grid column has to
+   be at least that wide. Releasing it here is what keeps the ask bar at one viewport width instead
+   of pushing `documentElement.scrollWidth` past it. */
+.ask-bar,
+.ask-bar__pill {
+  min-width: 0;
+}
+
 /* ==========================================================================================
    US-D02b responsive list pane — it responds to **the list pane's own** width, not the shell's
    (@container list; .inbox-card above is the container). With the detail pane open the list pane
@@ -1611,7 +1650,9 @@ body {
   }
 
   /* An icon-only button keeps a target of at least 32px — the padding takes back what the word
-     gave up. */
+     gave up. The five view pills come with them: this is the phone tier, they are its primary
+     control, and 19px is half the touch floor. The strip still measures 40px (4 + 32 + 4). */
+  .inbox-card__pills button,
   .filter-chip-bar__add,
   .inbox-card__archived-pill {
     min-height: 32px;

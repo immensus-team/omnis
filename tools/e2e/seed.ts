@@ -137,7 +137,7 @@ export async function seed(pool: Pool, env: E2EEnv): Promise<SeedResult> {
   await query(
     pool,
     `INSERT INTO items (thread_id, account_id, kind, status, scope, body, sent_at)
-       VALUES ($1, $2, 'message', 'draft', 'work', '네, 오늘 중으로 리뷰할게요.', now())`,
+       VALUES ($1, $2, 'message', 'draft', 'work', 'Sure, I will review it today.', now())`,
     [slackThreadId, slackAccount.account_id],
   );
 

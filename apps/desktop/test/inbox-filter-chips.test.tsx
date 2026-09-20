@@ -254,7 +254,12 @@ describe("Inbox filter row responsive contract (US-D02b)", () => {
     expect(chipCells()).toEqual([["Label", "Integrations"]]);
   });
 
-  it("keeps that strip and the chip bar single-line in the stylesheet", () => {
+  // The next three cases read app.css and assert on declarations. jsdom cannot lay anything out,
+  // so they guard against the declaration being deleted and nothing more — a later override, a
+  // renamed container or a specificity conflict all keep them green. The layout invariants
+  // themselves (no horizontal overflow, a <= 40px strip, 32px targets, no dead gutter) are
+  // measured in a real browser by tools/e2e/shots-responsive.ts. Their names say so.
+  it("keeps the nowrap and overflow-x declarations on the strip and the chip bar", () => {
     const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
     // Matches the rule that starts the line — `.inbox-card__filter-row .filter-chip-bar` (the
     // padding reset) and the `::-webkit-scrollbar` rule both have more after the selector.
@@ -277,7 +282,7 @@ describe("Inbox filter row responsive contract (US-D02b)", () => {
   // Keyboard focus used to be indistinguishable from hover in this strip: the chips swapped in
   // `--state-hover`, which is the hover value, and the pills and the Archived toggle had nothing
   // at all. A ring with an offset is the signal hover never uses.
-  it("gives every control in the strip a focus ring hover does not also draw", () => {
+  it("keeps one focus-ring rule in the stylesheet covering every control in the strip", () => {
     const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
     const ring = css.match(/\.inbox-card__pills button:focus-visible,[\s\S]*?\{([\s\S]*?)\}/)?.[0];
 
@@ -295,13 +300,46 @@ describe("Inbox filter row responsive contract (US-D02b)", () => {
 
   // The chips were `flex: 0 0 auto` next to the summary, so at 390px they took the whole line and
   // the AI summary — the row's reason to exist — collapsed to about two characters.
-  it("hands the row's second line back to the summary below a 480px pane", () => {
+  it("keeps the 480px container query that clamps the summary and drops the row chips", () => {
     const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
     const narrow = css.match(/@container list \(max-width: 479\.98px\) \{([\s\S]*?)\n\}/)?.[1];
 
     expect(narrow).toBeDefined();
     expect(narrow).toContain("-webkit-line-clamp: 1");
     expect(narrow).toMatch(/\.inbox-row__chips \{\s*display: none;/);
+  });
+
+  // Three rules for the touch layout, on two different containers, and none of them can be observed
+  // in jsdom — so this case locks the declarations down and shots-responsive.ts measures them.
+  // (1) The five view pills are ~19px tall, under half the touch floor, while being this tier's
+  // primary control; that is the list pane's own width, so it lives in the `list` query with the
+  // icon collapse. (2) The hover-only Archive/Restore button is `opacity: 0`, so it keeps its box
+  // — ~65px of every row's right column for a control a finger cannot reveal at all. That one is
+  // the *shell* tier: at 768px the list pane is still ~736px wide, so the `list` query never fires
+  // there even though the rail has already collapsed to a bottom bar. (3) The ask pill's grid
+  // column needs its min-content released, and its orb dropped at phone widths, or the placeholder
+  // ellipsizes and the strip can push the page wider.
+  it("keeps the container queries that raise the pill targets and drop the row action", () => {
+    const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
+    const ruleBlock = (query: string): string | undefined =>
+      css.match(new RegExp(`@container ${query} \\{([\\s\\S]*?)\\n\\}`))?.[1];
+
+    const narrowList = ruleBlock("list \\(max-width: 559\\.98px\\)");
+    expect(narrowList).toBeDefined();
+    expect(narrowList).toMatch(/\.inbox-card__pills button,[\s\S]*?min-height: 32px;/);
+
+    const narrowShell = ruleBlock("shell \\(max-width: 899\\.98px\\)");
+    expect(narrowShell).toBeDefined();
+    expect(narrowShell).toMatch(/\.inbox-row__action \{\s*display: none;/);
+    // Not global: the wide tier still reveals the action on `:focus-within` for the keyboard.
+    expect(css).toContain(".inbox-row:focus-within .inbox-row__action");
+
+    const phoneShell = ruleBlock("shell \\(max-width: 419\\.98px\\)");
+    expect(phoneShell).toBeDefined();
+    expect(phoneShell).toMatch(/\.ask-bar__orb \{\s*display: none;/);
+    // The orb is the only child that carries no information — the controls stay.
+    expect(phoneShell).not.toContain("ask-bar__composer-button");
+    expect(css).toMatch(/\.ask-bar,\s*\n\.ask-bar__pill \{\s*\n\s*min-width: 0;/);
   });
 
   // Below a 560px list pane the container query hides `.inbox-card__archived-label` and shows the
