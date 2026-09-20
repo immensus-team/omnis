@@ -9,3 +9,12 @@ export { T1_BASE_URL, T1_MODEL_ID, T1_RUN_MODEL } from "./t1/provider.js";
 export { sensitivityFor, pickSensitivity, SENSITIVITY_PRIORITY } from "./sensitivity.js";
 export { summarizeThread, type SummarizeThreadResult } from "./summarize.js";
 export { summarizeWithT1, T1SummaryOutput } from "./t1/summarize-t1.js";
+export {
+  CHANNEL_DRAFT_SHAPE,
+  NEEDS_REPLY_MIN,
+  needsReplyScore,
+  pickRegister,
+  type DraftShape,
+  type Register,
+} from "./draft/register.js";
+export { SELF_CHECK_ITEMS, selfCheck, type SelfCheckCtx } from "./draft/selfcheck.js";
