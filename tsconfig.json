@@ -5,6 +5,7 @@
     { "path": "./packages/db" },
     { "path": "./packages/kernel" },
     { "path": "./apps/hub" },
+    { "path": "./packages/agents" },
     { "path": "./apps/local-agent" }
   ]
 }
