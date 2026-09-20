@@ -60,7 +60,7 @@ export async function nightlyGroups(
     count: string;
     samples: { id: string; line: string }[] | null;
   }>(
-    `SELECT COALESCE(meta->'archived_by'->>'reason','other') AS reason,
+    `SELECT COALESCE(meta->'archived_by'->>'reason','Other') AS reason,
             count(*)::text AS count,
             jsonb_agg(jsonb_build_object('id', id, 'line', left(COALESCE(subject, body), 90))
                       ORDER BY sent_at DESC) AS samples

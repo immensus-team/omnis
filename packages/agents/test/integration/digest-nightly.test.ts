@@ -61,6 +61,23 @@ describe("nightlyDigestLoop (A4 §6.4·§9.4)", () => {
     expect(g?.undo_token).toBe(undoTokenFor("d1", "newsletter"));
   });
 
+  // The fallback for an archived item whose meta carries no reason. kernel archive.ts's
+  // archivedSince() reports the same bucket, so the two must not drift: reason is also what
+  // undo_token is hashed from, and a casing split would silently produce two buckets and two
+  // undo tokens for one bucket of items.
+  it("buckets an archived item with no reason under 'Other'", async () => {
+    await pool.query(
+      `INSERT INTO items (thread_id, account_id, kind, status, body, sent_at, meta)
+       VALUES ($1, (SELECT account_id FROM threads WHERE id = $1), 'email', 'archived',
+               'No reason recorded', now(),
+               jsonb_build_object('archived_by', jsonb_build_object('at', now()::text)))`,
+      [threadId],
+    );
+    const groups = await nightlyGroups(pool, seededAt, "d1");
+    expect(groups.find((x) => x.reason === "Other")?.count).toBe(1);
+    expect(groups.find((x) => x.reason === "other")).toBeUndefined();
+  });
+
   it("stores the cost field the hub injected", async () => {
     await nightlyDigestLoop.apply(
       {
