@@ -4,10 +4,16 @@
 // archive-inbox.test.tsx의 테이블 태깅 목을 그대로 쓴다(Inbox는 쿼리마다 다른 행이 필요하다).
 import "./setup";
 
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { VirtuosoMockContext } from "react-virtuoso";
 import { describe, expect, it, vi } from "vitest";
+
+/** This test file's own directory, taken from the module URL rather than cwd — the same resolution
+ *  app-shell.test.tsx uses, so it works from both the root `pnpm test` and `--filter @omnis/desktop`. */
+const TEST_DIR = dirname(new URL(import.meta.url).pathname);
 
 const THREADS = {
   none: "11111111-1111-1111-1111-111111111111",
@@ -187,5 +193,59 @@ describe("Inbox channel filter chips (US-D02)", () => {
   it("콜백이 없으면 channelFilter가 걸려 있어도 칩을 그리지 않는다", () => {
     renderInbox({ channelFilter: "gmail" });
     expect(document.querySelector(".filter-chip")).toBeNull();
+  });
+});
+
+describe("Inbox filter row responsive contract (US-D02b)", () => {
+  // The pills, the archived toggle and the label chips are ONE horizontal strip, not three stacked
+  // lines — three stacked lines is the bug this slice fixed. app.css holds the strip on
+  // `flex-wrap: nowrap` + `overflow-x: auto`, so a narrow pane scrolls it sideways instead of
+  // growing taller. JSDOM computes no layout, so the geometry itself (no page-level horizontal
+  // overflow, strip <= 40px tall) is asserted for real in tools/e2e/shots-responsive.ts — what is
+  // locked here is the class hook and the stylesheet rule behind it.
+  it("puts the pills, the archived toggle and the chip bar in one strip", () => {
+    const { container } = renderInbox();
+
+    expect(
+      [...(container.querySelector(".inbox-card__filter-row")?.children ?? [])].map(
+        (child) => child.className,
+      ),
+    ).toEqual(["inbox-card__pills", "inbox-card__archived-pill", "filter-chip-bar"]);
+  });
+
+  it("keeps that strip and the chip bar single-line in the stylesheet", () => {
+    const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
+    // Matches the rule that starts the line — `.inbox-card__filter-row .filter-chip-bar` (the
+    // padding reset) and the `::-webkit-scrollbar` rule both have more after the selector.
+    const ruleFor = (selector: string): string =>
+      css.match(new RegExp(`\\n${selector} \\{([^}]*)\\}`))?.[1] ?? "";
+
+    const filterRow = ruleFor("\\.inbox-card__filter-row");
+    expect(filterRow).toContain("flex-wrap: nowrap");
+    expect(filterRow).toContain("overflow-x: auto");
+    // The same bar is used by other screens, which have no scrolling host — it must not wrap there
+    // either, or the inbox's 3-line chip pile comes back through the shared component.
+    expect(ruleFor("\\.filter-chip-bar")).toContain("flex-wrap: nowrap");
+  });
+
+  // Below a 560px list pane the container query hides `.inbox-card__archived-label` and shows the
+  // archive glyph in its place. JSDOM cannot apply `@container`, so both halves are asserted to be
+  // in the DOM at all times — and the toggle's name to come from aria-label, never from the text
+  // that a real browser hides.
+  it("keeps the archived toggle's glyph and label in the DOM under one stable accessible name", () => {
+    renderInbox();
+
+    const toggle = screen.getByRole("button", { name: "Archived" });
+    expect(toggle).toHaveAttribute("aria-label", "Archived");
+    expect(toggle).toHaveAttribute("title", "Archived");
+    expect(toggle.querySelector(".inbox-card__archived-label")).toHaveTextContent("Archived");
+    // The glyph is what survives the collapse, so it must not join the accessible name.
+    expect(toggle.querySelector(".inbox-card__archived-icon")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
   });
 });

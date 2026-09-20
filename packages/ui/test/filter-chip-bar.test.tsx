@@ -111,3 +111,39 @@ describe("FilterChipBar (US-D02)", () => {
     expect(screen.queryByRole("button", { name: "Add Label filter" })).not.toBeInTheDocument();
   });
 });
+
+describe("FilterChipBar responsive contract (US-D02b)", () => {
+  // The bar is a single horizontal strip, never a wrapping pile — app.css holds `.filter-chip-bar`
+  // on `flex-wrap: nowrap` and lets its host scroll it sideways instead. JSDOM computes no layout
+  // and evaluates no `@container`, so the class hook plus the DOM shape below is everything this
+  // level can honestly assert; the real 390/768/1024/1440px geometry is asserted in
+  // tools/e2e/shots-responsive.ts (no horizontal overflow, filter row <= 40px tall).
+  it("keeps every chip and the add trigger as children of one strip element", () => {
+    const { container } = render(
+      <FilterChipBar
+        chips={[{ id: "labels", field: "Label", value: "one of 2", onRemove: vi.fn() }]}
+        addOptions={addOptions()}
+      />,
+    );
+
+    // One strip: the chip and the trigger side by side, nothing wrapping them in an extra row.
+    expect(
+      [...(container.querySelector(".filter-chip-bar")?.children ?? [])].map((c) => c.className),
+    ).toEqual(["filter-chip", "filter-chip-bar__add"]);
+  });
+
+  // Below a 560px list pane app.css hides `.filter-chip-bar__add-label` and leaves the "+" — the
+  // collapse is display:none, which JSDOM cannot apply. So what is locked here is that both halves
+  // stay in the DOM and the button keeps a name that does not depend on either being visible.
+  it("keeps the + glyph and the field label in the DOM under one stable accessible name", () => {
+    render(<FilterChipBar chips={[]} addOptions={addOptions()} />);
+
+    const add = screen.getByRole("button", { name: "Add Label filter" });
+    // The name comes from aria-label, not from the text that the container query hides.
+    expect(add).toHaveAttribute("aria-label", "Add Label filter");
+    expect(add).toHaveAttribute("title", "Label");
+    expect(add.querySelector(".filter-chip-bar__add-label")).toHaveTextContent("Label");
+    // The "+" is decoration once the label is there — it must not join the accessible name.
+    expect(within(add).getByText("+")).toHaveAttribute("aria-hidden", "true");
+  });
+});
