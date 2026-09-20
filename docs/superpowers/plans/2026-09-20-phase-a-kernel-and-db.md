@@ -2,64 +2,64 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Postgres 17 위에 omnis L0 커널(스키마 8파일 + 이벤트 3티어 + 스케줄러 + 승인 게이트 + kill switch + 감사 미들웨어)을 세우고 `apps/hub`가 `127.0.0.1:8787`에서 그것을 서비스하게 만든다.
+**Goal:** Stand up the omnis L0 kernel (8 schema files + 3 event tiers + scheduler + approval gate + kill switch + audit middleware) on Postgres 17, and make `apps/hub` serve it at `127.0.0.1:8787`.
 
-**Architecture:** `@omnis/db`는 DDL과 마이그레이션 러너, 타입드 쿼리 헬퍼만 갖는 최하층이다(ORM 없음). `@omnis/kernel`은 `@omnis/db`와 `@omnis/protocol`에만 의존해 events/scheduler/approvals/kill-switch/audit/egress를 순수 백엔드 로직으로 구현하고, 비가역 행동은 전부 `runEgress` 한 함수를 통과해야만 실행된다. `apps/hub`는 커널을 부팅해 루프백 HTTP 표면 5개와 `WS /bridge`(계약 §5가 서버 구현 오너를 이 계획으로 고정했다), graceful shutdown만 얹는다 — 채널 코드도 UI도 없다. 마지막으로 A7 §6의 CI 워크플로를 붙인다.
+**Architecture:** `@omnis/db` is the lowest layer, holding only DDL, the migration runner, and typed query helpers (no ORM). `@omnis/kernel` depends only on `@omnis/db` and `@omnis/protocol`, implementing events/scheduler/approvals/kill-switch/audit/egress as pure backend logic, and every irreversible action must pass through the single `runEgress` function to run. `apps/hub` boots the kernel and layers on only the 5 loopback HTTP surfaces, `WS /bridge` (contract §5 pinned this plan as the owner of the server implementation), and graceful shutdown — no channel code and no UI. Finally it attaches the CI workflow from A7 §6.
 
-**Tech Stack:** Node 22 + pnpm workspaces · TypeScript 5.6 (strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`) · PostgreSQL 17 + `pgcrypto`/`vector`(pgvector)/`pg_trgm` · `pg` 8.13.x (ORM 없음) · vitest 2.1.x (projects: `unit`/`contract`/`integration`) · Biome 1.9.x · `node:http` + `ws` 8.18.x (웹 프레임워크 없음) · GitHub Actions(`pgvector/pgvector:pg17` 서비스 컨테이너)
+**Tech Stack:** Node 22 + pnpm workspaces · TypeScript 5.6 (strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`) · PostgreSQL 17 + `pgcrypto`/`vector`(pgvector)/`pg_trgm` · `pg` 8.13.x (no ORM) · vitest 2.1.x (projects: `unit`/`contract`/`integration`) · Biome 1.9.x · `node:http` + `ws` 8.18.x (no web framework) · GitHub Actions (`pgvector/pgvector:pg17` service container)
 
-**Spec:** /Users/logankim/AI-Workspaces/omnis/docs/spec/00-omnis-design.md + 이 계획이 구현하는 부록:
-- `A3-data-schema.md` 전체 (§1 규약, §1.1 값 집합, §2 코어 DDL, §2.1 캘린더, §3 사람·라벨, §4 작업·에이전트·승인, §5 메모리, §6 커널 테이블, §6.1 append-only, §6.1.1 롤오프, §6.2 NOTIFY, §7 publication, §8 마이그레이션, §9 draft 전이, §11 보존)
-- `00-omnis-design.md` §4.2 배치 토폴로지, §7 커널
-- `A7-dev-process.md` §1 의존 규칙, §2 툴체인, §5 테스트 전략, §7 백로그(US-A01~A10)
-- `2026-09-20-phase-a-interfaces.md` (인터페이스 계약 — §1 패키지, §2 명령, §4 `@omnis/db`, §5 `@omnis/kernel`, §9 공통 규약)
+**Spec:** /Users/logankim/AI-Workspaces/omnis/docs/spec/00-omnis-design.md + the appendices this plan implements:
+- `A3-data-schema.md` in full (§1 conventions, §1.1 value sets, §2 core DDL, §2.1 calendar, §3 people·labels, §4 tasks·agents·approvals, §5 memory, §6 kernel tables, §6.1 append-only, §6.1.1 rolloff, §6.2 NOTIFY, §7 publication, §8 migration, §9 draft transitions, §11 retention)
+- `00-omnis-design.md` §4.2 deployment topology, §7 kernel
+- `A7-dev-process.md` §1 dependency rules, §2 toolchain, §5 test strategy, §7 backlog (US-A01~A10)
+- `2026-09-20-phase-a-interfaces.md` (interface contract — §1 packages, §2 commands, §4 `@omnis/db`, §5 `@omnis/kernel`, §9 common conventions)
 
 ---
 
 ## Global Constraints
 
-- Node 22 + pnpm workspaces. 루트 `pnpm-workspace.yaml`에 `packages/*`, `packages/adapters/*`, `apps/*`만 넣고 `tools/spikes/*`는 넣지 않는다(A7 §1).
-- TypeScript strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`를 루트 `tsconfig.base.json`에 고정하고 각 패키지가 extend한다(A7 §1).
-- Postgres 17 고정(A3 §1). 개발 DB `omnis`, 테스트 DB `omnis_test`, 접속은 `DATABASE_URL`(계약 §0-3, §9).
-- 허브는 `127.0.0.1:8787`에만 bind한다(마스터 §4.2). 8642는 Hermes `api_server`가 쓰므로 피한다.
-- 마이그레이션은 append-only 파일 `packages/db/migrations/000N_<name>.sql`이고 추적 테이블은 `_omnis_migrations`다(A3 §8). 이미 적용된 파일을 수정하지 않는다 — 항상 새 번호를 추가한다.
-- 승인 게이트(US-A07)가 완성되기 전에는 `send`/`delete`/`delegate`/`calendar_write` 비가역 tool을 아무 데도 배선하지 않는다(A7 §7 공통 금지). 이 계획에서 실제 채널 `send`가 닿는 지점은 Task 22의 `createOutbox` 하나뿐이고, 그 안에서만 `runEgress`를 거친다.
-- 테스트를 삭제하거나 스킵해서 통과시키지 않는다(A7 §7 공통 금지).
-- provider SDK는 각 어댑터 패키지 안에서만 import한다 — `@omnis/db`/`@omnis/kernel`/`apps/hub`는 `pg` 외의 외부 클라이언트를 갖지 않는다(A7 §1).
-- Keychain item 이름은 A1 규칙 `omnis.<channel>.<kind>.<external_id>`, 브리지 토큰은 `omnis.bridge.token.<host>`다(계약 §0-7). 이 계획은 Keychain을 읽지 않지만 `account_secrets.auth_ref`가 이 형식의 문자열만 담는다는 것을 DDL 주석으로 유지한다.
-- 스토리 티어는 A7 §4 배정표를 따르고, DeepSeek가 만든 diff는 반드시 Sonnet 이상이 리뷰한다(A7 §3·§4).
-- 커밋 메시지는 `<story-id>: <한 줄 요약>` + 본문에 충족한 acceptance criteria 목록 + 본문 마지막의 `Implemented-by: <tier>` 한 줄(A7 §6이 요구하는 "실제로 그 스토리를 구현한 모델" 표기: `DeepSeek V4.1 Flash` / `Claude Sonnet` / `Claude Opus`), 그리고 커밋의 **마지막 줄은 예외 없이** `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`(세션 규칙). 계약 §9의 `Co-Authored-By: Claude <tier>` / `Co-Authored-By: DeepSeek V4.1 Flash` 형식은 `Implemented-by:` 본문 줄로 흡수됐다 — open question 아님. 아래 모든 `git commit` 명령이 이 형식이다.
-- 브랜치는 `ralph/<story-id>`, 워크트리는 `omnis/.worktrees/<story-id>`(계약 §9).
+- Node 22 + pnpm workspaces. The root `pnpm-workspace.yaml` includes only `packages/*`, `packages/adapters/*`, `apps/*`, and does not include `tools/spikes/*` (A7 §1).
+- Pin TypeScript strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` in the root `tsconfig.base.json`, and every package extends it (A7 §1).
+- Pin Postgres 17 (A3 §1). Dev DB `omnis`, test DB `omnis_test`, connection via `DATABASE_URL` (contract §0-3, §9).
+- The hub binds only to `127.0.0.1:8787` (master §4.2). Port 8642 is used by Hermes `api_server`, so avoid it.
+- Migrations are append-only files `packages/db/migrations/000N_<name>.sql` and the tracking table is `_omnis_migrations` (A3 §8). Never modify an already-applied file — always add a new number.
+- Until the approval gate (US-A07) is complete, do not wire up the `send`/`delete`/`delegate`/`calendar_write` irreversible tools anywhere (A7 §7 common prohibitions). In this plan the only place a real channel `send` is reached is `createOutbox` in Task 22, and only there does it pass through `runEgress`.
+- Do not delete or skip tests to make them pass (A7 §7 common prohibitions).
+- Import provider SDKs only inside each adapter package — `@omnis/db`/`@omnis/kernel`/`apps/hub` have no external client other than `pg` (A7 §1).
+- Keychain item names follow the A1 rule `omnis.<channel>.<kind>.<external_id>`, and the bridge token is `omnis.bridge.token.<host>` (contract §0-7). This plan does not read the Keychain, but it preserves as a DDL comment the fact that `account_secrets.auth_ref` holds only strings of this form.
+- Story tiers follow the A7 §4 assignment table, and any diff produced by DeepSeek must be reviewed by Sonnet or higher (A7 §3·§4).
+- The commit message is `<story-id>: <one-line summary>` + a list of the acceptance criteria met in the body + a single `Implemented-by: <tier>` line at the end of the body (the "model that actually implemented the story" notation required by A7 §6: `DeepSeek V4.1 Flash` / `Claude Sonnet` / `Claude Opus`), and the **last line of the commit is, without exception,** `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` (session rule). The `Co-Authored-By: Claude <tier>` / `Co-Authored-By: DeepSeek V4.1 Flash` format from contract §9 was absorbed into the `Implemented-by:` body line — not an open question. Every `git commit` command below uses this format.
+- Branches are `ralph/<story-id>`, worktrees are `omnis/.worktrees/<story-id>` (contract §9).
 
-**선행 조건(이 계획 밖)**: Task 16 이후는 `@omnis/protocol`의 `HumanInterrupt`/`HumanResponse`/`ApprovalAction`/`ApprovalState`/`ApprovalDecision`/`ApprovalRisk`(계약 §3.4)와 `Adapter`/`NormalizedItem`/`AdapterEvent`/`IngestSink`(계약 §3.2·§3.3)를 import한다. 이 심볼들은 `2026-09-20-phase-a-protocol-and-adapters.md`의 US-A11이 만든다. US-A11이 merge되기 전에는 Task 16~25를 시작하지 않는다(A7 §7의 의존 순서에는 없지만 계약 §1의 패키지 의존이 강제한다).
+**Prerequisites (outside this plan):** From Task 16 on, the code imports `HumanInterrupt`/`HumanResponse`/`ApprovalAction`/`ApprovalState`/`ApprovalDecision`/`ApprovalRisk` from `@omnis/protocol` (contract §3.4) and `Adapter`/`NormalizedItem`/`AdapterEvent`/`IngestSink` (contract §3.2·§3.3). These symbols are created by US-A11 in `2026-09-20-phase-a-protocol-and-adapters.md`. Do not start Tasks 16~25 before US-A11 is merged (it is not in the A7 §7 dependency order, but the package dependency in contract §1 forces it).
 
-**`exactOptionalPropertyTypes` 함정**: `{ target_id: maybeUndefined }`는 optional 프로퍼티에 `undefined`를 대입하는 것이라 컴파일 에러다. 이 계획의 코드는 전부 `...(x !== undefined ? { k: x } : {})` 조건부 스프레드나 SQL 파라미터의 `?? null`로 푼다.
+**`exactOptionalPropertyTypes` pitfall**: `{ target_id: maybeUndefined }` assigns `undefined` to an optional property, which is a compile error. All the code in this plan solves this with the conditional spread `...(x !== undefined ? { k: x } : {})` or with `?? null` on SQL parameters.
 
-**`noUncheckedIndexedAccess` 함정**: `rows[0]`의 타입은 `T | undefined`다. 이 계획의 코드는 전부 `const row = rows[0]; if (row === undefined) throw ...`로 좁힌다.
+**`noUncheckedIndexedAccess` pitfall**: the type of `rows[0]` is `T | undefined`. All the code in this plan narrows it with `const row = rows[0]; if (row === undefined) throw ...`.
 
 ---
 
 ## Task 1: db-scaffold (US-A01, tier: DeepSeek)
 
-**스토리 US-A01** — 목표: `packages/db` 스캐폴드 + 마이그레이션 러너(스키마 없이 러너만, advisory lock + sha 비교) / 산출물: `packages/db/src/migrate.ts`, `_omnis_migrations` 부트스트랩 / 검증 명령: `pnpm --filter @omnis/db test` / 티어: DeepSeek(리뷰 Sonnet+).
+**Story US-A01** — Goal: `packages/db` scaffold + migration runner (runner only, no schema, advisory lock + sha comparison) / Outputs: `packages/db/src/migrate.ts`, `_omnis_migrations` bootstrap / Verification command: `pnpm --filter @omnis/db test` / tier: DeepSeek (review: Sonnet+).
 
-이 태스크는 모노레포 전체의 부트스트랩을 `@omnis/db`가 살아나는 데 필요한 만큼만 만든다. Task 2가 러너를 얹는다.
+This task builds only as much of the monorepo-wide bootstrap as is needed for `@omnis/db` to come alive. Task 2 layers on the runner.
 
-**읽을 곳**: A7 §1(트리·의존 방향), A7 §2(툴체인·루트 스크립트), 계약 §1(패키지 표), 계약 §2(명령 표), 계약 §4(`@omnis/db` export 목록).
+**Read:** A7 §1 (tree·dependency direction), A7 §2 (toolchain·root scripts), contract §1 (package table), contract §2 (command table), contract §4 (`@omnis/db` export list).
 
-**만들지 않을 것(YAGNI)**: Turborepo/Nx(A7-D2가 명시적으로 배제), ORM, 커스텀 로깅 라이브러리, `packages/memory`·`packages/agents`·`packages/ui`·`apps/desktop` 스캐폴드(각자 자기 계획에서 만든다), CI 워크플로(A7 §6 — 이 계획의 Task 27이 만든다, 여기서는 아니다).
+**Do NOT build (YAGNI):** Turborepo/Nx (explicitly excluded by A7-D2), an ORM, a custom logging library, scaffolds for `packages/memory`·`packages/agents`·`packages/ui`·`apps/desktop` (each is built in its own plan), the CI workflow (A7 §6 — Task 27 of this plan builds it, not here).
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/package.json`, `/Users/logankim/AI-Workspaces/omnis/pnpm-workspace.yaml`, `/Users/logankim/AI-Workspaces/omnis/tsconfig.base.json`, `/Users/logankim/AI-Workspaces/omnis/tsconfig.json`, `/Users/logankim/AI-Workspaces/omnis/biome.jsonc`, `/Users/logankim/AI-Workspaces/omnis/vitest.shared.ts`, `/Users/logankim/AI-Workspaces/omnis/vitest.workspace.ts`, `/Users/logankim/AI-Workspaces/omnis/packages/db/package.json`, `/Users/logankim/AI-Workspaces/omnis/packages/db/tsconfig.json`, `/Users/logankim/AI-Workspaces/omnis/packages/db/vitest.config.ts`, `/Users/logankim/AI-Workspaces/omnis/packages/db/src/index.ts`
 - Test: `/Users/logankim/AI-Workspaces/omnis/packages/db/test/pool.test.ts`
 
 **Interfaces:**
-- Consumes: 없음(리프 부트스트랩).
-- Produces: `createPool(env?: NodeJS.ProcessEnv): Pool` · `query<T>(c: Pool | PoolClient, sql: string, params?: readonly unknown[]): Promise<T[]>` · `one<T>(c: Pool | PoolClient, sql: string, params?: readonly unknown[]): Promise<T>` · `tx<T>(pool: Pool, fn: (c: PoolClient) => Promise<T>): Promise<T>` · `MIGRATIONS_DIR: string` · `NOTIFY_CHANNELS: readonly string[]` (전부 `@omnis/db`, 계약 §4).
+- Consumes: none (leaf bootstrap).
+- Produces: `createPool(env?: NodeJS.ProcessEnv): Pool` · `query<T>(c: Pool | PoolClient, sql: string, params?: readonly unknown[]): Promise<T[]>` · `one<T>(c: Pool | PoolClient, sql: string, params?: readonly unknown[]): Promise<T>` · `tx<T>(pool: Pool, fn: (c: PoolClient) => Promise<T>): Promise<T>` · `MIGRATIONS_DIR: string` · `NOTIFY_CHANNELS: readonly string[]` (all from `@omnis/db`, contract §4).
 
 ### Steps
 
-- [ ] 1. 워크스페이스 루트 파일 4개를 만든다.
+- [ ] 1. Create the 4 workspace root files.
 
 `/Users/logankim/AI-Workspaces/omnis/pnpm-workspace.yaml`:
 ```yaml
@@ -103,9 +103,9 @@ packages:
 }
 ```
 
-> **루트 파일 오너는 이 태스크 하나다**(계약 §2). 다른 5개 계획은 루트 스캐폴드를 만들지 않고 `test -f`로 존재만 확인한다. 버전 핀은 전 워크스페이스 동일: `vitest 2.1.9` · `typescript 5.6.3` · `pg 8.13.1` · `packageManager pnpm@9.12.3` · `zod ^3.24.1`(오너 `@omnis/protocol`, zod 4 금지) · `@rocicorp/zero 1.9.0` exact · `ai 7.0.107`.
+> **This task is the sole owner of the root files** (contract §2). The other 5 plans do not create the root scaffold and only check that it exists with `test -f`. Version pins are identical across the whole workspace: `vitest 2.1.9` · `typescript 5.6.3` · `pg 8.13.1` · `packageManager pnpm@9.12.3` · `zod ^3.24.1` (owner `@omnis/protocol`, zod 4 prohibited) · `@rocicorp/zero 1.9.0` exact · `ai 7.0.107`.
 >
-> `dev`·`tauri:dev`·`tauri:build`는 `@omnis/desktop`을 가리킨다 — 그 패키지는 `2026-09-20-phase-a-desktop.md`가 만든다. 이 계획 단계에서 `pnpm dev`를 돌리면 pnpm이 `@omnis/desktop`을 못 찾고 그 한 쪽만 실패한다(정상). `db:migrate`는 `@omnis/db`의 `migrate` 스크립트를 부르고, 그 스크립트와 CLI 파일은 Task 2가 만든다.
+> `dev`·`tauri:dev`·`tauri:build` point at `@omnis/desktop` — that package is created by `2026-09-20-phase-a-desktop.md`. Running `pnpm dev` at this stage of the plan means pnpm cannot find `@omnis/desktop` and only that side fails (expected). `db:migrate` calls the `migrate` script in `@omnis/db`, and that script and its CLI file are created by Task 2.
 
 `/Users/logankim/AI-Workspaces/omnis/tsconfig.base.json`:
 ```json
@@ -149,13 +149,13 @@ packages:
 }
 ```
 
-- [ ] 2. vitest 프로젝트 3개(`unit`/`contract`/`integration`)를 고정한다(계약 §2). 소스 TS를 그대로 실행하도록 워크스페이스 alias도 여기서 한 번만 선언한다.
+- [ ] 2. Pin the 3 vitest projects (`unit`/`contract`/`integration`) (contract §2). Declare the workspace alias here, only once, so that source TS runs directly.
 
 `/Users/logankim/AI-Workspaces/omnis/vitest.shared.ts`:
 ```ts
 import { fileURLToPath } from "node:url";
 
-/** 내부 패키지는 빌드 산출물이 아니라 소스 TS를 그대로 물린다. 프로덕션은 tsc --build의 dist를 쓴다. */
+/** Internal packages resolve to source TS directly, not to build artifacts. Production uses the dist from tsc --build. */
 export const omnisAlias: Record<string, string> = {
   "@omnis/db": fileURLToPath(new URL("./packages/db/src/index.ts", import.meta.url)),
   "@omnis/protocol": fileURLToPath(new URL("./packages/protocol/src/index.ts", import.meta.url)),
@@ -173,8 +173,8 @@ export default defineWorkspace([
     resolve: { alias: omnisAlias },
     test: {
       name: "unit",
-      // 계약 §2: unit은 *.test.ts와 *.test.tsx를 둘 다 덮는다(packages/ui·apps/desktop의 tsx 테스트가
-      // pnpm test에서 조용히 스킵되지 않도록). src/ 옆 테스트와 test/ 디렉터리 테스트를 모두 수집한다.
+      // contract §2: unit covers both *.test.ts and *.test.tsx (so that the tsx tests in packages/ui·apps/desktop
+      // are not silently skipped by pnpm test). It collects both tests next to src/ and tests in the test/ directory.
       include: [
         "packages/*/src/**/*.test.{ts,tsx}",
         "packages/*/test/**/*.test.{ts,tsx}",
@@ -204,9 +204,9 @@ export default defineWorkspace([
 ]);
 ```
 
-> `vitest.global-setup.ts`는 Task 2가 만든다. Task 1에서는 `integration` 프로젝트에 매칭되는 파일이 없으므로 참조돼도 실행되지 않는다.
+> `vitest.global-setup.ts` is created by Task 2. In Task 1 no file matches the `integration` project, so it does not run even though it is referenced.
 
-- [ ] 3. `@omnis/db` 패키지 골격을 만든다.
+- [ ] 3. Create the `@omnis/db` package skeleton.
 
 `/Users/logankim/AI-Workspaces/omnis/packages/db/package.json`:
 ```json
@@ -230,7 +230,7 @@ export default defineWorkspace([
 }
 ```
 
-> `migrate`/`migrate:create`가 가리키는 CLI 파일은 Task 2가 만든다. Task 1에서는 스크립트만 선언돼 있고 실행하지 않는다 — 루트 `pnpm db:migrate`가 `pnpm --filter @omnis/db migrate`로 위임하므로(계약 §2) 이름을 여기서 미리 고정해 둔다.
+> The CLI files that `migrate`/`migrate:create` point at are created by Task 2. In Task 1 only the scripts are declared and they are not run — the root `pnpm db:migrate` delegates to `pnpm --filter @omnis/db migrate` (contract §2), so the names are pinned here in advance.
 
 `/Users/logankim/AI-Workspaces/omnis/packages/db/tsconfig.json`:
 ```json
@@ -258,7 +258,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] 4. 실패하는 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/pool.test.ts`:
+- [ ] 4. Write the failing test. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/pool.test.ts`:
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -299,14 +299,14 @@ describe("constants", () => {
 });
 ```
 
-- [ ] 5. 의존성을 설치하고 테스트를 돌려 실패를 확인한다.
+- [ ] 5. Install the dependencies and run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm install && pnpm --filter @omnis/db test
 ```
-기대 실패: `Failed to resolve import "@omnis/db"` 또는 `Cannot find module .../packages/db/src/index.ts`.
+Expected failure: `Failed to resolve import "@omnis/db"` or `Cannot find module .../packages/db/src/index.ts`.
 
-- [ ] 6. 최소 구현을 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/db/src/index.ts`:
+- [ ] 6. Write the minimal implementation. `/Users/logankim/AI-Workspaces/omnis/packages/db/src/index.ts`:
 
 ```ts
 import { fileURLToPath } from "node:url";
@@ -314,10 +314,10 @@ import { Pool, type PoolClient } from "pg";
 
 export { Pool, type PoolClient } from "pg";
 
-/** packages/db/migrations 절대경로. src 실행(vitest)과 dist 실행(hub) 양쪽에서 같은 곳을 가리킨다. */
+/** Absolute path to packages/db/migrations. Points to the same place whether running from src (vitest) or dist (hub). */
 export const MIGRATIONS_DIR: string = fileURLToPath(new URL("../migrations", import.meta.url));
 
-/** A3 §6.2. 페이로드는 id만, 8,000B 한도. */
+/** A3 §6.2. The payload carries only the id, 8,000B limit. */
 export const NOTIFY_CHANNELS: readonly string[] = [
   "omnis_item",
   "omnis_thread",
@@ -331,7 +331,7 @@ export const NOTIFY_CHANNELS: readonly string[] = [
 export function createPool(env: NodeJS.ProcessEnv = process.env): Pool {
   const connectionString = env.DATABASE_URL;
   if (connectionString === undefined || connectionString === "") {
-    throw new Error("DATABASE_URL is required (계약 §9)");
+    throw new Error("DATABASE_URL is required (contract §9)");
   }
   return new Pool({ connectionString, max: 10, application_name: "omnis-hub" });
 }
@@ -374,29 +374,29 @@ export async function tx<T>(pool: Pool, fn: (c: PoolClient) => Promise<T>): Prom
 }
 ```
 
-- [ ] 7. 테스트를 돌려 통과를 확인한다.
+- [ ] 7. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대: `Test Files  1 passed (1)` / `Tests  4 passed (4)`.
+Expected output: `Test Files  1 passed (1)` / `Tests  4 passed (4)`.
 
-- [ ] 8. 타입체크와 린트를 돌린다.
+- [ ] 8. Run the typecheck and lint.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm typecheck && pnpm lint
 ```
-기대: 둘 다 에러 0.
+Expected output: 0 errors on both.
 
-- [ ] 9. 커밋한다.
+- [ ] 9. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A01: packages/db 스캐폴드와 타입드 쿼리 헬퍼
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A01: packages/db scaffold and typed query helpers
 
 - pnpm workspaces + tsconfig.base.json(strict/noUncheckedIndexedAccess/exactOptionalPropertyTypes)
-- Biome 단일 린터, vitest 프로젝트 unit/contract/integration
+- Biome as the single linter, vitest projects unit/contract/integration
 - @omnis/db: createPool/query/one/tx/MIGRATIONS_DIR/NOTIFY_CHANNELS
-- pnpm --filter @omnis/db test 통과
+- pnpm --filter @omnis/db test passes
 
 Implemented-by: DeepSeek V4.1 Flash
 
@@ -407,11 +407,11 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 2: migrate-runner (US-A01, tier: DeepSeek)
 
-**스토리 US-A01** (계속) — 산출물 `packages/db/src/migrate.ts` + `_omnis_migrations` 부트스트랩. 검증 명령 `pnpm --filter @omnis/db test`. A3 §8의 러너 코드가 단일 소스이고 이 태스크는 그것을 `migrate(pool, dir)` 시그니처로 옮겨 적는다.
+**Story US-A01** (continued) — Outputs `packages/db/src/migrate.ts` + the `_omnis_migrations` bootstrap. Verification command `pnpm --filter @omnis/db test`. The runner code in A3 §8 is the single source, and this task transcribes it into the `migrate(pool, dir)` signature.
 
-**읽을 곳**: A3 §8(러너 코드 전문, 검증 규칙), 계약 §4(`migrate()` 의미 문단 — 부트스트랩 → advisory lock 8931447 → 정렬 → sha256 비교 → `.noxact.sql` 예외 → insert → finally unlock), 계약 §2(통합 테스트 DB 문단).
+**Read:** A3 §8 (the runner code in full, verification rules), contract §4 (the `migrate()` semantics paragraph — bootstrap → advisory lock 8931447 → sort → sha256 comparison → `.noxact.sql` exception → insert → finally unlock), contract §2 (the integration test DB paragraph).
 
-**만들지 않을 것(YAGNI)**: 롤백(forward-only, A3-D9), 마이그레이션 생성 템플릿의 화려한 스캐폴딩(파일 하나 touch면 충분), 드라이런 모드, 마이그레이션 잠금 타임아웃 설정.
+**Do NOT build (YAGNI):** rollback (forward-only, A3-D9), fancy scaffolding for the migration creation template (touching a single file is enough), a dry-run mode, migration lock timeout configuration.
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/packages/db/src/migrate.ts`, `/Users/logankim/AI-Workspaces/omnis/packages/db/src/cli/migrate.ts`, `/Users/logankim/AI-Workspaces/omnis/packages/db/src/cli/create.ts`, `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/.gitkeep`, `/Users/logankim/AI-Workspaces/omnis/vitest.global-setup.ts`
@@ -420,18 +420,18 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `createPool`, `query`, `MIGRATIONS_DIR` (Task 1).
-- Produces: `migrate(pool: Pool, dir: string): Promise<{ applied: string[] }>` · `class MigrationError extends Error` (`name === "MigrationError"`, 계약 §9) — 둘 다 `@omnis/db` re-export.
+- Produces: `migrate(pool: Pool, dir: string): Promise<{ applied: string[] }>` · `class MigrationError extends Error` (`name === "MigrationError"`, contract §9) — both re-exported from `@omnis/db`.
 
 ### Steps
 
-- [ ] 1. 테스트 DB를 만든다. 로컬 네이티브 Postgres 17 전제(계약 §2: 컨테이너 없음).
+- [ ] 1. Create the test DB. Assumes a local native Postgres 17 (contract §2: no container).
 
 ```bash
 dropdb --if-exists omnis_test && createdb omnis_test && psql -d omnis_test -c 'SELECT version()'
 ```
-기대: `PostgreSQL 17.x ...` 한 줄.
+Expected output: a single `PostgreSQL 17.x ...` line.
 
-- [ ] 2. integration 프로젝트의 globalSetup을 만든다. 리셋 전략은 계약 §2 그대로 `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` → `migrate(pool, MIGRATIONS_DIR)` 하나뿐이다(파일별 트랜잭션 롤백은 쓰지 않는다 — 트리거와 NOTIFY를 검증해야 한다).
+- [ ] 2. Create the globalSetup for the integration project. The reset strategy is exactly the contract §2 one: `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` → `migrate(pool, MIGRATIONS_DIR)` and nothing else (no per-file transaction rollback — triggers and NOTIFY must be verified).
 
 `/Users/logankim/AI-Workspaces/omnis/vitest.global-setup.ts`:
 ```ts
@@ -462,9 +462,9 @@ export default async function setup(): Promise<void> {
 }
 ```
 
-> `DROP SCHEMA public CASCADE`는 확장(`vector` 등)과 `_omnis_migrations`까지 같이 지운다. 역할(`omnis_owner`/`omnis_hub`/`omnis_sync`)은 클러스터 전역이라 살아남으므로 `0001_extensions.sql`은 반드시 idempotent해야 한다(Task 3).
+> `DROP SCHEMA public CASCADE` also drops the extensions (`vector` etc.) and `_omnis_migrations`. The roles (`omnis_owner`/`omnis_hub`/`omnis_sync`) are cluster-global and survive, so `0001_extensions.sql` must be idempotent (Task 3).
 
-- [ ] 3. 실패하는 통합 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/migrate.test.ts`:
+- [ ] 3. Write the failing integration test. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/migrate.test.ts`:
 
 ```ts
 import { mkdtemp, writeFile } from "node:fs/promises";
@@ -549,14 +549,14 @@ describe("migrate", () => {
 });
 ```
 
-- [ ] 4. 테스트를 돌려 실패를 확인한다.
+- [ ] 4. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대 실패: `No "migrate" export is defined on the "@omnis/db" mock` 계열 — 실제로는 `SyntaxError: The requested module ... does not provide an export named 'migrate'`.
+Expected failure: something along the lines of `No "migrate" export is defined on the "@omnis/db" mock` — in practice `SyntaxError: The requested module ... does not provide an export named 'migrate'`.
 
-- [ ] 5. 러너를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/db/src/migrate.ts`:
+- [ ] 5. Write the runner. `/Users/logankim/AI-Workspaces/omnis/packages/db/src/migrate.ts`:
 
 ```ts
 import { createHash } from "node:crypto";
@@ -620,19 +620,19 @@ export async function migrate(pool: Pool, dir: string): Promise<{ applied: strin
 }
 ```
 
-- [ ] 6. `@omnis/db`에서 re-export한다. `/Users/logankim/AI-Workspaces/omnis/packages/db/src/index.ts` 맨 위 import 줄 바로 아래에 추가:
+- [ ] 6. Re-export from `@omnis/db`. Add it directly below the import lines at the top of `/Users/logankim/AI-Workspaces/omnis/packages/db/src/index.ts`:
 
 ```ts
 export { MigrationError, migrate } from "./migrate.js";
 ```
 
-- [ ] 7. 빈 마이그레이션 디렉터리를 만든다(Task 3부터 채운다).
+- [ ] 7. Create the empty migrations directory (filled from Task 3 on).
 
 ```bash
 mkdir -p /Users/logankim/AI-Workspaces/omnis/packages/db/migrations && touch /Users/logankim/AI-Workspaces/omnis/packages/db/migrations/.gitkeep
 ```
 
-- [ ] 8. 루트 스크립트가 물릴 CLI 두 개를 쓴다.
+- [ ] 8. Write the two CLI files the root scripts hook up.
 
 `/Users/logankim/AI-Workspaces/omnis/packages/db/src/cli/migrate.ts`:
 ```ts
@@ -666,29 +666,29 @@ await writeFile(file, `-- ${name}\n`, { flag: "wx" });
 console.log(file);
 ```
 
-- [ ] 9. 테스트를 돌려 통과를 확인한다.
+- [ ] 9. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대: `Tests  8 passed (8)` (Task 1의 4개 + 이번 4개).
+Expected output: `Tests  8 passed (8)` (the 4 from Task 1 + these 4).
 
-- [ ] 10. A3 §8이 정한 러너 전체 테스트, 즉 2연속 실행이 no-op인지 CLI로도 확인한다.
+- [ ] 10. Also verify from the CLI the full runner test defined by A3 §8, namely that two consecutive runs are a no-op.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && DATABASE_URL=postgres://logan@127.0.0.1:5432/omnis_test pnpm db:migrate && DATABASE_URL=postgres://logan@127.0.0.1:5432/omnis_test pnpm db:migrate
 ```
-기대: 두 번 다 `up to date`(마이그레이션 파일이 아직 없으므로).
+Expected output: `up to date` both times (since there are no migration files yet).
 
-- [ ] 11. 커밋한다.
+- [ ] 11. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A01: 마이그레이션 러너(advisory lock + sha256 비교, forward-only)
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A01: migration runner (advisory lock + sha256 comparison, forward-only)
 
-- migrate(pool, dir): _omnis_migrations 부트스트랩 → pg_advisory_lock(8931447) → 정렬 → sha 비교
-- 적용된 파일이 바뀌면 MigrationError
-- .noxact.sql은 트랜잭션 밖에서 실행(CREATE INDEX CONCURRENTLY용)
-- pnpm db:migrate 2연속 실행이 no-op
+- migrate(pool, dir): _omnis_migrations bootstrap → pg_advisory_lock(8931447) → sort → sha comparison
+- MigrationError when an applied file changes
+- .noxact.sql runs outside a transaction (for CREATE INDEX CONCURRENTLY)
+- pnpm db:migrate two consecutive runs are a no-op
 - vitest globalSetup: DROP SCHEMA public CASCADE → migrate(MIGRATIONS_DIR)
 
 Implemented-by: DeepSeek V4.1 Flash
@@ -700,11 +700,11 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 3: ddl-0001-extensions (US-A02, tier: DeepSeek)
 
-**스토리 US-A02** — 목표: DDL(A3-D9 `0001`~`0002`) / 산출물: `packages/db/migrations/0001_extensions.sql`, `packages/db/migrations/0002_core_inbox.sql` / 검증 명령: `pnpm db:migrate && pnpm --filter @omnis/db test` / 티어: DeepSeek(리뷰 Sonnet+). 의존: A01.
+**Story US-A02** — Goal: DDL (A3-D9 `0001`~`0002`) / Outputs: `packages/db/migrations/0001_extensions.sql`, `packages/db/migrations/0002_core_inbox.sql` / Verification command: `pnpm db:migrate && pnpm --filter @omnis/db test` / tier: DeepSeek (review: Sonnet+). Depends on: A01.
 
-**읽을 곳**: A3 §1(규약 — 확장 3개, 역할 3개), A3 §8(파일 분할표 `0001` 행).
+**Read:** A3 §1 (conventions — 3 extensions, 3 roles), A3 §8 (file split table, `0001` row).
 
-**만들지 않을 것(YAGNI)**: 역할별 세부 GRANT 매트릭스(A3가 정한 것만 — `0006`의 REVOKE/GRANT가 전부다), `uuidv7()` 대체 구현(A3-D1: 시간 정렬은 `(at, id)` 인덱스로 충분), `mem0` 스키마(폴백 경로 전용, Phase B).
+**Do NOT build (YAGNI):** a detailed per-role GRANT matrix (only what A3 defines — the REVOKE/GRANT in `0006` is all of it), an alternative `uuidv7()` implementation (A3-D1: an `(at, id)` index is enough for time ordering), the `mem0` schema (fallback path only, Phase B).
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0001_extensions.sql`
@@ -712,11 +712,11 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `migrate`, `createPool`, `query`, `MIGRATIONS_DIR` (Task 1·2).
-- Produces: 확장 `pgcrypto`/`vector`/`pg_trgm`, 역할 `omnis_owner`/`omnis_hub`/`omnis_sync`. SQL 심볼이라 TS export 없음.
+- Produces: the extensions `pgcrypto`/`vector`/`pg_trgm`, the roles `omnis_owner`/`omnis_hub`/`omnis_sync`. They are SQL symbols, so there is no TS export.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0001.test.ts`:
+- [ ] 1. Write the failing test. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0001.test.ts`:
 
 ```ts
 import type { Pool } from "pg";
@@ -757,18 +757,18 @@ describe("0001_extensions", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대 실패: `expected [] to deeply equal [ 'pg_trgm', 'pgcrypto', 'vector' ]`.
+Expected failure: `expected [] to deeply equal [ 'pg_trgm', 'pgcrypto', 'vector' ]`.
 
-- [ ] 3. `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0001_extensions.sql`을 쓴다. `CREATE EXTENSION` 3줄은 A3 §1의 블록 그대로다. 역할 생성 DDL은 A3 §1이 "역할: `omnis_owner`(DDL·마이그레이션), `omnis_hub`(허브 프로세스, DML), `omnis_sync`(zero-cache, `REPLICATION` + SELECT)"로 책임만 정하고 SQL을 주지 않으므로 그 문장을 그대로 SQL로 옮긴다. 역할은 클러스터 전역이라 `DROP SCHEMA public CASCADE` 리셋에도 살아남는다 — 반드시 idempotent해야 한다.
+- [ ] 3. Write `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0001_extensions.sql`. The 3 `CREATE EXTENSION` lines are exactly the block from A3 §1. For the role-creation DDL, A3 §1 only defines the responsibilities — "roles: `omnis_owner` (DDL·migrations), `omnis_hub` (hub process, DML), `omnis_sync` (zero-cache, `REPLICATION` + SELECT)" — and gives no SQL, so that sentence is transcribed directly into SQL. Roles are cluster-global, so they survive a `DROP SCHEMA public CASCADE` reset — it must be idempotent.
 
 ```sql
 -- 0001_extensions.sql
--- A3 §1 규약: 확장 3개 + 역할 3개. 역할은 클러스터 전역이므로 재실행 안전해야 한다.
+-- A3 §1 conventions: 3 extensions + 3 roles. Roles are cluster-global, so this must be safe to re-run.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -777,10 +777,10 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'omnis_owner') THEN
-    CREATE ROLE omnis_owner NOLOGIN;        -- DDL·마이그레이션
+    CREATE ROLE omnis_owner NOLOGIN;        -- DDL·migrations
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'omnis_hub') THEN
-    CREATE ROLE omnis_hub NOLOGIN;          -- 허브 프로세스, DML만
+    CREATE ROLE omnis_hub NOLOGIN;          -- hub process, DML only
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'omnis_sync') THEN
     CREATE ROLE omnis_sync NOLOGIN REPLICATION;   -- zero-cache: REPLICATION + SELECT
@@ -793,30 +793,30 @@ $$;
 GRANT USAGE ON SCHEMA public TO omnis_hub, omnis_sync;
 ```
 
-> **복제 role은 `omnis_sync` 하나다.** zero-cache가 `ZERO_UPSTREAM_DB`로 붙을 때 쓰는 유저가 바로 `omnis_sync`이고, 논리 복제 슬롯도 이 role이 연다(A3 §1이 스키마 오너). 계약 §7이 적은 `zero_replication`은 같은 역할을 가리키는 옛 이름이므로 **쓰지 않는다** — `0001`에도, `0008`에도, `apps/hub` 어디에도 `zero_replication`이라는 이름은 등장하지 않는다.
+> **The only replication role is `omnis_sync`.** The user zero-cache connects with via `ZERO_UPSTREAM_DB` is exactly `omnis_sync`, and this role also opens the logical replication slot (A3 §1 is the schema owner). The `zero_replication` written in contract §7 is an old name referring to the same role, so **do not use it** — the name `zero_replication` does not appear in `0001`, in `0008`, or anywhere in `apps/hub`.
 
-- [ ] 4. 마이그레이션을 적용하고 테스트를 돌린다.
+- [ ] 4. Apply the migration and run the tests.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대: `Tests  11 passed (11)` (globalSetup이 `0001`을 적용한 뒤 3개가 새로 통과).
+Expected output: `Tests  11 passed (11)` (after globalSetup applies `0001`, 3 more pass).
 
-- [ ] 5. 개발 DB에도 적용해 A7 US-A02의 검증 명령 절반을 만족시킨다.
+- [ ] 5. Apply it to the dev DB as well, satisfying half of the A7 US-A02 verification command.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && createdb omnis 2>/dev/null; DATABASE_URL=postgres://logan@127.0.0.1:5432/omnis pnpm db:migrate && DATABASE_URL=postgres://logan@127.0.0.1:5432/omnis pnpm db:migrate
 ```
-기대: 첫 줄 `applied 1: 0001_extensions.sql`, 둘째 줄 `up to date`.
+Expected output: first line `applied 1: 0001_extensions.sql`, second line `up to date`.
 
-- [ ] 6. 커밋한다.
+- [ ] 6. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A02: 0001_extensions.sql — pgcrypto/vector/pg_trgm + 역할 3개
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A02: 0001_extensions.sql — pgcrypto/vector/pg_trgm + 3 roles
 
-- A3 §1 규약 그대로: CREATE EXTENSION 3개
-- omnis_owner/omnis_hub/omnis_sync(REPLICATION) idempotent 생성
-- pnpm db:migrate 2연속이 no-op
+- Exactly the A3 §1 conventions: 3 CREATE EXTENSION statements
+- omnis_owner/omnis_hub/omnis_sync(REPLICATION) created idempotently
+- pnpm db:migrate two consecutive runs are a no-op
 
 Implemented-by: DeepSeek V4.1 Flash
 
@@ -827,25 +827,25 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 4: ddl-0002-core-inbox (US-A02, tier: DeepSeek)
 
-**스토리 US-A02** (계속) — `0002_core_inbox.sql`은 A3 §8 표가 정한 9개 테이블 전부를 만든다: `accounts`, `account_secrets`, `persons`, `identities`, `person_merges`, `agent_runtimes`(+`omnis` 1 row seed), `threads`, `items`(+부분 HNSW), `calendar_events`.
+**Story US-A02** (continued) — `0002_core_inbox.sql` creates all 9 tables assigned by the A3 §8 table: `accounts`, `account_secrets`, `persons`, `identities`, `person_merges`, `agent_runtimes` (+ `omnis` 1 row seed), `threads`, `items` (+ partial HNSW), `calendar_events`.
 
-**읽을 곳**: A3 §2(accounts/account_secrets/threads/items DDL 전문), A3 §2.1(calendar_events DDL + 조인 규칙), A3 §3(persons/identities/person_merges DDL), A3 §4(agent_runtimes DDL + 부분 유니크 인덱스 + seed), A3 §8(파일 순서 규칙 — "`person_merges`는 `persons`만 참조하므로 `0002`에, `calendar_events`는 `items`를 참조하므로 같은 `0002` 끝에").
+**Read:** A3 §2 (accounts/account_secrets/threads/items DDL in full), A3 §2.1 (calendar_events DDL + join rules), A3 §3 (persons/identities/person_merges DDL), A3 §4 (agent_runtimes DDL + partial unique index + seed), A3 §8 (file ordering rules — "`person_merges` references only `persons` so it goes in `0002`; `calendar_events` references `items` so it goes at the end of the same `0002`").
 
-**SQL은 A3에서 그대로 복사한다 — 바꿔 쓰지 않는다.** A3 §2의 읽기용 순서(items를 먼저 보여줌)와 달리 파일에서는 FK 대상이 먼저 온다: `accounts` → `account_secrets` → `threads` → `persons` → `identities` → `person_merges` → `agent_runtimes` → `items` → `calendar_events`. (A3 §2의 각주가 "실제 마이그레이션 파일에서는 그 두 테이블이 먼저 생성된다"라고 지시한 그대로다. `threads.participants`는 `uuid[]`이고 FK가 아니므로 `persons`보다 먼저 와도 된다.)
+**The SQL is copied verbatim from A3 — it is not rewritten.** Unlike the reading order in A3 §2 (which shows items first), in the file the FK targets come first: `accounts` → `account_secrets` → `threads` → `persons` → `identities` → `person_merges` → `agent_runtimes` → `items` → `calendar_events`. (This is exactly what the footnote to A3 §2 directs: "in the actual migration file those two tables are created first." `threads.participants` is `uuid[]` and not an FK, so it may come before `persons`.)
 
-**만들지 않을 것(YAGNI)**: `items` 이외 테이블의 임베딩 컬럼, 한국어 형태소 분석기(A3 §1: v1에서 쓰지 않는다), person 해석 로직(A3 §10은 TS 쪽이고 Phase A 스토리에 없다), 파티셔닝(A3-D6).
+**Do NOT build (YAGNI):** embedding columns on tables other than `items`, a Korean morphological analyzer (A3 §1: not used in v1), person resolution logic (A3 §10 is on the TS side and is not in any Phase A story), partitioning (A3-D6).
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0002_core_inbox.sql`
 - Test: `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0002.test.ts`
 
 **Interfaces:**
-- Consumes: `0001_extensions.sql`의 `pgcrypto`(`gen_random_uuid()`), `vector`, `pg_trgm`.
-- Produces: 테이블 9개와 그 제약 이름 — `accounts_uq`, `accounts_channel_ck`, `accounts_state_ck`, `threads_uq`, `threads_kind_ck`, `threads_scope_ck`, `persons_rel_ck`, `identities_uq`, `identities_source_ck`, `person_merges_kind_ck`, `agent_runtimes_uq`, `agent_runtimes_runtime_ck`, `agent_runtimes_host_ck`, `agent_runtimes_state_ck`, `agent_runtimes_omnis_uq`, `items_kind_ck`, `items_status_ck`, `items_scope_ck`, `items_sensitivity_ck`, `items_author_ck`, `items_external_uq`, `items_source_hash_uq`, `items_idem_uq`, `items_embedding_idx`, `calendar_events_uq`, `calendar_events_status_ck`, `calendar_events_span_ck`. 뒤 태스크와 다른 계획이 이 이름들로 assertion을 건다.
+- Consumes: `pgcrypto` (`gen_random_uuid()`), `vector`, `pg_trgm` from `0001_extensions.sql`.
+- Produces: the 9 tables and their constraint names — `accounts_uq`, `accounts_channel_ck`, `accounts_state_ck`, `threads_uq`, `threads_kind_ck`, `threads_scope_ck`, `persons_rel_ck`, `identities_uq`, `identities_source_ck`, `person_merges_kind_ck`, `agent_runtimes_uq`, `agent_runtimes_runtime_ck`, `agent_runtimes_host_ck`, `agent_runtimes_state_ck`, `agent_runtimes_omnis_uq`, `items_kind_ck`, `items_status_ck`, `items_scope_ck`, `items_sensitivity_ck`, `items_author_ck`, `items_external_uq`, `items_source_hash_uq`, `items_idem_uq`, `items_embedding_idx`, `calendar_events_uq`, `calendar_events_status_ck`, `calendar_events_span_ck`. Later tasks and other plans assert on these names.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0002.test.ts`:
+- [ ] 1. Write the failing test. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0002.test.ts`:
 
 ```ts
 import type { Pool } from "pg";
@@ -1002,25 +1002,25 @@ describe("0002_core_inbox", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대 실패: `relation "accounts" does not exist`.
+Expected failure: `relation "accounts" does not exist`.
 
-- [ ] 3. `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0002_core_inbox.sql`을 쓴다. 아래 블록은 A3 §2·§2.1·§3·§4의 DDL을 FK 순서로 재배열한 것이고 컬럼·제약·인덱스는 한 글자도 바꾸지 않았다.
+- [ ] 3. Write `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0002_core_inbox.sql`. The block below rearranges the DDL from A3 §2·§2.1·§3·§4 into FK order, with not a single character changed in the columns, constraints, or indexes.
 
 ```sql
 -- 0002_core_inbox.sql
--- A3 §8 표: accounts, account_secrets, persons, identities, person_merges,
---           agent_runtimes(+omnis seed), threads, items(+부분 HNSW), calendar_events
--- 순서는 FK 순서다(A3 §2 각주). A3 §2의 읽기용 순서와 다르다.
+-- A3 §8 table: accounts, account_secrets, persons, identities, person_merges,
+--           agent_runtimes(+omnis seed), threads, items(+partial HNSW), calendar_events
+-- The order is FK order (A3 §2 footnote). It differs from the reading order in A3 §2.
 
 CREATE TABLE accounts (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   channel       text NOT NULL,
-  external_id   text NOT NULL,                 -- 채널 내 계정 식별자 (Slack team+user, 메일 주소 등)
+  external_id   text NOT NULL,                 -- account identifier within the channel (Slack team+user, email address, etc.)
   display       text NOT NULL,
   capabilities  jsonb NOT NULL DEFAULT '{}'::jsonb,  -- {read,write,realtime,history,media,markRead,typing}
   state         text NOT NULL DEFAULT 'active',
@@ -1033,11 +1033,11 @@ CREATE TABLE accounts (
   CONSTRAINT accounts_uq UNIQUE (channel, external_id)
 );
 
--- A3-D4: 비밀은 별도 테이블. Zero publication에 절대 넣지 않는다.
+-- A3-D4: secrets live in a separate table. Never put them in the Zero publication.
 CREATE TABLE account_secrets (
   account_id  uuid PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
-  auth_ref    text NOT NULL,                   -- Keychain item 이름 (값이 아니다).
-                                               -- 명명 규칙은 A1 소유: omnis.<channel>.<kind>.<external_id>
+  auth_ref    text NOT NULL,                   -- Keychain item name (not the value).
+                                               -- the naming convention is owned by A1: omnis.<channel>.<kind>.<external_id>
   scopes      text[] NOT NULL DEFAULT '{}',
   expires_at  timestamptz,
   rotated_at  timestamptz NOT NULL DEFAULT now()
@@ -1051,7 +1051,7 @@ CREATE TABLE threads (
   title         text,
   scope         text NOT NULL DEFAULT 'unknown',
   participants  uuid[] NOT NULL DEFAULT '{}',  -- persons.id
-  meta          jsonb NOT NULL DEFAULT '{}'::jsonb,  -- 예약 키: meta.pending_next_step (A4 §7.3)
+  meta          jsonb NOT NULL DEFAULT '{}'::jsonb,  -- reserved key: meta.pending_next_step (A4 §7.3)
   last_item_at  timestamptz,
   unread_count  integer NOT NULL DEFAULT 0,
   needs_action  boolean NOT NULL DEFAULT false,
@@ -1077,12 +1077,12 @@ CREATE TABLE persons (
   relationship_state text NOT NULL DEFAULT 'unknown',
   vip                boolean NOT NULL DEFAULT false,
   notes              text,
-  first_contact_at   timestamptz,          -- A4 §7.2 초면 판정
+  first_contact_at   timestamptz,          -- A4 §7.2 first-contact determination
   last_contact_at    timestamptz,
   next_followup_at   timestamptz,
   item_count         integer NOT NULL DEFAULT 0,
-  primary_thread_id  uuid REFERENCES threads(id) ON DELETE SET NULL,  -- A4 §7.3 cadence 조인 대상
-  cadence_days       integer,              -- NULL이면 relationship_state 기본값 (A4 §7.3)
+  primary_thread_id  uuid REFERENCES threads(id) ON DELETE SET NULL,  -- A4 §7.3 cadence join target
+  cadence_days       integer,              -- if NULL, the relationship_state default applies (A4 §7.3)
   priority_score     real NOT NULL DEFAULT 0,
   merged_into        uuid REFERENCES persons(id) ON DELETE SET NULL,  -- tombstone
   created_at         timestamptz NOT NULL DEFAULT now(),
@@ -1099,8 +1099,8 @@ CREATE TABLE identities (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   person_id   uuid NOT NULL REFERENCES persons(id) ON DELETE CASCADE,
   channel     text NOT NULL,
-  handle      text NOT NULL,              -- 원본 표기
-  handle_norm text NOT NULL,              -- 정규화 키 (A3 §10)
+  handle      text NOT NULL,              -- original spelling
+  handle_norm text NOT NULL,              -- normalized key (A3 §10)
   display     text,
   verified    boolean NOT NULL DEFAULT false,
   source      text NOT NULL DEFAULT 'adapter',
@@ -1115,7 +1115,7 @@ CREATE TABLE person_merges (
   kind           text NOT NULL,                 -- 'merge' | 'split'
   from_person_id uuid NOT NULL,
   to_person_id   uuid NOT NULL,
-  identity_ids   uuid[] NOT NULL DEFAULT '{}',  -- split일 때 옮긴 identity
+  identity_ids   uuid[] NOT NULL DEFAULT '{}',  -- identities moved when kind='split'
   reason         text,
   at             timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT person_merges_kind_ck CHECK (kind IN ('merge','split'))
@@ -1126,7 +1126,7 @@ CREATE TABLE agent_runtimes (
   runtime      text NOT NULL,
   host         text NOT NULL,                  -- 'mini' | 'macbook'
   display      text NOT NULL,
-  capabilities jsonb NOT NULL DEFAULT '{}'::jsonb,   -- 브리지 자기기술 (마스터 D5)
+  capabilities jsonb NOT NULL DEFAULT '{}'::jsonb,   -- bridge self-description (master D5)
   version      text,
   state        text NOT NULL DEFAULT 'offline',
   last_seen_at timestamptz,
@@ -1138,7 +1138,7 @@ CREATE TABLE agent_runtimes (
   CONSTRAINT agent_runtimes_uq UNIQUE (runtime, host)
 );
 
--- `omnis`는 유효한 runtime 값이지만 브리지 어댑터가 없는 특수 row다(마스터 §6, 99-review §4-8).
+-- `omnis` is a valid runtime value but a special row with no bridge adapter (master §6, 99-review §4-8).
 CREATE UNIQUE INDEX agent_runtimes_omnis_uq ON agent_runtimes (runtime)
   WHERE runtime = 'omnis';
 
@@ -1149,11 +1149,11 @@ CREATE TABLE items (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   thread_id        uuid NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
   account_id       uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
-  external_id      text,                        -- draft는 NULL (아직 채널에 없음)
+  external_id      text,                        -- NULL for drafts (not yet in the channel)
   kind             text NOT NULL,
   status           text NOT NULL DEFAULT 'received',
   scope            text NOT NULL DEFAULT 'unknown',
-  sensitivity      text NOT NULL DEFAULT 'normal',   -- A4 L1이 유일한 생산자 (A4 §2.4, A4-D12)
+  sensitivity      text NOT NULL DEFAULT 'normal',   -- A4 L1 is the only producer (A4 §2.4, A4-D12)
   author_person_id uuid REFERENCES persons(id) ON DELETE SET NULL,
   author_agent_id  uuid REFERENCES agent_runtimes(id) ON DELETE SET NULL,
   author_is_me     boolean NOT NULL DEFAULT false,
@@ -1162,15 +1162,15 @@ CREATE TABLE items (
   body             text NOT NULL DEFAULT '',
   body_html        text,
   attachments      jsonb NOT NULL DEFAULT '[]'::jsonb,
-  tool             jsonb,                       -- kind='tool_call'일 때 {name,args,state,label,icon}
+  tool             jsonb,                       -- when kind='tool_call': {name,args,state,label,icon}
   sent_at          timestamptz NOT NULL,
   received_at      timestamptz NOT NULL DEFAULT now(),
-  source_hash      text,                        -- 어댑터 멱등성 키
-  idempotency_key  text,                        -- 발송 멱등성 키 (A3-D10)
-  outbox_claimed_at timestamptz,                -- 발송 워커의 at-most-once claim
+  source_hash      text,                        -- adapter idempotency key
+  idempotency_key  text,                        -- send idempotency key (A3-D10)
+  outbox_claimed_at timestamptz,                -- at-most-once claim by the send worker
   fail_reason      text,
   meta             jsonb NOT NULL DEFAULT '{}'::jsonb,
-  embedding        vector(768),                 -- nomic-embed-text-v1.5. A4 §2.2 kNN의 입력
+  embedding        vector(768),                 -- nomic-embed-text-v1.5. Input to the A4 §2.2 kNN
   search_tsv       tsvector GENERATED ALWAYS AS
                      (to_tsvector('simple', coalesce(subject,'') || ' ' || coalesce(body,''))) STORED,
   CONSTRAINT items_kind_ck CHECK (kind IN ('message','email','event','agent_turn','tool_call','system')),
@@ -1194,18 +1194,18 @@ CREATE INDEX items_pending_idx ON items (status, sent_at DESC)
 CREATE INDEX items_search_idx ON items USING gin (search_tsv);
 CREATE INDEX items_body_trgm_idx ON items USING gin (body gin_trgm_ops);
 
--- 임베딩이 있는 item만 인덱싱한다.
+-- Index only the items that have an embedding.
 CREATE INDEX items_embedding_idx ON items
   USING hnsw (embedding vector_cosine_ops)
-  WITH (m = 16, ef_construction = 64)   -- 파라미터 근거: UNVERIFIED — spike (A3 §14 S-A3-7)
+  WITH (m = 16, ef_construction = 64)   -- parameter rationale: UNVERIFIED — spike (A3 §14 S-A3-7)
   WHERE embedding IS NOT NULL;
 
--- A3 §2.1: items(kind='event')=인박스 투영, calendar_events=상세.
+-- A3 §2.1: items(kind='event') = inbox projection, calendar_events = detail.
 CREATE TABLE calendar_events (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  item_id      uuid NOT NULL UNIQUE REFERENCES items(id) ON DELETE CASCADE,  -- 조인 규칙
+  item_id      uuid NOT NULL UNIQUE REFERENCES items(id) ON DELETE CASCADE,  -- join rule
   account_id   uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
-  external_id  text NOT NULL,              -- Google/Graph의 event id
+  external_id  text NOT NULL,              -- event id from Google/Graph
   start_at     timestamptz NOT NULL,
   end_at       timestamptz NOT NULL,
   all_day      boolean NOT NULL DEFAULT false,
@@ -1213,7 +1213,7 @@ CREATE TABLE calendar_events (
   attendees    jsonb NOT NULL DEFAULT '[]'::jsonb,   -- [{email, display, response, person_id}]
   attendees_count integer GENERATED ALWAYS AS (jsonb_array_length(attendees)) STORED,
   location     text,
-  recurrence   text,                       -- RRULE 원문. 전개는 하지 않는다
+  recurrence   text,                       -- the raw RRULE. No expansion is performed
   updated_at   timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT calendar_events_status_ck CHECK (status IN ('confirmed','tentative','cancelled')),
   CONSTRAINT calendar_events_uq UNIQUE (account_id, external_id),
@@ -1224,30 +1224,30 @@ CREATE INDEX calendar_events_end_idx   ON calendar_events (end_at)
   WHERE status <> 'cancelled';
 ```
 
-- [ ] 4. 테스트를 돌려 통과를 확인한다.
+- [ ] 4. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대: `Tests  17 passed (17)`.
+Expected output: `Tests  17 passed (17)`.
 
-- [ ] 5. US-A02 검증 명령을 그대로 돌린다.
+- [ ] 5. Run the US-A02 verification command as-is.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && DATABASE_URL=postgres://logan@127.0.0.1:5432/omnis pnpm db:migrate && pnpm --filter @omnis/db test
 ```
-기대: `applied 1: 0002_core_inbox.sql` 후 테스트 전부 통과.
+Expected output: `applied 1: 0002_core_inbox.sql`, then all tests pass.
 
-- [ ] 6. 커밋한다.
+- [ ] 6. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A02: 0002_core_inbox.sql — 인박스 코어 9개 테이블
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A02: 0002_core_inbox.sql — 9 inbox core tables
 
 - accounts/account_secrets/threads/persons/identities/person_merges/agent_runtimes/items/calendar_events
-- items: author 3컬럼(items_author_ck), sensitivity, embedding vector(768) + 부분 HNSW, search_tsv 생성 컬럼
-- agent_runtimes: omnis 1 row seed + agent_runtimes_omnis_uq 부분 유니크
-- calendar_events: attendees_count 생성 컬럼 + span CHECK
-- pnpm db:migrate && pnpm --filter @omnis/db test 통과
+- items: 3 author columns (items_author_ck), sensitivity, embedding vector(768) + partial HNSW, generated search_tsv column
+- agent_runtimes: omnis 1 row seed + agent_runtimes_omnis_uq partial unique
+- calendar_events: attendees_count generated column + span CHECK
+- pnpm db:migrate && pnpm --filter @omnis/db test pass
 
 Implemented-by: DeepSeek V4.1 Flash
 
@@ -1258,23 +1258,23 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 5: ddl-0003-labels (US-A03, tier: DeepSeek)
 
-**스토리 US-A03** — 목표: DDL(A3-D9 `0003`~`0004`) — `0003_labels.sql`(`labels`/`label_rules`/`item_labels`/`thread_labels`) + `0004_tasks_approvals.sql`(`agent_sessions`/`tasks`/`pending_approvals`/`notes`/`digests`/`agent_runs`) / 검증 명령: `pnpm db:migrate && pnpm --filter @omnis/db test` / 티어: DeepSeek(리뷰 Sonnet+). 의존: A02.
+**Story US-A03** — Goal: DDL (A3-D9 `0003`~`0004`) — `0003_labels.sql` (`labels`/`label_rules`/`item_labels`/`thread_labels`) + `0004_tasks_approvals.sql` (`agent_sessions`/`tasks`/`pending_approvals`/`notes`/`digests`/`agent_runs`) / Verification command: `pnpm db:migrate && pnpm --filter @omnis/db test` / tier: DeepSeek (review: Sonnet+). Depends on: A02.
 
-**읽을 곳**: A3 §3(labels/label_rules/item_labels/thread_labels DDL 전문 + A4 §2.3 표기 대응표), A3 §1.1(`labels.kind`, `label_rules.tier` 값 집합), A3 §7(`label_rules`의 `probe_embedding`은 Zero 복제 제외 — 이 파일이 아니라 `0008`이 처리).
+**Read:** A3 §3 (labels/label_rules/item_labels/thread_labels DDL in full + the A4 §2.3 naming mapping table), A3 §1.1 (`labels.kind`, `label_rules.tier` value sets), A3 §7 (`label_rules.probe_embedding` is excluded from Zero replication — handled by `0008`, not this file).
 
-**만들지 않을 것(YAGNI)**: 규칙 컴파일러(A4 §2.3, Phase A 스토리 아님), `probe_embedding`의 HNSW 인덱스(A3가 `label_rules`에는 인덱스를 `label_rules_active_idx` 하나만 정했다 — 규칙은 수십 개 규모라 kNN 인덱스가 필요 없다), 라벨 시드 데이터.
+**Do NOT build (YAGNI):** a rule compiler (A4 §2.3, not a Phase A story), an HNSW index on `probe_embedding` (A3 defines only one index on `label_rules`, `label_rules_active_idx` — there are only dozens of rules, so a kNN index is unnecessary), label seed data.
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0003_labels.sql`
 - Test: `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0003.test.ts`
 
 **Interfaces:**
-- Consumes: `0002`의 `persons`, `items`, `threads`.
-- Produces: 제약 이름 `labels_kind_ck`, `labels_uq`, `label_rules_tier_ck`, `item_labels_by_ck`, `thread_labels_by_ck`와 인덱스 `label_rules_active_idx`, `item_labels_label_idx`, `thread_labels_label_idx`.
+- Consumes: `persons`, `items`, `threads` from `0002`.
+- Produces: the constraint names `labels_kind_ck`, `labels_uq`, `label_rules_tier_ck`, `item_labels_by_ck`, `thread_labels_by_ck` and the indexes `label_rules_active_idx`, `item_labels_label_idx`, `thread_labels_label_idx`.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0003.test.ts`:
+- [ ] 1. Write the failing test. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0003.test.ts`:
 
 ```ts
 import type { Pool } from "pg";
@@ -1311,7 +1311,7 @@ describe("0003_labels", () => {
     const rule = await one<{ tier: string; active: boolean; positives: string[] }>(
       pool,
       `INSERT INTO label_rules (label_id, prompt, probe_embedding)
-       VALUES ($1, '청구서가 첨부된 메일', $2::vector)
+       VALUES ($1, 'email with an invoice attached', $2::vector)
        RETURNING tier, active, positives`,
       [label.id, `[${new Array(768).fill(0).join(",")}]`],
     );
@@ -1356,14 +1356,14 @@ describe("0003_labels", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대 실패: `relation "labels" does not exist`.
+Expected failure: `relation "labels" does not exist`.
 
-- [ ] 3. `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0003_labels.sql`을 쓴다 — A3 §3의 뒤쪽 블록 그대로다.
+- [ ] 3. Write `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0003_labels.sql` — it is the later block from A3 §3 verbatim.
 
 ```sql
 -- 0003_labels.sql
@@ -1374,7 +1374,7 @@ CREATE TABLE labels (
   name       text NOT NULL,
   kind       text NOT NULL,
   color      text,
-  rule       text,                          -- 자연어 규칙 (Superhuman Auto Labels 방식)
+  rule       text,                          -- natural-language rule (Superhuman Auto Labels style)
   rule_model text,
   person_id  uuid REFERENCES persons(id) ON DELETE CASCADE,  -- kind='person'
   archived   boolean NOT NULL DEFAULT false,
@@ -1383,16 +1383,16 @@ CREATE TABLE labels (
   CONSTRAINT labels_uq UNIQUE (kind, name)
 );
 
--- 자연어 라벨 규칙 (A4 §2.3). A4 표기 대응: compiled→rule, compiled_by→rule_by,
--- compiled_at→rule_at, corrections→corrections_30d. positives/negatives는 uuid[](items.id).
+-- Natural-language label rules (A4 §2.3). A4 naming mapping: compiled→rule, compiled_by→rule_by,
+-- compiled_at→rule_at, corrections→corrections_30d. positives/negatives are uuid[] (items.id).
 CREATE TABLE label_rules (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   label_id       uuid NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
-  prompt         text NOT NULL,                    -- 사용자가 적은 원문 (SSOT)
-  rule           jsonb NOT NULL DEFAULT '{}'::jsonb, -- 컴파일 결과 CompiledRule (A4 §2.3)
+  prompt         text NOT NULL,                    -- the verbatim text the user wrote (SSOT)
+  rule           jsonb NOT NULL DEFAULT '{}'::jsonb, -- compiled result CompiledRule (A4 §2.3)
   rule_by        text,                             -- 'claude-sonnet-5' | 'user'
   rule_at        timestamptz,
-  probe_embedding vector(768),                     -- CompiledRule.semantic 임베딩 (A4 §2.3 kNN 폴백)
+  probe_embedding vector(768),                     -- CompiledRule.semantic embedding (A4 §2.3 kNN fallback)
   tier           text NOT NULL DEFAULT 'T0',
   positives      uuid[] NOT NULL DEFAULT '{}',     -- items.id
   negatives      uuid[] NOT NULL DEFAULT '{}',
@@ -1429,21 +1429,21 @@ CREATE TABLE thread_labels (
 CREATE INDEX thread_labels_label_idx ON thread_labels (label_id);
 ```
 
-- [ ] 4. 테스트를 돌려 통과를 확인한다.
+- [ ] 4. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대: `Tests  20 passed (20)`.
+Expected output: `Tests  20 passed (20)`.
 
-- [ ] 5. 커밋한다.
+- [ ] 5. Commit.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A03: 0003_labels.sql — labels/label_rules/item_labels/thread_labels
 
-- label_rules는 A4가 갖고 있던 DDL을 A3 표기(rule/rule_by/rule_at/corrections_30d)로 편입, id·label_id는 uuid
-- item_labels/thread_labels는 (item|thread, label) 복합 PK + by CHECK
-- pnpm db:migrate && pnpm --filter @omnis/db test 통과
+- label_rules folds in the DDL A4 had, adopting A3 naming (rule/rule_by/rule_at/corrections_30d); id and label_id are uuid
+- item_labels/thread_labels use a composite (item|thread, label) PK + a by CHECK
+- pnpm db:migrate && pnpm --filter @omnis/db test pass
 
 Implemented-by: DeepSeek V4.1 Flash
 
@@ -1454,25 +1454,25 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 6: ddl-0004-tasks-approvals (US-A03, tier: DeepSeek)
 
-**스토리 US-A03** (계속) — `0004_tasks_approvals.sql`: `agent_sessions`, `agent_runs`, `tasks`, `pending_approvals`, `notes`, `digests`. `agent_runs`는 마스터 §6·A4-D16이 "평가·비용·감사의 단일 소스"로 못박은 테이블이다.
+**Story US-A03** (continued) — `0004_tasks_approvals.sql`: `agent_sessions`, `agent_runs`, `tasks`, `pending_approvals`, `notes`, `digests`. `agent_runs` is the table that master §6 and A4-D16 pin down as "the single source for evaluation, cost, and audit".
 
-**읽을 곳**: A3 §4 전체(DDL 6개 + A4 §1.7 대응표), A3 §1.1(`tasks.state`/`tasks.kind`/`agent_runs.model_tier`/`agent_runs.outcome`/`agent_sessions.state`/`pending_approvals.action`·`state`·`decision` 값 집합), A3 §8(`agent_runs`가 `agent_sessions`와 `items` 둘 다 참조하므로 `0004`에 온다), 계약 §0-6(`action`은 A3의 6값이 이긴다).
+**Read:** A3 §4 in full (6 DDLs + the A4 §1.7 mapping table), A3 §1.1 (`tasks.state`/`tasks.kind`/`agent_runs.model_tier`/`agent_runs.outcome`/`agent_sessions.state`/`pending_approvals.action`·`state`·`decision` value sets), A3 §8 (`agent_runs` references both `agent_sessions` and `items`, so it lands in `0004`), contract §0-6 (`action` — A3's 6 values win).
 
-**주의 — `approvals_decided_ck`의 실질적 의미**: `CHECK ((state = 'pending') = (decision IS NULL))`는 `state`가 `pending`이 아닌 모든 row에 non-NULL `decision`을 요구한다. `expired`도 예외가 아니다. Task 18이 이 제약을 만족시키는 방법(만료 시 `decision='ignore'`)을 정하므로 여기서는 A3 SQL을 그대로 적고 바꾸지 않는다.
+**Note — the practical meaning of `approvals_decided_ck`**: `CHECK ((state = 'pending') = (decision IS NULL))` requires a non-NULL `decision` on every row whose `state` is not `pending`. `expired` is no exception. Task 18 decides how to satisfy this constraint (on expiry, `decision='ignore'`), so here we write the A3 SQL verbatim and do not change it.
 
-**만들지 않을 것(YAGNI)**: 승인 실행기(Task 22), 다이제스트 생성기(Phase B), `agent_runs` 집계 뷰(비용 리포트는 Phase B), `tasks`의 반복 규칙.
+**Do NOT build (YAGNI):** the approval executor (Task 22), the digest generator (Phase B), the `agent_runs` aggregate view (cost reports are Phase B), recurrence rules for `tasks`.
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0004_tasks_approvals.sql`
 - Test: `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0004.test.ts`
 
 **Interfaces:**
-- Consumes: `0002`의 `agent_runtimes`, `threads`, `items`, `persons`.
-- Produces: 제약 이름 `agent_sessions_state_ck`, `agent_sessions_uq`, `agent_runs_tier_ck`, `agent_runs_outcome_ck`, `tasks_kind_ck`, `tasks_state_ck`, `tasks_owner_ck`, `approvals_action_ck`, `approvals_state_ck`, `approvals_decision_ck`, `approvals_risk_ck`, `approvals_decided_ck`, `notes_route_state_ck`, `digests_kind_ck`, `digests_uq`. Task 16~18과 `apps/hub`가 이 이름으로 실패를 식별한다.
+- Consumes: `agent_runtimes`, `threads`, `items`, `persons` from `0002`.
+- Produces: the constraint names `agent_sessions_state_ck`, `agent_sessions_uq`, `agent_runs_tier_ck`, `agent_runs_outcome_ck`, `tasks_kind_ck`, `tasks_state_ck`, `tasks_owner_ck`, `approvals_action_ck`, `approvals_state_ck`, `approvals_decision_ck`, `approvals_risk_ck`, `approvals_decided_ck`, `notes_route_state_ck`, `digests_kind_ck`, `digests_uq`. Tasks 16~18 and `apps/hub` identify failures by these names.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0004.test.ts`:
+- [ ] 1. Write the failing test. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0004.test.ts`:
 
 ```ts
 import type { Pool } from "pg";
@@ -1524,15 +1524,15 @@ describe("0004_tasks_approvals", () => {
       `INSERT INTO pending_approvals (action, args, description)
        VALUES ('send','{}'::jsonb,'coupling') RETURNING id`,
     );
-    // pending인데 decision이 있으면 거부
+    // rejected when pending but a decision is set
     await expect(
       query(pool, `UPDATE pending_approvals SET decision = 'accept' WHERE id = $1`, [a.id]),
     ).rejects.toThrow(/approvals_decided_ck/);
-    // pending이 아닌데 decision이 NULL이어도 거부 — expired 포함
+    // rejected when not pending but decision is NULL — expired included
     await expect(
       query(pool, `UPDATE pending_approvals SET state = 'expired' WHERE id = $1`, [a.id]),
     ).rejects.toThrow(/approvals_decided_ck/);
-    // 둘을 같이 바꾸면 통과
+    // passes when both are changed together
     await query(
       pool,
       `UPDATE pending_approvals SET state='decided', decision='accept', decided_at=now() WHERE id=$1`,
@@ -1609,14 +1609,14 @@ describe("0004_tasks_approvals", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대 실패: `relation "pending_approvals" does not exist`.
+Expected failure: `relation "pending_approvals" does not exist`.
 
-- [ ] 3. `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0004_tasks_approvals.sql`을 쓴다 — A3 §4의 DDL 그대로, FK 순서대로 배열(`agent_sessions` → `agent_runs` → `tasks` → `pending_approvals` → `notes` → `digests`).
+- [ ] 3. Write `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0004_tasks_approvals.sql` — the A3 §4 DDL verbatim, ordered by FK dependency (`agent_sessions` → `agent_runs` → `tasks` → `pending_approvals` → `notes` → `digests`).
 
 ```sql
 -- 0004_tasks_approvals.sql
@@ -1625,12 +1625,12 @@ cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 CREATE TABLE agent_sessions (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   runtime_id   uuid NOT NULL REFERENCES agent_runtimes(id) ON DELETE CASCADE,
-  thread_id    uuid NOT NULL REFERENCES threads(id) ON DELETE CASCADE,  -- 세션 = thread
-  session_key  text NOT NULL,        -- 안정 스코프 (마스터 D5)
-  session_id   text,                 -- 회전하는 트랜스크립트 id
+  thread_id    uuid NOT NULL REFERENCES threads(id) ON DELETE CASCADE,  -- session = thread
+  session_key  text NOT NULL,        -- stable scope (master D5)
+  session_id   text,                 -- rotating transcript id
   cwd          text,
   state        text NOT NULL DEFAULT 'starting',
-  summary      text,                 -- read_session이 읽는 durable 요약
+  summary      text,                 -- durable summary that read_session reads
   last_turn_at timestamptz,
   started_at   timestamptz NOT NULL DEFAULT now(),
   ended_at     timestamptz,
@@ -1641,15 +1641,15 @@ CREATE TABLE agent_sessions (
 CREATE INDEX agent_sessions_active_idx ON agent_sessions (last_turn_at DESC)
   WHERE ended_at IS NULL;
 
--- 모든 L3 루프 실행의 단일 기록 (A4-D16). 여기 없는 실행은 존재하지 않은 것으로 취급한다.
+-- The single record of every L3 loop run (A4-D16). A run that is not here is treated as not having happened.
 CREATE TABLE agent_runs (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   loop             text NOT NULL,
   agent_session_id uuid REFERENCES agent_sessions(id) ON DELETE SET NULL,
   item_id          uuid REFERENCES items(id) ON DELETE SET NULL,
   trigger_kind     text NOT NULL DEFAULT 'event',   -- 'event' | 'cron' | 'manual'
-  trigger_ref      text,                   -- cron 잡 이름 등, item 외의 트리거
-  model_tier       text NOT NULL,          -- T0|T1|T2|T3 (마스터 §14)
+  trigger_ref      text,                   -- cron job name etc., triggers other than item
+  model_tier       text NOT NULL,          -- T0|T1|T2|T3 (master §14)
   provider         text NOT NULL,          -- 'local' | 'deepseek' | 'anthropic' | 'openrouter'
   model            text NOT NULL,
   tokens_in        integer,
@@ -1660,11 +1660,11 @@ CREATE TABLE agent_runs (
   outcome          text NOT NULL DEFAULT 'running',
   error            text,
   confidence       real,
-  escalated_from   uuid REFERENCES agent_runs(id) ON DELETE SET NULL,  -- T1 → T2 에스컬레이션
+  escalated_from   uuid REFERENCES agent_runs(id) ON DELETE SET NULL,  -- T1 → T2 escalation
   injection_flags  text[] NOT NULL DEFAULT '{}',
-  context_hash     text,                   -- sha256(cachedPrefix) — 캐시 히트율 추적
-  result_ref       uuid,                   -- 산출물 id. FK 없음: 대상 테이블이 여럿
-  raw_output       text,                   -- 스키마 위반 출력 보관 (A4 §1.6)
+  context_hash     text,                   -- sha256(cachedPrefix) — cache hit rate tracking
+  result_ref       uuid,                   -- output id. No FK: there are several target tables
+  raw_output       text,                   -- keeps output that violated the schema (A4 §1.6)
   created_at       timestamptz NOT NULL DEFAULT now(),
   finished_at      timestamptz,
   CONSTRAINT agent_runs_tier_ck CHECK (model_tier IN ('T0','T1','T2','T3')),
@@ -1678,7 +1678,7 @@ CREATE TABLE tasks (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title               text NOT NULL,
   detail              text,
-  kind                text NOT NULL DEFAULT 'todo',  -- A4 §7.3 Task 라우팅
+  kind                text NOT NULL DEFAULT 'todo',  -- A4 §7.3 task routing
   state               text NOT NULL DEFAULT 'open',
   owner_kind          text NOT NULL DEFAULT 'me',   -- 'me' | 'agent'
   owner_runtime_id    uuid REFERENCES agent_runtimes(id) ON DELETE SET NULL,
@@ -1697,17 +1697,17 @@ CREATE TABLE tasks (
 CREATE INDEX tasks_open_idx ON tasks (due_at NULLS LAST) WHERE state IN ('open','in_progress');
 CREATE INDEX tasks_remind_idx ON tasks (remind_at) WHERE remind_at IS NOT NULL AND state <> 'done';
 
--- HumanInterrupt / HumanResponse를 그대로 이식. A3-D11.
+-- HumanInterrupt / HumanResponse ported verbatim. A3-D11.
 CREATE TABLE pending_approvals (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   action        text NOT NULL,
-  args          jsonb NOT NULL,          -- ActionRequest.args (전문. UI가 그대로 노출)
+  args          jsonb NOT NULL,          -- ActionRequest.args (verbatim; the UI exposes it as-is)
   description   text NOT NULL,
   config        jsonb NOT NULL DEFAULT
                   '{"allow_accept":true,"allow_edit":true,"allow_respond":false,"allow_ignore":true}'::jsonb,
   state         text NOT NULL DEFAULT 'pending',
   decision      text,                    -- accept | edit | respond | ignore
-  decided_args  jsonb,                   -- edit/respond일 때 사람이 고친 결과
+  decided_args  jsonb,                   -- the human-corrected result for edit/respond
   requested_by  uuid REFERENCES agent_runtimes(id) ON DELETE SET NULL,
   thread_id     uuid REFERENCES threads(id) ON DELETE SET NULL,
   item_id       uuid REFERENCES items(id) ON DELETE SET NULL,
@@ -1747,36 +1747,36 @@ CREATE TABLE digests (
   for_date   date NOT NULL,
   body       text NOT NULL,
   item_ids   uuid[] NOT NULL DEFAULT '{}',
-  metrics    jsonb NOT NULL DEFAULT '{}'::jsonb,   -- 커버리지·비용 지표 (마스터 §2)
+  metrics    jsonb NOT NULL DEFAULT '{}'::jsonb,   -- coverage and cost metrics (master §2)
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT digests_kind_ck CHECK (kind IN ('morning','nightly')),
   CONSTRAINT digests_uq UNIQUE (kind, for_date)
 );
 ```
 
-- [ ] 4. 테스트를 돌려 통과를 확인한다.
+- [ ] 4. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대: `Tests  25 passed (25)`.
+Expected output: `Tests  25 passed (25)`.
 
-- [ ] 5. US-A03 검증 명령을 그대로 돌린다.
+- [ ] 5. Run the US-A03 verification command verbatim.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && DATABASE_URL=postgres://logan@127.0.0.1:5432/omnis pnpm db:migrate && pnpm --filter @omnis/db test
 ```
-기대: `applied 2: 0003_labels.sql, 0004_tasks_approvals.sql` 후 전부 통과.
+Expected output: everything passes after `applied 2: 0003_labels.sql, 0004_tasks_approvals.sql`.
 
-- [ ] 6. 커밋한다.
+- [ ] 6. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A03: 0004_tasks_approvals.sql — 세션·런·작업·승인·노트·다이제스트
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A03: 0004_tasks_approvals.sql — sessions, runs, tasks, approvals, notes, digests
 
-- pending_approvals: action 6값(A3 approvals_action_ck), state 6값, decision 4값, approvals_decided_ck
-- agent_runs: A3 컬럼명(model_tier/tokens_in/outcome/created_at) + escalated_from 자기참조
-- agent_sessions (runtime_id, session_key) 유니크, tasks/notes/digests
-- pnpm db:migrate && pnpm --filter @omnis/db test 통과
+- pending_approvals: 6 action values (A3 approvals_action_ck), 6 state values, 4 decision values, approvals_decided_ck
+- agent_runs: A3 column names (model_tier/tokens_in/outcome/created_at) + escalated_from self-reference
+- agent_sessions (runtime_id, session_key) unique, tasks/notes/digests
+- pnpm db:migrate && pnpm --filter @omnis/db test pass
 
 Implemented-by: DeepSeek V4.1 Flash
 
@@ -1787,23 +1787,23 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 7: ddl-0005-memory (US-A04, tier: Sonnet)
 
-**스토리 US-A04** — 목표: DDL(A3-D9 `0005`~`0008`) — `0005_memory.sql`(`entities`/`relations`/`memories`+HNSW) + `0006_kernel.sql`(`events` append-only/`audit_log`/`jobs`+트리거) + `0007_notify.sql`(LISTEN/NOTIFY, id-only 페이로드) + `0008_publication.sql`(`zero_omnis`) / 검증 명령: `pnpm db:migrate && pnpm --filter @omnis/db test` / 티어: Sonnet. 의존: A03. **추가 인수 기준**: US-A02가 만든 `calendar_events`에 대해 `attendees_count BETWEEN 1 AND 8` 조회와 `end_at` 기준 48시간 윈도 조회가 둘 다 성공해야 한다(Task 11).
+**Story US-A04** — Goal: DDL (A3-D9 `0005`~`0008`) — `0005_memory.sql` (`entities`/`relations`/`memories`+HNSW) + `0006_kernel.sql` (`events` append-only/`audit_log`/`jobs`+triggers) + `0007_notify.sql` (LISTEN/NOTIFY, id-only payload) + `0008_publication.sql` (`zero_omnis`) / Verification command: `pnpm db:migrate && pnpm --filter @omnis/db test` / tier: Sonnet. Depends on: A03. **Additional acceptance criteria**: for the `calendar_events` that US-A02 created, both an `attendees_count BETWEEN 1 AND 8` query and a 48-hour window query on `end_at` must succeed (Task 11).
 
-**읽을 곳**: A3 §5(entities/relations/memories DDL + 3층 대응표), A3 §1.1(`memories.kind`, `entities.type`), A3 §11(보존 정책 — memories는 삭제하지 않고 `invalidated_at`으로 무효화).
+**Read:** A3 §5 (entities/relations/memories DDL + the 3-layer mapping table), A3 §1.1 (`memories.kind`, `entities.type`), A3 §11 (retention policy — memories are not deleted but invalidated via `invalidated_at`).
 
-**만들지 않을 것(YAGNI)**: mem0 VectorStore 어댑터(A3-D12, Phase B 스파이크 S-A3-1 결과 대기), 임베딩 생성(Ollama는 Phase B), `relations` traversal 헬퍼, Matryoshka 축소(A3 §13의 임계 신호가 오면).
+**Do NOT build (YAGNI):** the mem0 VectorStore adapter (A3-D12, waiting on the Phase B spike S-A3-1 result), embedding generation (Ollama is Phase B), a `relations` traversal helper, Matryoshka truncation (once A3 §13's threshold signal arrives).
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0005_memory.sql`
 - Test: `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0005.test.ts`
 
 **Interfaces:**
-- Consumes: `0002`의 `persons`, `items`.
-- Produces: 제약 이름 `entities_type_ck`, `memories_kind_ck`, `memories_scope_ck`와 인덱스 `entities_live_uq`, `memories_embedding_idx`, `relations_asof_idx`. Phase B의 `@omnis/memory`가 이 이름들 위에 선다.
+- Consumes: `persons`, `items` from `0002`.
+- Produces: the constraint names `entities_type_ck`, `memories_kind_ck`, `memories_scope_ck` and the indexes `entities_live_uq`, `memories_embedding_idx`, `relations_asof_idx`. Phase B's `@omnis/memory` stands on these names.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0005.test.ts`:
+- [ ] 1. Write the failing test. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0005.test.ts`:
 
 ```ts
 import type { Pool } from "pg";
@@ -1872,7 +1872,7 @@ describe("0005_memory", () => {
 
     await query(
       pool,
-      `INSERT INTO memories (content, embedding, kind) VALUES ('logan prefers 한국어', $1::vector, 'preference')`,
+      `INSERT INTO memories (content, embedding, kind) VALUES ('logan prefers Korean', $1::vector, 'preference')`,
       [zero768],
     );
     const hit = await query<{ content: string }>(
@@ -1880,7 +1880,7 @@ describe("0005_memory", () => {
       `SELECT content FROM memories WHERE invalidated_at IS NULL ORDER BY embedding <=> $1::vector LIMIT 1`,
       [zero768],
     );
-    expect(hit[0]?.content).toContain("한국어");
+    expect(hit[0]?.content).toContain("Korean");
 
     await expect(
       query(pool, `INSERT INTO memories (content, kind) VALUES ('x','rumor')`),
@@ -1889,14 +1889,14 @@ describe("0005_memory", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대 실패: `relation "entities" does not exist`.
+Expected failure: `relation "entities" does not exist`.
 
-- [ ] 3. `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0005_memory.sql`을 쓴다 — A3 §5 그대로.
+- [ ] 3. Write `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0005_memory.sql` — A3 §5 verbatim.
 
 ```sql
 -- 0005_memory.sql
@@ -1926,16 +1926,16 @@ CREATE TABLE relations (
   attributes     jsonb NOT NULL DEFAULT '{}'::jsonb,
   source_item_id uuid REFERENCES items(id) ON DELETE SET NULL,
   confidence     real NOT NULL DEFAULT 0.5,
-  valid_from     timestamptz NOT NULL,     -- 사실이 유효해진 시점
-  valid_until    timestamptz,              -- 사실이 무효해진 시점
-  recorded_at    timestamptz NOT NULL DEFAULT now(),   -- 시스템이 알게 된 시점
-  invalidated_at timestamptz               -- 시스템이 "더 이상 사실 아님"을 알게 된 시점
+  valid_from     timestamptz NOT NULL,     -- when the fact became valid
+  valid_until    timestamptz,              -- when the fact stopped being valid
+  recorded_at    timestamptz NOT NULL DEFAULT now(),   -- when the system learned of it
+  invalidated_at timestamptz               -- when the system learned it is "no longer a fact"
 );
 CREATE INDEX relations_from_idx ON relations (from_entity_id, type, valid_from DESC);
 CREATE INDEX relations_to_idx   ON relations (to_entity_id, type, valid_from DESC);
 CREATE INDEX relations_asof_idx ON relations (valid_from, valid_until);
 
--- L2-2 벡터 메모리. nomic-embed-text-v1.5 = 768d, HNSW 한계 2,000d 안쪽.
+-- L2-2 vector memory. nomic-embed-text-v1.5 = 768d, within HNSW's 2,000d limit.
 CREATE TABLE memories (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   content        text NOT NULL,
@@ -1944,7 +1944,7 @@ CREATE TABLE memories (
   scope          text NOT NULL DEFAULT 'unknown',
   source_item_id uuid REFERENCES items(id) ON DELETE SET NULL,
   source_kind    text NOT NULL DEFAULT 'inbox',  -- inbox|calendar|file|drive|github|self
-  source_ref     text,                            -- 파일 경로, Drive fileId, GitHub URL 등
+  source_ref     text,                            -- file path, Drive fileId, GitHub URL, etc.
   person_id      uuid REFERENCES persons(id) ON DELETE SET NULL,
   entity_id      uuid REFERENCES entities(id) ON DELETE SET NULL,
   confidence     real NOT NULL DEFAULT 0.5,
@@ -1957,31 +1957,31 @@ CREATE TABLE memories (
   CONSTRAINT memories_scope_ck CHECK (scope IN ('work','personal','unknown'))
 );
 
--- 현재 유효한 메모리만 인덱싱한다.
+-- Index only currently valid memories.
 CREATE INDEX memories_embedding_idx ON memories
   USING hnsw (embedding vector_cosine_ops)
-  WITH (m = 16, ef_construction = 64)   -- 파라미터 근거: UNVERIFIED — spike (A3 §14 S-A3-7)
+  WITH (m = 16, ef_construction = 64)   -- parameter rationale: UNVERIFIED — spike (A3 §14 S-A3-7)
   WHERE invalidated_at IS NULL;
 CREATE INDEX memories_person_idx ON memories (person_id, recorded_at DESC);
 CREATE INDEX memories_source_idx ON memories (source_kind, source_ref);
 CREATE INDEX memories_valid_idx ON memories (valid_from DESC) WHERE invalidated_at IS NULL;
 ```
 
-- [ ] 4. 테스트를 돌려 통과를 확인한다.
+- [ ] 4. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대: `Tests  28 passed (28)`.
+Expected output: `Tests  28 passed (28)`.
 
-- [ ] 5. 커밋한다.
+- [ ] 5. Commit.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A04: 0005_memory.sql — entities/relations/memories + HNSW
 
 - Graphiti 4-timestamp(valid_from/valid_until/recorded_at/invalidated_at)
-- entities_live_uq: 살아있는 엔티티만 (type, lower(name)) 유니크
-- memories는 invalidated_at으로 무효화, 부분 HNSW가 자동 제외
+- entities_live_uq: unique on (type, lower(name)) for live entities only
+- memories are invalidated via invalidated_at; the partial HNSW excludes them automatically
 
 Implemented-by: Claude Sonnet
 
@@ -1992,11 +1992,11 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 8: ddl-0006-kernel (US-A04, tier: Sonnet)
 
-**스토리 US-A04** (계속) — `0006_kernel.sql`: `events`, `audit_log`, `jobs`(+ seed 16개) + append-only 트리거 + `omnis_events_rolloff()` 함수와 GRANT.
+**Story US-A04** (continued) — `0006_kernel.sql`: `events`, `audit_log`, `jobs` (+ 16 seeds) + the append-only triggers + the `omnis_events_rolloff()` function and GRANTs.
 
-**읽을 곳**: A3 §6(events/audit_log/jobs DDL + seed 15행 + 오너 분담 주석), A3 §6.1(append-only 트리거 2함수 4트리거 + REVOKE), A3 §6.1.1(`omnis_events_rolloff()` SECURITY DEFINER 전문 + OWNER/REVOKE/GRANT), A3-D5·A3-D6, A3 §11(보존 정책).
+**Read:** A3 §6 (events/audit_log/jobs DDL + the 15 seed rows + the owner-split comment), A3 §6.1 (append-only: 2 functions, 4 triggers + REVOKE), A3 §6.1.1 (`omnis_events_rolloff()` SECURITY DEFINER in full + OWNER/REVOKE/GRANT), A3-D5·A3-D6, A3 §11 (retention policy).
 
-**A3 SQL에서 딱 한 줄을 바꿔야 한다 — 그 이유와 바꾼 형태**: A3 §6.1은 `ALTER DATABASE omnis SET omnis.events_retention = '90 days';`로 DB 이름을 리터럴로 박았다. 테스트 DB는 `omnis_test`이고 계약 §2가 그 이름을 고정했으므로 리터럴을 그대로 쓰면 `0006`이 `omnis_test`에서 즉시 실패한다(`database "omnis" does not exist`). 동작이 같고 DB 이름에 독립적인 형태로만 바꾼다:
+**Exactly one line of the A3 SQL has to change — why, and what the changed form is**: A3 §6.1 hard-codes the DB name as a literal via `ALTER DATABASE omnis SET omnis.events_retention = '90 days';`. The test DB is `omnis_test` and contract §2 pins that name, so using the literal as-is makes `0006` fail immediately on `omnis_test` (`database "omnis" does not exist`). We change it only to a form with identical behavior that is independent of the DB name:
 
 ```sql
 DO $$
@@ -2006,21 +2006,21 @@ END
 $$;
 ```
 
-`ALTER DATABASE ... SET`은 **새 커넥션부터** 적용된다. 그래서 `vitest.global-setup.ts`가 마이그레이션을 끝낸 뒤 각 테스트 파일이 새 풀을 여는 순서가 중요하다(globalSetup이 먼저 끝나고 테스트 파일이 나중에 연결하므로 자동으로 충족된다). 이 사실은 SQL 주석으로 남긴다.
+`ALTER DATABASE ... SET` takes effect **from new connections onward**. So the ordering matters: `vitest.global-setup.ts` finishes the migration first, and only then does each test file open a new pool (globalSetup finishes first and the test files connect later, so this is satisfied automatically). We leave this fact in a SQL comment.
 
-**만들지 않을 것(YAGNI)**: 파티셔닝(A3-D6: 일 100,000건 또는 DELETE 5분 초과 전에는 하지 않는다), cold 덤프 파일 쓰기(A3 §11 — 허브가 롤오프 호출 전에 한다, Phase B), 잡 핸들러(Task 14~15), `omnis_hub`에 대한 전면 GRANT 매트릭스(A3가 정한 REVOKE/GRANT만).
+**Do NOT build (YAGNI):** partitioning (A3-D6: do not do it before 100,000 rows/day or a DELETE taking over 5 minutes), writing cold dump files (A3 §11 — the hub does it before calling rolloff, Phase B), job handlers (Tasks 14~15), a full GRANT matrix for `omnis_hub` (only the REVOKE/GRANT that A3 specifies).
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0006_kernel.sql`
 - Test: `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0006.test.ts`
 
 **Interfaces:**
-- Consumes: `0004`(seed가 참조하는 테이블은 없지만 파일 순서상 뒤에 온다), `0001`의 역할 3개.
-- Produces: 테이블 `events`(`seq` bigint identity), `audit_log`(`seq`), `jobs`; 함수 `omnis_append_only()`, `omnis_no_truncate()`, `omnis_events_rolloff()`; 트리거 `events_append_only`, `audit_append_only`, `events_no_truncate`, `audit_no_truncate`; DB 파라미터 `omnis.events_retention='90 days'`; seed 잡 16개(`morning_digest`, `nightly_digest`, `memory_consolidate`, `auto_archive_sweep`, `task_remind`, `network_inactive_sweep`, `self_model_weekly`, `eval_weekly`, `drive_poll`, `github_poll`, `followup_sweep`, `token_refresh`, `gmail_rewatch`, `graph_sub_renew`, `events_rolloff`, `slot_health`). Task 12·14·19·21이 전부 이 위에 선다.
+- Consumes: `0004` (no table the seed references, but it comes later in file order), the 3 roles from `0001`.
+- Produces: the tables `events` (`seq` bigint identity), `audit_log` (`seq`), `jobs`; the functions `omnis_append_only()`, `omnis_no_truncate()`, `omnis_events_rolloff()`; the triggers `events_append_only`, `audit_append_only`, `events_no_truncate`, `audit_no_truncate`; the DB parameter `omnis.events_retention='90 days'`; the 16 seed jobs (`morning_digest`, `nightly_digest`, `memory_consolidate`, `auto_archive_sweep`, `task_remind`, `network_inactive_sweep`, `self_model_weekly`, `eval_weekly`, `drive_poll`, `github_poll`, `followup_sweep`, `token_refresh`, `gmail_rewatch`, `graph_sub_renew`, `events_rolloff`, `slot_health`). Tasks 12·14·19·21 all stand on this.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0006.test.ts`:
+- [ ] 1. Write the failing test. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0006.test.ts`:
 
 ```ts
 import type { Pool } from "pg";
@@ -2120,19 +2120,19 @@ describe("0006_kernel", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대 실패: `relation "events" does not exist`.
+Expected failure: `relation "events" does not exist`.
 
-- [ ] 3. `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0006_kernel.sql`을 쓴다.
+- [ ] 3. Write `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0006_kernel.sql`.
 
 ```sql
 -- 0006_kernel.sql
--- A3 §6: events, audit_log, jobs(+seed) + §6.1 append-only 트리거 + §6.1.1 롤오프 함수·GRANT
--- events/audit_log에는 FK를 걸지 않는다(A3 §1): 원본이 지워져도 감사 기록은 남아야 한다.
+-- A3 §6: events, audit_log, jobs (+seed) + §6.1 append-only triggers + §6.1.1 rolloff function and GRANTs
+-- No FKs on events/audit_log (A3 §1): audit records must survive even if the source row is deleted.
 
 CREATE TABLE events (
   seq     bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -2155,7 +2155,7 @@ CREATE TABLE audit_log (
   target_id    uuid,
   before       jsonb,
   after        jsonb,
-  approval_id  uuid,                     -- FK 없음(의도적). egress는 여기에 반드시 남는다
+  approval_id  uuid,                     -- no FK (deliberate). Egress always leaves a record here
   at           timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX audit_log_at_idx ON audit_log (at DESC);
@@ -2176,30 +2176,30 @@ CREATE TABLE jobs (
 );
 CREATE INDEX jobs_due_idx ON jobs (next_run_at) WHERE enabled AND claimed_at IS NULL;
 
--- 스케줄 오너 분담(A3 §6):
---   L3~L9 루프 잡의 cron 정본은 A4 §6.1 표다. A3는 seed만 하고, 시각이 바뀌면 A4를 먼저 고친다.
---   어댑터·커널 인프라 잡의 오너는 A3다.
+-- Schedule owner split (A3 §6):
+--   The canonical source for L3~L9 loop job cron schedules is the A4 §6.1 table. A3 only seeds them; if a time changes, fix A4 first.
+--   The owner of adapter and kernel infrastructure jobs is A3.
 INSERT INTO jobs (name, schedule, next_run_at) VALUES
-  -- A4 소유 (정본: A4 §6.1)
-  ('morning_digest',        '30 6 * * *',   now()),   -- L5 아침 브리핑 06:30 KST
-  ('nightly_digest',        '0 23 * * *',   now()),   -- L5 밤 다이제스트 23:00 KST
-  ('memory_consolidate',    '30 23 * * *',  now()),   -- 야간 메모리 통합
-  ('auto_archive_sweep',    '0 22 * * *',   now()),   -- L8 자동 보관
-  ('task_remind',           '0 9,14,19 * * *', now()),-- L3 리마인드
-  ('network_inactive_sweep','0 10 * * 1-5', now()),   -- L6 비활성 감지(평일 10:00)
-  ('self_model_weekly',     '0 21 * * 0',   now()),   -- self-model 제안(일 21:00)
-  ('eval_weekly',           '0 22 * * 0',   now()),   -- 평가 하네스(일 22:00)
+  -- A4-owned (canonical: A4 §6.1)
+  ('morning_digest',        '30 6 * * *',   now()),   -- L5 morning briefing 06:30 KST
+  ('nightly_digest',        '0 23 * * *',   now()),   -- L5 nightly digest 23:00 KST
+  ('memory_consolidate',    '30 23 * * *',  now()),   -- nightly memory consolidation
+  ('auto_archive_sweep',    '0 22 * * *',   now()),   -- L8 auto-archive
+  ('task_remind',           '0 9,14,19 * * *', now()),-- L3 reminders
+  ('network_inactive_sweep','0 10 * * 1-5', now()),   -- L6 inactivity detection (weekdays 10:00)
+  ('self_model_weekly',     '0 21 * * 0',   now()),   -- self-model proposals (Sun 21:00)
+  ('eval_weekly',           '0 22 * * 0',   now()),   -- eval harness (Sun 22:00)
   ('drive_poll',            '*/10 * * * *', now()),   -- L9 ingestion
   ('github_poll',           '*/15 * * * *', now()),   -- L9 ingestion
-  -- A3 소유 (인프라)
-  ('followup_sweep',        '0 * * * *',    now()),   -- outbox claim 해제
+  -- A3-owned (infrastructure)
+  ('followup_sweep',        '0 * * * *',    now()),   -- release outbox claims
   ('token_refresh',         '*/30 * * * *', now()),
-  ('gmail_rewatch',         '0 3 * * *',    now()),   -- watch 만료 7일 → 매일 갱신
-  ('graph_sub_renew',       '0 4 * * 1',    now()),   -- Outlook 구독 10,080분
+  ('gmail_rewatch',         '0 3 * * *',    now()),   -- watch expires in 7 days → renew daily
+  ('graph_sub_renew',       '0 4 * * 1',    now()),   -- Outlook subscription 10,080 minutes
   ('events_rolloff',        '15 4 * * *',   now()),
-  ('slot_health',           '*/5 * * * *',  now());   -- WAL 슬롯 감시
+  ('slot_health',           '*/5 * * * *',  now());   -- WAL slot monitoring
 
--- A3 §6.1 append-only 강제 (A3-D5)
+-- A3 §6.1 append-only enforcement (A3-D5)
 CREATE OR REPLACE FUNCTION omnis_append_only() RETURNS trigger
 LANGUAGE plpgsql AS $fn$
 BEGIN
@@ -2208,7 +2208,7 @@ BEGIN
       USING ERRCODE = '42501';
   END IF;
   IF TG_OP = 'DELETE' THEN
-    -- audit_log는 어떤 경우에도 삭제 불가. events는 롤오프 윈도우 밖만 허용.
+    -- audit_log can never be deleted. events only allow deletes outside the rolloff window.
     IF TG_TABLE_NAME = 'audit_log'
        OR OLD.at > now() - (current_setting('omnis.events_retention', true))::interval THEN
       RAISE EXCEPTION 'append-only: DELETE on % is forbidden (retention window)', TG_TABLE_NAME
@@ -2236,19 +2236,19 @@ CREATE TRIGGER events_no_truncate   BEFORE TRUNCATE ON events
 CREATE TRIGGER audit_no_truncate    BEFORE TRUNCATE ON audit_log
   FOR EACH STATEMENT EXECUTE FUNCTION omnis_no_truncate();
 
--- A3 §6.1은 `ALTER DATABASE omnis SET ...`로 DB 이름을 리터럴로 적었다. 테스트 DB는 omnis_test이므로
--- 동작이 같고 이름에 독립적인 형태로만 바꾼다. ALTER DATABASE ... SET은 새 커넥션부터 적용된다.
+-- A3 §6.1 wrote the DB name as a literal via `ALTER DATABASE omnis SET ...`. The test DB is omnis_test, so
+-- we change it only to a form with identical behavior that is independent of the name. ALTER DATABASE ... SET applies from new connections onward.
 DO $$
 BEGIN
   EXECUTE format('ALTER DATABASE %I SET omnis.events_retention = %L', current_database(), '90 days');
 END
 $$;
 
--- 2차 방어: 허브 역할에서 권한 자체를 뺀다.
+-- Second line of defense: take the privilege away from the hub role entirely.
 REVOKE UPDATE, DELETE, TRUNCATE ON events, audit_log FROM omnis_hub;
-GRANT  DELETE ON events TO omnis_owner;   -- 롤오프는 아래 SECURITY DEFINER 함수로만
+GRANT  DELETE ON events TO omnis_owner;   -- rolloff happens only through the SECURITY DEFINER function below
 
--- A3 §6.1.1: 허브(omnis_hub)는 임의 DELETE 대신 이 함수 EXECUTE만 갖는다.
+-- A3 §6.1.1: the hub (omnis_hub) has only EXECUTE on this function instead of arbitrary DELETE.
 CREATE OR REPLACE FUNCTION omnis_events_rolloff()
 RETURNS TABLE (cutoff timestamptz, deleted bigint)
 LANGUAGE plpgsql
@@ -2264,7 +2264,7 @@ BEGIN
     RAISE EXCEPTION 'omnis.events_retention is not set — refusing to roll off';
   END IF;
   cut := now() - retention::interval;
-  -- 덤프(A3 §11)는 호출 전에 허브가 끝낸다. 이 함수는 삭제만 한다.
+  -- The hub finishes the dump (A3 §11) before calling this. This function only deletes.
   DELETE FROM events WHERE at <= cut;
   GET DIAGNOSTICS n = ROW_COUNT;
   INSERT INTO audit_log (actor, action, target_table, after)
@@ -2279,23 +2279,23 @@ REVOKE ALL   ON FUNCTION omnis_events_rolloff() FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION omnis_events_rolloff() TO omnis_hub;
 ```
 
-- [ ] 4. 테스트를 돌려 통과를 확인한다. `omnis.events_retention` 테스트는 새 커넥션이 필요하므로, globalSetup이 끝난 뒤 열리는 테스트 풀에서 자동으로 만족된다.
+- [ ] 4. Run the tests and confirm they pass. The `omnis.events_retention` test needs a new connection, so it is satisfied automatically by the test pool opened after globalSetup finishes.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대: `Tests  34 passed (34)`.
+Expected output: `Tests  34 passed (34)`.
 
-- [ ] 5. 커밋한다.
+- [ ] 5. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A04: 0006_kernel.sql — events/audit_log/jobs + append-only + 롤오프 함수
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A04: 0006_kernel.sql — events/audit_log/jobs + append-only + rolloff function
 
-- events/audit_log는 FK 없이 seq bigint identity, append-only 트리거 4개(UPDATE/DELETE/TRUNCATE)
-- audit_log는 영구 삭제 불가, events는 retention 윈도 밖만 허용
-- omnis_events_rolloff(): SECURITY DEFINER, OWNER omnis_owner, omnis_hub는 EXECUTE만
-- jobs seed 16개(A4 소유 10 + A3 인프라 6)
-- ALTER DATABASE는 current_database()로 동적 실행(테스트 DB omnis_test 대응, 동작 동일)
+- events/audit_log use seq bigint identity with no FK; 4 append-only triggers (UPDATE/DELETE/TRUNCATE)
+- audit_log can never be deleted; events allow deletes only outside the retention window
+- omnis_events_rolloff(): SECURITY DEFINER, OWNER omnis_owner, omnis_hub gets EXECUTE only
+- 16 job seeds (10 A4-owned + 6 A3 infrastructure)
+- ALTER DATABASE runs dynamically via current_database() (works with the omnis_test test DB, identical behavior)
 
 Implemented-by: Claude Sonnet
 
@@ -2306,15 +2306,15 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 9: ddl-0007-notify (US-A04, tier: Sonnet)
 
-**스토리 US-A04** (계속) — `0007_notify.sql`: LISTEN/NOTIFY 채널, 페이로드는 id만(8,000B 한도).
+**Story US-A04** (continued) — `0007_notify.sql`: the LISTEN/NOTIFY channels, payloads carry only the id (8,000B limit).
 
-**읽을 곳**: A3 §6.2(채널 7개 표 + `omnis_notify_item()` 예시 + "같은 모양의 트리거를 `threads`, `pending_approvals`, `tasks`, `agent_sessions`에 붙인다"), A3-D7(허브 내부 팬아웃 전용), A3-D14·계약 §0-9(ephemeral은 NOTIFY를 타지 않는다), 계약 §4(채널·페이로드 표).
+**Read:** A3 §6.2 (the 7-channel table + the `omnis_notify_item()` example + "attach triggers of the same shape to `threads`, `pending_approvals`, `tasks`, `agent_sessions`"), A3-D7 (hub-internal fanout only), A3-D14·contract §0-9 (ephemeral does not ride NOTIFY), contract §4 (the channel and payload table).
 
-**채널 7개 중 6개만 트리거를 갖는다**: `omnis_item`/`omnis_thread`/`omnis_approval`/`omnis_task`/`omnis_session`/`omnis_job`은 테이블 트리거가 쏜다. **`omnis_control`은 테이블이 없다** — kill switch 상태 변경 때 커널이 `pg_notify`로 직접 쏜다(Task 19). 이 파일은 `omnis_control` 트리거를 만들지 않는다.
+**Only 6 of the 7 channels have triggers**: `omnis_item`/`omnis_thread`/`omnis_approval`/`omnis_task`/`omnis_session`/`omnis_job` are fired by table triggers. **`omnis_control` has no table** — the kernel fires it directly with `pg_notify` when the kill switch state changes (Task 19). This file does not create an `omnis_control` trigger.
 
-`omnis_approval`의 페이로드 `state`는 계약 §4가 `"pending"|"decided"` 두 값만 허용하므로 트리거는 그 두 상태로 바뀔 때만 NOTIFY한다. `omnis_session`은 `runtime` 문자열이 필요하므로 `agent_runtimes`를 조인한다.
+The payload `state` of `omnis_approval` allows only the two values `"pending"|"decided"` per contract §4, so the trigger NOTIFYs only when it changes to one of those two states. `omnis_session` needs the `runtime` string, so it joins `agent_runtimes`.
 
-**만들지 않을 것(YAGNI)**: 디바운스·coalescing 로직(Postgres가 같은 트랜잭션·같은 채널·같은 페이로드를 이미 합친다, A3 §6.2), ephemeral 채널, 페이로드에 body·title 등 실제 데이터(id만).
+**Do NOT build (YAGNI):** debounce/coalescing logic (Postgres already merges the same transaction, channel, and payload, A3 §6.2), ephemeral channels, real data such as body or title in the payload (id only).
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0007_notify.sql`
@@ -2322,11 +2322,11 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `0002`(items/threads/agent_runtimes), `0004`(pending_approvals/tasks/agent_sessions), `0006`(jobs).
-- Produces: 함수 `omnis_notify_item()`, `omnis_notify_thread()`, `omnis_notify_approval()`, `omnis_notify_task()`, `omnis_notify_session()`, `omnis_notify_job()`; 트리거 `items_notify`, `threads_notify`, `approvals_notify`, `tasks_notify`, `sessions_notify`, `jobs_notify`. Task 13이 이 트리거들이 실제로 쏘는지를 커널 `subscribe()`로 검증한다.
+- Produces: the functions `omnis_notify_item()`, `omnis_notify_thread()`, `omnis_notify_approval()`, `omnis_notify_task()`, `omnis_notify_session()`, `omnis_notify_job()`; the triggers `items_notify`, `threads_notify`, `approvals_notify`, `tasks_notify`, `sessions_notify`, `jobs_notify`. Task 13 verifies with the kernel's `subscribe()` that these triggers actually fire.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. 이 테스트는 `pg`의 raw client로 직접 LISTEN한다(커널은 아직 없다). `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0007.test.ts`:
+- [ ] 1. Write the failing test. This test LISTENs directly with `pg`'s raw client (there is no kernel yet). `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0007.test.ts`:
 
 ```ts
 import { Client } from "pg";
@@ -2465,19 +2465,19 @@ describe("0007_notify", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대 실패: `expected undefined to deeply equal { id: ..., thread_id: ..., op: 'insert' }`.
+Expected failure: `expected undefined to deeply equal { id: ..., thread_id: ..., op: 'insert' }`.
 
-- [ ] 3. `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0007_notify.sql`을 쓴다. `omnis_notify_item()`은 A3 §6.2 그대로이고 나머지 5개는 A3가 "같은 모양"이라고 지시한 것을 각 채널의 페이로드 표(A3 §6.2 / 계약 §4)에 맞춰 쓴 것이다.
+- [ ] 3. Write `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0007_notify.sql`. `omnis_notify_item()` is A3 §6.2 verbatim, and the other 5 are what A3 directed as "the same shape", written to match each channel's payload table (A3 §6.2 / contract §4).
 
 ```sql
 -- 0007_notify.sql
--- A3 §6.2 / A3-D7: 허브 내부 팬아웃 전용, 페이로드는 id만(8,000B 한도).
--- omnis_control은 테이블이 없다 — kill switch가 커널에서 pg_notify로 직접 쏜다.
+-- A3 §6.2 / A3-D7: hub-internal fanout only, payloads carry only the id (8,000B limit).
+-- omnis_control has no table — the kill switch fires it directly from the kernel with pg_notify.
 
 CREATE OR REPLACE FUNCTION omnis_notify_item() RETURNS trigger
 LANGUAGE plpgsql AS $fn$
@@ -2499,7 +2499,7 @@ BEGIN
 END
 $fn$;
 
--- 계약 §4: state는 'pending' | 'decided' 두 값만 흘린다.
+-- contract §4: state only ever emits the two values 'pending' | 'decided'.
 CREATE OR REPLACE FUNCTION omnis_notify_approval() RETURNS trigger
 LANGUAGE plpgsql AS $fn$
 BEGIN
@@ -2557,22 +2557,22 @@ CREATE TRIGGER jobs_notify      AFTER INSERT OR UPDATE ON jobs
   FOR EACH ROW EXECUTE FUNCTION omnis_notify_job();
 ```
 
-- [ ] 4. 테스트를 돌려 통과를 확인한다.
+- [ ] 4. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대: `Tests  38 passed (38)`.
+Expected output: `Tests  38 passed (38)`.
 
-- [ ] 5. 커밋한다.
+- [ ] 5. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A04: 0007_notify.sql — NOTIFY 6채널 트리거(id-only 페이로드)
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A04: 0007_notify.sql — NOTIFY 6-channel triggers (id-only payload)
 
-- omnis_item/thread/approval/task/session/job 트리거 + 함수
-- omnis_approval은 pending|decided일 때만, omnis_session은 runtime 조인
-- omnis_control은 테이블이 없으므로 커널이 직접 쏜다(A3-D7)
-- 모든 페이로드가 8,000B 한도 안
+- omnis_item/thread/approval/task/session/job triggers + functions
+- omnis_approval only on pending|decided, omnis_session joins runtime
+- omnis_control has no table, so the kernel fires it directly (A3-D7)
+- every payload stays under the 8,000B limit
 
 Implemented-by: Claude Sonnet
 
@@ -2583,25 +2583,25 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 10: ddl-0008-publication (US-A04, tier: Sonnet)
 
-**스토리 US-A04** (계속) — `0008_publication.sql`: `CREATE PUBLICATION zero_omnis`(컬럼 리스트 포함).
+**Story US-A04** (continued) — `0008_publication.sql`: `CREATE PUBLICATION zero_omnis` (with column lists).
 
-**읽을 곳**: A3 §7(publication SQL 전문 + include/exclude 판정표 + "`label_rules`도 컬럼 리스트가 필요하다(`probe_embedding` 제외)" + 제외 테이블 목록), A3-D8(화이트리스트), 계약 §7(복제 테이블 목록과 좁힌 `items` 컬럼 리스트).
+**Read:** A3 §7 (the publication SQL in full + the include/exclude decision table + "`label_rules` also needs a column list (`probe_embedding` excluded)" + the excluded table list), A3-D8 (whitelist), contract §7 (the replicated table list and the narrowed `items` column list).
 
-**A3가 펼치지 않은 것 하나**: A3 §7의 SQL 블록은 가독성 때문에 `items`만 컬럼을 펼쳤고 본문이 "실제 `0008_publication.sql`은 `label_rules`도 같은 방식으로 컬럼을 나열한다"라고 지시한다. 이 태스크가 그 지시를 이행한다 — `label_rules`에서 `probe_embedding`만 뺀 15개 컬럼을 나열한다.
+**One thing A3 did not spell out**: the SQL block in A3 §7 expands columns only for `items` for readability, and the body instructs that "the real `0008_publication.sql` also lists `label_rules` columns the same way". This task carries out that instruction — it lists the 15 columns of `label_rules` with only `probe_embedding` removed.
 
-**만들지 않을 것(YAGNI)**: 복제 슬롯 생성(zero-cache가 만든다), `zero_cvr` 스키마(A6 소관), Zero permission DSL(TS 쪽, US-A21), `idle_replication_slot_timeout`(A6 소유).
+**Do NOT build (YAGNI):** replication slot creation (zero-cache does it), the `zero_cvr` schema (A6's remit), the Zero permission DSL (TS side, US-A21), `idle_replication_slot_timeout` (owned by A6).
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0008_publication.sql`
 - Test: `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0008.test.ts`
 
 **Interfaces:**
-- Consumes: `0002`~`0006`의 테이블 전부.
-- Produces: publication `zero_omnis`. US-A21(`zeroSchema`)이 이 publication의 테이블·컬럼 집합과 1:1이어야 한다.
+- Consumes: every table from `0002`~`0006`.
+- Produces: the publication `zero_omnis`. US-A21 (`zeroSchema`) must be 1:1 with this publication's table and column set.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0008.test.ts`:
+- [ ] 1. Write the failing test. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/schema-0008.test.ts`:
 
 ```ts
 import type { Pool } from "pg";
@@ -2688,55 +2688,55 @@ describe("0008_publication", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대 실패: `expected [] to deeply equal [ 'accounts', 'agent_runtimes', ... ]`.
+Expected failure: `expected [] to deeply equal [ 'accounts', 'agent_runtimes', ... ]`.
 
-- [ ] 3. `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0008_publication.sql`을 쓴다.
+- [ ] 3. Write `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0008_publication.sql`.
 
 ```sql
 -- 0008_publication.sql
--- A3 §7 / A3-D8: Zero 복제는 화이트리스트다. 새 테이블은 명시적으로 추가하지 않으면 동기화되지 않는다.
--- 제외: account_secrets(비밀), events(cold), audit_log(감사), agent_runs(비용·감사),
---       memories/entities/relations(서버 쿼리), person_merges, jobs.
+-- A3 §7 / A3-D8: Zero replication is a whitelist. A table does not sync unless it is explicitly added.
+-- Excluded: account_secrets(secrets), events(cold), audit_log(audit), agent_runs(cost·audit),
+--       memories/entities/relations(server queries), person_merges, jobs.
 
 CREATE PUBLICATION zero_omnis FOR TABLE
   accounts, threads, calendar_events, persons, identities,
   labels, item_labels, thread_labels,
   tasks, agent_runtimes, agent_sessions,
   pending_approvals, notes, digests,
-  -- items만 컬럼 리스트로 좁힌다: 768d 임베딩과 생성 컬럼을 폰까지 끌고 가지 않는다.
+  -- Narrow only items to a column list: do not drag the 768d embedding and generated columns down to the phone.
   items (id, thread_id, account_id, external_id, kind, status, scope, sensitivity,
          author_person_id, author_agent_id, author_is_me, in_reply_to,
          subject, body, body_html, attachments, tool, sent_at, received_at,
          source_hash, idempotency_key, outbox_claimed_at, fail_reason, meta),
-  -- label_rules는 probe_embedding만 뺀다(A3 §7 본문 지시).
+  -- label_rules drops only probe_embedding (instruction from the A3 §7 body).
   label_rules (id, label_id, prompt, rule, rule_by, rule_at, tier,
                positives, negatives, hits_30d, corrections_30d,
                pinned_by_user, active, created_at, updated_at);
 ```
 
-> 이 publication을 읽는 복제 유저는 `0001`이 만든 **`omnis_sync`**(`REPLICATION` + SELECT)다. zero-cache의 `ZERO_UPSTREAM_DB` 접속 문자열이 이 role을 쓴다(계약 §7의 `zero_replication`은 옛 이름 — 쓰지 않는다).
+> The replication user that reads this publication is **`omnis_sync`** (`REPLICATION` + SELECT) created by `0001`. zero-cache's `ZERO_UPSTREAM_DB` connection string uses this role (`zero_replication` in contract §7 is the old name — do not use it).
 
-> `items`의 컬럼 리스트는 `id`부터 `meta`까지 **24개**다(`embedding`·`search_tsv` 2개가 빠진 값). 테스트가 이 숫자를 고정한다 — `pg_publication_tables.attnames`의 길이로 직접 센다.
+> The `items` column list runs from `id` through `meta` — **24** columns (the value with the 2 columns `embedding`·`search_tsv` left out). The test pins this number — it counts directly from the length of `pg_publication_tables.attnames`.
 
-- [ ] 4. 테스트를 돌려 통과를 확인한다.
+- [ ] 4. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대: `Tests  42 passed (42)`.
+Expected output: `Tests  42 passed (42)`.
 
-- [ ] 5. 커밋한다.
+- [ ] 5. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A04: 0008_publication.sql — zero_omnis 화이트리스트 publication
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A04: 0008_publication.sql — zero_omnis whitelist publication
 
-- 복제 16개 테이블, items는 24컬럼(embedding/search_tsv 제외), label_rules는 probe_embedding 제외
-- account_secrets/events/audit_log/agent_runs/memories/entities/relations/person_merges/jobs 제외
+- 16 replicated tables, items with 24 columns (embedding/search_tsv excluded), label_rules with probe_embedding excluded
+- account_secrets/events/audit_log/agent_runs/memories/entities/relations/person_merges/jobs excluded
 
 Implemented-by: Claude Sonnet
 
@@ -2747,22 +2747,22 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 11: calendar-query-acceptance (US-A04, tier: Sonnet)
 
-**스토리 US-A04의 명시적 인수 기준** — "US-A02가 만든 `calendar_events`에 대해 `attendees_count BETWEEN 1 AND 8` 조회(A4 §7.1 미팅-종료 트리거의 전제)와 `end_at` 기준 48시간 윈도 조회(A3 §12 (5b), A4 §7.5 지표의 전제)가 둘 다 성공해야 한다." 이 태스크는 그 두 조회를 실행 가능한 테스트로 고정한다.
+**Story US-A04's explicit acceptance criteria** — "for the `calendar_events` created by US-A02, both the `attendees_count BETWEEN 1 AND 8` query (the prerequisite of the meeting-end trigger in A4 §7.1) and the 48-hour window query on `end_at` (the prerequisite of the metrics in A3 §12 (5b), A4 §7.5) must succeed." This task pins those two queries as executable tests.
 
-**읽을 곳**: A3 §12 (5)·(5b)(팔로업 큐 / 48시간 지표 쿼리 전문), A3 §2.1(조인 규칙 — 1 이벤트 = 1 `items` row + 1 `calendar_events` row, `items.sent_at`에 `start_at`을 넣는다).
+**Read:** A3 §12 (5)·(5b) (follow-up queue / 48-hour metric query in full), A3 §2.1 (join rule — 1 event = 1 `items` row + 1 `calendar_events` row, put `start_at` into `items.sent_at`).
 
-**만들지 않을 것(YAGNI)**: 팔로업 루프 자체(A4 §7, Phase B), `digests.metrics` 쓰기(밤 다이제스트 잡, Phase B), 쿼리를 감싸는 TS 헬퍼(아직 호출자가 없다 — 이 태스크는 SQL이 도는지만 증명한다).
+**Do NOT build (YAGNI):** the follow-up loop itself (A4 §7, Phase B), writing `digests.metrics` (nightly digest job, Phase B), a TS helper wrapping the queries (there is no caller yet — this task only proves the SQL runs).
 
 **Files:**
 - Test: `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/calendar-queries.test.ts`
 
 **Interfaces:**
-- Consumes: `0002`의 `accounts`/`threads`/`items`/`calendar_events`/`persons`.
-- Produces: 없음(인수 테스트만). A3 §12 (5)/(5b) SQL이 스키마와 맞는다는 증거.
+- Consumes: `accounts`/`threads`/`items`/`calendar_events`/`persons` from `0002`.
+- Produces: none (acceptance tests only). Evidence that the A3 §12 (5)/(5b) SQL matches the schema.
 
 ### Steps
 
-- [ ] 1. 인수 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/calendar-queries.test.ts`:
+- [ ] 1. Write the acceptance test. `/Users/logankim/AI-Workspaces/omnis/packages/db/test/integration/calendar-queries.test.ts`:
 
 ```ts
 import type { Pool } from "pg";
@@ -2790,11 +2790,11 @@ beforeAll(async () => {
        VALUES ($1,'cal-main','calendar', ARRAY[$2]::uuid[]) RETURNING id`,
       [acc.id, person.id],
     );
-    // A3 §2.1 조인 규칙: items.sent_at = start_at
+    // A3 §2.1 join rule: items.sent_at = start_at
     const item = await one<{ id: string }>(
       c,
       `INSERT INTO items (thread_id, account_id, kind, subject, body, sent_at)
-       VALUES ($1,$2,'event','PoC 킥오프','', now() - interval '3 days') RETURNING id`,
+       VALUES ($1,$2,'event','PoC kickoff','', now() - interval '3 days') RETURNING id`,
       [thread.id, acc.id],
     );
     await query(
@@ -2863,7 +2863,7 @@ describe("US-A04 acceptance: calendar queries (A4 §7.1, A3 §12 5b)", () => {
     await query(
       pool,
       `INSERT INTO items (thread_id, account_id, kind, body, status, author_is_me, sent_at)
-       VALUES ($1,$2,'message','감사합니다','sent', true, now() - interval '2 days')`,
+       VALUES ($1,$2,'message','Thank you','sent', true, now() - interval '2 days')`,
       [thread.id, accountId],
     );
     const rows = await query<{ missed_followups: string }>(
@@ -2894,28 +2894,28 @@ describe("US-A04 acceptance: calendar queries (A4 §7.1, A3 §12 5b)", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌린다. 스키마가 이미 있으므로 이번에는 바로 통과해야 한다 — 실패하면 `0002`의 `calendar_events`나 `threads.participants`가 A3와 어긋난 것이므로 Task 4로 돌아간다.
+- [ ] 2. Run the tests. The schema already exists, so this time they must pass right away — if they fail, `calendar_events` or `threads.participants` from `0002` has diverged from A3, so go back to Task 4.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/db test
 ```
-기대: `Tests  45 passed (45)`.
+Expected output: `Tests  45 passed (45)`.
 
-- [ ] 3. US-A04 검증 명령을 그대로 돌려 스토리를 닫는다.
+- [ ] 3. Run the US-A04 verification command verbatim to close the story.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && DATABASE_URL=postgres://logan@127.0.0.1:5432/omnis pnpm db:migrate && pnpm --filter @omnis/db test
 ```
-기대: `applied 4: 0005_memory.sql, 0006_kernel.sql, 0007_notify.sql, 0008_publication.sql` 후 전부 통과.
+Expected output: everything passes after `applied 4: 0005_memory.sql, 0006_kernel.sql, 0007_notify.sql, 0008_publication.sql`.
 
-- [ ] 4. 커밋한다.
+- [ ] 4. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A04: 캘린더 인수 기준 — attendees_count 1..8 조회와 48시간 윈도 지표
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A04: calendar acceptance criteria — attendees_count 1..8 query and 48-hour window metric
 
-- A4 §7.1 미팅-종료 트리거 전제: attendees_count BETWEEN 1 AND 8 조회 성공
-- A3 §12 (5b) 48시간 미발송 지표 쿼리가 스키마 위에서 그대로 동작
-- 48시간 안에 내가 보낸 item이 생기면 지표가 0으로 떨어지는 것까지 확인
+- A4 §7.1 meeting-end trigger prerequisite: the attendees_count BETWEEN 1 AND 8 query succeeds
+- The A3 §12 (5b) 48-hour missed-send metric query runs as-is on top of the schema
+- Verified down to the metric dropping to 0 once an item I sent appears within 48 hours
 
 Implemented-by: Claude Sonnet
 
@@ -2926,29 +2926,29 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 12: kernel-events-tiers (US-A05, tier: Opus)
 
-**스토리 US-A05** — 목표: `packages/kernel` 이벤트 버스(ephemeral/durable/cold 3티어 라우팅, NOTIFY 8000B id-only) / 산출물: `packages/kernel/src/events.ts` / 검증 명령: `pnpm --filter @omnis/kernel test:integration` / 티어: Opus. 의존: A04.
+**Story US-A05** — Goal: `packages/kernel` event bus (ephemeral/durable/cold 3-tier routing, NOTIFY 8000B id-only) / Outputs: `packages/kernel/src/events.ts` / Verification command: `pnpm --filter @omnis/kernel test:integration` / tier: Opus. Depends on: A04.
 
-**읽을 곳**: 마스터 §7(이벤트 3티어 정의), A3-D14 + 계약 §0-9(**ephemeral은 WS 팬아웃 전용 — NOTIFY도 저장도 없다**), A3-D7(NOTIFY는 허브 내부 팬아웃 전용, id만), 계약 §5(`Events` 인터페이스 주석), 계약 §4(채널·페이로드 표), 계약 §9(로그 형식).
+**Read:** master §7 (definition of the 3 event tiers), A3-D14 + contract §0-9 (**ephemeral is WS fan-out only — no NOTIFY and no storage**), A3-D7 (NOTIFY is for in-hub fan-out only, id only), contract §5 (`Events` interface comment), contract §4 (channel·payload table), contract §9 (log format).
 
-**3티어의 정확한 의미(계약 §5 주석 그대로)**:
-- `ephemeral` — 프로세스 안 구독자에게만 전달한다. DB를 건드리지 않고 NOTIFY도 쏘지 않는다. 허브 WS 팬아웃이 유일한 소비자다.
-- `durable` — **호출자가 이미 쓴 row의 id를 NOTIFY로 알린다.** row를 쓰는 것은 emit의 일이 아니다. `items`/`threads`/`pending_approvals`/`tasks`/`agent_sessions`/`jobs`는 `0007`의 트리거가 이미 쏘므로 emit을 부를 필요가 없다 — emit이 필요한 곳은 트리거가 없는 `omnis_control`(kill switch, Task 19)이다.
-- `cold` — `events` 테이블 INSERT. `events`에는 NOTIFY 트리거가 없으므로 아무 데도 팬아웃되지 않는다.
+**The precise meaning of the 3 tiers (verbatim from the contract §5 comment)**:
+- `ephemeral` — delivered only to in-process subscribers. It does not touch the DB and does not fire NOTIFY. The hub WS fan-out is the only consumer.
+- `durable` — **notifies, via NOTIFY, the id of a row the caller has already written.** Writing the row is not emit's job. `items`/`threads`/`pending_approvals`/`tasks`/`agent_sessions`/`jobs` are already fired by the `0007` triggers, so there is no need to call emit — the place that needs emit is `omnis_control` (kill switch, Task 19), which has no trigger.
+- `cold` — INSERT into the `events` table. `events` has no NOTIFY trigger, so nothing is fanned out anywhere.
 
-**만들지 않을 것(YAGNI)**: 이벤트 리플레이, 구독 필터 DSL, 백프레셔 큐, 재연결 백오프(Task 25의 graceful shutdown이 닫고 허브가 재시작한다 — Phase A 허브는 LaunchDaemon이 되살린다), 트랜잭션 안에서 emit하는 경로.
+**Do NOT build (YAGNI):** event replay, a subscription filter DSL, a backpressure queue, reconnect backoff (the graceful shutdown in Task 25 closes it and the hub restarts — the LaunchDaemon revives the Phase A hub), a path that emits inside a transaction.
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/package.json`, `/Users/logankim/AI-Workspaces/omnis/packages/kernel/tsconfig.json`, `/Users/logankim/AI-Workspaces/omnis/packages/kernel/vitest.config.ts`, `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/logger.ts`, `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/events.ts`, `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/index.ts`
-- Modify: `/Users/logankim/AI-Workspaces/omnis/tsconfig.json`(references에 kernel 추가)
+- Modify: `/Users/logankim/AI-Workspaces/omnis/tsconfig.json` (add kernel to references)
 - Test: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/events.test.ts`
 
 **Interfaces:**
 - Consumes: `createPool`, `query`, `NOTIFY_CHANNELS` (`@omnis/db`, Task 1).
-- Produces (`@omnis/kernel`): `type EventTier = "ephemeral" | "durable" | "cold"` · `interface Events { emit(tier: EventTier, kind: string, payload: { id?: string; [k: string]: unknown }): Promise<void>; subscribe(channel: string, fn: (p: Record<string, unknown>) => void): () => void }` (계약 §5) · `interface Logger { debug/info/warn/error(msg: string, extra?: Record<string, unknown>): void }` · `createLogger(pkg: string, traceId?: string | null): Logger`(계약 §5와 동일 시그니처 — 아래 구현은 `traceId: string | null = null` 기본값으로 둘 다 만족한다) · `createEvents(deps: { pool: Pool; logger: Logger }): Events & { close(): Promise<void> }` · `DURABLE_CHANNEL: Readonly<Record<string, string>>` · `NOTIFY_MAX_BYTES: 8000`. `createKernel`은 Task 22가 이 조각들을 모아 만든다.
+- Produces (`@omnis/kernel`): `type EventTier = "ephemeral" | "durable" | "cold"` · `interface Events { emit(tier: EventTier, kind: string, payload: { id?: string; [k: string]: unknown }): Promise<void>; subscribe(channel: string, fn: (p: Record<string, unknown>) => void): () => void }` (contract §5) · `interface Logger { debug/info/warn/error(msg: string, extra?: Record<string, unknown>): void }` · `createLogger(pkg: string, traceId?: string | null): Logger` (same signature as contract §5 — the implementation below satisfies both with the `traceId: string | null = null` default) · `createEvents(deps: { pool: Pool; logger: Logger }): Events & { close(): Promise<void> }` · `DURABLE_CHANNEL: Readonly<Record<string, string>>` · `NOTIFY_MAX_BYTES: 8000`. `createKernel` is assembled from these pieces by Task 22.
 
 ### Steps
 
-- [ ] 1. 패키지 골격을 만든다.
+- [ ] 1. Create the package skeleton.
 
 `/Users/logankim/AI-Workspaces/omnis/packages/kernel/package.json`:
 ```json
@@ -2973,7 +2973,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 }
 ```
 
-> `./zero` 서브패스(계약 §7)는 US-A21이 `src/zero-schema.ts`를 만들 자리다. 이 태스크는 파일을 만들지 않는다 — `exports` 항목만 미리 둔다.
+> The `./zero` subpath (contract §7) is where US-A21 will create `src/zero-schema.ts`. This task does not create the file — it only puts the `exports` entry in place up front.
 
 `/Users/logankim/AI-Workspaces/omnis/packages/kernel/tsconfig.json`:
 ```json
@@ -3002,7 +3002,7 @@ export default defineConfig({
 });
 ```
 
-`/Users/logankim/AI-Workspaces/omnis/tsconfig.json`의 `references`를 갱신:
+Update `references` in `/Users/logankim/AI-Workspaces/omnis/tsconfig.json`:
 ```json
 {
   "files": [],
@@ -3010,7 +3010,7 @@ export default defineConfig({
 }
 ```
 
-- [ ] 2. 실패하는 통합 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/events.test.ts`:
+- [ ] 2. Write the failing integration test. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/events.test.ts`:
 
 ```ts
 import type { Pool } from "pg";
@@ -3135,14 +3135,14 @@ describe("events — subscribe", () => {
 });
 ```
 
-- [ ] 3. 테스트를 돌려 실패를 확인한다.
+- [ ] 3. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm install && pnpm --filter @omnis/kernel test:integration
 ```
-기대 실패: `Failed to resolve import "@omnis/kernel"`.
+Expected failure: `Failed to resolve import "@omnis/kernel"`.
 
-- [ ] 4. 로거를 쓴다(계약 §9의 한 줄 JSON 형식). `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/logger.ts`:
+- [ ] 4. Write the logger (the one-line JSON format from contract §9). `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/logger.ts`:
 
 ```ts
 export type LogLevel = "debug" | "info" | "warn" | "error";
@@ -3154,7 +3154,7 @@ export interface Logger {
   error(msg: string, extra?: Record<string, unknown>): void;
 }
 
-/** 계약 §9: 한 줄 JSON을 stdout으로. 필수 키 ts/level/pkg/msg/trace_id. 시크릿은 어떤 키에도 넣지 않는다. */
+/** contract §9: one line of JSON to stdout. Required keys ts/level/pkg/msg/trace_id. Never put secrets in any key. */
 export function createLogger(pkg: string, traceId: string | null = null): Logger {
   const write = (level: LogLevel, msg: string, extra?: Record<string, unknown>): void => {
     process.stdout.write(
@@ -3170,7 +3170,7 @@ export function createLogger(pkg: string, traceId: string | null = null): Logger
 }
 ```
 
-- [ ] 5. 이벤트 버스를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/events.ts`:
+- [ ] 5. Write the event bus. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/events.ts`:
 
 ```ts
 import { NOTIFY_CHANNELS, query } from "@omnis/db";
@@ -3180,14 +3180,14 @@ import type { Logger } from "./logger.js";
 export type EventTier = "ephemeral" | "durable" | "cold";
 
 export interface Events {
-  /** ephemeral: 프로세스 안 팬아웃만(저장·NOTIFY 없음, A3-D14).
-   *  durable: 호출자가 이미 쓴 row의 id를 NOTIFY로 알린다.
-   *  cold: events 테이블 INSERT(트리거가 없어 NOTIFY 없음). */
+  /** ephemeral: in-process fan-out only (no storage, no NOTIFY, A3-D14).
+   *  durable: notifies the id of a row the caller has already written.
+   *  cold: INSERT into the events table (no trigger, so no NOTIFY). */
   emit(tier: EventTier, kind: string, payload: { id?: string; [k: string]: unknown }): Promise<void>;
   subscribe(channel: string, fn: (p: Record<string, unknown>) => void): () => void;
 }
 
-/** durable 이벤트 kind → NOTIFY 채널(계약 §4). 여기 없는 kind는 durable로 쏠 수 없다. */
+/** durable event kind → NOTIFY channel (contract §4). A kind not listed here cannot be emitted as durable. */
 export const DURABLE_CHANNEL: Readonly<Record<string, string>> = {
   "item.created": "omnis_item",
   "item.updated": "omnis_item",
@@ -3202,7 +3202,7 @@ export const DURABLE_CHANNEL: Readonly<Record<string, string>> = {
   "control.kill_switch": "omnis_control",
 };
 
-/** A3 §6.2: NOTIFY 페이로드 한도. */
+/** A3 §6.2: NOTIFY payload limit. */
 export const NOTIFY_MAX_BYTES = 8000;
 
 export interface EventsDeps {
@@ -3244,7 +3244,7 @@ export function createEvents(deps: EventsDeps): Events & { close(): Promise<void
       }
       fanout(msg.channel, payload);
     });
-    // 채널 이름은 식별자라 파라미터화할 수 없다. NOTIFY_CHANNELS는 고정 상수이므로 주입 경로가 없다.
+    // Channel names are identifiers and cannot be parameterized. NOTIFY_CHANNELS is a fixed constant, so there is no injection path.
     for (const ch of NOTIFY_CHANNELS) {
       await c.query(`LISTEN ${ch}`);
     }
@@ -3312,14 +3312,14 @@ export function createEvents(deps: EventsDeps): Events & { close(): Promise<void
       listener = null;
       if (c !== null) {
         c.removeAllListeners("notification");
-        c.release(true); // 이 커넥션은 LISTEN 상태이므로 풀에 돌려주지 않고 버린다
+        c.release(true); // this connection is in LISTEN state, so discard it instead of returning it to the pool
       }
     },
   };
 }
 ```
 
-- [ ] 6. 배럴을 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/index.ts`:
+- [ ] 6. Write the barrel. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/index.ts`:
 
 ```ts
 export { DURABLE_CHANNEL, NOTIFY_MAX_BYTES, createEvents } from "./events.js";
@@ -3328,30 +3328,30 @@ export { createLogger } from "./logger.js";
 export type { LogLevel, Logger } from "./logger.js";
 ```
 
-- [ ] 7. 테스트를 돌려 통과를 확인한다.
+- [ ] 7. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대: `Tests  6 passed (6)`.
+Expected output: `Tests  6 passed (6)`.
 
-- [ ] 8. 타입체크를 돌린다(의존 방향이 컴파일 타임에 지켜지는지 확인, A7 §2).
+- [ ] 8. Run the typecheck (verify the dependency direction is enforced at compile time, A7 §2).
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm typecheck
 ```
-기대: 에러 0.
+Expected output: 0 errors.
 
-- [ ] 9. 커밋한다.
+- [ ] 9. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A05: 커널 이벤트 버스 3티어 라우팅
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A05: kernel event bus 3-tier routing
 
-- ephemeral: 프로세스 내 팬아웃만, row도 NOTIFY도 만들지 않는다(A3-D14)
-- durable: DURABLE_CHANNEL 매핑으로 pg_notify, 8000B 한도 초과 시 throw
-- cold: events 테이블 INSERT(NOTIFY 트리거 없음)
-- subscribe는 omnis_ 채널 화이트리스트만 LISTEN, 구독자 예외가 다른 구독자를 죽이지 않는다
-- pnpm --filter @omnis/kernel test:integration 통과
+- ephemeral: in-process fan-out only, creates neither a row nor a NOTIFY (A3-D14)
+- durable: pg_notify via the DURABLE_CHANNEL mapping, throws when the 8000B limit is exceeded
+- cold: INSERT into the events table (no NOTIFY trigger)
+- subscribe LISTENs only the omnis_ channel whitelist; a subscriber exception does not kill the other subscribers
+- pnpm --filter @omnis/kernel test:integration passes
 
 Implemented-by: Claude Opus
 
@@ -3362,22 +3362,22 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 13: notify-fanout (US-A05, tier: Opus)
 
-**스토리 US-A05** (계속) — `0007`의 DB 트리거와 커널 `subscribe()`가 실제로 이어져서, 아무도 `emit`을 부르지 않아도 row 쓰기만으로 팬아웃이 도는지를 고정한다. 이게 "durable 티어는 호출자가 이미 쓴 row의 id를 알린다"의 실제 동작이다.
+**Story US-A05** (continued) — pins down whether the DB triggers from `0007` and the kernel `subscribe()` are actually wired together, so that fan-out runs from a row write alone even when nobody calls `emit`. This is the real behavior of "the durable tier notifies the id of a row the caller already wrote.".
 
-**읽을 곳**: A3 §6.2(트리거 표), 계약 §5(`Events` 주석), Task 9가 만든 트리거 6개.
+**Read:** A3 §6.2 (trigger table), contract §5 (`Events` comment), the 6 triggers created by Task 9.
 
-**만들지 않을 것(YAGNI)**: WS 서버(Task 24가 `/bridge`를 열 자리만 남기고, WS 자체는 US-A17), 팬아웃 메트릭, 구독자별 큐.
+**Do NOT build (YAGNI):** the WS server (Task 24 only leaves the spot to open `/bridge`; the WS itself is US-A17), fan-out metrics, per-subscriber queues.
 
 **Files:**
 - Test: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/notify-fanout.test.ts`
 
 **Interfaces:**
-- Consumes: `createEvents`, `createLogger` (Task 12), `0007`의 트리거.
-- Produces: 없음(행동 계약 테스트).
+- Consumes: `createEvents`, `createLogger` (Task 12), the triggers from `0007`.
+- Produces: none (behavior contract test).
 
 ### Steps
 
-- [ ] 1. 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/notify-fanout.test.ts`:
+- [ ] 1. Write the test. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/notify-fanout.test.ts`:
 
 ```ts
 import type { Pool } from "pg";
@@ -3395,7 +3395,7 @@ beforeAll(async () => {
   for (const ch of ["omnis_item", "omnis_thread", "omnis_approval"]) {
     events.subscribe(ch, (p) => received.push({ channel: ch, payload: p }));
   }
-  // LISTEN이 걸릴 때까지 한 박자 기다린다(subscribe는 비동기로 커넥션을 잡는다).
+  // Wait a beat for LISTEN to take effect (subscribe grabs the connection asynchronously).
   await new Promise((r) => setTimeout(r, 300));
 });
 afterAll(async () => {
@@ -3488,21 +3488,21 @@ describe("DB trigger → kernel subscriber", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌린다. Task 9와 Task 12가 모두 맞았다면 바로 통과한다 — 실패하면 어느 쪽이 깨졌는지 실패 메시지가 가른다(`timed out waiting for NOTIFY` = 트리거 또는 LISTEN 문제, payload 불일치 = 트리거의 `json_build_object` 문제).
+- [ ] 2. Run the tests. If both Task 9 and Task 12 are correct they pass right away — if they fail, the failure message tells which side broke (`timed out waiting for NOTIFY` = trigger or LISTEN problem, payload mismatch = the trigger's `json_build_object` problem).
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대: `Tests  9 passed (9)`.
+Expected output: `Tests  9 passed (9)`.
 
-- [ ] 3. US-A05 검증 명령으로 스토리를 닫고 커밋한다.
+- [ ] 3. Close the story with the US-A05 verification command and commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration && git add -A && git commit -m "US-A05: DB 트리거 → 커널 subscribe 팬아웃 검증
+cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration && git add -A && git commit -m "US-A05: DB trigger → kernel subscribe fan-out verification
 
-- items/threads INSERT만으로 omnis_item/omnis_thread가 구독자에게 도달
-- 같은 트랜잭션의 동일 페이로드는 Postgres가 coalescing(A3 §6.2)
-- omnis_approval은 pending/decided만, executing은 조용
+- A bare items/threads INSERT is enough for omnis_item/omnis_thread to reach subscribers
+- Postgres coalesces identical payloads in the same transaction (A3 §6.2)
+- omnis_approval only on pending/decided, executing is silent
 
 Implemented-by: Claude Opus
 
@@ -3513,13 +3513,13 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 14: scheduler-jobs (US-A06, tier: Opus)
 
-**스토리 US-A06** — 목표: 스케줄러(`jobs` 테이블 + cron 실행기, 최초 job=헬스체크) / 산출물: `packages/kernel/src/scheduler.ts` / 검증 명령: `pnpm --filter @omnis/kernel test:integration` / 티어: Opus. 의존: A05.
+**Story US-A06** — Goal: scheduler (`jobs` table + cron runner, first job = healthcheck) / Outputs: `packages/kernel/src/scheduler.ts` / Verification command: `pnpm --filter @omnis/kernel test:integration` / tier: Opus. Depends on: A05.
 
-**읽을 곳**: 마스터 §7(스케줄러 — 허브 프로세스 안의 cron 테이블, 실행 기록은 events에), A3 §6(`jobs` 컬럼과 `jobs_due_idx`, seed 16개, TZ=Asia/Seoul), 계약 §5(`Scheduler` 인터페이스 주석 — 10초 틱, claim UPDATE 문장 그대로, 실행 후 갱신 목록).
+**Read:** master §7 (scheduler — a cron table inside the hub process, run history in events), A3 §6 (the `jobs` columns and `jobs_due_idx`, the 16 seeds, TZ=Asia/Seoul), contract §5 (`Scheduler` interface comment — 10-second tick, the claim UPDATE statement verbatim, the list updated after a run).
 
-**cron 파서를 직접 쓴다 — 왜**: 계약 §1이 `@omnis/kernel`의 의존을 `@omnis/db`와 `@omnis/protocol`로 못박았으므로 `cron-parser` 같은 외부 라이브러리를 넣을 수 없다. seed 16개가 쓰는 문법은 `*`, `*/n`, `a,b,c`, `a-b` 네 가지뿐이고 TZ는 **Asia/Seoul 하나**다. Asia/Seoul은 DST가 없으므로 고정 +9h 오프셋으로 환산하면 정확하다. 이 두 사실이 파서를 40줄로 줄인다.
+**Write the cron parser by hand — why**: contract §1 pins `@omnis/kernel`'s dependencies to `@omnis/db` and `@omnis/protocol`, so an external library such as `cron-parser` cannot be added. The syntax used by the 16 seeds is only four kinds — `*`, `*/n`, `a,b,c`, `a-b` — and the TZ is **Asia/Seoul only**. Asia/Seoul has no DST, so converting with a fixed +9h offset is exact. These two facts shrink the parser to 40 lines.
 
-**만들지 않을 것(YAGNI)**: 초 단위 필드, `L`/`W`/`#` 확장, 여러 타임존, 분산 리더 선출(허브는 한 프로세스다 — `claimed_at`이 재시작 중복만 막으면 된다), 잡 재시도 백오프(다음 `next_run_at`에 다시 돈다), 잡 히스토리 테이블(`events` cold 티어가 남긴다).
+**Do NOT build (YAGNI):** second-level fields, `L`/`W`/`#` extensions, multiple timezones, distributed leader election (the hub is a single process — `claimed_at` only has to prevent duplicates across restarts), job retry backoff (it runs again at the next `next_run_at`), a job history table (the `events` cold tier records it).
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/cron.ts`, `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/scheduler.ts`
@@ -3528,17 +3528,17 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `query`, `one` (`@omnis/db`) · `Events`, `Logger` (Task 12).
-- Produces (`@omnis/kernel`): `nextRunAt(cron: string, from: Date): Date` · `interface Scheduler { register(name: string, cron: string, handler: () => Promise<void>): void; start(): Promise<void>; stop(): Promise<void> }` (계약 §5) · `createScheduler(deps: SchedulerDeps): Scheduler` · `interface SchedulerDeps { pool: Pool; events: Events; logger: Logger; now?: () => Date; tickMs?: number; isKillSwitchOn?: () => Promise<boolean> }`.
+- Produces (`@omnis/kernel`): `nextRunAt(cron: string, from: Date): Date` · `interface Scheduler { register(name: string, cron: string, handler: () => Promise<void>): void; start(): Promise<void>; stop(): Promise<void> }` (contract §5) · `createScheduler(deps: SchedulerDeps): Scheduler` · `interface SchedulerDeps { pool: Pool; events: Events; logger: Logger; now?: () => Date; tickMs?: number; isKillSwitchOn?: () => Promise<boolean> }`.
 
 ### Steps
 
-- [ ] 1. cron 파서의 실패하는 유닛 테스트를 쓴다(DB가 필요 없으므로 `unit` 프로젝트다). `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/cron.test.ts`:
+- [ ] 1. Write the failing unit test for the cron parser (no DB needed, so it is the `unit` project). `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/cron.test.ts`:
 
 ```ts
 import { describe, expect, it } from "vitest";
 import { nextRunAt } from "@omnis/kernel";
 
-/** KST 기준 시각을 UTC Date로 만든다(Asia/Seoul = UTC+9, DST 없음). */
+/** Build a UTC Date from a KST wall-clock time (Asia/Seoul = UTC+9, no DST). */
 function kst(iso: string): Date {
   return new Date(`${iso}+09:00`);
 }
@@ -3587,19 +3587,19 @@ describe("nextRunAt (5-field cron, TZ=Asia/Seoul)", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test
 ```
-기대 실패: `does not provide an export named 'nextRunAt'`.
+Expected failure: `does not provide an export named 'nextRunAt'`.
 
-- [ ] 3. cron 파서를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/cron.ts`:
+- [ ] 3. Write the cron parser. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/cron.ts`:
 
 ```ts
-/** A3 §6: 5-field cron, TZ=Asia/Seoul. Asia/Seoul은 DST가 없으므로 고정 +9h로 환산한다.
- *  ponytail: 분 단위 선형 스캔(366일 상한). 잡 실행 직후 한 번만 부르므로 비용이 문제되지 않는다.
- *  DST가 있는 타임존이 필요해지면 Intl.DateTimeFormat 기반 환산으로 갈아끼운다. */
+/** A3 §6: 5-field cron, TZ=Asia/Seoul. Asia/Seoul has no DST, so convert with a fixed +9h.
+ *  ponytail: linear minute-by-minute scan (366-day cap). It is called only once right after a job runs, so the cost does not matter.
+ *  If a timezone with DST is ever needed, swap in an Intl.DateTimeFormat-based conversion. */
 const SEOUL_OFFSET_MS = 9 * 60 * 60 * 1000;
 const MINUTE_MS = 60_000;
 
@@ -3653,7 +3653,7 @@ export function nextRunAt(cron: string, from: Date): Date {
     if (!months.has(seoul.getUTCMonth() + 1)) continue;
     const domOk = doms.has(seoul.getUTCDate());
     const dowOk = dows.has(seoul.getUTCDay());
-    // POSIX cron: dom과 dow가 둘 다 제한되면 OR, 하나만 제한되면 그것만 본다.
+    // POSIX cron: when both dom and dow are restricted, OR them; when only one is restricted, read only that one.
     const dayOk = domStar && dowStar ? true : domStar ? dowOk : dowStar ? domOk : domOk || dowOk;
     if (dayOk) return new Date(t);
   }
@@ -3661,14 +3661,14 @@ export function nextRunAt(cron: string, from: Date): Date {
 }
 ```
 
-- [ ] 4. cron 유닛 테스트를 돌려 통과를 확인한다.
+- [ ] 4. Run the cron unit tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test -- cron
 ```
-기대: `Tests  4 passed (4)`.
+Expected output: `Tests  4 passed (4)`.
 
-- [ ] 5. 스케줄러의 실패하는 통합 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/scheduler.test.ts`:
+- [ ] 5. Write the failing integration test for the scheduler. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/scheduler.test.ts`:
 
 ```ts
 import type { Pool } from "pg";
@@ -3804,14 +3804,14 @@ describe("scheduler", () => {
 });
 ```
 
-- [ ] 6. 테스트를 돌려 실패를 확인한다.
+- [ ] 6. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대 실패: `does not provide an export named 'createScheduler'`.
+Expected failure: `does not provide an export named 'createScheduler'`.
 
-- [ ] 7. 스케줄러를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/scheduler.ts`:
+- [ ] 7. Write the scheduler. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/scheduler.ts`:
 
 ```ts
 import { query } from "@omnis/db";
@@ -3831,9 +3831,9 @@ export interface SchedulerDeps {
   events: Events;
   logger: Logger;
   now?: () => Date;
-  /** 기본 10초(계약 §5). 테스트만 줄인다. */
+  /** Default 10 seconds (contract §5). Only tests reduce it. */
   tickMs?: number;
-  /** Task 20이 kill switch를 물린다. 없으면 항상 꺼진 것으로 본다. */
+  /** Task 20 wires up the kill switch. When absent, it is always treated as off. */
   isKillSwitchOn?: () => Promise<boolean>;
 }
 
@@ -3850,7 +3850,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
   let ticking = false;
 
   async function runOne(name: string, handler: () => Promise<void>): Promise<void> {
-    // 계약 §5의 claim 문장 그대로. 0행이면 다른 틱/프로세스가 이미 잡았거나 아직 때가 아니다.
+    // The claim statement from contract §5 verbatim. Zero rows means another tick/process already claimed it or it is not due yet.
     const claimed = await query<{ id: string; schedule: string }>(
       pool,
       `UPDATE jobs SET claimed_at = now()
@@ -3909,7 +3909,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 
   return {
     register(name, cron, handler) {
-      nextRunAt(cron, now()); // 잘못된 cron은 등록 시점에 터진다
+      nextRunAt(cron, now()); // a malformed cron blows up at registration time
       handlers.set(name, handler);
       schedules.set(name, cron);
     },
@@ -3937,7 +3937,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
         clearInterval(timer);
         timer = null;
       }
-      // 진행 중인 틱이 claimed_at을 들고 끝나도록 잠깐 기다린다.
+      // Wait a moment so an in-flight tick finishes while holding claimed_at.
       for (let i = 0; i < 100 && ticking; i += 1) {
         await new Promise((r) => setTimeout(r, 20));
       }
@@ -3946,7 +3946,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 }
 ```
 
-- [ ] 8. 배럴에 추가한다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/index.ts`에 두 줄 추가:
+- [ ] 8. Add to the barrel. Add two lines to `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/index.ts`:
 
 ```ts
 export { nextRunAt } from "./cron.js";
@@ -3954,23 +3954,23 @@ export { createScheduler } from "./scheduler.js";
 export type { Scheduler, SchedulerDeps } from "./scheduler.js";
 ```
 
-- [ ] 9. 테스트를 돌려 통과를 확인한다.
+- [ ] 9. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test
 ```
-기대: `Tests  19 passed (19)` (cron 4 + events 6 + fanout 3 + scheduler 6).
+Expected output: `Tests  19 passed (19)` (cron 4 + events 6 + fanout 3 + scheduler 6).
 
-- [ ] 10. 커밋한다.
+- [ ] 10. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A06: 스케줄러(jobs 테이블 + 5-field cron 실행기)
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A06: scheduler (jobs table + 5-field cron runner)
 
-- register/start/stop, 10초 틱, 계약 §5의 claim UPDATE 문장 그대로(at-most-once)
-- 실행 후 last_run_at/last_status/last_error/next_run_at 갱신 + claimed_at 해제
-- 실행 기록은 cold 티어 job.run 이벤트로 남는다(마스터 §7)
-- cron 파서는 자작: 외부 의존 금지(계약 §1) + Asia/Seoul은 DST가 없어 고정 +9h로 충분
-- 핸들러가 등록되지 않은 seed 잡은 건드리지 않는다
+- register/start/stop, 10-second tick, the claim UPDATE statement from contract §5 verbatim (at-most-once)
+- After a run, updates last_run_at/last_status/last_error/next_run_at and clears claimed_at
+- Run history is recorded as a cold-tier job.run event (master §7)
+- The cron parser is hand-written: external dependencies forbidden (contract §1) + Asia/Seoul has no DST, so a fixed +9h is enough
+- Seeded jobs with no registered handler are left untouched
 
 Implemented-by: Claude Opus
 
@@ -3981,11 +3981,11 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 15: scheduler-healthcheck-job (US-A06, tier: Opus)
 
-**스토리 US-A06**의 "최초 job=헬스체크" 부분 — 스케줄러가 실제로 물릴 첫 핸들러를 만든다. A3 §6의 seed 16개는 전부 Phase B 이후의 루프·인프라 잡이라 Phase A에는 핸들러가 없다. `hub_healthcheck`는 A3 seed에 없으므로 `register()`가 새 row를 만든다.
+**Story US-A06**'s "first job = healthcheck" part — creates the first handler the scheduler will actually have wired up. All 16 seeds in A3 §6 are loop and infrastructure jobs from Phase B onward, so they have no handler in Phase A. `hub_healthcheck` is not in the A3 seeds, so `register()` creates a new row.
 
-**읽을 곳**: A6 §8(healthchecks.io ping 대상 표 — 이 잡이 그 자리의 Phase A 대역이다), A3 §6(`slot_health`는 A3 소유 인프라 잡이고 별개다), 마스터 §7("실행 기록은 events에 남는다").
+**Read:** A6 §8 (healthchecks.io ping target table — this job is the Phase A stand-in for that slot), A3 §6 (`slot_health` is an infrastructure job owned by A3 and is separate), master §7 ("run history is recorded in events").
 
-**만들지 않을 것(YAGNI)**: healthchecks.io HTTP ping(A6 소관, Phase B에 `HC_UUIDS`가 생기면 이 핸들러 안에 한 줄 추가), ntfy 알림, WAL 슬롯 검사(`slot_health` 잡, Phase B), 디스크 용량 검사.
+**Do NOT build (YAGNI):** healthchecks.io HTTP ping (A6's concern, add one line inside this handler once `HC_UUIDS` exists in Phase B), ntfy notifications, WAL slot checks (the `slot_health` job, Phase B), disk capacity checks.
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/jobs/healthcheck.ts`
@@ -3998,7 +3998,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/healthcheck-job.test.ts`:
+- [ ] 1. Write the failing test. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/healthcheck-job.test.ts`:
 
 ```ts
 import type { Pool } from "pg";
@@ -4067,14 +4067,14 @@ describe("hub_healthcheck job", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대 실패: `does not provide an export named 'registerHealthcheckJob'`.
+Expected failure: `does not provide an export named 'registerHealthcheckJob'`.
 
-- [ ] 3. 잡을 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/jobs/healthcheck.ts`:
+- [ ] 3. Write the job. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/jobs/healthcheck.ts`:
 
 ```ts
 import { one } from "@omnis/db";
@@ -4085,7 +4085,7 @@ import type { Scheduler } from "../scheduler.js";
 export const HEALTHCHECK_JOB_NAME = "hub_healthcheck";
 export const HEALTHCHECK_CRON = "*/5 * * * *";
 
-/** 스케줄러가 물리는 첫 핸들러(US-A06). DB가 살아 있는지 + 큐가 막히지 않았는지만 본다. */
+/** The first handler the scheduler hooks up (US-A06). It only checks that the DB is alive and the queue is not jammed. */
 export function registerHealthcheckJob(
   scheduler: Scheduler,
   deps: { pool: Pool; events: Events },
@@ -4108,27 +4108,27 @@ export function registerHealthcheckJob(
 }
 ```
 
-- [ ] 4. 배럴에 추가한다:
+- [ ] 4. Add to the barrel:
 
 ```ts
 export { HEALTHCHECK_CRON, HEALTHCHECK_JOB_NAME, registerHealthcheckJob } from "./jobs/healthcheck.js";
 ```
 
-- [ ] 5. 테스트를 돌리고 US-A06 검증 명령으로 스토리를 닫는다.
+- [ ] 5. Run the tests and close the story with the US-A06 verification command.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대: `Tests  17 passed (17)` (events 6 + fanout 3 + scheduler 6 + healthcheck 2).
+Expected output: `Tests  17 passed (17)` (events 6 + fanout 3 + scheduler 6 + healthcheck 2).
 
-- [ ] 6. 커밋한다.
+- [ ] 6. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A06: hub_healthcheck — 스케줄러의 첫 잡
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A06: hub_healthcheck — the scheduler's first job
 
-- */5 * * * *로 등록, DB 왕복 + pending_approvals/due_jobs 카운트
-- 결과는 cold 티어 hub.health 이벤트로 남는다
-- healthchecks.io ping은 A6 소관이라 붙이지 않는다
+- registers on */5 * * * *, DB round trip + pending_approvals/due_jobs counts
+- the result is left as a cold tier hub.health event
+- the healthchecks.io ping is A6's concern, so it is not wired up
 
 Implemented-by: Claude Opus
 
@@ -4139,30 +4139,30 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 16: approvals-propose (US-A07, tier: Opus)
 
-**스토리 US-A07** — 목표: 승인 게이트 API(`propose`/`decide` 상태 전이, HumanInterrupt/HumanResponse 이식) / 산출물: `packages/kernel/src/approvals.ts` / 검증 명령: `pnpm --filter @omnis/kernel test:integration` / 티어: Opus. 의존: A03, A05.
+**Story US-A07** — Goal: approval gate API (`propose`/`decide` state transitions, porting HumanInterrupt/HumanResponse) / Outputs: `packages/kernel/src/approvals.ts` / Verification command: `pnpm --filter @omnis/kernel test:integration` / tier: Opus. Depends on: A03, A05.
 
-**선행**: 이 태스크부터 `@omnis/protocol`(US-A11)이 필요하다. `packages/protocol`이 워크스페이스에 없으면 시작하지 않는다.
+**Prerequisite**: This task onward needs `@omnis/protocol` (US-A11). If `packages/protocol` is not in the workspace, do not start.
 
-**읽을 곳**: 계약 §3.4(`HumanInterrupt`/`HumanResponse` zod 스키마 전문 — `action` 6값, `config` 기본값, `risk` 기본 `normal`), 계약 §5(`Approvals` 인터페이스 + 상태 전이 주석), A3 §4(`pending_approvals` DDL과 제약 이름), A3-D11(`state`와 `decision` 두 컬럼), 마스터 §7(모든 egress가 이 게이트를 거친다).
+**Read:** contract §3.4 (`HumanInterrupt`/`HumanResponse` zod schema in full — the 6 values of `action`, the `config` defaults, `risk` defaulting to `normal`), contract §5 (`Approvals` interface + state transition comments), A3 §4 (`pending_approvals` DDL and constraint names), A3-D11 (the two columns `state` and `decision`), master §7 (every egress goes through this gate).
 
-**`action`은 A3의 6값이다**(계약 §0-6): `send`, `delete`, `calendar_write`, `delegate`, `self_model_edit`, `memory_write`. A7 §1 본문의 4값 표기는 여기서 쓰지 않는다.
+**`action` is the 6 values from A3** (contract §0-6): `send`, `delete`, `calendar_write`, `delegate`, `self_model_edit`, `memory_write`. The 4-value notation in the body of A7 §1 is not used here.
 
-**NOTIFY를 직접 쏘지 않는다**: `0007`의 `approvals_notify` 트리거가 INSERT 시 `omnis_approval`을 이미 쏜다. `propose()`가 `events.emit("durable", ...)`을 부르면 같은 알림이 두 번 나간다 — 부르지 않는다.
+**Do not fire NOTIFY directly**: The `approvals_notify` trigger in `0007` already fires `omnis_approval` on INSERT. If `propose()` calls `events.emit("durable", ...)`, the same notification goes out twice — do not call it.
 
-**만들지 않을 것(YAGNI)**: 승인 정책 엔진(채널·사람별 "자율 허용"은 마스터 §7이 v1 기능으로 적었지만 Phase A 스토리가 아니다 — 기본값은 항상 승인), 만료 스윕 잡(Task 18이 `expire()`를 만들고, 그걸 부르는 cron 잡은 Phase B), 승인 UI(US-A30), 푸시 알림(A6).
+**Do NOT build (YAGNI):** the approval policy engine (per-channel and per-person "autonomous allow" is written in master §7 as a v1 feature, but it is not a Phase A story — the default is always approval), the expiry sweep job (Task 18 creates `expire()`, and the cron job that calls it is Phase B), the approval UI (US-A30), push notifications (A6).
 
 **Files:**
-- Create: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/approvals.ts`, `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/audit.ts`(타입만 — 구현은 Task 21)
-- Modify: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/package.json`(`@omnis/protocol` 의존 추가), `/Users/logankim/AI-Workspaces/omnis/packages/kernel/tsconfig.json`(references), `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/index.ts`
+- Create: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/approvals.ts`, `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/audit.ts` (types only — implementation is Task 21)
+- Modify: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/package.json` (add the `@omnis/protocol` dependency), `/Users/logankim/AI-Workspaces/omnis/packages/kernel/tsconfig.json` (references), `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/index.ts`
 - Test: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/approvals-propose.test.ts`
 
 **Interfaces:**
-- Consumes: `HumanInterrupt`, `HumanResponse`, `ApprovalAction`, `ApprovalState`, `ApprovalDecision`, `ApprovalRisk` (`@omnis/protocol`, 계약 §3.4) · `one`, `query` (`@omnis/db`) · `Audit` (Task 21이 만든다 — 그전까지 `propose`는 `deps.audit`를 optional로 받는다).
-- Produces (`@omnis/kernel`): `interface PendingApproval { id, action, args, description, config, state, decision, decided_args, requested_by, thread_id, item_id, task_id, risk, expires_at, created_at, decided_at, executed_at, fail_reason }` · `class ApprovalStateError extends Error` (`name === "ApprovalStateError"`, 계약 §9) · `interface Approvals { propose(i): Promise<string>; decide(id, r): Promise<void>; list(f?): Promise<PendingApproval[]> }` — 계약 §5의 `Approvals`는 여기에 더해 `beginExecution`/`completeExecution`/`failExecution`/`expire` 4개를 더 요구하고, 그 4개는 Task 18이 같은 인터페이스에 붙여 US-A07을 닫는다 · `createApprovals(deps: ApprovalsDeps): Approvals` · `interface ApprovalsDeps { pool: Pool; logger: Logger; now?: () => Date; audit?: Audit }`.
+- Consumes: `HumanInterrupt`, `HumanResponse`, `ApprovalAction`, `ApprovalState`, `ApprovalDecision`, `ApprovalRisk` (`@omnis/protocol`, contract §3.4) · `one`, `query` (`@omnis/db`) · `Audit` (Task 21 creates it — until then `propose` takes `deps.audit` as optional).
+- Produces (`@omnis/kernel`): `interface PendingApproval { id, action, args, description, config, state, decision, decided_args, requested_by, thread_id, item_id, task_id, risk, expires_at, created_at, decided_at, executed_at, fail_reason }` · `class ApprovalStateError extends Error` (`name === "ApprovalStateError"`, contract §9) · `interface Approvals { propose(i): Promise<string>; decide(id, r): Promise<void>; list(f?): Promise<PendingApproval[]> }` — on top of this, `Approvals` in contract §5 requires 4 more methods, `beginExecution`/`completeExecution`/`failExecution`/`expire`, and Task 18 attaches those 4 to the same interface to close US-A07 · `createApprovals(deps: ApprovalsDeps): Approvals` · `interface ApprovalsDeps { pool: Pool; logger: Logger; now?: () => Date; audit?: Audit }`.
 
 ### Steps
 
-- [ ] 1. protocol 의존을 배선한다. `packages/kernel/package.json`의 `dependencies`에 한 줄 추가하고 `tsconfig.json`의 `references`에 한 항목 추가한다.
+- [ ] 1. Wire up the protocol dependency. Add one line to `dependencies` in `packages/kernel/package.json` and one entry to `references` in `tsconfig.json`.
 
 ```json
   "dependencies": { "@omnis/db": "workspace:*", "@omnis/protocol": "workspace:*", "pg": "8.13.1" },
@@ -4170,13 +4170,13 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```json
   "references": [{ "path": "../db" }, { "path": "../protocol" }]
 ```
-그리고 설치한다:
+Then install:
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm install
 ```
-기대: `@omnis/protocol` 링크 생성. 실패하면 US-A11이 아직 merge되지 않은 것이므로 여기서 멈춘다.
+Expected output: the `@omnis/protocol` link is created. If it fails, US-A11 has not been merged yet, so stop here.
 
-- [ ] 2. 실패하는 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/approvals-propose.test.ts`:
+- [ ] 2. Write the failing test. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/approvals-propose.test.ts`:
 
 ```ts
 import type { Pool } from "pg";
@@ -4199,8 +4199,8 @@ describe("approvals.propose", () => {
   it("inserts a pending row with the contract's default config and risk", async () => {
     const id = await approvals.propose({
       action: "send",
-      args: { thread_id: "t", text: "안녕하세요" },
-      description: "Slack DM 답장",
+      args: { thread_id: "t", text: "Hello" },
+      description: "Slack DM reply",
       config: { allow_accept: true, allow_edit: true, allow_respond: false, allow_ignore: true },
       risk: "normal",
     });
@@ -4218,7 +4218,7 @@ describe("approvals.propose", () => {
     expect(row.decision).toBeNull();
     expect(row.risk).toBe("normal");
     expect(row.config.allow_respond).toBe(false);
-    expect(row.args.text).toBe("안녕하세요");
+    expect(row.args.text).toBe("Hello");
   });
 
   it("accepts all 6 actions from A3 approvals_action_ck", async () => {
@@ -4238,7 +4238,7 @@ describe("approvals.propose", () => {
     const before = await one<{ n: string }>(pool, `SELECT count(*)::text AS n FROM pending_approvals`);
     await expect(
       approvals.propose({
-        // @ts-expect-error — 런타임 방어를 검증하려고 일부러 타입을 깬다
+        // @ts-expect-error — deliberately break the type to verify the runtime guard
         action: "wire_money",
         args: {},
         description: "nope",
@@ -4266,7 +4266,7 @@ describe("approvals.propose", () => {
     const id = await approvals.propose({
       action: "delegate",
       args: { runtime: "codex" },
-      description: "맥북 Codex에 위임",
+      description: "Delegate to the MacBook Codex",
       config: { allow_accept: true, allow_edit: false, allow_respond: false, allow_ignore: true },
       risk: "high",
       requested_by: runtime.id,
@@ -4309,17 +4309,17 @@ describe("approvals.list", () => {
 });
 ```
 
-- [ ] 3. 테스트를 돌려 실패를 확인한다.
+- [ ] 3. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대 실패: `does not provide an export named 'createApprovals'`.
+Expected failure: `does not provide an export named 'createApprovals'`.
 
-- [ ] 4. 감사 **타입만** 먼저 놓는다. `propose`/`decide`가 `Audit`을 참조하는데 구현은 Task 21이 하므로, 인터페이스 파일을 여기서 만들고 Task 21이 같은 파일에 `createAudit`를 더한다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/audit.ts`:
+- [ ] 4. Put down **only the audit types** first. `propose`/`decide` reference `Audit`, but Task 21 does the implementation, so create the interface file here and let Task 21 add `createAudit` to the same file. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/audit.ts`:
 
 ```ts
-/** 계약 §5. append-only, 모든 egress가 반드시 경유한다. 구현은 Task 21. */
+/** Contract §5. append-only; every egress must pass through it. Implementation is Task 21. */
 export interface AuditEntry {
   actor: string; // 'me' | `agent:${RuntimeKind}` | 'system'
   action: string; // 'item.sent' | 'approval.decided' | 'kill_switch.set' ...
@@ -4335,7 +4335,7 @@ export interface Audit {
 }
 ```
 
-- [ ] 5. `propose`와 `list`를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/approvals.ts`:
+- [ ] 5. Write `propose` and `list`. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/approvals.ts`:
 
 ```ts
 import { one, query } from "@omnis/db";
@@ -4365,7 +4365,7 @@ export interface ApprovalConfig {
   allow_ignore: boolean;
 }
 
-/** pending_approvals row 1:1 (A3 §4). 계약 §5의 Approvals.list가 돌려주는 타입. */
+/** 1:1 with a pending_approvals row (A3 §4). The type contract §5's Approvals.list returns. */
 export interface PendingApproval {
   id: string;
   action: ApprovalAction;
@@ -4397,7 +4397,7 @@ export interface ApprovalsDeps {
   pool: Pool;
   logger: Logger;
   now?: () => Date;
-  /** Task 21이 audit를 물린다. 없으면 감사 기록을 건너뛴다(테스트 부트스트랩용). */
+  /** Task 21 hooks up audit. Without it, audit recording is skipped (for test bootstrap). */
   audit?: Audit;
 }
 
@@ -4411,7 +4411,7 @@ export function createApprovals(deps: ApprovalsDeps): Approvals {
 
   return {
     async propose(i) {
-      // zod가 action 6값·config·risk 기본값을 강제한다. DB에 닿기 전에 터진다.
+      // zod enforces the 6 action values, config, and the risk default. It blows up before reaching the DB.
       const v = HumanInterrupt.parse(i);
       const row = await one<{ id: string }>(
         pool,
@@ -4432,7 +4432,7 @@ export function createApprovals(deps: ApprovalsDeps): Approvals {
           v.expires_at ?? null,
         ],
       );
-      // NOTIFY는 0007의 approvals_notify 트리거가 이미 쏜다 — 여기서 emit하면 두 번 나간다.
+      // The approvals_notify trigger in 0007 already fires NOTIFY — emitting here would send it twice.
       await deps.audit?.record({
         actor: "system",
         action: "approval.proposed",
@@ -4461,7 +4461,7 @@ export function createApprovals(deps: ApprovalsDeps): Approvals {
         where.push(`thread_id = $${params.length}`);
       }
       params.push(Math.min(f?.limit ?? 50, 200));
-      // A3 §12 (2): 고위험 먼저, 그 다음 오래된 순.
+      // A3 §12 (2): high risk first, then oldest first.
       return query<PendingApproval>(
         pool,
         `${SELECT_ALL}
@@ -4475,47 +4475,47 @@ export function createApprovals(deps: ApprovalsDeps): Approvals {
 }
 ```
 
-> `decide`는 Task 17이 채운다. 여기서 `throw`로 남기는 것은 placeholder가 아니라 **실행하면 반드시 터지는 명시적 미구현**이다 — Task 17의 실패 테스트가 이 문장을 바로 잡는다. Task 17을 건너뛰고 merge하지 않는다.
+> Task 17 fills in `decide`. Leaving it as a `throw` here is not a placeholder but an **explicit not-implemented that necessarily throws when run** — Task 17's failing test fixes this statement. Do not skip Task 17 and merge.
 
-- [ ] 6. 배럴에 추가한다:
+- [ ] 6. Add to the barrel:
 
 ```ts
 export { ApprovalStateError, createApprovals } from "./approvals.js";
 export type { ApprovalConfig, Approvals, ApprovalsDeps, PendingApproval } from "./approvals.js";
 ```
 
-- [ ] 7. 테스트를 돌려 통과를 확인한다.
+- [ ] 7. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대: propose 4개 + list 2개가 통과. `Tests  23 passed (23)`.
+Expected output: the 4 propose tests + 2 list tests pass. `Tests  23 passed (23)`.
 
-- [ ] 8. 커밋하지 않는다 — US-A07은 Task 18까지가 하나의 원자 커밋이다(A7-D8: 스토리당 원자 커밋 1개). Task 17로 넘어간다.
+- [ ] 8. Do not commit — for US-A07, everything through Task 18 is a single atomic commit (A7-D8: one atomic commit per story). Move on to Task 17.
 
 ---
 
 ## Task 17: approvals-decide (US-A07, tier: Opus)
 
-**스토리 US-A07** (계속) — `decide(id, HumanResponse)`: `pending → decided` 전이 하나만 한다. `decision`/`decided_args`/`decided_at`을 같은 UPDATE에서 채워야 `approvals_decided_ck`를 만족한다.
+**Story US-A07** (continued) — `decide(id, HumanResponse)`: performs only the single `pending → decided` transition. `decision`/`decided_args`/`decided_at` must be filled in the same UPDATE to satisfy `approvals_decided_ck`.
 
-**읽을 곳**: 계약 §3.4(`HumanResponse = { decision, decided_args? }`, `decision ∈ accept|edit|respond|ignore`), 계약 §5(`decide`: pending → decided), A3 §4(`approvals_decided_ck`, `approvals_decision_ck`), A3 §11(`expires_at` 경과 시 `state='expired'`).
+**Read:** contract §3.4 (`HumanResponse = { decision, decided_args? }`, `decision ∈ accept|edit|respond|ignore`), contract §5 (`decide`: pending → decided), A3 §4 (`approvals_decided_ck`, `approvals_decision_ck`), A3 §11 (when `expires_at` has passed, `state='expired'`).
 
-**config 게이트**: `config.allow_edit=false`인데 `decision='edit'`이 오면 `ApprovalStateError`다. 이게 `22`의 `HumanInterrupt.config`가 존재하는 이유다 — UI가 버튼을 숨기는 것과 별개로 서버가 거절해야 한다.
+**config gate**: If `config.allow_edit=false` and `decision='edit'` arrives, it is an `ApprovalStateError`. This is why `HumanInterrupt.config` in `22` exists — apart from the UI hiding the button, the server must reject it.
 
-**만들지 않을 것(YAGNI)**: `respond` 결정이 만들어내는 후속 턴(A4 소관), 결정 취소, 다중 승인자.
+**Do NOT build (YAGNI):** the follow-up turn that a `respond` decision produces (A4's concern), decision revocation, multiple approvers.
 
 **Files:**
 - Modify: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/approvals.ts`
 - Test: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/approvals-decide.test.ts`
 
 **Interfaces:**
-- Consumes: Task 16의 `createApprovals`, `PendingApproval`, `ApprovalStateError`.
-- Produces: `Approvals.decide`의 실제 동작. 새 export 없음.
+- Consumes: `createApprovals`, `PendingApproval`, `ApprovalStateError` from Task 16.
+- Produces: the actual behavior of `Approvals.decide`. No new exports.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/approvals-decide.test.ts`:
+- [ ] 1. Write the failing test. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/approvals-decide.test.ts`:
 
 ```ts
 import type { Pool } from "pg";
@@ -4544,7 +4544,7 @@ const base = {
 describe("approvals.decide", () => {
   it("moves pending → decided and stores decision + decided_args + decided_at", async () => {
     const id = await approvals.propose({ ...base, action: "send" });
-    await approvals.decide(id, { decision: "edit", decided_args: { text: "고친 초안" } });
+    await approvals.decide(id, { decision: "edit", decided_args: { text: "revised draft" } });
 
     const row = await one<{
       state: string;
@@ -4554,7 +4554,7 @@ describe("approvals.decide", () => {
     }>(pool, `SELECT state, decision, decided_args, decided_at FROM pending_approvals WHERE id = $1`, [id]);
     expect(row.state).toBe("decided");
     expect(row.decision).toBe("edit");
-    expect(row.decided_args.text).toBe("고친 초안");
+    expect(row.decided_args.text).toBe("revised draft");
     expect(row.decided_at).toBeInstanceOf(Date);
   });
 
@@ -4610,14 +4610,14 @@ describe("approvals.decide", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대 실패: `ApprovalStateError: decide() is implemented in Task 17`.
+Expected failure: `ApprovalStateError: decide() is implemented in Task 17`.
 
-- [ ] 3. `decide`를 구현한다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/approvals.ts`의 `decide` 메서드를 통째로 교체한다.
+- [ ] 3. Implement `decide`. Replace the `decide` method in `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/approvals.ts` wholesale.
 
 ```ts
     async decide(id, r) {
@@ -4645,7 +4645,7 @@ cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integ
         throw new ApprovalStateError(`approval ${id} config forbids decision "${v.decision}"`);
       }
 
-      // state와 decision을 한 UPDATE에서 바꿔야 approvals_decided_ck를 만족한다.
+      // state and decision must change in a single UPDATE to satisfy approvals_decided_ck.
       const updated = await query<{ id: string }>(
         pool,
         `UPDATE pending_approvals
@@ -4670,38 +4670,38 @@ cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integ
     },
 ```
 
-- [ ] 4. 테스트를 돌려 통과를 확인한다.
+- [ ] 4. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대: `Tests  29 passed (29)`.
+Expected output: `Tests  29 passed (29)`.
 
-- [ ] 5. 커밋하지 않는다 — Task 18까지가 US-A07 하나의 커밋이다.
+- [ ] 5. Do not commit — everything through Task 18 is the single commit for US-A07.
 
 ---
 
 ## Task 18: approvals-state-machine (US-A07, tier: Opus)
 
-**스토리 US-A07** (마무리) — 계약 §5가 적은 전이 전체를 실행 가능하게 만든다: `pending → decided → executing → executed | failed`, 그리고 `pending → expired`. `decided` 다음 구간은 Task 22의 `runEgress`가 쓴다.
+**Story US-A07** (wrap-up) — makes the full set of transitions written in contract §5 executable: `pending → decided → executing → executed | failed`, and `pending → expired`. The segment after `decided` is used by `runEgress` in Task 22.
 
-**읽을 곳**: 계약 §5(상태 전이 한 줄 주석), A3 §4(`approvals_state_ck` 6값, `approvals_decided_ck`), A3 §11(`expires_at` 경과 시 `state='expired'`, row는 남긴다), A3 §9 규칙 5(모든 `→ sent` 전이는 `audit_log`에 `approval_id`와 함께 기록된다).
+**Read:** contract §5 (the one-line state transition comment), A3 §4 (`approvals_state_ck` 6 values, `approvals_decided_ck`), A3 §11 (when `expires_at` has passed, `state='expired'`; the row is kept), A3 §9 rule 5 (every `→ sent` transition is recorded in `audit_log` together with `approval_id`).
 
-**`expired`와 `approvals_decided_ck`의 충돌 — 이 태스크가 푸는 방식**: `CHECK ((state = 'pending') = (decision IS NULL))`이므로 `state='expired'` row는 non-NULL `decision`을 가져야 한다. A3 §11의 "`expires_at` 경과 시 `state='expired'`"만으로는 제약을 통과할 수 없다. **만료는 `decision='ignore'`와 함께 기록한다** — 사람이 아무것도 고르지 않고 시간이 지난 것은 의미상 "무시"이고, `ApprovalDecision`의 4값 중 이것이 유일하게 맞는 값이다. `decided_at`은 만료 시각을 넣고, 감사 로그의 `action='approval.expired'`가 사람의 결정과 만료를 구분한다. (이 판단은 A3 본문에 없다 — open question으로 올린다.)
+**The conflict between `expired` and `approvals_decided_ck` — how this task resolves it**: Since `CHECK ((state = 'pending') = (decision IS NULL))` holds, a `state='expired'` row must have a non-NULL `decision`. A3 §11's "when `expires_at` has passed, `state='expired'`" alone cannot pass the constraint. **Expiry is recorded together with `decision='ignore'`** — a person choosing nothing while time passes semantically means "ignore", and among the 4 values of `ApprovalDecision` this is the only one that fits. `decided_at` gets the expiry time, and `action='approval.expired'` in the audit log distinguishes a human decision from an expiry. (This judgment is not in the A3 body — raise it as an open question.)
 
-**만들지 않을 것(YAGNI)**: 만료 스윕 cron 잡(Phase B가 `expire()`를 `followup_sweep`에 얹는다), `executing` 타임아웃 회수, 재시도 큐.
+**Do NOT build (YAGNI):** the expiry sweep cron job (Phase B layers `expire()` onto `followup_sweep`), `executing` timeout reclamation, a retry queue.
 
 **Files:**
 - Modify: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/approvals.ts`
 - Test: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/approvals-state-machine.test.ts`
 
 **Interfaces:**
-- Consumes: Task 16·17의 `createApprovals`, `ApprovalStateError`.
-- Produces (`@omnis/kernel`, 계약 §5 `Approvals`의 나머지 메서드 4개 — 2026-09-20 계약 개정으로 정식 계약 표면이 됐다): `Approvals.beginExecution(id: string): Promise<PendingApproval>` · `Approvals.completeExecution(id: string): Promise<void>` · `Approvals.failExecution(id: string, reason: string): Promise<void>` · `Approvals.expire(id: string): Promise<boolean>`.
+- Consumes: `createApprovals`, `ApprovalStateError` from Tasks 16 and 17.
+- Produces (`@omnis/kernel`, the remaining 4 methods of `Approvals` in contract §5 — they became part of the formal contract surface with the 2026-09-20 contract revision): `Approvals.beginExecution(id: string): Promise<PendingApproval>` · `Approvals.completeExecution(id: string): Promise<void>` · `Approvals.failExecution(id: string, reason: string): Promise<void>` · `Approvals.expire(id: string): Promise<boolean>`.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/approvals-state-machine.test.ts`:
+- [ ] 1. Write the failing test. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/approvals-state-machine.test.ts`:
 
 ```ts
 import type { Pool } from "pg";
@@ -4815,36 +4815,36 @@ describe("approvals state machine", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대 실패: `approvals.beginExecution is not a function`.
+Expected failure: `approvals.beginExecution is not a function`.
 
-- [ ] 3. `Approvals` 인터페이스에 메서드 4개를 더한다(`approvals.ts`의 `export interface Approvals` 블록 교체):
+- [ ] 3. Add 4 methods to the `Approvals` interface (replace the `export interface Approvals` block in `approvals.ts`):
 
 ```ts
 export interface Approvals {
   propose(i: unknown): Promise<string>;
   decide(id: string, r: unknown): Promise<void>;
   list(f?: { state?: ApprovalState; thread_id?: string; limit?: number }): Promise<PendingApproval[]>;
-  /** decided(accept|edit) → executing. 0행이면 ApprovalStateError. runEgress만 부른다. */
+  /** decided(accept|edit) → executing. If 0 rows, ApprovalStateError. Only runEgress calls it. */
   beginExecution(id: string): Promise<PendingApproval>;
   /** executing → executed */
   completeExecution(id: string): Promise<void>;
   /** executing → failed */
   failExecution(id: string, reason: string): Promise<void>;
-  /** pending & expires_at <= now → expired(+decision='ignore'). 바뀌었으면 true. */
+  /** pending & expires_at <= now → expired(+decision='ignore'). true if it changed. */
   expire(id: string): Promise<boolean>;
 }
 ```
 
-- [ ] 4. 구현 4개를 `createApprovals`가 돌려주는 객체의 `list` 뒤에 추가한다:
+- [ ] 4. Add the 4 implementations after `list` in the object `createApprovals` returns:
 
 ```ts
     async beginExecution(id) {
-      // decision이 accept|edit일 때만 실행할 수 있다. ignore/respond는 채널로 나가지 않는다.
+      // Executable only when decision is accept|edit. ignore/respond do not go out to the channel.
       const rows = await query<PendingApproval>(
         pool,
         `UPDATE pending_approvals
@@ -4887,8 +4887,8 @@ export interface Approvals {
     },
 
     async expire(id) {
-      // approvals_decided_ck는 state<>'pending'인 row에 non-NULL decision을 요구한다.
-      // 아무도 고르지 않고 시간이 지난 것 = 'ignore'.
+      // approvals_decided_ck requires a non-NULL decision on rows where state<>'pending'.
+      // Nobody choosing while time passes = 'ignore'.
       const rows = await query<{ id: string }>(
         pool,
         `UPDATE pending_approvals
@@ -4912,24 +4912,24 @@ export interface Approvals {
     },
 ```
 
-- [ ] 5. 테스트를 돌려 통과를 확인한다.
+- [ ] 5. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대: `Tests  35 passed (35)`.
+Expected output: `Tests  35 passed (35)`.
 
-- [ ] 6. US-A07을 하나의 원자 커밋으로 남긴다(Task 16~18).
+- [ ] 6. Leave US-A07 as a single atomic commit (Task 16~18).
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A07: 승인 게이트 API(propose/decide + 전체 상태 전이)
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A07: approval gate API (propose/decide + full state transitions)
 
-- propose: HumanInterrupt zod 검증 후 pending_approvals INSERT, NOTIFY는 0007 트리거가 담당
-- decide: pending → decided를 한 UPDATE로(approvals_decided_ck), config가 막는 decision은 ApprovalStateError
-- 만료·이미 결정된 승인·존재하지 않는 id를 각각 구분해 거절
+- propose: after HumanInterrupt zod validation, INSERT into pending_approvals; NOTIFY is handled by the 0007 trigger
+- decide: pending → decided in a single UPDATE (approvals_decided_ck); a decision the config blocks raises ApprovalStateError
+- Rejects expiry, already-decided approvals, and non-existent ids, each distinguished
 - beginExecution/completeExecution/failExecution: decided(accept|edit) → executing → executed|failed, at-most-once claim
-- expire: pending → expired + decision='ignore'(제약 충족) + audit action='approval.expired'
-- list: 고위험 먼저, 오래된 순(A3 §12 (2))
+- expire: pending → expired + decision='ignore' (satisfies the constraint) + audit action='approval.expired'
+- list: high risk first, then oldest first (A3 §12 (2))
 
 Implemented-by: Claude Opus
 
@@ -4940,13 +4940,13 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 19: kill-switch-audit-state (US-A08, tier: Opus)
 
-**스토리 US-A08** — 목표: kill switch(전역 플래그, 모든 자율 루프/egress 체크포인트) / 산출물: `packages/kernel/src/kill-switch.ts` / 검증 명령: `pnpm --filter @omnis/kernel test:integration` / 티어: Opus. 의존: A05.
+**Story US-A08** — Goal: kill switch (global flag, checkpoints for every autonomous loop and egress) / Outputs: `packages/kernel/src/kill-switch.ts` / Verification command: `pnpm --filter @omnis/kernel test:integration` / tier: Opus. Depends on: A05.
 
-**읽을 곳**: 마스터 §7(kill switch — 전역 플래그 하나로 모든 자율 루프와 egress를 멈춘다, UI와 CLI 양쪽에서 켠다), 계약 §5(`KillSwitch` 인터페이스 + **상태 저장소는 새 테이블이 아니라 `audit_log`** — `action='kill_switch.set'`, `after={"on":bool,"reason":string}`의 최신 row가 현재 값; 프로세스 내 캐시 + `omnis_control` NOTIFY로 무효화), A3 §6.2(`omnis_control` 채널 페이로드 `{"kill_switch":true|false}`).
+**Read:** master §7 (kill switch — a single global flag stops every autonomous loop and egress; turned on from both the UI and the CLI), contract §5 (`KillSwitch` interface + **the state store is not a new table but `audit_log`** — the newest row with `action='kill_switch.set'`, `after={"on":bool,"reason":string}` is the current value; in-process cache + invalidation via the `omnis_control` NOTIFY), A3 §6.2 (the `omnis_control` channel payload `{"kill_switch":true|false}`).
 
-**새 테이블을 만들지 않는 이유**(계약이 이미 정했지만 구현자가 이유를 알아야 한다): 스위치 변경은 그 자체가 감사 대상이고, `audit_log`는 append-only라 "누가 언제 왜 껐는가"의 이력이 공짜로 남는다. 플래그 테이블을 따로 두면 그 이력을 또 만들어야 한다.
+**Why no new table** (the contract already decided this, but the implementer must know the reason): a switch change is itself an audit target, and since `audit_log` is append-only, the history of "who turned it off, when, and why" is left for free. Keeping a separate flag table would mean having to build that history all over again.
 
-**만들지 않을 것(YAGNI)**: 스위치 스코프(채널별/루프별 — 마스터가 "전역 플래그 하나"라고 못박았다), 자동 해제 타이머, CLI 바이너리(허브 HTTP `POST /kill-switch`가 Task 24에 생긴다).
+**Do NOT build (YAGNI):** switch scoping (per-channel / per-loop — the master pinned it down as "a single global flag"), an auto-release timer, a CLI binary (the hub HTTP `POST /kill-switch` appears in Task 24).
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/kill-switch.ts`
@@ -4954,12 +4954,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Test: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/kill-switch.test.ts`
 
 **Interfaces:**
-- Consumes: `query` (`@omnis/db`) · `Events` (Task 12) · `Audit` (Task 16의 타입, Task 21의 구현).
-- Produces (`@omnis/kernel`): `class KillSwitchError extends Error` (`name === "KillSwitchError"`, 계약 §9) · `interface KillSwitch { isOn(): Promise<boolean>; set(on: boolean, reason: string): Promise<void>; assertOff(): Promise<void> }` · `createKillSwitch(deps: KillSwitchDeps): KillSwitch` · `killSwitchStatus(pool: Pool): Promise<{ on: boolean; since: string | null; reason: string | null }>` (허브 `GET /kill-switch`가 쓴다) · `interface KillSwitchDeps { pool: Pool; events: Events; audit: Audit; logger: Logger }`.
+- Consumes: `query` (`@omnis/db`) · `Events` (Task 12) · `Audit` (the type from Task 16, the implementation from Task 21).
+- Produces (`@omnis/kernel`): `class KillSwitchError extends Error` (`name === "KillSwitchError"`, contract §9) · `interface KillSwitch { isOn(): Promise<boolean>; set(on: boolean, reason: string): Promise<void>; assertOff(): Promise<void> }` · `createKillSwitch(deps: KillSwitchDeps): KillSwitch` · `killSwitchStatus(pool: Pool): Promise<{ on: boolean; since: string | null; reason: string | null }>` (used by the hub `GET /kill-switch`) · `interface KillSwitchDeps { pool: Pool; events: Events; audit: Audit; logger: Logger }`.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. 이 테스트는 **두 개의 커널 인스턴스**를 만들어 NOTIFY 기반 캐시 무효화를 검증한다 — 허브와 다른 프로세스가 같이 도는 실제 상황이다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/kill-switch.test.ts`:
+- [ ] 1. Write the failing test. This test creates **two kernel instances** and verifies NOTIFY-based cache invalidation — the real situation where the hub and another process run together. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/kill-switch.test.ts`:
 
 ```ts
 import type { Pool } from "pg";
@@ -4990,7 +4990,7 @@ beforeAll(async () => {
   eventsB = createEvents({ pool, logger });
   a = createKillSwitch({ pool, events: eventsA, audit, logger });
   b = createKillSwitch({ pool, events: eventsB, audit, logger });
-  await new Promise((r) => setTimeout(r, 300)); // LISTEN이 걸릴 시간
+  await new Promise((r) => setTimeout(r, 300)); // time for LISTEN to take effect
 });
 beforeEach(async () => {
   await a.set(false, "test reset");
@@ -5005,7 +5005,7 @@ afterAll(async () => {
 describe("kill switch", () => {
   it("starts off and reads its state from the newest audit_log row", async () => {
     expect(await a.isOn()).toBe(false);
-    await a.set(true, "인젝션 의심 — 전부 정지");
+    await a.set(true, "suspected injection — stop everything");
     expect(await a.isOn()).toBe(true);
 
     const row = await one<{ actor: string; after: { on: boolean; reason: string } }>(
@@ -5014,7 +5014,7 @@ describe("kill switch", () => {
     );
     expect(row.actor).toBe("me");
     expect(row.after.on).toBe(true);
-    expect(row.after.reason).toContain("인젝션");
+    expect(row.after.reason).toContain("injection");
   });
 
   it("creates no table of its own", async () => {
@@ -5027,23 +5027,23 @@ describe("kill switch", () => {
   });
 
   it("invalidates the other process's cache through omnis_control", async () => {
-    expect(await b.isOn()).toBe(false); // b의 캐시를 채운다
+    expect(await b.isOn()).toBe(false); // populates b's cache
     await a.set(true, "from process A");
     await new Promise((r) => setTimeout(r, 400));
     expect(await b.isOn()).toBe(true);
   });
 
   it("reports since and reason for the hub route", async () => {
-    await a.set(true, "점검 중");
+    await a.set(true, "under maintenance");
     const status = await killSwitchStatus(pool);
     expect(status.on).toBe(true);
-    expect(status.reason).toBe("점검 중");
+    expect(status.reason).toBe("under maintenance");
     expect(status.since).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
-    await a.set(false, "점검 끝");
+    await a.set(false, "maintenance done");
     const off = await killSwitchStatus(pool);
     expect(off.on).toBe(false);
-    expect(off.reason).toBe("점검 끝");
+    expect(off.reason).toBe("maintenance done");
   });
 
   it("keeps the whole history because audit_log is append-only", async () => {
@@ -5067,14 +5067,14 @@ describe("assertOff", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대 실패: `does not provide an export named 'createKillSwitch'`. (`createAudit`도 없으므로 Task 21을 먼저 끝내거나, Task 21의 8줄짜리 `createAudit`를 먼저 붙이고 돌아온다 — 아래 3단계가 그것을 한다.)
+Expected failure: `does not provide an export named 'createKillSwitch'`. (`createAudit` is missing too, so either finish Task 21 first, or attach Task 21's 8-line `createAudit` first and come back — step 3 below does that.)
 
-- [ ] 3. Task 21의 `createAudit` 구현을 지금 붙인다(8줄이고 kill switch가 그것 없이는 상태를 못 쓴다). `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/audit.ts`의 타입 정의 아래에 추가:
+- [ ] 3. Attach Task 21's `createAudit` implementation now (it is 8 lines, and without it the kill switch cannot persist its state). Add below the type definitions in `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/audit.ts`:
 
 ```ts
 import { query } from "@omnis/db";
@@ -5101,9 +5101,9 @@ export function createAudit(pool: Pool): Audit {
   };
 }
 ```
-그리고 배럴에 `export { createAudit } from "./audit.js"; export type { Audit, AuditEntry } from "./audit.js";`를 더한다. (Task 21은 이 구현 위에 egress 강제와 테스트를 얹는다.)
+Then add `export { createAudit } from "./audit.js"; export type { Audit, AuditEntry } from "./audit.js";` to the barrel. (Task 21 layers egress enforcement and tests on top of this implementation.)
 
-- [ ] 4. kill switch를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/kill-switch.ts`:
+- [ ] 4. Write the kill switch. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/kill-switch.ts`:
 
 ```ts
 import { query } from "@omnis/db";
@@ -5138,7 +5138,7 @@ interface KillSwitchRow {
   reason: string | null;
 }
 
-/** 허브 GET /kill-switch가 쓰는 읽기 전용 조회. 상태는 audit_log의 최신 row가 전부다(계약 §5). */
+/** Read-only query used by the hub GET /kill-switch. The state is entirely the newest row of audit_log (contract §5). */
 export async function killSwitchStatus(pool: Pool): Promise<KillSwitchRow> {
   const rows = await query<{ at: Date; after: { on?: unknown; reason?: unknown } | null }>(
     pool,
@@ -5159,7 +5159,7 @@ export function createKillSwitch(deps: KillSwitchDeps): KillSwitch {
   const { pool, events, audit, logger } = deps;
   let cached: boolean | null = null;
 
-  // 다른 프로세스가 스위치를 만지면 캐시를 버린다(계약 §5).
+  // If another process touches the switch, drop the cache (contract §5).
   events.subscribe("omnis_control", (p) => {
     cached = p.kill_switch === true;
     logger.warn("kill switch changed elsewhere", { on: cached });
@@ -5192,43 +5192,43 @@ export function createKillSwitch(deps: KillSwitchDeps): KillSwitch {
 }
 ```
 
-- [ ] 5. 배럴에 추가한다:
+- [ ] 5. Add to the barrel:
 
 ```ts
 export { KillSwitchError, createKillSwitch, killSwitchStatus } from "./kill-switch.js";
 export type { KillSwitch, KillSwitchDeps } from "./kill-switch.js";
 ```
 
-- [ ] 6. 테스트를 돌려 통과를 확인한다.
+- [ ] 6. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대: `Tests  41 passed (41)`.
+Expected output: `Tests  41 passed (41)`.
 
-- [ ] 7. 커밋하지 않는다 — Task 20까지가 US-A08 하나의 커밋이다.
+- [ ] 7. Do not commit — everything through Task 20 is the single commit for US-A08.
 
 ---
 
 ## Task 20: kill-switch-assert-off (US-A08, tier: Opus)
 
-**스토리 US-A08**의 "모든 자율 루프/egress 체크포인트" 부분 — 스위치가 켜졌을 때 실제로 **무엇이 멈추는가**를 배선하고 증명한다. Phase A에서 자율적으로 도는 것은 스케줄러 틱 하나이고(어댑터·L3 루프는 다른 계획), egress는 Task 22가 잡는다.
+The "checkpoints for every autonomous loop and egress" part of **Story US-A08** — wires up and proves **what actually stops** when the switch is on. The only thing running autonomously in Phase A is the scheduler tick (adapters and the L3 loop are other plans), and egress is handled by Task 22.
 
-**읽을 곳**: 마스터 §7(kill switch가 멈추는 대상), Task 14의 `SchedulerDeps.isKillSwitchOn`(자리를 미리 열어 뒀다), A7 §7 공통 금지(승인 게이트 전에 비가역 tool을 배선하지 않는다).
+**Read:** master §7 (what the kill switch stops), `SchedulerDeps.isKillSwitchOn` in Task 14 (the slot was opened ahead of time), A7 §7 common prohibitions (do not wire up an irreversible tool before the approval gate).
 
-**만들지 않을 것(YAGNI)**: 이미 claim된 잡의 중단(다음 틱부터 멈추면 충분하다), 스위치가 켜진 동안의 요청 큐잉, UI 배너(US-A24~A30).
+**Do NOT build (YAGNI):** aborting jobs already claimed (stopping from the next tick is enough), queueing requests while the switch is on, the UI banner (US-A24~A30).
 
 **Files:**
-- Modify: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/scheduler.ts`(주석만 — `isKillSwitchOn`은 Task 14에 이미 있다)
+- Modify: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/scheduler.ts` (comments only — `isKillSwitchOn` already exists in Task 14)
 - Test: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/kill-switch-scheduler.test.ts`
 
 **Interfaces:**
-- Consumes: `createScheduler`(`isKillSwitchOn` 옵션, Task 14), `createKillSwitch`(Task 19).
-- Produces: 없음(배선 계약 테스트).
+- Consumes: `createScheduler` (the `isKillSwitchOn` option, Task 14), `createKillSwitch` (Task 19).
+- Produces: nothing (a wiring contract test).
 
 ### Steps
 
-- [ ] 1. 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/kill-switch-scheduler.test.ts`:
+- [ ] 1. Write the test. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/kill-switch-scheduler.test.ts`:
 
 ```ts
 import type { Pool } from "pg";
@@ -5307,31 +5307,31 @@ describe("kill switch stops the scheduler", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌린다. Task 14가 `isKillSwitchOn`을 이미 넣었으므로 바로 통과해야 한다 — 실패하면 Task 14의 `tick()`이 게이트를 빠뜨린 것이다.
+- [ ] 2. Run the tests. Task 14 already added `isKillSwitchOn`, so they must pass right away — if they fail, Task 14's `tick()` dropped the gate.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대: `Tests  44 passed (44)`.
+Expected output: `Tests  44 passed (44)`.
 
-- [ ] 3. `scheduler.ts`의 `isKillSwitchOn` 필드 주석을 확정 문구로 바꾼다(왜 이 게이트가 여기 있는지 다음 사람이 알도록):
+- [ ] 3. Change the `isKillSwitchOn` field comment in `scheduler.ts` to the final wording (so the next person knows why this gate lives here):
 
 ```ts
-  /** 마스터 §7: kill switch 하나로 모든 자율 루프가 멈춘다. 스케줄러 틱이 Phase A의 유일한 자율 루프다.
-   *  이미 claim된 잡은 끝까지 돌고, 다음 틱부터 멈춘다. */
+  /** master §7: a single kill switch stops every autonomous loop. The scheduler tick is the only autonomous loop in Phase A.
+   *  A job already claimed runs to completion; from the next tick on, it stops. */
   isKillSwitchOn?: () => Promise<boolean>;
 ```
 
-- [ ] 4. US-A08을 하나의 원자 커밋으로 남긴다(Task 19~20).
+- [ ] 4. Leave US-A08 as a single atomic commit (Task 19~20).
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A08: kill switch(전역 플래그 + 자율 루프 체크포인트)
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A08: kill switch (global flag + autonomous loop checkpoint)
 
-- 상태 저장소는 새 테이블이 아니라 audit_log의 최신 kill_switch.set row(계약 §5)
-- 프로세스 내 캐시 + omnis_control NOTIFY로 다른 프로세스 캐시까지 무효화
-- assertOff()는 KillSwitchError를 throw
-- 스케줄러 틱이 매번 게이트를 지난다 — 켜져 있으면 due 잡도 claim하지 않는다
-- killSwitchStatus(pool)로 since/reason 조회(허브 GET /kill-switch용)
+- The state store is not a new table but the latest kill_switch.set row in audit_log (contract §5)
+- An in-process cache + omnis_control NOTIFY, which invalidates other processes' caches too
+- assertOff() throws KillSwitchError
+- The scheduler tick passes the gate every time — when it is on, even due jobs are not claimed
+- killSwitchStatus(pool) reads since/reason (for the hub's GET /kill-switch)
 
 Implemented-by: Claude Opus
 
@@ -5342,25 +5342,25 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 21: audit-record (US-A09, tier: Opus)
 
-**스토리 US-A09** — 목표: 감사 로그 미들웨어(모든 egress가 경유하도록 강제) / 산출물: `packages/kernel/src/audit.ts` / 검증 명령: `pnpm --filter @omnis/kernel test:integration` / 티어: Opus. 의존: A04, A07.
+**Story US-A09** — Goal: audit log middleware (enforcing that every egress goes through it) / Outputs: `packages/kernel/src/audit.ts` / Verification command: `pnpm --filter @omnis/kernel test:integration` / tier: Opus. Depends on: A04, A07.
 
-이 태스크는 기록 쪽(`Audit.record`)을 닫고, Task 22가 강제 쪽(`runEgress`)을 닫는다.
+This task closes the recording side (`Audit.record`), and Task 22 closes the enforcement side (`runEgress`).
 
-**읽을 곳**: 계약 §5(`AuditEntry` 필드와 `actor` 값 형태 `'me' | 'agent:${RuntimeKind}' | 'system'`), A3 §6(`audit_log` DDL — FK 없음, `approval_id`도 FK 없음), A3-D5(UPDATE/DELETE/TRUNCATE 영구 금지), A3 §9 규칙 5(**모든 `→ sent` 전이는 `approval_id`와 함께 기록된다. 승인 없는 sent는 존재할 수 없고, 야간 잡이 `sent인데 approval_id 없음`을 센다**), 마스터 §2 지표("승인 없는 외부 전송 0건").
+**Read:** contract §5 (`AuditEntry` fields and the `actor` value shape `'me' | 'agent:${RuntimeKind}' | 'system'`), A3 §6 (`audit_log` DDL — no FK, and `approval_id` has no FK either), A3-D5 (UPDATE/DELETE/TRUNCATE permanently forbidden), A3 §9 rule 5 (**every `→ sent` transition is recorded together with `approval_id`. A sent without approval cannot exist, and a nightly job counts `sent but no approval_id`**), master §2 metric ("zero unapproved external sends").
 
-**만들지 않을 것(YAGNI)**: 감사 로그 조회 API(A5의 Settings 화면, Phase B), 서명·해시 체인(append-only 트리거 + REVOKE로 충분, A3-D5), 보존 롤오프(`audit_log`는 영구 보존, A3 §11), 구조화된 `action` enum(자유 문자열이 정본 — A3가 CHECK를 걸지 않았다).
+**Do NOT build (YAGNI):** an audit log query API (A5's Settings screen, Phase B), a signature/hash chain (an append-only trigger + REVOKE is enough, A3-D5), retention roll-off (`audit_log` is retained forever, A3 §11), a structured `action` enum (a free-form string is the canonical source — A3 did not add a CHECK).
 
 **Files:**
-- Modify: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/audit.ts`(Task 19에서 붙인 `createAudit`에 배치 헬퍼와 불변식 쿼리를 더한다)
+- Modify: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/audit.ts` (add batch helpers and invariant queries to the `createAudit` attached in Task 19)
 - Test: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/audit.test.ts`
 
 **Interfaces:**
 - Consumes: `query` (`@omnis/db`).
-- Produces (`@omnis/kernel`): `interface AuditEntry` · `interface Audit { record(e: AuditEntry): Promise<void> }` (계약 §5) · `createAudit(pool: Pool): Audit` · `countUnapprovedSends(pool: Pool, since: Date): Promise<number>` (A3 §9 규칙 5의 야간 점검 쿼리 — 0이 아니면 마스터 §2 지표가 깨진 것이다).
+- Produces (`@omnis/kernel`): `interface AuditEntry` · `interface Audit { record(e: AuditEntry): Promise<void> }` (contract §5) · `createAudit(pool: Pool): Audit` · `countUnapprovedSends(pool: Pool, since: Date): Promise<number>` (the nightly check query for A3 §9 rule 5 — if it is not 0, the master §2 metric is broken).
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/audit.test.ts`:
+- [ ] 1. Write a failing test. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/audit.test.ts`:
 
 ```ts
 import type { Pool } from "pg";
@@ -5453,7 +5453,7 @@ describe("audit.record", () => {
   });
 });
 
-describe("countUnapprovedSends (A3 §9 rule 5 / 마스터 §2)", () => {
+describe("countUnapprovedSends (A3 §9 rule 5 / master §2)", () => {
   it("counts item.sent rows that carry no approval_id", async () => {
     const since = new Date(Date.now() - 60_000);
     const before = await countUnapprovedSends(pool, since);
@@ -5478,18 +5478,18 @@ describe("countUnapprovedSends (A3 §9 rule 5 / 마스터 §2)", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대 실패: `does not provide an export named 'countUnapprovedSends'`.
+Expected failure: `does not provide an export named 'countUnapprovedSends'`.
 
-- [ ] 3. `audit.ts`에 불변식 쿼리를 더한다(`createAudit` 아래):
+- [ ] 3. Add the invariant query to `audit.ts` (below `createAudit`):
 
 ```ts
-/** A3 §9 규칙 5 / 마스터 §2: 승인 없는 외부 전송은 0건이어야 한다.
- *  밤 다이제스트 잡(Phase B)이 이 값을 세고, 0이 아니면 그날 다이제스트에 뜬다. */
+/** A3 §9 rule 5 / master §2: there must be zero unapproved external sends.
+ *  The nightly digest job (Phase B) counts this value, and if it is not 0 it shows up in that day's digest. */
 export async function countUnapprovedSends(pool: Pool, since: Date): Promise<number> {
   const rows = await query<{ n: string }>(
     pool,
@@ -5500,31 +5500,31 @@ export async function countUnapprovedSends(pool: Pool, since: Date): Promise<num
   return Number(rows[0]?.n ?? "0");
 }
 ```
-그리고 배럴에 `countUnapprovedSends`를 더한다.
+Then add `countUnapprovedSends` to the barrel.
 
-- [ ] 4. 테스트를 돌려 통과를 확인한다.
+- [ ] 4. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대: `Tests  49 passed (49)`.
+Expected output: `Tests  49 passed (49)`.
 
-- [ ] 5. 커밋하지 않는다 — Task 22까지가 US-A09 하나의 커밋이다.
+- [ ] 5. Do not commit — everything through Task 22 is the single US-A09 commit.
 
 ---
 
 ## Task 22: egress-middleware (US-A09, tier: Opus)
 
-**스토리 US-A09**의 핵심 — "모든 egress가 감사 로그를 경유하도록 **강제**". 강제는 관례가 아니라 구조여야 한다(마스터 D10: 프롬프트가 아니라 구조로). 이 태스크는 동시에 `createKernel`(계약 §5)을 조립한다 — 지금에야 6개 조각이 전부 존재하기 때문이다.
+The heart of **Story US-A09** — "**enforce** that every egress goes through the audit log". Enforcement must be structure, not convention (master D10: by structure, not by prompt). This task also assembles `createKernel` (contract §5) — only now do all 6 pieces exist.
 
-**강제 패턴 — 무엇이 무엇을 막는가**:
-1. `runEgress(deps, spec, fn)`가 **유일한** 실행 경로다. 순서는 ① `killSwitch.assertOff()` → ② `approvals.beginExecution(approvalId)`(decided + accept|edit이 아니면 `ApprovalStateError`) → ③ `fn(token)` → ④ 성공이면 `completeExecution` + `audit.record({approval_id})`, 실패면 `failExecution` + `audit.record`. 감사 기록은 `finally` 경로에 있어 성공·실패 어느 쪽도 빠져나갈 수 없다.
-2. `fn`은 `EgressToken`을 받는데, 이 브랜디드 타입은 `runEgress` 안에서만 만들어진다. 채널로 나가는 함수(`createOutbox().send`)가 토큰을 **인자로 요구**하므로, 승인 없이 부르는 코드는 타입체크에서 떨어진다.
-3. 어댑터 인스턴스는 `createOutbox`가 클로저로 가두고 밖으로 내보내지 않는다. 허브는 raw `Adapter`를 손에 쥐지 않는다 — `adapter.send(...)`를 직접 부를 참조가 없다.
+**Enforcement pattern — what blocks what**:
+1. `runEgress(deps, spec, fn)` is the **only** execution path. The order is ① `killSwitch.assertOff()` → ② `approvals.beginExecution(approvalId)` (if not decided + accept|edit, `ApprovalStateError`) → ③ `fn(token)` → ④ on success `completeExecution` + `audit.record({approval_id})`, on failure `failExecution` + `audit.record`. The audit record sits on the `finally` path, so neither success nor failure can escape it.
+2. `fn` receives an `EgressToken`, and this branded type is created only inside `runEgress`. Because the function that goes out to a channel (`createOutbox().send`) **requires the token as an argument**, code that calls it without an approval fails the typecheck.
+3. The adapter instance is locked inside a closure by `createOutbox` and is not exported. The hub never holds a raw `Adapter` — there is no reference from which to call `adapter.send(...)` directly.
 
-**읽을 곳**: 마스터 §7(승인 게이트 — 모든 egress가 `pending_approvals`를 거친다), A7 §1(`packages/agents`에는 `send`/`delete`/`delegate`/`calendar_write` 타입 자체가 없고 그것은 `packages/kernel`의 승인 핸들러에만 있다), A3 §9(draft 전이와 규칙 5), 계약 §3.3(`Adapter.send`는 "승인 후에만 호출된다"), 계약 §5(`Kernel` 인터페이스 — `events/scheduler/approvals/killSwitch/audit/ingest/close`).
+**Read:** master §7 (approval gate — every egress goes through `pending_approvals`), A7 §1 (`packages/agents` has no `send`/`delete`/`delegate`/`calendar_write` type at all, and it exists only in `packages/kernel`'s approval handlers), A3 §9 (draft transitions and rule 5), contract §3.3 (`Adapter.send` "is called only after approval"), contract §5 (the `Kernel` interface — `events/scheduler/approvals/killSwitch/audit/ingest/close`).
 
-**만들지 않을 것(YAGNI)**: 실제 채널 어댑터(다른 계획), outbox claim 워커(A3 §9 규칙 2·4 — `followup_sweep` 잡은 Phase B), 재시도 백오프, person 신원 해석(A3 §10은 Phase A 스토리가 아니다 — ingest sink는 `author_person_id`를 NULL로 두고 어댑터가 `person` author를 주더라도 해석하지 않는다), `ingest.scan`/`ingest.read` RPC(Phase B, A7 §7 시드 메모).
+**Do NOT build (YAGNI):** real channel adapters (another plan), the outbox claim worker (A3 §9 rules 2·4 — the `followup_sweep` job is Phase B), retry backoff, person identity resolution (A3 §10 is not a Phase A story — the ingest sink leaves `author_person_id` NULL and does not resolve it even when an adapter supplies a `person` author), the `ingest.scan`/`ingest.read` RPCs (Phase B, A7 §7 seed note).
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/egress.ts`, `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/outbox.ts`, `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/ingest.ts`, `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/kernel.ts`
@@ -5533,11 +5533,11 @@ cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integ
 
 **Interfaces:**
 - Consumes: `Approvals`(+`beginExecution`/`completeExecution`/`failExecution`), `KillSwitch`, `Audit`, `Events`, `Scheduler` (Task 12~21) · `Adapter`, `ThreadRef`, `Outbound`, `SendResult`, `NormalizedItem`, `AdapterEvent`, `IngestSink` (`@omnis/protocol`).
-- Produces (`@omnis/kernel`): `type EgressToken`(브랜디드) · `interface EgressSpec { approvalId: string; actor: string; action: string; targetTable: string; targetId?: string }` · `runEgress<T>(deps: EgressDeps, spec: EgressSpec, fn: (t: EgressToken) => Promise<T>): Promise<T>` · `interface EgressDeps { approvals: Approvals; killSwitch: KillSwitch; audit: Audit }` · `createOutbox(deps: OutboxDeps): { send(t: EgressToken, ref: ThreadRef, draft: Outbound): Promise<SendResult> }` · `createIngestSink(deps: { pool: Pool; logger: Logger }): IngestSink` · `interface KernelDeps { pool: Pool; now?: () => Date; logger?: Logger }` · `createKernel(deps: KernelDeps): Kernel` · `interface Kernel { events; scheduler; approvals; killSwitch; audit; ingest: { sink: IngestSink }; close(): Promise<void> }` (계약 §5 그대로).
+- Produces (`@omnis/kernel`): `type EgressToken` (branded) · `interface EgressSpec { approvalId: string; actor: string; action: string; targetTable: string; targetId?: string }` · `runEgress<T>(deps: EgressDeps, spec: EgressSpec, fn: (t: EgressToken) => Promise<T>): Promise<T>` · `interface EgressDeps { approvals: Approvals; killSwitch: KillSwitch; audit: Audit }` · `createOutbox(deps: OutboxDeps): { send(t: EgressToken, ref: ThreadRef, draft: Outbound): Promise<SendResult> }` · `createIngestSink(deps: { pool: Pool; logger: Logger }): IngestSink` · `interface KernelDeps { pool: Pool; now?: () => Date; logger?: Logger }` · `createKernel(deps: KernelDeps): Kernel` · `interface Kernel { events; scheduler; approvals; killSwitch; audit; ingest: { sink: IngestSink }; close(): Promise<void> }` (exactly as in contract §5).
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/egress.test.ts`:
+- [ ] 1. Write a failing test. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/egress.test.ts`:
 
 ```ts
 import type { Adapter, Outbound, SendResult, ThreadRef } from "@omnis/protocol";
@@ -5595,8 +5595,8 @@ afterAll(async () => {
 });
 
 const base = {
-  args: { text: "보냅니다" },
-  description: "Slack 답장 발송",
+  args: { text: "Sending it" },
+  description: "Send Slack reply",
   config: { allow_accept: true, allow_edit: true, allow_respond: false, allow_ignore: true },
   risk: "normal" as const,
 };
@@ -5613,7 +5613,7 @@ describe("runEgress", () => {
     const result = await runEgress(
       kernel,
       { approvalId, actor: "me", action: "item.sent", targetTable: "items" },
-      (token: EgressToken) => outbox.send(token, { accountId: "a", externalId: "C1" }, { text: "보냅니다" }),
+      (token: EgressToken) => outbox.send(token, { accountId: "a", externalId: "C1" }, { text: "Sending it" }),
     );
     expect(result.externalId).toBe("1758.000900");
     expect(sent).toHaveLength(1);
@@ -5694,7 +5694,7 @@ describe("runEgress", () => {
   });
 
   it("cannot be bypassed: outbox.send needs a token only runEgress can mint", () => {
-    // @ts-expect-error — 토큰 없이 부르면 컴파일되지 않는다. 이것이 강제 장치다.
+    // @ts-expect-error — calling it without a token does not compile. This is the enforcement device.
     void (() => outbox.send({ accountId: "a", externalId: "C1" }, { text: "x" }));
   });
 
@@ -5704,7 +5704,7 @@ describe("runEgress", () => {
 });
 ```
 
-- [ ] 2. 커널 조립 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/kernel.test.ts`:
+- [ ] 2. Write the kernel assembly test. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/kernel.test.ts`:
 
 ```ts
 import type { NormalizedItem } from "@omnis/protocol";
@@ -5768,7 +5768,7 @@ describe("ingest.sink", () => {
   });
 
   it("upserts the thread and the item, leaving author resolution to Phase B", async () => {
-    await kernel.ingest.sink(accountId, item("m-1", "첫 메시지"));
+    await kernel.ingest.sink(accountId, item("m-1", "first message"));
     const row = await one<{
       body: string;
       status: string;
@@ -5782,7 +5782,7 @@ describe("ingest.sink", () => {
         WHERE i.account_id = $1 AND i.external_id = 'm-1'`,
       [accountId],
     );
-    expect(row.body).toBe("첫 메시지");
+    expect(row.body).toBe("first message");
     expect(row.status).toBe("received");
     expect(row.author_person_id).toBeNull();
     expect(row.author_is_me).toBe(false);
@@ -5790,7 +5790,7 @@ describe("ingest.sink", () => {
   });
 
   it("is idempotent on source_hash and bumps threads.last_item_at", async () => {
-    await kernel.ingest.sink(accountId, item("m-1", "첫 메시지"));
+    await kernel.ingest.sink(accountId, item("m-1", "first message"));
     const count = await one<{ n: string }>(
       pool,
       `SELECT count(*)::text AS n FROM items WHERE account_id=$1 AND source_hash='hash-m-1'`,
@@ -5798,7 +5798,7 @@ describe("ingest.sink", () => {
     );
     expect(count.n).toBe("1");
 
-    await kernel.ingest.sink(accountId, item("m-2", "두 번째"));
+    await kernel.ingest.sink(accountId, item("m-2", "second one"));
     const thread = await one<{ last_item_at: Date }>(
       pool,
       `SELECT last_item_at FROM threads WHERE account_id=$1 AND external_id='C-ing'`,
@@ -5839,14 +5839,14 @@ describe("ingest.sink", () => {
 });
 ```
 
-- [ ] 3. 두 테스트를 돌려 실패를 확인한다.
+- [ ] 3. Run both tests and confirm they fail.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
-기대 실패: `does not provide an export named 'runEgress'`.
+Expected failure: `does not provide an export named 'runEgress'`.
 
-- [ ] 4. egress 게이트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/egress.ts`:
+- [ ] 4. Write the egress gate. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/egress.ts`:
 
 ```ts
 import type { Approvals } from "./approvals.js";
@@ -5854,7 +5854,7 @@ import type { Audit } from "./audit.js";
 import type { KillSwitch } from "./kill-switch.js";
 
 declare const egressBrand: unique symbol;
-/** runEgress 안에서만 만들어진다. 채널로 나가는 함수는 이 토큰을 인자로 요구해 우회를 컴파일 에러로 만든다. */
+/** Created only inside runEgress. The function that goes out to a channel requires this token as an argument, turning a bypass into a compile error. */
 export type EgressToken = { readonly [egressBrand]: "EgressToken"; readonly approvalId: string };
 
 export interface EgressSpec {
@@ -5871,14 +5871,14 @@ export interface EgressDeps {
   audit: Audit;
 }
 
-/** 비가역 행동의 유일한 실행 경로(마스터 §7, A7 §1). 순서를 바꾸지 않는다. */
+/** The only execution path for irreversible actions (master §7, A7 §1). Do not change the order. */
 export async function runEgress<T>(
   deps: EgressDeps,
   spec: EgressSpec,
   fn: (token: EgressToken) => Promise<T>,
 ): Promise<T> {
   await deps.killSwitch.assertOff();
-  await deps.approvals.beginExecution(spec.approvalId); // decided + accept|edit이 아니면 throw
+  await deps.approvals.beginExecution(spec.approvalId); // throws unless decided + accept|edit
   const token = { approvalId: spec.approvalId } as unknown as EgressToken;
   const targetIdField = spec.targetId !== undefined ? { target_id: spec.targetId } : {};
   try {
@@ -5909,14 +5909,14 @@ export async function runEgress<T>(
 }
 ```
 
-- [ ] 5. outbox를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/outbox.ts`:
+- [ ] 5. Write the outbox. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/outbox.ts`:
 
 ```ts
 import type { Adapter, Outbound, SendResult, ThreadRef } from "@omnis/protocol";
 import type { EgressToken } from "./egress.js";
 
 export interface OutboxDeps {
-  /** 채널 → 어댑터. 이 Map은 클로저 밖으로 나가지 않는다. */
+  /** channel → adapter. This Map does not leave the closure. */
   adapters: ReadonlyMap<string, Adapter>;
 }
 
@@ -5924,12 +5924,12 @@ export interface Outbox {
   send(token: EgressToken, ref: ThreadRef, draft: Outbound): Promise<SendResult>;
 }
 
-/** 채널 send()에 닿는 유일한 지점. 토큰이 없으면 컴파일되지 않고, 어댑터는 밖으로 새지 않는다. */
+/** The only point that reaches a channel send(). Without a token it does not compile, and the adapter does not leak out. */
 export function createOutbox(deps: OutboxDeps): Outbox {
   const { adapters } = deps;
   return {
     async send(token, ref, draft) {
-      void token; // 존재 자체가 승인 증거다
+      void token; // its very existence is the evidence of approval
       const channel = ref.accountId.includes(":") ? ref.accountId.split(":")[0] : undefined;
       const adapter = channel !== undefined ? adapters.get(channel) : [...adapters.values()][0];
       if (adapter === undefined) {
@@ -5941,9 +5941,9 @@ export function createOutbox(deps: OutboxDeps): Outbox {
 }
 ```
 
-> `accountId`로 채널을 고르는 규칙은 Phase A에 어댑터가 하나도 없어서 아직 정본이 없다. 어댑터 계획(US-A12~A15)이 실제 `accounts` 조회로 바꾼다 — 그때까지는 `adapters` Map이 1개짜리이므로 동작이 결정론적이다.
+> The rule for choosing a channel from `accountId` has no canonical source yet, because Phase A has no adapters at all. The adapter plan (US-A12~A15) replaces it with a real `accounts` lookup — until then the `adapters` Map holds exactly 1 entry, so the behavior is deterministic.
 
-- [ ] 6. ingest sink를 쓴다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/ingest.ts`:
+- [ ] 6. Write the ingest sink. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/ingest.ts`:
 
 ```ts
 import { one, query, tx } from "@omnis/db";
@@ -5955,9 +5955,9 @@ function isItem(e: NormalizedItem | AdapterEvent): e is NormalizedItem {
   return "threadExternalId" in e;
 }
 
-/** 어댑터가 밀어넣는 유일한 입구(계약 §3.3 IngestSink).
- *  Phase A는 thread/item upsert까지만 한다 — person 신원 해석(A3 §10)은 Phase A 스토리가 아니므로
- *  author_person_id를 채우지 않는다. 어댑터가 person author를 줘도 NULL로 남는다. */
+/** The only entry point adapters push into (contract §3.3 IngestSink).
+ *  Phase A goes only as far as the thread/item upsert — person identity resolution (A3 §10) is not a Phase A story, so
+ *  it does not populate author_person_id. Even when an adapter supplies a person author, it stays NULL. */
 export function createIngestSink(deps: { pool: Pool; logger: Logger }): IngestSink {
   const { pool, logger } = deps;
   return async (accountId, e) => {
@@ -6002,7 +6002,7 @@ export function createIngestSink(deps: { pool: Pool; logger: Logger }): IngestSi
         threadId = row.id;
       }
 
-      // author_agent_id만 해석한다. person은 Phase B(A3 §10).
+      // resolve only author_agent_id. person is Phase B (A3 §10).
       const agentId =
         e.author.kind === "agent"
           ? ((await query<{ id: string }>(c, `SELECT id FROM agent_runtimes WHERE id = $1`, [e.author.id]))[0]
@@ -6042,7 +6042,7 @@ export function createIngestSink(deps: { pool: Pool; logger: Logger }): IngestSi
 }
 ```
 
-- [ ] 7. 커널을 조립한다. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/kernel.ts`:
+- [ ] 7. Assemble the kernel. `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/kernel.ts`:
 
 ```ts
 import type { IngestSink } from "@omnis/protocol";
@@ -6103,7 +6103,7 @@ export function createKernel(deps: KernelDeps): Kernel {
 }
 ```
 
-- [ ] 8. 배럴을 갱신한다:
+- [ ] 8. Update the barrel:
 
 ```ts
 export { runEgress } from "./egress.js";
@@ -6115,24 +6115,24 @@ export { createKernel } from "./kernel.js";
 export type { Kernel, KernelDeps } from "./kernel.js";
 ```
 
-- [ ] 9. 테스트를 돌려 통과를 확인한다.
+- [ ] 9. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration && pnpm typecheck
 ```
-기대: `Tests  62 passed (62)`, typecheck 에러 0. (`@ts-expect-error`가 붙은 우회 시도 테스트는 **컴파일이 실패해야 통과**한다 — typecheck가 통과하면 강제 장치가 산다.)
+Expected output: `Tests  62 passed (62)`, 0 typecheck errors. (The bypass-attempt test carrying `@ts-expect-error` **passes only if compilation fails** — if the typecheck passes, the enforcement device is alive.)
 
-- [ ] 10. US-A09를 하나의 원자 커밋으로 남긴다(Task 21~22).
+- [ ] 10. Leave US-A09 as a single atomic commit (Task 21~22).
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A09: 감사 로그 + 모든 egress가 경유하는 강제 게이트
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A09: audit log + the enforcement gate every egress goes through
 
-- createAudit: audit_log append-only INSERT, FK 없는 target_id/approval_id 그대로 보존
-- countUnapprovedSends: A3 §9 규칙 5 / 마스터 §2 '승인 없는 외부 전송 0건' 점검 쿼리
+- createAudit: append-only INSERT into audit_log, preserving a target_id/approval_id with no FK as-is
+- countUnapprovedSends: the check query for A3 §9 rule 5 / master §2 'zero unapproved external sends'
 - runEgress: killSwitch.assertOff → beginExecution → fn → completeExecution|failExecution + audit(approval_id)
-- 우회 불가 3중: EgressToken은 runEgress만 발급, outbox.send가 토큰을 요구, 어댑터는 클로저 밖으로 안 나간다
-- createKernel: events/scheduler/approvals/killSwitch/audit/ingest/close (계약 §5 그대로)
-- ingest.sink: thread/item upsert + source_hash 멱등, AdapterEvent는 cold 티어로
+- Triple bypass prevention: only runEgress mints an EgressToken, outbox.send requires the token, and the adapter does not leave the closure
+- createKernel: events/scheduler/approvals/killSwitch/audit/ingest/close (exactly as in contract §5)
+- ingest.sink: thread/item upsert + source_hash idempotency, AdapterEvent goes to the cold tier
 
 Implemented-by: Claude Opus
 
@@ -6143,11 +6143,11 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 23: hub-bootstrap (US-A10, tier: Sonnet)
 
-**스토리 US-A10** — 목표: `apps/hub` 부트스트랩(kernel 초기화, Postgres 연결, graceful shutdown) / 산출물: `apps/hub/src/main.ts` / 검증 명령: `pnpm --filter @omnis/hub build` / 티어: Sonnet. 의존: A05~A09.
+**Story US-A10** — Goal: `apps/hub` bootstrap (kernel initialization, Postgres connection, graceful shutdown) / Outputs: `apps/hub/src/main.ts` / Verification command: `pnpm --filter @omnis/hub build` / tier: Sonnet. Depends on: A05~A09.
 
-**읽을 곳**: 마스터 §4.2(허브는 `127.0.0.1:8787`에만 bind, Tailscale Serve가 `/api/`로 노출, 8642는 Hermes), 계약 §5(허브 HTTP 표면 표), 계약 §9(환경변수 `DATABASE_URL`·`OMNIS_HUB_PORT=8787`, 로그 형식), A6 §3(`tailscale serve --https=443 /api/ localhost:8787/`).
+**Read:** master §4.2 (the hub binds only to `127.0.0.1:8787`, Tailscale Serve exposes it at `/api/`, 8642 is Hermes), contract §5 (hub HTTP surface table), contract §9 (env vars `DATABASE_URL`·`OMNIS_HUB_PORT=8787`, log format), A6 §3 (`tailscale serve --https=443 /api/ localhost:8787/`).
 
-**만들지 않을 것(YAGNI)**: Express/Fastify(라우트 5개에 프레임워크는 과하다 — `node:http`로 충분하고, 계약 §1이 `apps/hub`의 의존을 `packages/*`로 못박았다), 부팅 시 자동 마이그레이션(`pnpm db:migrate`가 별도 단계다 — 허브가 스키마를 바꾸면 A3의 오너십이 무너진다), 어댑터 등록(다른 계획), WS `/bridge` 구현(US-A17), CORS(루프백 전용), 인증(tailnet 경계가 인증이다 — A6 §3).
+**Do NOT build (YAGNI):** Express/Fastify (a framework is overkill for 5 routes — `node:http` is enough, and contract §1 pins `apps/hub`'s dependencies to `packages/*`), automatic migration at boot (`pnpm db:migrate` is a separate step — if the hub modified the schema, A3's ownership would collapse), adapter registration (another plan), the WS `/bridge` implementation (US-A17), CORS (loopback only), auth (the tailnet boundary is the auth — A6 §3).
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/apps/hub/package.json`, `/Users/logankim/AI-Workspaces/omnis/apps/hub/tsconfig.json`, `/Users/logankim/AI-Workspaces/omnis/apps/hub/vitest.config.ts`, `/Users/logankim/AI-Workspaces/omnis/apps/hub/src/config.ts`, `/Users/logankim/AI-Workspaces/omnis/apps/hub/src/main.ts`
@@ -6156,11 +6156,11 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `createPool` (`@omnis/db`) · `createKernel`, `createLogger`, `registerHealthcheckJob` (`@omnis/kernel`).
-- Produces (`@omnis/hub`, 내부 전용): `interface HubConfig { port: number; host: "127.0.0.1"; version: string }` · `readConfig(env?: NodeJS.ProcessEnv): HubConfig` · `startHub(): Promise<{ close(): Promise<void> }>` (Task 24·25가 채운다).
+- Produces (`@omnis/hub`, internal only): `interface HubConfig { port: number; host: "127.0.0.1"; version: string }` · `readConfig(env?: NodeJS.ProcessEnv): HubConfig` · `startHub(): Promise<{ close(): Promise<void> }>` (Tasks 24·25 fill it in).
 
 ### Steps
 
-- [ ] 1. 패키지 골격을 만든다.
+- [ ] 1. Create the package skeleton.
 
 `/Users/logankim/AI-Workspaces/omnis/apps/hub/package.json`:
 ```json
@@ -6214,7 +6214,7 @@ export default defineConfig({
 });
 ```
 
-루트 `tsconfig.json`:
+Root `tsconfig.json`:
 ```json
 {
   "files": [],
@@ -6227,14 +6227,14 @@ export default defineConfig({
 }
 ```
 
-- [ ] 2. 실패하는 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/apps/hub/test/config.test.ts`:
+- [ ] 2. Write a failing test. `/Users/logankim/AI-Workspaces/omnis/apps/hub/test/config.test.ts`:
 
 ```ts
 import { describe, expect, it } from "vitest";
 import { readConfig } from "../src/config.js";
 
 describe("readConfig", () => {
-  it("binds the loopback address and port 8787 by default (마스터 §4.2)", () => {
+  it("binds the loopback address and port 8787 by default (master §4.2)", () => {
     const c = readConfig({ DATABASE_URL: "postgres://x/y" });
     expect(c.host).toBe("127.0.0.1");
     expect(c.port).toBe(8787);
@@ -6258,14 +6258,14 @@ describe("readConfig", () => {
 });
 ```
 
-- [ ] 3. 테스트를 돌려 실패를 확인한다.
+- [ ] 3. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm install && pnpm --filter @omnis/hub test
 ```
-기대 실패: `Cannot find module '../src/config.js'`.
+Expected failure: `Cannot find module '../src/config.js'`.
 
-- [ ] 4. 설정을 쓴다. `/Users/logankim/AI-Workspaces/omnis/apps/hub/src/config.ts`:
+- [ ] 4. Write the config. `/Users/logankim/AI-Workspaces/omnis/apps/hub/src/config.ts`:
 
 ```ts
 export interface HubConfig {
@@ -6276,10 +6276,10 @@ export interface HubConfig {
 
 export const HUB_VERSION = "0.1.0";
 
-/** 마스터 §4.2: 허브는 127.0.0.1:8787에만 bind한다. Tailscale Serve가 /api/로 노출한다. */
+/** master §4.2: the hub binds only to 127.0.0.1:8787. Tailscale Serve exposes it at /api/. */
 export function readConfig(env: NodeJS.ProcessEnv = process.env): HubConfig {
   if (env.DATABASE_URL === undefined || env.DATABASE_URL === "") {
-    throw new Error("DATABASE_URL is required (계약 §9)");
+    throw new Error("DATABASE_URL is required (contract §9)");
   }
   const raw = env.OMNIS_HUB_PORT ?? "8787";
   const port = Number(raw);
@@ -6287,13 +6287,13 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): HubConfig {
     throw new Error(`OMNIS_HUB_PORT must be an integer port, got ${raw}`);
   }
   if (port === 8642) {
-    throw new Error("port 8642 belongs to Hermes api_server (마스터 §4.2) — pick another");
+    throw new Error("port 8642 belongs to Hermes api_server (master §4.2) — pick another");
   }
   return { port, host: "127.0.0.1", version: HUB_VERSION };
 }
 ```
 
-- [ ] 5. 부트스트랩을 쓴다. HTTP 서버는 Task 24가 붙이므로 지금은 커널만 띄운다. `/Users/logankim/AI-Workspaces/omnis/apps/hub/src/main.ts`:
+- [ ] 5. Write the bootstrap. Task 24 attaches the HTTP server, so for now it only starts the kernel. `/Users/logankim/AI-Workspaces/omnis/apps/hub/src/main.ts`:
 
 ```ts
 import { createPool } from "@omnis/db";
@@ -6326,28 +6326,28 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
   };
 }
 
-// 직접 실행될 때만 부팅한다(테스트는 startHub를 import한다).
+// Boot only when run directly (tests import startHub).
 if (process.argv[1] !== undefined && import.meta.url === `file://${process.argv[1]}`) {
   await startHub();
 }
 ```
 
-- [ ] 6. 테스트와 빌드를 돌린다.
+- [ ] 6. Run the tests and the build.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/hub test && pnpm --filter @omnis/hub build
 ```
-기대: `Tests  4 passed (4)`, 빌드 에러 0.
+Expected output: `Tests  4 passed (4)`, 0 build errors.
 
-- [ ] 7. 커밋하지 않는다 — Task 26까지가 US-A10 하나의 커밋이다.
+- [ ] 7. Do not commit — everything through Task 26 is the single US-A10 commit.
 
 ---
 
 ## Task 24: hub-http-routes (US-A10, tier: Sonnet)
 
-**스토리 US-A10** (계속) — 계약 §5의 허브 HTTP 표면 5개를 `node:http`로 연다.
+**Story US-A10** (continued) — opens the 5 hub HTTP surface routes of contract §5 with `node:http`.
 
-| 메서드·경로 | body | 응답 |
+| Method·path | body | response |
 |---|---|---|
 | `GET /health` | — | `{ ok, version, db: "up"\|"down", uptimeSec, killSwitch }` |
 | `GET /approvals?state=pending&limit=50` | — | `{ approvals: PendingApproval[] }` |
@@ -6355,9 +6355,9 @@ cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/hub test && pnpm 
 | `GET /kill-switch` | — | `{ on, since, reason }` |
 | `POST /kill-switch` | `{ on, reason }` | `{ on, since }` |
 
-**읽을 곳**: 계약 §5(위 표가 정본), 계약 §5 말미(`GET /search`·`GET /memory/search`·`GET /transcript/:session_id`는 다른 부록이 소유하므로 Phase A 범위 밖 — 열지 않는다), A6 §3(외부 경로는 `https://<mini>.ts.net/api/...`이고 마운트는 Tailscale이 한다 — 허브는 `/api` 접두를 모른다).
+**Read:** contract §5 (the table above is the canonical source), the end of contract §5 (`GET /search`·`GET /memory/search`·`GET /transcript/:session_id` are owned by other appendices and are therefore out of Phase A scope — do not open them), A6 §3 (the external path is `https://<mini>.ts.net/api/...` and Tailscale does the mounting — the hub does not know about the `/api` prefix).
 
-**만들지 않을 것(YAGNI)**: 라우터 라이브러리, OpenAPI 스펙, rate limit(루프백), 페이지네이션 커서(`limit`으로 충분), `/bridge` WS 구현(**Task 26**이 같은 `onUpgrade` 훅에 꽂는다 — 계약 §5가 서버 구현 오너를 이 계획으로 고정했다. agent-bridge 계획은 dial하는 클라이언트만 만든다).
+**Do NOT build (YAGNI):** a router library, an OpenAPI spec, rate limiting (loopback), pagination cursors (`limit` is enough), the `/bridge` WS implementation (**Task 26** plugs it into the same `onUpgrade` hook — contract §5 pinned the server implementation owner to this plan. The agent-bridge plan builds only the dialing client).
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/apps/hub/src/http.ts`
@@ -6370,7 +6370,7 @@ cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/hub test && pnpm 
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. `/Users/logankim/AI-Workspaces/omnis/apps/hub/test/integration/routes.test.ts`:
+- [ ] 1. Write a failing test. `/Users/logankim/AI-Workspaces/omnis/apps/hub/test/integration/routes.test.ts`:
 
 ```ts
 import type { AddressInfo } from "node:net";
@@ -6528,14 +6528,14 @@ describe("unknown routes", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the tests and confirm they fail.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/hub test:integration
 ```
-기대 실패: `Cannot find module '../../src/http.js'`.
+Expected failure: `Cannot find module '../../src/http.js'`.
 
-- [ ] 3. HTTP 표면을 쓴다. `/Users/logankim/AI-Workspaces/omnis/apps/hub/src/http.ts`:
+- [ ] 3. Write the HTTP surface. `/Users/logankim/AI-Workspaces/omnis/apps/hub/src/http.ts`:
 
 ```ts
 import { type IncomingMessage, type Server, type ServerResponse, createServer } from "node:http";
@@ -6554,7 +6554,7 @@ export interface HubServerDeps {
   config: HubConfig;
   logger: Logger;
   startedAt: number;
-  /** Task 26(hub-bridge-ws)이 WS /bridge를 여기에 꽂는다. 주입 안 되면 업그레이드는 501이다. */
+  /** Task 26 (hub-bridge-ws) plugs the /bridge WS in here. If it is not injected, upgrades get a 501. */
   onUpgrade?: (req: IncomingMessage, socket: Duplex, head: Buffer) => void;
 }
 
@@ -6667,7 +6667,7 @@ export function createHubServer(deps: HubServerDeps): Server {
       return send(res, 405, { error: "method not allowed" });
     }
 
-    // /search, /memory/search, /transcript/:id는 다른 부록이 소유한다(계약 §5) — Phase A는 열지 않는다.
+    // /search, /memory/search, /transcript/:id are owned by other appendices (contract §5) — Phase A does not open them.
     return send(res, 404, { error: "not found" });
   }
 
@@ -6676,7 +6676,7 @@ export function createHubServer(deps: HubServerDeps): Server {
       deps.onUpgrade(req, socket, head as Buffer);
       return;
     }
-    // WS /bridge는 Task 26이 붙인다.
+    // WS /bridge is attached by Task 26.
     socket.write("HTTP/1.1 501 Not Implemented\r\n\r\n");
     socket.destroy();
   });
@@ -6685,45 +6685,45 @@ export function createHubServer(deps: HubServerDeps): Server {
 }
 ```
 
-- [ ] 4. `main.ts`가 서버를 띄우도록 고친다. `startHub`의 `registerHealthcheckJob` 다음에 아래를 넣고 `RunningHub`에 `port`를 더한다:
+- [ ] 4. Fix `main.ts` so it starts the server. After `registerHealthcheckJob` in `startHub` insert the following and add `port` to `RunningHub`:
 
 ```ts
   const startedAt = Date.now();
   const server = createHubServer({ kernel, pool, config, logger, startedAt });
   await new Promise<void>((resolve) => server.listen(config.port, config.host, resolve));
 ```
-그리고 `close()`의 첫 줄에 `await new Promise<void>((r) => server.close(() => r()));`를 넣는다(Task 25가 이 자리를 더 다듬는다). 파일 맨 위에 `import { createHubServer } from "./http.js";`를 더한다.
+Then put `await new Promise<void>((r) => server.close(() => r()));` on the first line of `close()` (Task 25 refines this spot further). Add `import { createHubServer } from "./http.js";` at the top of the file.
 
-- [ ] 5. 테스트를 돌려 통과를 확인한다.
+- [ ] 5. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/hub test:integration
 ```
-기대: `Tests  9 passed (9)`.
+Expected output: `Tests  9 passed (9)`.
 
-- [ ] 6. 커밋하지 않는다 — Task 26이 US-A10을 닫는다.
+- [ ] 6. Do not commit — Task 26 closes US-A10.
 
 ---
 
 ## Task 25: graceful-shutdown (US-A10, tier: Sonnet)
 
-**스토리 US-A10** (마무리) — SIGTERM/SIGINT에서 새 요청을 받지 않고, 스케줄러의 진행 중 잡을 끝내고, LISTEN 커넥션과 풀을 닫고, 그래도 안 끝나면 강제 종료한다. LaunchDaemon이 허브를 재시작할 때 `claimed_at`이 남은 잡이 없어야 한다(A3 §9 규칙 4의 5분 스윕에 의존하지 않도록).
+**Story US-A10** (wrap-up) — on SIGTERM/SIGINT, stop accepting new requests, let the scheduler's in-flight jobs finish, close the LISTEN connection and the pool, and force exit if that still does not finish. When LaunchDaemon restarts the hub, there must be no jobs left with `claimed_at` set (so it does not depend on the 5-minute sweep in A3 §9 rule 4).
 
-**읽을 곳**: A6 §1(LaunchDaemon이 SIGTERM을 보낸다), 계약 §5(`Kernel.close()`), Task 14의 `Scheduler.stop()`(진행 중 틱을 기다린다), A3 §9 규칙 4(`approved`로 5분 이상 claim이 남으면 크래시로 간주).
+**Read:** A6 §1 (LaunchDaemon sends SIGTERM), contract §5 (`Kernel.close()`), Task 14's `Scheduler.stop()` (waits for the in-flight tick), A3 §9 rule 4 (a claim left in `approved` for more than 5 minutes is treated as a crash).
 
-**만들지 않을 것(YAGNI)**: drain 중 503 응답(루프백 클라이언트는 재시도한다), 헬스 엔드포인트의 draining 상태, 재시작 시 오래된 claim 회수(`followup_sweep` 잡, Phase B), systemd 스타일 readiness 파일.
+**Do NOT build (YAGNI):** 503 responses during drain (loopback clients retry), a draining state on the health endpoint, reclaiming stale claims on restart (the `followup_sweep` job, Phase B), a systemd-style readiness file.
 
 **Files:**
 - Modify: `/Users/logankim/AI-Workspaces/omnis/apps/hub/src/main.ts`
 - Test: `/Users/logankim/AI-Workspaces/omnis/apps/hub/test/integration/shutdown.test.ts`
 
 **Interfaces:**
-- Consumes: Task 23의 `startHub`, Task 24의 `createHubServer`.
+- Consumes: Task 23's `startHub`, Task 24's `createHubServer`.
 - Produces (`@omnis/hub`): `RunningHub { config: HubConfig; port: number; close(): Promise<void> }` · `installSignalHandlers(hub: RunningHub, logger: Logger, forceExitMs?: number): () => void`.
 
 ### Steps
 
-- [ ] 1. 실패하는 테스트를 쓴다. 실제 프로세스를 띄우고 SIGTERM을 보낸다 — 시그널 처리는 in-process로는 증명되지 않는다. `/Users/logankim/AI-Workspaces/omnis/apps/hub/test/integration/shutdown.test.ts`:
+- [ ] 1. Write a failing test. Start a real process and send it SIGTERM — signal handling cannot be proven in-process. `/Users/logankim/AI-Workspaces/omnis/apps/hub/test/integration/shutdown.test.ts`:
 
 ```ts
 import { spawn } from "node:child_process";
@@ -6802,14 +6802,14 @@ describe("graceful shutdown", () => {
 });
 ```
 
-- [ ] 2. 테스트를 돌려 실패를 확인한다.
+- [ ] 2. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/hub test:integration
 ```
-기대 실패: SIGTERM 후 프로세스가 죽지 않아 `hub never became healthy` 또는 exit code가 `143`(핸들러 없음).
+Expected failure: after SIGTERM the process does not die, so either `hub never became healthy` or an exit code of `143` (no handler).
 
-- [ ] 3. `main.ts`를 완성한다. `/Users/logankim/AI-Workspaces/omnis/apps/hub/src/main.ts` 전문:
+- [ ] 3. Finish `main.ts`. `/Users/logankim/AI-Workspaces/omnis/apps/hub/src/main.ts` in full:
 
 ```ts
 import { createPool } from "@omnis/db";
@@ -6846,14 +6846,14 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
     close() {
       if (closing !== null) return closing;
       closing = (async () => {
-        // 1) 새 연결을 받지 않는다. keep-alive는 즉시 끊는다.
+        // 1) Do not accept new connections. Keep-alive ones are cut immediately.
         await new Promise<void>((resolve) => {
           server.close(() => resolve());
           server.closeIdleConnections();
           setTimeout(() => server.closeAllConnections(), 2000).unref();
         });
-        // 2) 스케줄러를 멈추고 진행 중 틱이 claimed_at을 풀고 끝나기를 기다린다(Task 14의 stop()).
-        // 3) LISTEN 커넥션을 버린다.
+        // 2) Stop the scheduler and wait for the in-flight tick to release claimed_at and finish (Task 14's stop()).
+        // 3) Drop the LISTEN connection.
         await kernel.close();
         await kernel.audit.record({ actor: "system", action: "hub.stopped", target_table: "jobs" });
         await pool.end();
@@ -6864,7 +6864,7 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
   };
 }
 
-/** SIGTERM/SIGINT → close(). 10초 안에 안 끝나면 강제 종료한다(LaunchDaemon이 재시작한다). */
+/** SIGTERM/SIGINT → close(). If it does not finish within 10 seconds, force exit (LaunchDaemon restarts it). */
 export function installSignalHandlers(hub: RunningHub, logger: Logger, forceExitMs = 10_000): () => void {
   let shuttingDown = false;
   const onSignal = (signal: NodeJS.Signals): void => {
@@ -6901,33 +6901,33 @@ if (process.argv[1] !== undefined && import.meta.url === `file://${process.argv[
 }
 ```
 
-> `audit.record({action:'hub.stopped'})`가 `pool.end()` **앞**에 있어야 한다 — 순서를 바꾸면 기록이 사라진다. 테스트가 이 순서를 고정한다.
+> `audit.record({action:'hub.stopped'})` must come **before** `pool.end()` — swapping the order makes the record disappear. The test pins this order.
 
-- [ ] 4. 테스트를 돌려 통과를 확인한다.
+- [ ] 4. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/hub test:integration
 ```
-기대: `Tests  12 passed (12)`.
+Expected output: `Tests  12 passed (12)`.
 
-- [ ] 5. US-A10 검증 명령과 전체 회귀를 돌린다.
+- [ ] 5. Run the US-A10 verification command and the full regression.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/hub build && pnpm typecheck && pnpm lint && pnpm test && pnpm test:integration
 ```
-기대: 빌드·타입체크·린트 에러 0, `pnpm test`와 `pnpm test:integration` 전부 통과.
+Expected output: zero build, typecheck, and lint errors; `pnpm test` and `pnpm test:integration` all pass.
 
-- [ ] 6. 커밋하지 않는다 — US-A10은 Task 26(`hub-bridge-ws`)까지가 하나의 원자 커밋이다(A7-D8: 스토리당 원자 커밋 1개). 계약 §10이 US-A10의 태스크를 `hub-bootstrap` · `hub-http-routes` · `graceful-shutdown` · `hub-bridge-ws` 넷으로 적었다.
+- [ ] 6. Do not commit — for US-A10, the work through Task 26 (`hub-bridge-ws`) is a single atomic commit (A7-D8: one atomic commit per story). Contract §10 lists US-A10's tasks as four: `hub-bootstrap` · `hub-http-routes` · `graceful-shutdown` · `hub-bridge-ws`.
 
 ---
 
 ## Task 26: hub-bridge-ws (US-A10, tier: Opus)
 
-**스토리 US-A10** (마무리 2) — 계약 §5의 마지막 행 `WS /bridge`를 연다. **서버 구현 오너는 이 계획이다**(계약 §5·§10, 교차 검증 M6). `2026-09-20-phase-a-agent-bridge.md`는 여기에 dial하는 **클라이언트**만 만든다 — 그 계획에 `apps/hub`를 건드리는 스텝은 없다. Task 24가 남겨 둔 `onUpgrade` 훅에 꽂는다.
+**Story US-A10** (wrap-up 2) — open the last row of contract §5, `WS /bridge`. **This plan owns the server implementation** (contract §5·§10, cross-check M6). `2026-09-20-phase-a-agent-bridge.md` only builds the **client** that dials into it — that plan has no step that touches `apps/hub`. It plugs into the `onUpgrade` hook Task 24 left behind.
 
-**읽을 곳**: 계약 §3.5(브리지 프로토콜 전문 — `HUB_METHODS`/`BRIDGE_METHODS`/`BRIDGE_ERRORS`/`JSONRPC_ERRORS`/`withMeta`/`assertProtocolVersion`/`toJsonRpcError`), 계약 §5(`WS /bridge` 행 + `Approvals`), 계약 §8(`session.create`/`turn.start`/`approval.requested`의 파라미터 shape, `ingest.*`는 Phase B), A2 §3(JSON-RPC 방향·에러), A3 §4(`agent_runtimes`/`agent_sessions` 컬럼), 계약 §9(브리지 토큰 `omnis.bridge.token.<host>`).
+**Read:** contract §3.5 (the bridge protocol in full — `HUB_METHODS`/`BRIDGE_METHODS`/`BRIDGE_ERRORS`/`JSONRPC_ERRORS`/`withMeta`/`assertProtocolVersion`/`toJsonRpcError`), contract §5 (the `WS /bridge` row + `Approvals`), contract §8 (the parameter shapes of `session.create`/`turn.start`/`approval.requested`; `ingest.*` is Phase B), A2 §3 (JSON-RPC direction and errors), A3 §4 (`agent_runtimes`/`agent_sessions` columns), contract §9 (bridge token `omnis.bridge.token.<host>`).
 
-**만들지 않을 것(YAGNI)**: 런타임 자식 프로세스 spawn(US-A18/A19가 브리지 쪽에서 한다), `turn.item.*`를 `items` row로 쓰는 write path(US-A18/A19), `ingest.scan`/`ingest.read`(Phase B — 호출하면 `CAPABILITY_UNSUPPORTED`로 즉시 거절), 재연결 백오프(클라이언트 몫, 계약 §8), outbox 재생(클라이언트 몫), 멀티플렉싱/압축, mTLS(Tailscale이 전송 신뢰를 준다 — 토큰은 그 위의 2차 관문).
+**Do NOT build (YAGNI):** spawning runtime child processes (US-A18/A19 does that on the bridge side), the write path that turns `turn.item.*` into `items` rows (US-A18/A19), `ingest.scan`/`ingest.read` (Phase B — calling them is rejected immediately with `CAPABILITY_UNSUPPORTED`), reconnect backoff (the client's job, contract §8), outbox replay (the client's job), multiplexing/compression, mTLS (Tailscale provides transport trust — the token is a second gate on top of it).
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/apps/hub/src/bridge.ts`
@@ -6935,14 +6935,14 @@ cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/hub build && pnpm
 - Test: `/Users/logankim/AI-Workspaces/omnis/apps/hub/test/integration/bridge.test.ts`
 
 **Interfaces:**
-- Consumes: `Kernel`(`approvals`·`events`), `Logger` (`@omnis/kernel`) · `query` (`@omnis/db`) · `HUB_METHODS`, `BRIDGE_ERRORS`, `JSONRPC_ERRORS`, `BridgeError`, `BridgeErrorCode`, `HostId`, `RuntimeKind`, `HumanInterrupt`, `HumanResponse`, `PROTOCOL_VERSION`, `assertProtocolVersion`, `toJsonRpcError`, `withMeta` (`@omnis/protocol`, 계약 §3.4·§3.5).
+- Consumes: `Kernel` (`approvals`·`events`), `Logger` (`@omnis/kernel`) · `query` (`@omnis/db`) · `HUB_METHODS`, `BRIDGE_ERRORS`, `JSONRPC_ERRORS`, `BridgeError`, `BridgeErrorCode`, `HostId`, `RuntimeKind`, `HumanInterrupt`, `HumanResponse`, `PROTOCOL_VERSION`, `assertProtocolVersion`, `toJsonRpcError`, `withMeta` (`@omnis/protocol`, contract §3.4·§3.5).
 - Produces (`@omnis/hub`): `createBridgeHub(deps: BridgeDeps): BridgeHub` · `interface BridgeHub { handleUpgrade(req, socket, head): void; call<T>(host: HostId, method: HubMethod, params: Record<string, unknown>): Promise<T>; hosts(): HostId[]; close(): Promise<void> }` · `interface BridgeDeps { kernel: Kernel; pool: Pool; logger: Logger; token: string; heartbeatMs?: number; callTimeoutMs?: number }`.
 
-**새 환경변수**: `OMNIS_BRIDGE_TOKEN` — Keychain `omnis.bridge.token.<host>`의 값을 A6 래퍼가 주입한다(`DATABASE_URL`과 같은 경로). 허브는 Keychain을 직접 읽지 않는다. 빈 값이면 `/bridge` 업그레이드를 전부 503으로 닫는다 — 토큰 없이 열린 브리지는 존재하지 않는다.
+**New environment variable**: `OMNIS_BRIDGE_TOKEN` — the A6 wrapper injects the value from Keychain `omnis.bridge.token.<host>` (the same path as `DATABASE_URL`). The hub never reads Keychain directly. If it is empty, every `/bridge` upgrade is closed with 503 — no bridge exists that is open without a token.
 
 ### Steps
 
-- [ ] 1. `ws`를 `apps/hub` 의존성에 더한다. `/Users/logankim/AI-Workspaces/omnis/apps/hub/package.json`의 `dependencies`/`devDependencies`를 아래로 교체한다.
+- [ ] 1. Add `ws` to `apps/hub`'s dependencies. Replace `dependencies`/`devDependencies` in `/Users/logankim/AI-Workspaces/omnis/apps/hub/package.json` with the following.
 
 ```json
   "dependencies": {
@@ -6958,9 +6958,9 @@ cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/hub build && pnpm
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm install
 ```
-기대: `+ ws 8.18.0` 을 포함한 설치 요약, 에러 0.
+Expected output: an install summary including `+ ws 8.18.0`, zero errors.
 
-- [ ] 2. 실패하는 통합 테스트를 쓴다. 실제 `ws` 클라이언트를 띄워 register → discover 왕복과 승인 왕복을 증명한다. `/Users/logankim/AI-Workspaces/omnis/apps/hub/test/integration/bridge.test.ts`:
+- [ ] 2. Write a failing integration test. Start a real `ws` client and prove the register → discover round trip and the approval round trip. `/Users/logankim/AI-Workspaces/omnis/apps/hub/test/integration/bridge.test.ts`:
 
 ```ts
 import type { AddressInfo } from "node:net";
@@ -6989,7 +6989,7 @@ beforeAll(async () => {
   server = createHubServer({
     kernel,
     pool,
-    // 포트는 아래 listen(0)이 정한다. readConfig는 1~65535만 받으므로 유효값을 준다.
+    // The port is decided by listen(0) below. readConfig only accepts 1..65535, so give it a valid value.
     config: readConfig({ DATABASE_URL: "postgres://x/y", OMNIS_HUB_PORT: "8788" }),
     logger: createLogger("@omnis/hub"),
     startedAt: Date.now(),
@@ -7007,7 +7007,7 @@ afterAll(async () => {
   await pool.end();
 });
 
-/** 테스트용 미니 브리지 클라이언트: 알림을 보내고, 허브의 요청에는 handlers로 답한다. */
+/** Mini bridge client for tests: sends notifications, and answers the hub's requests via handlers. */
 function connect(handlers: Record<string, (params: Record<string, unknown>) => unknown>): Promise<{
   ws: WebSocket;
   notify(method: string, params: Record<string, unknown>): void;
@@ -7137,8 +7137,8 @@ describe("approval.requested", () => {
           turn_id: "t-1",
           interrupt: {
             action: "send",
-            args: { text: "보냅니다" },
-            description: "슬랙 답장 1건",
+            args: { text: "sending it" },
+            description: "1 Slack reply",
             config: { allow_accept: true, allow_edit: true, allow_respond: false, allow_ignore: true },
           },
           _meta: { "ai.omnis/protocolVersion": PROTOCOL_VERSION },
@@ -7148,7 +7148,7 @@ describe("approval.requested", () => {
 
     const id = await until(async () => {
       const rows = await kernel.approvals.list({ state: "pending", limit: 50 });
-      return rows.find((a) => a.description === "슬랙 답장 1건")?.id ?? null;
+      return rows.find((a) => a.description === "1 Slack reply")?.id ?? null;
     });
     await kernel.approvals.decide(id, { decision: "accept" });
 
@@ -7207,14 +7207,14 @@ describe("heartbeat", () => {
 });
 ```
 
-- [ ] 3. 테스트를 돌려 실패를 확인한다.
+- [ ] 3. Run the test and confirm it fails.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/hub test:integration
 ```
-기대 실패: `Cannot find module '../../src/bridge.js'`.
+Expected failure: `Cannot find module '../../src/bridge.js'`.
 
-- [ ] 4. 브리지 서버를 쓴다. `/Users/logankim/AI-Workspaces/omnis/apps/hub/src/bridge.ts`:
+- [ ] 4. Write the bridge server. `/Users/logankim/AI-Workspaces/omnis/apps/hub/src/bridge.ts`:
 
 ```ts
 import { randomUUID, timingSafeEqual } from "node:crypto";
@@ -7243,7 +7243,7 @@ import { type WebSocket, WebSocketServer } from "ws";
 
 const BRIDGE_PATH = "/bridge";
 
-/** 계약 §3.5 SessionState → A3 §4 agent_sessions.state. 두 enum의 이름이 다르다. */
+/** contract §3.5 SessionState → A3 §4 agent_sessions.state. The two enums have different names. */
 const SESSION_STATE: Readonly<Record<string, string>> = {
   idle: "idle",
   running: "running",
@@ -7264,7 +7264,7 @@ export interface BridgeDeps {
   kernel: Kernel;
   pool: Pool;
   logger: Logger;
-  /** Keychain omnis.bridge.token.<host>의 값(A6 래퍼가 OMNIS_BRIDGE_TOKEN으로 주입). 빈 문자열이면 브리지를 닫는다. */
+  /** The value of Keychain omnis.bridge.token.<host> (the A6 wrapper injects it as OMNIS_BRIDGE_TOKEN). An empty string closes the bridge. */
   token: string;
   heartbeatMs?: number;
   callTimeoutMs?: number;
@@ -7325,7 +7325,7 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     await query(pool, "UPDATE agent_runtimes SET state = 'offline' WHERE host = $1", [host]);
   }
 
-  // ---- bridge → hub 알림 ----
+  // ---- bridge → hub notifications ----
 
   async function onRegister(host: HostId, params: Record<string, unknown>): Promise<void> {
     const runtime = RuntimeKind.parse(params.runtime);
@@ -7372,10 +7372,10 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
       [sessionId, mapped ?? null, runtime, host, sessionKey],
     );
     if (rows.length === 0) {
-      // 허브가 session.create로 먼저 row를 만든다(Phase B). 지금은 모르는 세션을 조용히 흘린다.
+      // The hub creates the row first with session.create (Phase B). For now, sessions it does not know are dropped silently.
       logger.warn("session.registered for an unknown session_key", { runtime, host, sessionKey });
     }
-    // NOTIFY는 0007의 sessions_notify 트리거가 쏜다 — 여기서 emit하면 두 번 나간다.
+    // NOTIFY is fired by the sessions_notify trigger in 0007 — emitting here would send it twice.
   }
 
   // ---- approval.requested ----
@@ -7410,7 +7410,7 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
         }, reject);
       });
       waiters.add(waiter);
-      // propose와 subscribe 사이에 결정이 났을 수 있다 — 한 번 직접 읽는다.
+      // A decision may have landed between propose and subscribe — read it directly once.
       void readDecision(id).then((r) => {
         if (r !== null) settle(r);
       }, reject);
@@ -7424,7 +7424,7 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     return await waitForDecision(id);
   }
 
-  // ---- 디스패치 ----
+  // ---- dispatch ----
 
   async function dispatch(conn: Conn, method: string, params: Record<string, unknown>): Promise<unknown> {
     if (method === "runtime.registered") {
@@ -7440,7 +7440,7 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
       return null;
     }
     if (TURN_NOTIFICATIONS.has(method)) {
-      // ephemeral 팬아웃만(A3-D14). items row 쓰기는 US-A18/A19가 브리지 클라이언트 쪽에서 한다.
+      // Ephemeral fan-out only (A3-D14). Writing items rows is done by US-A18/A19 on the bridge client side.
       await kernel.events.emit("ephemeral", method, { ...params, host: conn.host });
       return null;
     }
@@ -7465,7 +7465,7 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
       return;
     }
 
-    // hub → bridge 요청에 대한 응답
+    // Response to a hub → bridge request
     if (msg.method === undefined) {
       if (msg.id === undefined || msg.id === null) return;
       const waiting = pending.get(String(msg.id));
@@ -7501,7 +7501,7 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     })();
   }
 
-  // ---- 업그레이드 ----
+  // ---- upgrade ----
 
   function handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
     const path = (req.url ?? "/").split("?")[0];
@@ -7545,7 +7545,7 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
       throw new BridgeError(JSONRPC_ERRORS.METHOD_NOT_FOUND, `not a hub method: ${method}`);
     }
     if (method === "ingest.scan" || method === "ingest.read") {
-      throw new BridgeError(BRIDGE_ERRORS.CAPABILITY_UNSUPPORTED, `${method} is Phase B (계약 §8)`);
+      throw new BridgeError(BRIDGE_ERRORS.CAPABILITY_UNSUPPORTED, `${method} is Phase B (contract §8)`);
     }
     const conn = conns.get(host);
     if (conn === undefined) {
@@ -7599,25 +7599,25 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
 }
 ```
 
-> `turn.item.delta`는 `emit("ephemeral", …)`로만 흘린다 — row도 NOTIFY도 만들지 않는다(계약 §3.5, A3-D14). `DURABLE_CHANNEL`에 `turn.*`가 없는 것은 실수가 아니라 이 규칙이다.
+> `turn.item.delta` is emitted only via `emit("ephemeral", …)` — it creates neither a row nor a NOTIFY (contract §3.5, A3-D14). The absence of `turn.*` from `DURABLE_CHANNEL` is not an oversight but this rule.
 
-- [ ] 5. 설정에 브리지 토큰을 더한다. `/Users/logankim/AI-Workspaces/omnis/apps/hub/src/config.ts`의 `HubConfig`와 `readConfig` 반환값을 고친다.
+- [ ] 5. Add the bridge token to the config. Fix `HubConfig` and the `readConfig` return value in `/Users/logankim/AI-Workspaces/omnis/apps/hub/src/config.ts`.
 
 ```ts
 export interface HubConfig {
   port: number;
   host: "127.0.0.1";
   version: string;
-  /** Keychain omnis.bridge.token.<host>의 값을 A6 래퍼가 주입한다. 빈 문자열이면 WS /bridge를 닫는다. */
+  /** The A6 wrapper injects the value of Keychain omnis.bridge.token.<host>. An empty string closes WS /bridge. */
   bridgeToken: string;
 }
 ```
-그리고 `return { port, host: "127.0.0.1", version: HUB_VERSION };`를 아래로 바꾼다:
+Then replace `return { port, host: "127.0.0.1", version: HUB_VERSION };` with the following:
 ```ts
   return { port, host: "127.0.0.1", version: HUB_VERSION, bridgeToken: env.OMNIS_BRIDGE_TOKEN ?? "" };
 ```
 
-- [ ] 6. `main.ts`에 브리지를 배선한다. `createHubServer` 호출 **앞**에 브리지를 만들고 `onUpgrade`로 넘긴 뒤, `close()`에서 서버를 닫은 직후 `bridge.close()`를 부른다.
+- [ ] 6. Wire the bridge into `main.ts`. Create the bridge **before** the `createHubServer` call and pass it as `onUpgrade`, then in `close()` call `bridge.close()` right after closing the server.
 
 ```ts
   const bridge = createBridgeHub({ kernel, pool, logger, token: config.bridgeToken });
@@ -7634,16 +7634,16 @@ export interface HubConfig {
     onUpgrade: (req, socket, head) => bridge.handleUpgrade(req, socket, head),
   });
 ```
-파일 맨 위에 `import { createBridgeHub } from "./bridge.js";`를 더하고, `close()`의 `await new Promise<void>((r) => server.close(() => r()));` 바로 다음 줄에 `await bridge.close();`를 넣는다(`kernel.close()` 앞 — 승인 대기 중인 브리지 요청을 먼저 깨워야 커널 LISTEN 커넥션을 닫을 수 있다).
+Add `import { createBridgeHub } from "./bridge.js";` at the top of the file, and put `await bridge.close();` on the line right after `await new Promise<void>((r) => server.close(() => r()));` in `close()` (before `kernel.close()` — bridge requests waiting on approval must be woken first before the kernel's LISTEN connection can be closed).
 
-- [ ] 7. 테스트를 돌려 통과를 확인한다.
+- [ ] 7. Run the tests and confirm they pass.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/hub test:integration
 ```
-기대: `Tests  19 passed (19)` (Task 24의 9개 + Task 25의 3개 + 이번 7개).
+Expected output: `Tests  19 passed (19)` (Task 24's 9 + Task 25's 3 + these 7).
 
-- [ ] 8. `WS /bridge`가 토큰 없이는 절대 열리지 않는다는 것을 실행 중인 허브로 한 번 더 확인한다.
+- [ ] 8. Confirm once more against a running hub that `WS /bridge` never opens without a token.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && DATABASE_URL=postgres://logan@127.0.0.1:5432/omnis OMNIS_BRIDGE_TOKEN=local-dev-token pnpm --filter @omnis/hub exec tsx src/main.ts & sleep 3
@@ -7651,31 +7651,31 @@ curl -si -N -H 'connection: Upgrade' -H 'upgrade: websocket' -H 'sec-websocket-v
 curl -si -N -H 'connection: Upgrade' -H 'upgrade: websocket' -H 'sec-websocket-version: 13' -H 'sec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==' -H 'x-omnis-host: macbook' -H 'authorization: Bearer local-dev-token' http://127.0.0.1:8787/bridge | head -1
 kill %1
 ```
-기대: 첫 줄 `HTTP/1.1 401 Unauthorized`, 둘째 줄 `HTTP/1.1 101 Switching Protocols`.
+Expected output: first line `HTTP/1.1 401 Unauthorized`, second line `HTTP/1.1 101 Switching Protocols`.
 
-- [ ] 9. 전체 회귀를 돌린다.
+- [ ] 9. Run the full regression.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/hub build && pnpm typecheck && pnpm lint && pnpm test && pnpm test:integration
 ```
-기대: 빌드·타입체크·린트 에러 0, `pnpm test`와 `pnpm test:integration` 전부 통과.
+Expected output: zero build, typecheck, and lint errors; `pnpm test` and `pnpm test:integration` all pass.
 
-- [ ] 10. US-A10을 하나의 원자 커밋으로 남긴다(Task 23~26).
+- [ ] 10. Leave US-A10 as a single atomic commit (Tasks 23~26).
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A10: apps/hub 부트스트랩 + HTTP 표면 + WS /bridge + graceful shutdown
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-A10: apps/hub bootstrap + HTTP surface + WS /bridge + graceful shutdown
 
-- readConfig: 127.0.0.1 고정, OMNIS_HUB_PORT 기본 8787, 8642(Hermes) 거부, OMNIS_BRIDGE_TOKEN 주입
-- startHub: createPool → createKernel → hub_healthcheck 등록 → scheduler.start → bridge → listen
-- HTTP 5개(node:http): GET /health, GET /approvals, POST /approvals/:id/decide, GET/POST /kill-switch
-- 다른 부록 소유 경로(/search, /memory/search, /transcript/:id)는 404
-- WS /bridge(계약 §5 서버 구현 오너 = 이 계획): Bearer 토큰 + x-omnis-host 검증, JSON-RPC 2.0,
-  runtime.registered/session.registered/health/turn.*/approval.requested 수신, bridge/discover 등 HUB_METHODS 송신,
-  approval.requested → pending_approvals → 결정 대기 → HumanResponse 응답, 30초 ping/pong 하트비트
-- 프로토콜 버전 불일치는 연결이 아니라 그 요청만 -32010으로 거절(A2-D3)
-- ApprovalStateError → 409, 잘못된 body → 400
-- SIGTERM/SIGINT: 연결 차단 → scheduler.stop(claim 해제) → bridge.close → kernel.close → hub.stopped 감사 → pool.end
-- pnpm --filter @omnis/hub build 통과
+- readConfig: pin 127.0.0.1, OMNIS_HUB_PORT defaults to 8787, reject 8642 (Hermes), inject OMNIS_BRIDGE_TOKEN
+- startHub: createPool → createKernel → register hub_healthcheck → scheduler.start → bridge → listen
+- 5 HTTP endpoints (node:http): GET /health, GET /approvals, POST /approvals/:id/decide, GET/POST /kill-switch
+- Paths owned by other appendices (/search, /memory/search, /transcript/:id) return 404
+- WS /bridge (contract §5, this plan owns the server implementation): Bearer token + x-omnis-host validation, JSON-RPC 2.0,
+  receives runtime.registered/session.registered/health/turn.*/approval.requested, sends HUB_METHODS such as bridge/discover,
+  approval.requested → pending_approvals → wait for decision → HumanResponse reply, 30s ping/pong heartbeat
+- A protocol version mismatch rejects only that request with -32010, not the connection (A2-D3)
+- ApprovalStateError → 409, invalid body → 400
+- SIGTERM/SIGINT: block connections → scheduler.stop (release claims) → bridge.close → kernel.close → hub.stopped audit → pool.end
+- pnpm --filter @omnis/hub build passes
 
 Implemented-by: Claude Opus
 
@@ -7686,22 +7686,22 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 27: ci (A7 §6, tier: Sonnet)
 
-**스토리 없음** — A7 §6/A7-D7이 요구하는 `.github/workflows/ci.yml`이 6개 계획 어디에도 배정돼 있지 않았다(교차 검증 M13). Phase A 마지막 태스크로 이 계획이 만든다. 스토리 id가 없으므로 커밋 제목은 `<story-id>:` 대신 `A7-§6:` 접두를 쓴다.
+**No story** — the `.github/workflows/ci.yml` required by A7 §6/A7-D7 was not assigned to any of the six plans (cross-check M13). This plan creates it as the last Phase A task. Since there is no story id, the commit subject uses the prefix `A7-§6:` instead of `<story-id>:`.
 
-**읽을 곳**: A7 §6(CI 문단 — lint+typecheck+unit은 항상, integration은 경로 필터), A7-D7(경로 필터 목록), 계약 §2(Postgres 17 + pgvector, 테스트 DB `omnis_test`, `DATABASE_URL` 기본값), Task 2의 `vitest.global-setup.ts`(`omnis_test`가 아니면 거부한다).
+**Read:** A7 §6 (the CI paragraph — lint+typecheck+unit always, integration behind a path filter), A7-D7 (the path filter list), contract §2 (Postgres 17 + pgvector, test DB `omnis_test`, `DATABASE_URL` default), Task 2's `vitest.global-setup.ts` (refuses anything that is not `omnis_test`).
 
-**만들지 않을 것(YAGNI)**: macOS 러너 Tauri 빌드 job(A7 §6이 적었지만 `apps/desktop`은 Phase A 이 계획 밖에서 생긴다 — 데스크톱 계획이 이 파일에 job 하나를 덧붙인다), 릴리스/서명 워크플로(Phase D), 커버리지 업로드, 캐시 튜닝, matrix(Node 22 하나).
+**Do NOT build (YAGNI):** a macOS-runner Tauri build job (A7 §6 lists it, but `apps/desktop` is created outside this plan in Phase A — the desktop plan appends one job to this file), release/signing workflows (Phase D), coverage upload, cache tuning, a matrix (a single Node 22).
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/.github/workflows/ci.yml`
 
 **Interfaces:**
-- Consumes: 루트 스크립트 `lint`/`typecheck`/`test`/`test:integration` (Task 1).
-- Produces: GitHub Actions 워크플로 `ci` (TS export 없음).
+- Consumes: root scripts `lint`/`typecheck`/`test`/`test:integration` (Task 1).
+- Produces: the GitHub Actions workflow `ci` (no TS export).
 
 ### Steps
 
-- [ ] 1. 워크플로를 쓴다. `/Users/logankim/AI-Workspaces/omnis/.github/workflows/ci.yml`:
+- [ ] 1. Write the workflow. `/Users/logankim/AI-Workspaces/omnis/.github/workflows/ci.yml`:
 
 ```yaml
 name: ci
@@ -7726,7 +7726,7 @@ jobs:
       - uses: dorny/paths-filter@v3
         id: filter
         with:
-          # A7-D7: integration job은 이 경로가 바뀔 때만 돈다.
+          # A7-D7: the integration job runs only when these paths change.
           filters: |
             backend:
               - 'packages/db/**'
@@ -7755,7 +7755,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
-      # 컨테이너 없이 도는 unit 프로젝트만(계약 §2). integration은 아래 job이 맡는다.
+      # Only the unit project, which runs without a container (contract §2). The job below handles integration.
       - run: pnpm test
 
   integration:
@@ -7765,7 +7765,7 @@ jobs:
     if: needs.changes.outputs.backend == 'true'
     services:
       postgres:
-        # pgvector/pgvector:pg17 = 공식 postgres:17 + vector 확장. pgcrypto/pg_trgm은 contrib로 이미 들어 있다.
+        # pgvector/pgvector:pg17 = the official postgres:17 + the vector extension. pgcrypto/pg_trgm are already included via contrib.
         image: pgvector/pgvector:pg17
         env:
           POSTGRES_USER: logan
@@ -7779,7 +7779,7 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
-      # vitest.global-setup.ts는 URL에 omnis_test가 없으면 스키마를 지우지 않고 거부한다.
+      # vitest.global-setup.ts refuses without dropping the schema if the URL does not contain omnis_test.
       DATABASE_URL: postgres://logan:logan@127.0.0.1:5432/omnis_test
     steps:
       - uses: actions/checkout@v4
@@ -7794,42 +7794,42 @@ jobs:
       - run: pnpm test:integration
 ```
 
-- [ ] 2. YAML이 파싱되는지, job 3개와 핀이 그대로인지 확인한다.
+- [ ] 2. Confirm the YAML parses and that the three jobs and the pins are unchanged.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm dlx js-yaml .github/workflows/ci.yml | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const w=JSON.parse(s);console.log(Object.keys(w.jobs).join(','));console.log(w.jobs.integration.services.postgres.image);console.log(w.jobs.check.steps.filter(x=>x.run).map(x=>x.run).join('|'));});"
 ```
-기대:
+Expected output:
 ```
 changes,check,integration
 pgvector/pgvector:pg17
 pnpm install --frozen-lockfile|pnpm lint|pnpm typecheck|pnpm test
 ```
 
-- [ ] 3. 워크플로가 부르는 루트 스크립트가 전부 실제로 존재하는지 확인한다(오타 방지).
+- [ ] 3. Confirm that every root script the workflow calls actually exists (to prevent typos).
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && node -e "const s=require('./package.json').scripts; for (const k of ['lint','typecheck','test','test:integration']) { if (!s[k]) { console.error('missing script: '+k); process.exit(1); } } console.log('all 4 root scripts present');"
 ```
-기대: `all 4 root scripts present`.
+Expected output: `all 4 root scripts present`.
 
-- [ ] 4. 로컬에서 CI와 같은 순서를 한 번 돌려 본다(러너에서 처음 깨지는 것을 막는다).
+- [ ] 4. Run the same sequence as CI once locally (to prevent the first breakage from happening on the runner).
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm test && pnpm test:integration
 ```
-기대: 5개 명령 전부 exit 0.
+Expected output: all five commands exit 0.
 
-- [ ] 5. 커밋한다.
+- [ ] 5. Commit.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "A7-§6: GitHub Actions CI — lint/typecheck/unit 상시 + Postgres 17 integration
+cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "A7-§6: GitHub Actions CI — lint/typecheck/unit always + Postgres 17 integration
 
 - check job: pnpm install --frozen-lockfile → lint(Biome) → typecheck(tsc --build --force) → test(vitest run)
-- integration job: pgvector/pgvector:pg17 서비스 컨테이너, DATABASE_URL이 omnis_test를 가리킨다
-- A7-D7 경로 필터(dorny/paths-filter): packages/db·packages/kernel·packages/memory·apps/hub 변경 시에만 integration
-- pnpm 9.12.3 / Node 22 핀(계약 §2)
-- macOS Tauri job은 apps/desktop이 생길 때 데스크톱 계획이 덧붙인다
+- integration job: pgvector/pgvector:pg17 service container, DATABASE_URL points at omnis_test
+- A7-D7 path filter (dorny/paths-filter): integration only when packages/db·packages/kernel·packages/memory·apps/hub change
+- pinned to pnpm 9.12.3 / Node 22 (contract §2)
+- the macOS Tauri job is appended by the desktop plan when apps/desktop appears
 
 Implemented-by: Claude Sonnet
 
@@ -7838,39 +7838,39 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-## 완료 확인
+## Definition of done
 
-계획 전체가 끝났을 때 아래가 전부 참이어야 한다.
+When the whole plan is finished, all of the following must be true.
 
-- [ ] `pnpm db:migrate`를 두 번 연속 돌리면 두 번째가 `up to date`다(A3 §8의 러너 전체 테스트).
-- [ ] `packages/db/migrations/`에 `0001`~`0008` 8개 파일이 있고 그 외에는 없다(A3 §8 = v1 테이블 전체 목록).
-- [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm test:integration`이 전부 통과한다.
-- [ ] `apps/hub`를 띄우고 `curl -s http://127.0.0.1:8787/health | jq` 하면 `{"ok":true,"version":"0.1.0","db":"up",...}`가 나온다.
-- [ ] `curl -s -X POST http://127.0.0.1:8787/kill-switch -H 'content-type: application/json' -d '{"on":true,"reason":"manual check"}'` 후 스케줄러 로그에 `scheduler tick skipped: kill switch is on`이 찍힌다.
-- [ ] `grep -rn "adapter.send\|\.send(" packages/kernel/src | grep -v outbox.ts`가 빈 결과다 — 채널 발송에 닿는 코드가 `outbox.ts` 하나뿐이라는 뜻이다.
-- [ ] `psql omnis -c "SELECT count(*) FROM audit_log WHERE action='item.sent' AND approval_id IS NULL"`이 0이다(마스터 §2 지표).
-- [ ] `OMNIS_BRIDGE_TOKEN` 없이 띄운 허브에 `/bridge` 업그레이드를 시도하면 `503`, 잘못된 토큰이면 `401`, 맞는 토큰 + `x-omnis-host: macbook`이면 `101 Switching Protocols`다(Task 26 스텝 8).
-- [ ] `grep -rn "zero_replication" packages apps` 가 빈 결과다 — 복제 role 이름은 `omnis_sync` 하나뿐이다.
-- [ ] `git log --format=%B | grep -c "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"` 가 이 계획이 만든 커밋 수와 같다 — 모든 커밋의 마지막 줄이 세션 규칙 트레일러이고, `Implemented-by:` 줄은 본문에 있다.
-- [ ] `.github/workflows/ci.yml`이 있고 `pnpm dlx js-yaml .github/workflows/ci.yml`이 `changes`/`check`/`integration` 3개 job을 출력한다.
-- [ ] 첫 push 후 GitHub Actions의 `check` job이 초록이고, `apps/hub` 변경이 포함된 push에서는 `integration` job도 돈다(A7-D7 경로 필터).
+- [ ] Running `pnpm db:migrate` twice in a row makes the second run say `up to date` (A3 §8's full runner test).
+- [ ] `packages/db/migrations/` contains 8 files, `0001` through `0008`, and nothing else (A3 §8 = the complete v1 table list).
+- [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test`, and `pnpm test:integration` all pass.
+- [ ] Start `apps/hub` and run `curl -s http://127.0.0.1:8787/health | jq`; you get `{"ok":true,"version":"0.1.0","db":"up",...}`.
+- [ ] After `curl -s -X POST http://127.0.0.1:8787/kill-switch -H 'content-type: application/json' -d '{"on":true,"reason":"manual check"}'`, the scheduler log shows `scheduler tick skipped: kill switch is on`.
+- [ ] `grep -rn "adapter.send\|\.send(" packages/kernel/src | grep -v outbox.ts` is empty — meaning the only code that reaches channel delivery is `outbox.ts`.
+- [ ] `psql omnis -c "SELECT count(*) FROM audit_log WHERE action='item.sent' AND approval_id IS NULL"` is 0 (master §2 metric).
+- [ ] Attempting a `/bridge` upgrade against a hub started without `OMNIS_BRIDGE_TOKEN` gives `503`, a wrong token gives `401`, and the right token plus `x-omnis-host: macbook` gives `101 Switching Protocols` (Task 26 step 8).
+- [ ] `grep -rn "zero_replication" packages apps` is empty — the only replication role name is `omnis_sync`.
+- [ ] `git log --format=%B | grep -c "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"` equals the number of commits this plan produced — every commit's last line is the session-rule trailer, and the `Implemented-by:` line is in the body.
+- [ ] `.github/workflows/ci.yml` exists and `pnpm dlx js-yaml .github/workflows/ci.yml` prints the three jobs `changes`/`check`/`integration`.
+- [ ] After the first push, the `check` job in GitHub Actions is green, and a push that includes an `apps/hub` change also runs the `integration` job (A7-D7 path filter).
 
 ---
 
-## 수정 이력 (2026-09-20, cross-plan review)
+## Revision history (2026-09-20, cross-plan review)
 
-`2026-09-20-plans-review.md` §1 불일치표와 §2 계약 개정(2026-09-20 확정본)을 이 계획에 반영했다.
+The §1 discrepancy table and §2 contract revisions (2026-09-20 final) from `2026-09-20-plans-review.md` were applied to this plan.
 
-- **M1·M3·M4** — Task 1을 루트 파일(`package.json`·`pnpm-workspace.yaml`·`tsconfig.base.json`·`biome.jsonc`·`vitest.workspace.ts`)의 **유일 오너**로 명문화하고, 버전 핀을 한 블록으로 고정했다: `vitest 2.1.9` · `typescript 5.6.3` · `pg 8.13.1` · `packageManager pnpm@9.12.3` · `zod ^3.24.1`(zod 4 금지) · `@rocicorp/zero 1.9.0` exact · `ai 7.0.107`. 다른 5개 계획은 루트 스캐폴드를 만들지 않고 `test -f`로 확인만 한다.
-- **M4(b)** — `biome.jsonc`의 `lineWidth`를 110 → **100**으로 내렸다(계약 §2 확정값). `tsconfig.base.json`은 `strict`·`noUncheckedIndexedAccess`·`exactOptionalPropertyTypes`·`verbatimModuleSyntax`·`isolatedModules`·`noImplicitOverride`를 모두 포함한 채로 유지했다.
-- **M5** — 루트 `scripts`에 `dev`(`concurrently`로 hub+desktop 동시, `concurrently 9.1.0` 핀 추가) · `tauri:dev` · `tauri:build`를 더했고, `db:migrate`/`db:migrate:create`를 `tsx packages/db/src/cli/*.ts` 직접 호출에서 **`pnpm --filter @omnis/db migrate`**(계약 §2)로 바꿨다. 그에 맞춰 `packages/db/package.json`에 `migrate`/`migrate:create` 스크립트와 `tsx 4.19.2` devDependency를 더했다.
-- **M12** — 루트 `vitest.workspace.ts`의 `unit` include를 `*.test.{ts,tsx}`로 넓혔다(`packages/*/src`·`packages/*/test`·`packages/adapters/*`·`apps/*/src`·`apps/*/test`). 계약이 적은 `src/**` 패턴을 그대로 넣되, 이 계획의 모든 테스트가 사는 `test/**`도 함께 유지해야 조용한 스킵이 생기지 않는다. `exclude`에 `**/dist/**`를 추가했다.
-- **M6** — **Task 26 `hub-bridge-ws`를 신설**했다(US-A10). `apps/hub/src/bridge.ts`가 계약 §3.5/§8의 서버 측을 구현한다: Bearer 토큰(`OMNIS_BRIDGE_TOKEN` ← Keychain `omnis.bridge.token.<host>`) + `x-omnis-host` 검증, JSON-RPC 2.0 프레이밍, `runtime.registered`/`session.registered`/`health`/`turn.*` 수신, `approval.requested` → `pending_approvals` → 결정 대기 → `HumanResponse` 응답, `HUB_METHODS` 송신(`bridge/discover`·`session.*`·`turn.*`, `ingest.*`는 Phase B로 즉시 거절), ping/pong 하트비트. 테스트는 `ws` 클라이언트로 register + discover 왕복을 실제로 돈다. Task 24의 YAGNI/주석에 있던 "US-A17이 꽂는다"는 전부 "Task 26이 꽂는다"로 정정했다.
-- **M13** — **Task 27 `ci`를 신설**했다. `.github/workflows/ci.yml`을 A7 §6/A7-D7대로 쓴다: `check` job(lint+typecheck+unit, 상시) + `integration` job(`pgvector/pgvector:pg17` 서비스 컨테이너, `dorny/paths-filter` 경로 필터). macOS Tauri job은 `apps/desktop`이 생길 때 데스크톱 계획이 덧붙인다.
-- **US-A10 커밋 단위** — 계약 §10이 US-A10을 `hub-bootstrap`·`hub-http-routes`·`graceful-shutdown`·`hub-bridge-ws` 4개 태스크로 적었으므로, 원자 커밋 1개 규칙(A7-D8)을 지키려고 Task 25의 커밋 스텝을 Task 26 마지막으로 옮겼다. Task 23~26 전체가 커밋 하나다.
-- **계약 §5 Approvals 정합** — `beginExecution`/`completeExecution`/`failExecution`/`expire`는 이제 계약 §5의 정식 표면이다. Task 18의 "계약을 넘어선 추가 메서드 4개" 표현을 "계약 §5 `Approvals`의 나머지 메서드 4개"로 고치고, Task 16의 `Approvals` 목록에 "나머지 4개는 Task 18이 붙인다"를 명시했다. `PendingApproval`·`Logger`/`createLogger`·`killSwitchStatus`·`runEgress`/`EgressToken`/`EgressSpec`/`EgressDeps`/`createOutbox`/`createIngestSink`는 이미 계약 §5와 같은 이름·시그니처였다 — `createLogger`만 Task 12의 Produces 줄에서 `traceId` 인자가 빠져 있어 계약과 같게 고쳤다. 계약 §5의 `zeroSchema`/`assertZeroPublication`/`ZeroPublicationError`는 `@omnis/kernel` 심볼이지만 오너가 US-A21(`2026-09-20-phase-a-sync-and-agents.md` Task 1~2)이므로 이 계획은 만들지 않는다 — 이 계획은 그들이 대조할 `zero_omnis` publication(Task 10)만 만든다.
-- **복제 role** — `omnis_sync`(A3 §1이 오너)를 그대로 두고, **zero-cache가 붙는 유저가 `omnis_sync`임을** `0001`·`0008` 양쪽에 1줄씩 명기했다. 계약 §7의 `zero_replication`은 옛 이름이며 코드 어디에도 등장하지 않는다.
-- **커밋 트레일러** — 이 계획의 `git commit` 19개 전부를 세션 규칙에 맞췄다: 본문 마지막에 `Implemented-by: <tier>`(A7 §6이 요구하는 실행 모델 표기), 커밋 마지막 줄은 예외 없이 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`. Global Constraints에 남아 있던 "불일치는 open question" 문장을 지웠다.
-- **완료 확인** — 브리지 업그레이드 401/503/101, `zero_replication` 부재, 트레일러 일관성, `ci.yml` 파싱, 첫 push CI 초록 5줄을 추가했다.
+- **M1·M3·M4** — Made Task 1 the **sole owner** of the root files (`package.json`·`pnpm-workspace.yaml`·`tsconfig.base.json`·`biome.jsonc`·`vitest.workspace.ts`), and pinned the versions in one block: `vitest 2.1.9` · `typescript 5.6.3` · `pg 8.13.1` · `packageManager pnpm@9.12.3` · `zod ^3.24.1` (zod 4 forbidden) · `@rocicorp/zero 1.9.0` exact · `ai 7.0.107`. The other five plans do not create the root scaffold and only check it with `test -f`.
+- **M4(b)** — Lowered `biome.jsonc`'s `lineWidth` from 110 to **100** (contract §2 final value). `tsconfig.base.json` was kept with `strict`·`noUncheckedIndexedAccess`·`exactOptionalPropertyTypes`·`verbatimModuleSyntax`·`isolatedModules`·`noImplicitOverride` all included.
+- **M5** — Added `dev` (hub+desktop at the same time via `concurrently`, with the `concurrently 9.1.0` pin added) · `tauri:dev` · `tauri:build` to the root `scripts`, and changed `db:migrate`/`db:migrate:create` from directly invoking `tsx packages/db/src/cli/*.ts` to **`pnpm --filter @omnis/db migrate`** (contract §2). Accordingly, added the `migrate`/`migrate:create` scripts and the `tsx 4.19.2` devDependency to `packages/db/package.json`.
+- **M12** — Widened the root `vitest.workspace.ts` `unit` include to `*.test.{ts,tsx}` (`packages/*/src`·`packages/*/test`·`packages/adapters/*`·`apps/*/src`·`apps/*/test`). Keep the `src/**` pattern the contract wrote as is, but also keep `test/**`, where all of this plan's tests live, so that no silent skips appear. Added `**/dist/**` to `exclude`.
+- **M6** — **Created Task 26 `hub-bridge-ws`** (US-A10). `apps/hub/src/bridge.ts` implements the server side of contract §3.5/§8: Bearer token (`OMNIS_BRIDGE_TOKEN` ← Keychain `omnis.bridge.token.<host>`) + `x-omnis-host` validation, JSON-RPC 2.0 framing, receiving `runtime.registered`/`session.registered`/`health`/`turn.*`, `approval.requested` → `pending_approvals` → wait for decision → `HumanResponse` reply, sending `HUB_METHODS` (`bridge/discover`·`session.*`·`turn.*`, with `ingest.*` rejected immediately as Phase B), ping/pong heartbeat. The test actually runs a register + discover round trip with a `ws` client. Every "US-A17 attaches it" in Task 24's YAGNI/comments was corrected to "Task 26 attaches it".
+- **M13** — **Created Task 27 `ci`**. Wrote `.github/workflows/ci.yml` per A7 §6/A7-D7: the `check` job (lint+typecheck+unit, always) + the `integration` job (`pgvector/pgvector:pg17` service container, `dorny/paths-filter` path filter). The macOS Tauri job is appended by the desktop plan when `apps/desktop` appears.
+- **US-A10 commit unit** — Since contract §10 lists US-A10 as four tasks, `hub-bootstrap`·`hub-http-routes`·`graceful-shutdown`·`hub-bridge-ws`, the commit step in Task 25 was moved to the end of Task 26 to honor the one-atomic-commit rule (A7-D8). Tasks 23~26 in their entirety are a single commit.
+- **contract §5 Approvals alignment** — `beginExecution`/`completeExecution`/`failExecution`/`expire` are now the official surface of contract §5. Task 18's phrase "4 additional methods beyond the contract" was changed to "the remaining 4 methods of contract §5 `Approvals`", and Task 16's `Approvals` list now states "the remaining 4 are attached by Task 18". `PendingApproval`·`Logger`/`createLogger`·`killSwitchStatus`·`runEgress`/`EgressToken`/`EgressSpec`/`EgressDeps`/`createOutbox`/`createIngestSink` already had the same names and signatures as contract §5 — only `createLogger` was missing the `traceId` argument on Task 12's Produces line, so it was fixed to match the contract. Contract §5's `zeroSchema`/`assertZeroPublication`/`ZeroPublicationError` are `@omnis/kernel` symbols but owned by US-A21 (`2026-09-20-phase-a-sync-and-agents.md` Tasks 1~2), so this plan does not create them — this plan only creates the `zero_omnis` publication (Task 10) they will check against.
+- **Replication role** — Left `omnis_sync` (owned by A3 §1) as is, and stated on one line each in `0001` and `0008` that **the user zero-cache connects as is `omnis_sync`**. `zero_replication` in contract §7 is the old name and appears nowhere in the code.
+- **Commit trailer** — Aligned all 19 `git commit`s in this plan with the session rules: `Implemented-by: <tier>` at the end of the body (the execution-model notation A7 §6 requires), and the last line of every commit is without exception `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`. Removed the "a discrepancy is an open question" sentence remaining in Global Constraints.
+- **Definition of done** — Added 5 lines: bridge upgrade 401/503/101, the absence of `zero_replication`, trailer consistency, `ci.yml` parsing, and green CI on the first push.
 
-미반영(이 계획 밖): M2(sync-and-agents의 zod 4 → protocol의 zod 3), M7·M8(Keychain 이름 — 어댑터·데스크톱 계획), M9·M10·M11(데스크톱 계획), M14(phase-0 T17 범위 축소).
+Not applied (outside this plan): M2 (sync-and-agents' zod 4 → protocol's zod 3), M7·M8 (Keychain names — the adapter and desktop plans), M9·M10·M11 (the desktop plan), M14 (the phase-0 T17 scope reduction).

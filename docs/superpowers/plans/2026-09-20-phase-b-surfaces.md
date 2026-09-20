@@ -5,56 +5,56 @@
 **Goal:** Ship the surfaces Logan actually touches in Phase B — unified search (`GET /search` + ⌘K search mode), the six new desktop screens (Today/Tasks/Network/Notes/Digest/Settings), and the iPhone PWA shell with Web Push — on top of the memory/agents/kernel work the other four Phase B plans land first (`memory-ingestion`, `agents`, `channels`, `ops`).
 **Architecture:** Desktop screens stay read-only Zero consumers exactly like Phase A (`apps/desktop/src/screens/*.tsx` query `@rocicorp/zero`, join client-side the way `Inbox.tsx` already does — no new Zero relationships beyond the one this plan itself owns, `settings`). Every write (settings, unarchive, digest undo, note routing, push subscribe) goes through a typed hub HTTP route under `apps/hub/src/*.ts`, following the `send()`/regex-path-match pattern already in `apps/hub/src/http.ts`. `GET /search` is a synchronous four-way fan-out (`items` FTS+trgm, `threads` rollup, `persons` trgm, `@omnis/memory` kNN) merged and ranked in `apps/hub/src/search.ts`, consumed by both the desktop ⌘K palette and the PWA. `apps/web` is a second Vite React app (no Tauri) that reuses `@omnis/ui` and the same Zero client shape as `apps/desktop`, plus a service worker for install + Web Push.
 **Tech Stack:** React 18 + TypeScript 5 (strict, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`), `@rocicorp/zero` 1.9.0 (read-only client), `cmdk` (⌘K), `react-virtuoso`, `lucide-react`, Vite 5 + `vite-plugin-pwa` 0.21.x, `web-push` 3.6.7 (hub-side VAPID push), `pg` 8.13.1, vitest 2.1.9 + `@testing-library/react` + `jsdom`, Biome.
-**Spec:** `/Users/logankim/AI-Workspaces/omnis/docs/spec/A4-agent-layer.md` §14(통합 검색 계약) · `/Users/logankim/AI-Workspaces/omnis/docs/spec/A5-ui-ux.md` §2.3~§2.5(팔레트/검색) §3.4~§3.9(Today/Tasks/Network/Notes/Digest/Settings) §4(iPhone PWA) §5(컴포넌트 맵) §7~§9(온보딩/카피/QA) · `/Users/logankim/AI-Workspaces/omnis/docs/spec/A3-data-schema.md` §2~§5(스키마) §7(Zero 복제) §10(person 신원) · `/Users/logankim/AI-Workspaces/omnis/docs/superpowers/plans/2026-09-20-phase-a-interfaces.md`(Phase A 심볼 정본) · `/Users/logankim/AI-Workspaces/omnis/docs/superpowers/plans/2026-09-20-phase-b-interfaces-delta.md`(Phase B 심볼 정본, §2.2/§2.3/§5/§6/§7 이 플랜이 그대로 복사) · `/Users/logankim/AI-Workspaces/omnis/docs/superpowers/plans/2026-09-20-phase-b-backlog.md`(US-B26~B33, B35, B36).
+**Spec:** `/Users/logankim/AI-Workspaces/omnis/docs/spec/A4-agent-layer.md` §14 (unified search contract) · `/Users/logankim/AI-Workspaces/omnis/docs/spec/A5-ui-ux.md` §2.3–§2.5 (palette/search) §3.4–§3.9 (Today/Tasks/Network/Notes/Digest/Settings) §4 (iPhone PWA) §5 (component map) §7–§9 (onboarding/copy/QA) · `/Users/logankim/AI-Workspaces/omnis/docs/spec/A3-data-schema.md` §2–§5 (schema) §7 (Zero replication) §10 (person identity) · `/Users/logankim/AI-Workspaces/omnis/docs/superpowers/plans/2026-09-20-phase-a-interfaces.md` (canonical Phase A symbols) · `/Users/logankim/AI-Workspaces/omnis/docs/superpowers/plans/2026-09-20-phase-b-interfaces-delta.md` (canonical Phase B symbols; this plan copies §2.2/§2.3/§5/§6/§7 verbatim) · `/Users/logankim/AI-Workspaces/omnis/docs/superpowers/plans/2026-09-20-phase-b-backlog.md` (US-B26–B33, B35, B36).
 
 ## Global Constraints
 
-- Node 22 + pnpm workspaces. `pnpm-workspace.yaml`의 `apps/*` glob이 이미 `apps/web`을 덮는다 — workspace 파일 수정 불필요.
-- TypeScript strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`(인터페이스 계약 §2). `packages/ui`는 "React만" 의존(Phase A 패키지 경계 판정 그대로) — `@omnis/protocol`의 `SearchResponse`/`SearchHit` 등을 **import하지 않고** 로컬 미러 타입(`UiSearchHit`/`UiSearchGroup`)을 쓴다.
-- Postgres 17. 마이그레이션은 append-only 파일 `packages/db/migrations/000N_<name>.sql`, 다음 번호는 **0009**부터(이 플랜이 `0009_settings.sql`·`0011_push_subscriptions.sql`·`0013_publication_phase_b.sql` 3개를 만든다 — `0010`(ingest_sources)은 memory-ingestion 플랜, `0012`(jobs seed)는 공유 파일이라 이 플랜은 건드리지 않는다).
-- 허브는 `127.0.0.1:8787`에만 bind(A6 §3), Tailscale Serve가 `/api/`로 마운트. `apps/web` 정적 서빙은 ops 플랜(US-B34 `tailscale-serve.sh`)의 몫이고 이 플랜은 `pnpm web:build` 산출물만 낸다.
-- 핀 버전(인터페이스 계약 §1 그대로): `vitest 2.1.9` · `zod ^3.24.1` · `pg 8.13.1` · `typescript 5.6.3` · `pnpm@9.12.3` · `@rocicorp/zero 1.9.0`(exact) · `ai 7.0.107`. 이 플랜이 새로 고정하는 것(델타 §1): `web-push 3.6.7`, `vite-plugin-pwa 0.21.x`.
-- 승인 게이트 없는 비가역 tool 배선 금지(A7 §7 공통 금지) — 이 플랜의 모든 쓰기 경로(설정 변경, 되살리기, 노트 라우팅 수락, 푸시 구독)는 `pending_approvals`를 거칠 필요가 없는 **가역** 액션이거나(되살리기는 archive의 undo, 설정 변경은 `audit_log`로 감사되는 관리 동작) 이미 승인된 것의 실행(Web Push의 Approve 버튼은 기존 `POST /approvals/:id/decide`를 그대로 쓴다, 새 경로를 만들지 않는다 — 계약 §7).
-- provider SDK는 어댑터 패키지 안에만 — 이 플랜은 채널 어댑터를 만들지 않는다. `web-push`(VAPID)는 채널 어댑터가 아니라 허브 자신의 발송 인프라라 예외가 아니라 애초에 규칙 대상이 아니다.
-- 스토리 티어(백로그 표): US-B26 **Opus**, 나머지(B27~B33, B35, B36) 전부 **Sonnet** — 이 플랜에 DeepSeek 티어 스토리는 없다.
-- 커밋: 스토리당 원자 커밋(제목 `US-Bxx: <한 줄 요약>`), 본문에 충족한 acceptance criteria + `Implemented-by: Claude <Tier>`, 마지막 줄 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`(인터페이스 계약 §12 최신 트레일러 규칙).
-- 이 플랜이 참조하는 **다른 Phase B 플랜의 심볼**(존재를 가정하되 이 워크트리에서 직접 만들지 않는 것): `@omnis/memory`의 `searchMemories`/`MemoryHit`(memory-ingestion US-B01/B04), `@omnis/kernel`의 `costState`/`currentPolicy`/`Policy`(agents US-B14), `@omnis/kernel`의 `archiveItem`/`undoArchive`/`ArchivedByMeta`/`UNDO_WINDOW_DAYS`(agents US-B18), `notifyTierFor`/`createNotifier`(agents US-B15/B17). 웨이브 순서(백로그 §3)상 이 플랜(W3)이 실행될 때는 이미 머지되어 있다.
+- Node 22 + pnpm workspaces. The `apps/*` glob in `pnpm-workspace.yaml` already covers `apps/web` — no workspace file change needed.
+- TypeScript strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` (interface contract §2). `packages/ui` depends on "React only" (the Phase A package-boundary ruling, unchanged) — it does **not import** `SearchResponse`/`SearchHit` etc. from `@omnis/protocol` and instead uses local mirror types (`UiSearchHit`/`UiSearchGroup`).
+- Postgres 17. Migrations are append-only files `packages/db/migrations/000N_<name>.sql`; the next number is **0009** (this plan creates three: `0009_settings.sql`, `0011_push_subscriptions.sql`, `0013_publication_phase_b.sql` — `0010` (ingest_sources) belongs to the memory-ingestion plan and `0012` (jobs seed) is a shared file, so this plan leaves both alone).
+- The hub binds only to `127.0.0.1:8787` (A6 §3); Tailscale Serve mounts it at `/api/`. Static serving of `apps/web` belongs to the ops plan (US-B34 `tailscale-serve.sh`); this plan only produces the `pnpm web:build` artifacts.
+- Pinned versions (interface contract §1, unchanged): `vitest 2.1.9` · `zod ^3.24.1` · `pg 8.13.1` · `typescript 5.6.3` · `pnpm@9.12.3` · `@rocicorp/zero 1.9.0` (exact) · `ai 7.0.107`. Newly pinned by this plan (delta §1): `web-push 3.6.7`, `vite-plugin-pwa 0.21.x`.
+- No wiring of irreversible tools without an approval gate (A7 §7 common prohibition) — every write path in this plan (settings change, unarchive, accepting note routing, push subscription) is either a **reversible** action that does not need to go through `pending_approvals` (unarchive is the undo of an archive; a settings change is an administrative action audited via `audit_log`) or the execution of something already approved (the Web Push Approve button reuses the existing `POST /approvals/:id/decide` as-is; no new route is created — contract §7).
+- Provider SDKs live only inside adapter packages — this plan creates no channel adapters. `web-push` (VAPID) is not a channel adapter but the hub's own delivery infrastructure, so it is not an exception; it was never in scope of the rule to begin with.
+- Story tiers (backlog table): US-B26 is **Opus**, all the others (B27–B33, B35, B36) are **Sonnet** — this plan has no DeepSeek-tier stories.
+- Commits: one atomic commit per story (subject `US-Bxx: <one-line summary>`), body listing the acceptance criteria met + `Implemented-by: Claude <Tier>`, final line `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` (interface contract §12, latest trailer rule).
+- **Symbols from other Phase B plans** that this plan references (assumed to exist, not created in this worktree): `searchMemories`/`MemoryHit` from `@omnis/memory` (memory-ingestion US-B01/B04), `costState`/`currentPolicy`/`Policy` from `@omnis/kernel` (agents US-B14), `archiveItem`/`undoArchive`/`ArchivedByMeta`/`UNDO_WINDOW_DAYS` from `@omnis/kernel` (agents US-B18), `notifyTierFor`/`createNotifier` (agents US-B15/B17). Given the wave order (backlog §3), these are already merged by the time this plan (W3) runs.
 
 ---
 
-### Task 1: 통합 검색 API — `GET /search` (US-B26, tier: Opus)
+### Task 1: Unified search API — `GET /search` (US-B26, tier: Opus)
 
-**목표(백로그)**: `GET /search?q&k&scope&since`, 네 갈래 병렬 쿼리(items FTS+trgm 폴백 / threads 집계 / persons trgm+handle_norm / memories kNN), 그룹 내 정규화 + `group_weight` 병합 랭킹 + recency·VIP 가산, 그룹당 5·전체 20 상한, `SearchResponse` 스키마 그대로. `agent_runs` row를 남기지 않는다.
-**산출물**: `apps/hub/src/search.ts`, `packages/memory/src/search.ts`(수정)
-**검증 명령**: `pnpm --filter @omnis/hub test`
-**의존**: B01(`@omnis/memory` 스캐폴드), B03(person 신원 해석)
-**읽을 스펙**: A4 §14(전체), 델타 §2.2(`SearchHit`/`SearchGroup`/`SearchResponse`/`SearchDeepLink`), A3 §2(items.search_tsv/items_body_trgm_idx), §3(persons_name_trgm_idx), §5(memories_embedding_idx — memory-ingestion 플랜 산출물, `searchMemories`로 이미 감싸져 있다)
-**하지 말 것(YAGNI)**: `scope`/`since` 필터의 SQL WHERE 적용(백로그 표면에는 있지만 A4 §14.2 쿼리 표에 scope/since 필터 조건이 없다 — 파라미터는 파싱해 받아 두되 이번 태스크는 무시한다, 열린 질문에 기록), 그룹별 "더 보기" 페이지네이션(§14.3 "더 필요하면 그룹 헤더의 더 보기"는 클라이언트 후속), `agent_runs` 기록(스펙이 명시적으로 금지).
+**Goal (backlog)**: `GET /search?q&k&scope&since`, four parallel queries (items FTS + trgm fallback / threads rollup / persons trgm + handle_norm / memories kNN), in-group normalization + `group_weight` merged ranking + recency·VIP boost, cap of 5 per group and 20 overall, `SearchResponse` schema verbatim. Leaves no `agent_runs` row.
+**Deliverables**: `apps/hub/src/search.ts`, `packages/memory/src/search.ts` (modified)
+**Verification command**: `pnpm --filter @omnis/hub test`
+**Depends on**: B01 (`@omnis/memory` scaffold), B03 (person identity resolution)
+**Spec to read**: A4 §14 (all), delta §2.2 (`SearchHit`/`SearchGroup`/`SearchResponse`/`SearchDeepLink`), A3 §2 (items.search_tsv/items_body_trgm_idx), §3 (persons_name_trgm_idx), §5 (memories_embedding_idx — a memory-ingestion plan deliverable, already wrapped by `searchMemories`)
+**Do not do (YAGNI)**: applying `scope`/`since` filters as SQL WHERE clauses (they appear on the backlog surface, but the A4 §14.2 query table has no scope/since filter conditions — parse and accept the params but ignore them in this task; recorded under open questions), per-group "more" pagination (§14.3's "if you need more, the group header's more" is a client follow-up), writing `agent_runs` (explicitly forbidden by the spec).
 
 **Files:**
 - Create: `apps/hub/src/search.ts`
-- Modify: `apps/hub/src/http.ts`(GET /search, GET /memory/search 라우트 추가), `apps/hub/package.json`(`@omnis/memory` 의존 추가)
+- Modify: `apps/hub/src/http.ts` (add GET /search and GET /memory/search routes), `apps/hub/package.json` (add the `@omnis/memory` dependency)
 - Test: `apps/hub/src/search.test.ts`
 
 **Interfaces:**
-- Consumes: `SearchHit`/`SearchGroup`/`SearchResponse`/`SearchGroupKind`/`SearchHitKind`(`@omnis/protocol`, 델타 §2.2), `Channel`/`MemorySourceKind`(`@omnis/protocol`), `searchMemories`/`MemoryHit`/**`truncateSnippet`**(`@omnis/memory`, 델타 §3 + memory-ingestion 계획 Task 4), `query`(`@omnis/db`)
-- Produces: `normalizeScores`, `mergedScore`, `buildGroup`, `runSearch`, `createSearchDeps`, `SearchDeps`, `ItemHitRow`, `ThreadHitRow`, `PersonHitRow`(`apps/hub/src/search.ts`)
+- Consumes: `SearchHit`/`SearchGroup`/`SearchResponse`/`SearchGroupKind`/`SearchHitKind` (`@omnis/protocol`, delta §2.2), `Channel`/`MemorySourceKind` (`@omnis/protocol`), `searchMemories`/`MemoryHit`/**`truncateSnippet`** (`@omnis/memory`, delta §3 + memory-ingestion plan Task 4), `query` (`@omnis/db`)
+- Produces: `normalizeScores`, `mergedScore`, `buildGroup`, `runSearch`, `createSearchDeps`, `SearchDeps`, `ItemHitRow`, `ThreadHitRow`, `PersonHitRow` (`apps/hub/src/search.ts`)
 
 **Steps:**
 
-1. [ ] **선행 확인** — `truncateSnippet`은 **memory-ingestion 계획 Task 4가 낸다**(2026-09-20 교차 리뷰 M13: `packages/memory/src/search.ts`는 그 계획의 단일 오너 파일이라 이 워크트리에서 덧붙이면 교차 소유가 된다). 이 태스크는 import만 한다 — 없으면 이 태스크를 시작하지 않고 memory-ingestion Task 4 머지를 기다린다.
+1. [ ] **Precondition check** — `truncateSnippet` is **produced by memory-ingestion plan Task 4** (2026-09-20 cross review M13: `packages/memory/src/search.ts` is that plan's single-owner file, so adding to it from this worktree would create cross-ownership). This task only imports it — if it is missing, do not start this task; wait for the memory-ingestion Task 4 merge.
    ```bash
    cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function truncateSnippet" packages/memory/src/search.ts && grep -n "truncateSnippet" packages/memory/src/index.ts
    ```
-   기대 출력: 두 grep 모두 1줄씩 hit(`packages/memory/src/index.ts`가 `export { searchMemories, truncateSnippet, type MemoryHit } from "./search.js";`). hit이 없으면 **중단**하고 W1의 memory-ingestion C1 체인(Task 1–4)이 머지될 때까지 기다린다.
+   Expected output: both greps hit exactly 1 line each (`packages/memory/src/index.ts` has `export { searchMemories, truncateSnippet, type MemoryHit } from "./search.js";`). If there is no hit, **stop** and wait for the W1 memory-ingestion C1 chain (Tasks 1–4) to merge.
 
-2. [ ] 병합 랭킹 순수 함수(`normalizeScores`/`mergedScore`/`buildGroup`)의 실패하는 테스트를 쓴다.
+2. [ ] Write the failing tests for the merge-ranking pure functions (`normalizeScores`/`mergedScore`/`buildGroup`).
    ```ts
    // apps/hub/src/search.test.ts
    import { describe, expect, it } from "vitest";
    import { buildGroup, mergedScore, normalizeScores, runSearch, type SearchDeps } from "./search.js";
 
-   describe("normalizeScores (A4 §14.3 그룹 내 0~1 정규화)", () => {
+   describe("normalizeScores (A4 §14.3 in-group 0–1 normalization)", () => {
      it("divides by the group max", () => {
        expect(normalizeScores([2, 4, 1])).toEqual([0.5, 1, 0.25]);
      });
@@ -81,7 +81,7 @@
      });
    });
 
-   describe("buildGroup (그룹당 최대 5, total은 상한 전 개수)", () => {
+   describe("buildGroup (max 5 per group, total is the pre-cap count)", () => {
      it("caps results at 5, sorts by score desc, keeps the true total", () => {
        const hits = Array.from({ length: 8 }, (_, i) => ({
          kind: "item" as const, id: String(i), score: i, title: "t", snippet: "s",
@@ -104,7 +104,7 @@
      };
    }
 
-   describe("runSearch (A4 §14.4 그룹 순서 고정 people→threads→items→memories)", () => {
+   describe("runSearch (A4 §14.4 fixed group order people→threads→items→memories)", () => {
      it("returns all 4 groups in fixed order even when everything is empty", async () => {
        const res = await runSearch(fakeDeps(), { q: "davich" });
        expect(res.groups.map((g) => g.kind)).toEqual(["people", "threads", "items", "memories"]);
@@ -115,12 +115,12 @@
        const res = await runSearch(
          fakeDeps({
            searchMemories: async () => [{
-             memory_id: "m1", content: "오전 미팅 선호", score: 0.9,
+             memory_id: "m1", content: "prefers morning meetings", score: 0.9,
              recorded_at: "2026-09-01T00:00:00Z", valid_from: "2026-09-01T00:00:00Z", valid_until: null,
              source_item_id: null, source_kind: "self", source_ref: null,
            }],
          }),
-         { q: "미팅" },
+         { q: "meetings" },
        );
        const memories = res.groups.find((g) => g.kind === "memories");
        expect(memories?.results[0]?.deep_link).toBeNull();
@@ -130,11 +130,11 @@
        const res = await runSearch(
          fakeDeps({
            searchItems: async () => [{
-             id: "i1", thread_id: "t1", subject: "계약서 요청", body: "확인 부탁드립니다",
+             id: "i1", thread_id: "t1", subject: "Contract request", body: "Please confirm",
              sent_at: "2026-09-19T09:00:00Z", channel: "gmail",
            }],
          }),
-         { q: "계약서" },
+         { q: "contract" },
        );
        const items = res.groups.find((g) => g.kind === "items");
        expect(items?.results[0]?.deep_link).toEqual({ screen: "thread", thread_id: "t1", item_id: "i1" });
@@ -142,13 +142,13 @@
    });
    ```
 
-3. [ ] 실행 → 실패 확인.
+3. [ ] Run → confirm failure.
    ```bash
    pnpm --filter @omnis/hub test
    ```
-   기대 출력: `Cannot find module './search.js'`.
+   Expected output: `Cannot find module './search.js'`.
 
-4. [ ] `apps/hub/src/search.ts`를 구현한다.
+4. [ ] Implement `apps/hub/src/search.ts`.
    ```ts
    // apps/hub/src/search.ts
    import type {
@@ -213,7 +213,7 @@
      return Math.exp(-ageDays / RECENCY_HALF_LIFE_DAYS);
    }
 
-   /** A4 §14.3: 그룹 안에서 0~1 정규화. 그룹 전체가 0이면(랭크 없음) 정규화도 전부 0. */
+   /** A4 §14.3: normalize to 0–1 within a group. If the whole group is 0 (no ranking), every normalized score is 0 too. */
    export function normalizeScores(raws: readonly number[]): number[] {
      const max = Math.max(0, ...raws);
      if (max === 0) return raws.map(() => 0);
@@ -268,7 +268,7 @@
        kind: "thread",
        id: r.id,
        score: mergedScore(GROUP_WEIGHT.threads, threadsNorm[i] ?? 0, r.last_item_at, false, now),
-       title: r.title ?? "(제목 없음)",
+       title: r.title ?? "(no subject)",
        snippet: r.title ?? "",
        at: r.last_item_at,
        channel: null,
@@ -316,7 +316,7 @@
      };
    }
 
-   /** 실제 SQL 배선. A4 §14.2 표 그대로 — FTS 0건일 때만 trigram 폴백을 다시 쏜다. */
+   /** The real SQL wiring. The A4 §14.2 table verbatim — re-issue the trigram fallback only when FTS returns 0 rows. */
    export function createSearchDeps(pool: Pool): SearchDeps {
      return {
        async searchItems(q, k) {
@@ -371,11 +371,11 @@
    }
    ```
 
-5. [ ] 재실행 → 통과 확인, 커밋.
+5. [ ] Re-run → confirm pass, commit.
    ```bash
    pnpm --filter @omnis/hub test
    ```
-   기대 출력: `normalizeScores`/`mergedScore`/`buildGroup`/`runSearch` 전부 PASS.
+   Expected output: `normalizeScores`/`mergedScore`/`buildGroup`/`runSearch` all PASS.
    ```bash
    git add apps/hub/src/search.ts apps/hub/src/search.test.ts
    git commit -m "$(cat <<'EOF'
@@ -391,18 +391,18 @@
    )"
    ```
 
-6. [ ] `apps/hub/package.json`에 `@omnis/memory` 의존을 추가한다(델타 §1 "apps/hub → @omnis/memory 추가").
+6. [ ] Add the `@omnis/memory` dependency to `apps/hub/package.json` (delta §1, "apps/hub → add @omnis/memory").
    ```json
-   // apps/hub/package.json — "dependencies"에 한 줄 추가
+   // apps/hub/package.json — add one line under "dependencies"
    "@omnis/memory": "workspace:*",
    ```
 
-7. [ ] `apps/hub/src/http.ts`의 마지막 분기("// /search, /memory/search, /transcript/:id는 다른 부록이 소유한다…") 바로 앞에 두 라우트를 추가한다.
+7. [ ] Add the two routes to `apps/hub/src/http.ts` immediately before the final branch (the "// /search, /memory/search, /transcript/:id are owned by other appendices…" one).
     ```ts
-    // apps/hub/src/http.ts — handle() 안, 기존 "/search... Phase A는 열지 않는다" 주석/404 이전에 삽입
+    // apps/hub/src/http.ts — inside handle(), inserted before the existing "/search... Phase A does not open it" comment/404
     import { createSearchDeps, runSearch } from "./search.js";
     import { searchMemories } from "@omnis/memory";
-    // (createHubServer 함수 상단, `const { kernel, pool, config, logger, startedAt } = deps;` 다음 줄)
+    // (top of the createHubServer function, on the line after `const { kernel, pool, config, logger, startedAt } = deps;`)
     const searchDeps = createSearchDeps(pool);
 
     if (path === "/search") {
@@ -427,7 +427,7 @@
     }
     ```
 
-8. [ ] 커밋.
+8. [ ] Commit.
     ```bash
     git add apps/hub/package.json apps/hub/src/http.ts
     git commit -m "$(cat <<'EOF'
@@ -439,38 +439,38 @@
     )"
     ```
 
-**열린 질문**: `scope`/`since` 쿼리 파라미터는 A4 §14.2 SQL 표에 필터 조건으로 나타나지 않는다(파싱만 하고 미적용) — Phase B 실행 시점에 A4 저자에게 확인 필요.
+**Open questions**: The `scope`/`since` query params do not appear as filter conditions in the A4 §14.2 SQL table (parsed but not applied) — needs confirmation from the A4 author when Phase B runs.
 
 ---
 
-### Task 2: ⌘K 검색 모드 (US-B27, tier: Sonnet)
+### Task 2: ⌘K search mode (US-B27, tier: Sonnet)
 
-**목표(백로그)**: 입력이 액션과 매치 안 되면 팔레트가 검색 결과로 전환, 그룹 순서 고정(people→threads→items→memories), 180ms 디바운스, `deep_link`가 null인 memory는 클릭 비활성, 빈 상태·느림 상태 카피.
-**산출물**: `packages/ui/src/components/command-palette.tsx`(수정), `apps/desktop/src/api/search.ts`
-**검증 명령**: `pnpm --filter @omnis/desktop test`
-**의존**: B26
-**읽을 스펙**: A5 §2.5(전체), §2.3(기존 팔레트 액션 카테고리 — 하위 호환 유지)
-**하지 말 것(YAGNI)**: 그룹별 "더 보기" 페이지네이션, `scope` 필터 UI(Task 1이 서버에서 아직 안 쓰므로 UI도 안 만든다).
+**Goal (backlog)**: When the input matches no action, the palette switches to search results; fixed group order (people→threads→items→memories); 180ms debounce; memories with a null `deep_link` are not clickable; empty-state and slow-state copy.
+**Deliverables**: `packages/ui/src/components/command-palette.tsx` (modified), `apps/desktop/src/api/search.ts`
+**Verification command**: `pnpm --filter @omnis/desktop test`
+**Depends on**: B26
+**Spec to read**: A5 §2.5 (all), §2.3 (existing palette action categories — keep backward compatible)
+**Do not do (YAGNI)**: per-group "more" pagination, the `scope` filter UI (Task 1 does not use it server-side yet, so the UI is not built either).
 
 **Files:**
 - Modify: `packages/ui/src/components/command-palette.tsx`
 - Create: `apps/desktop/src/api/search.ts`
-- Test: `packages/ui/test/command-palette.test.tsx`(확장), `apps/desktop/test/search-api.test.ts`
+- Test: `packages/ui/test/command-palette.test.tsx` (extended), `apps/desktop/test/search-api.test.ts`
 
 **Interfaces:**
-- Consumes: `Command`(cmdk), `GlassSurface`(기존)
-- Produces: `matchesAnyAction`, `UiSearchHit`, `UiSearchGroup`, `UiSearchGroupKind`, `CommandPaletteSearch`(모두 `command-palette.tsx`); `search`(`apps/desktop/src/api/search.ts`)
+- Consumes: `Command` (cmdk), `GlassSurface` (existing)
+- Produces: `matchesAnyAction`, `UiSearchHit`, `UiSearchGroup`, `UiSearchGroupKind`, `CommandPaletteSearch` (all in `command-palette.tsx`); `search` (`apps/desktop/src/api/search.ts`)
 
 **Steps:**
 
-1. [ ] 검색 모드 전환 판정(`matchesAnyAction`)의 실패하는 테스트를 쓴다.
+1. [ ] Write the failing test for the search-mode switch decision (`matchesAnyAction`).
    ```tsx
-   // packages/ui/test/command-palette.test.tsx — 기존 파일에 describe 블록 추가
+   // packages/ui/test/command-palette.test.tsx — add a describe block to the existing file
    import { matchesAnyAction, type PaletteAction, type UiSearchGroup } from "../src/components/command-palette.js";
 
-   describe("matchesAnyAction (A5 §2.5: 입력이 액션과 안 맞으면 검색 모드)", () => {
+   describe("matchesAnyAction (A5 §2.5: search mode when the input matches no action)", () => {
      const actions: PaletteAction[] = [
-       { id: "go-inbox", name: "Inbox로 이동", group: "이동", perform: () => {} },
+       { id: "go-inbox", name: "Go to Inbox", group: "Navigation", perform: () => {} },
      ];
      it("stays in action mode for an empty query", () => {
        expect(matchesAnyAction("", actions)).toBe(true);
@@ -484,17 +484,17 @@
    });
    ```
 
-2. [ ] 실행 → 실패 확인.
+2. [ ] Run → confirm failure.
    ```bash
    pnpm --filter @omnis/ui test
    ```
-   기대 출력: `matchesAnyAction is not exported`.
+   Expected output: `matchesAnyAction is not exported`.
 
-3. [ ] `command-palette.tsx`에 검색 모드 타입 + `matchesAnyAction` + `SearchResultList`를 추가하고, `CommandPalette`가 `search` prop이 있고 액션이 안 맞을 때 그 목록으로 전환하게 한다.
+3. [ ] Add the search-mode types + `matchesAnyAction` + `SearchResultList` to `command-palette.tsx`, and make `CommandPalette` switch to that list when a `search` prop is present and the input matches no action.
    ```tsx
-   // packages/ui/src/components/command-palette.tsx — 기존 파일 상단부에 추가
+   // packages/ui/src/components/command-palette.tsx — added to the top of the existing file
    import { useEffect, useState } from "react";
-   // (기존 import에 useState/useEffect 추가)
+   // (add useState/useEffect to the existing imports)
 
    export type UiSearchGroupKind = "people" | "threads" | "items" | "memories";
    export interface UiSearchHit {
@@ -519,7 +519,7 @@
    const SEARCH_GROUP_ORDER: UiSearchGroupKind[] = ["people", "threads", "items", "memories"];
    const SEARCH_DEBOUNCE_MS = 180;
 
-   /** A5 §2.5: 빈 입력은 항상 액션 모드, 아니면 등록된 액션 이름 중 하나라도 부분일치하면 액션 모드. */
+   /** A5 §2.5: an empty input is always action mode; otherwise it is action mode if any registered action name matches as a substring. */
    export function matchesAnyAction(query: string, actions: PaletteAction[]): boolean {
      const q = query.trim().toLowerCase();
      if (q === "") return true;
@@ -536,8 +536,8 @@
      const empty = !search.loading && search.groups.every((g) => g.results.length === 0);
      return (
        <Command.List>
-         {search.loading && <div className="palette-search__loading">검색 중…</div>}
-         {empty && <div className="palette-search__empty">{`${query}에 대한 검색 결과가 없어요`}</div>}
+         {search.loading && <div className="palette-search__loading">Searching…</div>}
+         {empty && <div className="palette-search__empty">{`No results for ${query}`}</div>}
          {SEARCH_GROUP_ORDER.map((kind) => {
            const group = search.groups.find((g) => g.kind === kind);
            if (!group || group.results.length === 0) return null;
@@ -563,14 +563,14 @@
    }
    ```
 
-4. [ ] `CommandPaletteProps`에 `search?: CommandPaletteSearch`를 추가하고, `CommandPalette` 본문에서 `query` 상태 + 180ms 디바운스 + 모드 분기를 배선한다(기존 `resultList`/`Command.Input` 부분을 아래로 교체 — 기존 `Command.Dialog`/`GlassSurface` 뼈대는 그대로 두고 `search` prop 하나만 얹는다, mode/inline 팔레트는 이 스토리의 목표 밖이라 만들지 않는다).
+4. [ ] Add `search?: CommandPaletteSearch` to `CommandPaletteProps`, then wire the `query` state + 180ms debounce + mode branch into the `CommandPalette` body (replace the existing `resultList`/`Command.Input` section with the code below — keep the existing `Command.Dialog`/`GlassSurface` skeleton and layer on just the one `search` prop; mode/inline palettes are out of scope for this story and are not built).
    ```tsx
-   // packages/ui/src/components/command-palette.tsx — CommandPaletteProps에 필드 추가
+   // packages/ui/src/components/command-palette.tsx — add the field to CommandPaletteProps
    export interface CommandPaletteProps {
      open: boolean;
      onOpenChange: (open: boolean) => void;
      actions: PaletteAction[];
-     /** US-B27: 있으면 액션 미매치 시 검색 결과 모드로 전환한다. 없으면 Phase A 동작 그대로. */
+     /** US-B27: when present, an unmatched action query switches to search-results mode. When absent, Phase A behavior is unchanged. */
      search?: CommandPaletteSearch;
    }
 
@@ -591,7 +591,7 @@
      const showSearch = search !== undefined && !matchesAnyAction(query, actions);
      const actionList = (
        <Command.List>
-         <Command.Empty>결과가 없어요</Command.Empty>
+         <Command.Empty>No results</Command.Empty>
          {Object.entries(groups).map(([group, items]) => (
            <Command.Group key={group} heading={group}>
              {items.map((action) => (
@@ -619,7 +619,7 @@
      return (
        <Command.Dialog open={open} onOpenChange={onOpenChange} label="omnis command palette">
          <GlassSurface slot="palette">
-           <Command.Input value={query} onValueChange={setQuery} placeholder="검색 또는 명령…" />
+           <Command.Input value={query} onValueChange={setQuery} placeholder="Search or run a command…" />
            {resultList}
          </GlassSurface>
        </Command.Dialog>
@@ -627,21 +627,21 @@
    }
    ```
 
-5. [ ] 렌더링 테스트를 추가한다: 그룹 순서 고정 + deep_link 없는 memory 클릭 비활성.
+5. [ ] Add the rendering tests: fixed group order + a memory without a deep_link is not clickable.
    ```tsx
-   // packages/ui/test/command-palette.test.tsx — 추가
+   // packages/ui/test/command-palette.test.tsx — added
    import { Command } from "cmdk";
    import { render, screen, fireEvent } from "@testing-library/react";
    import { CommandPalette } from "../src/components/command-palette.js";
 
-   describe("CommandPalette search mode (A5 §2.5 그룹 순서 고정, memory deep_link 클릭 비활성)", () => {
+   describe("CommandPalette search mode (A5 §2.5 fixed group order, memory deep_link click disabled)", () => {
      it("renders people before memories and blocks a deep_link-less memory hit", () => {
        const onSelectHit = vi.fn();
        const groups: UiSearchGroup[] = [
-         { kind: "memories", label: "메모리", results: [
-           { kind: "memory", id: "m1", title: "선호", snippet: "오전 미팅 선호", deepLinkDisabled: true },
+         { kind: "memories", label: "Memories", results: [
+           { kind: "memory", id: "m1", title: "Preference", snippet: "prefers morning meetings", deepLinkDisabled: true },
          ] },
-         { kind: "people", label: "사람", results: [
+         { kind: "people", label: "People", results: [
            { kind: "person", id: "p1", title: "David Park", snippet: "", deepLinkDisabled: false },
          ] },
        ];
@@ -656,7 +656,7 @@
        fireEvent.change(screen.getByRole("combobox"), { target: { value: "david" } });
        const options = screen.getAllByRole("option");
        expect(options[0]).toHaveTextContent("David Park");
-       fireEvent.click(screen.getByText("선호"));
+       fireEvent.click(screen.getByText("Preference"));
        expect(onSelectHit).not.toHaveBeenCalled();
      });
 
@@ -670,16 +670,16 @@
          />,
        );
        fireEvent.change(screen.getByRole("combobox"), { target: { value: "davich" } });
-       expect(screen.getByText("davich에 대한 검색 결과가 없어요")).toBeInTheDocument();
+       expect(screen.getByText("No results for davich")).toBeInTheDocument();
      });
    });
    ```
 
-6. [ ] 실행 → 통과 확인, 커밋.
+6. [ ] Run → confirm pass, commit.
    ```bash
    pnpm --filter @omnis/ui test
    ```
-   기대 출력: `matchesAnyAction` 3개 + `CommandPalette search mode` 2개 PASS.
+   Expected output: 3 `matchesAnyAction` + 2 `CommandPalette search mode` PASS.
    ```bash
    git add packages/ui/src/components/command-palette.tsx packages/ui/test/command-palette.test.tsx
    git commit -m "$(cat <<'EOF'
@@ -694,13 +694,13 @@
    )"
    ```
 
-7. [ ] 허브 `/search` 클라이언트의 실패하는 테스트를 쓴다(기존 `apps/desktop/src/api/approvals.ts`와 같은 패턴 — `fetch` stub).
+7. [ ] Write the failing test for the hub `/search` client (same pattern as the existing `apps/desktop/src/api/approvals.ts` — a `fetch` stub).
    ```ts
    // apps/desktop/test/search-api.test.ts
    import { afterEach, describe, expect, it, vi } from "vitest";
    import { search } from "../src/api/search.js";
 
-   describe("search (계약 §7 GET /search)", () => {
+   describe("search (contract §7 GET /search)", () => {
      afterEach(() => vi.unstubAllGlobals());
 
      it("GETs /search?q=... and returns the parsed SearchResponse", async () => {
@@ -725,13 +725,13 @@
    });
    ```
 
-8. [ ] 실행 → 실패 확인.
+8. [ ] Run → confirm failure.
    ```bash
    pnpm --filter @omnis/desktop test
    ```
-   기대 출력: `Cannot find module '../src/api/search.js'`.
+   Expected output: `Cannot find module '../src/api/search.js'`.
 
-9. [ ] `apps/desktop/src/api/search.ts`를 구현한다(`approvals.ts`와 동일한 `HUB_HTTP_URL` 패턴).
+9. [ ] Implement `apps/desktop/src/api/search.ts` (the same `HUB_HTTP_URL` pattern as `approvals.ts`).
    ```ts
    // apps/desktop/src/api/search.ts
    const HUB_HTTP_URL = import.meta.env.OMNIS_HUB_HTTP_URL ?? "http://127.0.0.1:8787";
@@ -779,11 +779,11 @@
    }
    ```
 
-10. [ ] 재실행 → 통과, 커밋.
+10. [ ] Re-run → pass, commit.
     ```bash
     pnpm --filter @omnis/desktop test
     ```
-    기대 출력: `search (계약 §7 GET /search)` 3개 PASS.
+    Expected output: 3 `search (contract §7 GET /search)` PASS.
     ```bash
     git add apps/desktop/src/api/search.ts apps/desktop/test/search-api.test.ts
     git commit -m "$(cat <<'EOF'
@@ -797,57 +797,57 @@
 
 ---
 
-### Task 3: Today 화면 (US-B28, tier: Sonnet)
+### Task 3: Today screen (US-B28, tier: Sonnet)
 
-**목표(백로그)**: 인사말 `<h1>`, 밤 다이제스트 진입 카드(nightly가 있을 때만), 오늘 캘린더, 아침 브리핑 리스트(항목 클릭 → 스레드 딥링크), 대기 승인 칩 스트립(클릭 시 인라인 확장).
-**산출물**: `apps/desktop/src/screens/Today.tsx`, `packages/ui/src/components/digest-card.tsx`
-**검증 명령**: `pnpm --filter @omnis/desktop test`
-**의존**: B23(아침 브리핑 루프 — `digests(kind='morning')` row를 채움)
-**읽을 스펙**: A5 §3.4(전체), §5.2(`DigestCard` 역할)
-**4상태(로딩/빈/오류/오프라인)는 이 태스크가 전부 만든다**(백로그 US-B28 산출물 문구 그대로, 2026-09-20 교차 리뷰 M-B28). 구현은 작게 간다: 상태 판정은 순수 함수 `screenState()` 하나로 뽑아 유닛 테스트하고, 화면은 그 값으로 **한 줄짜리 배너** `<p role="status">` 또는 `role="alert"`를 화면 최상단에 렌더링한다. `offline`/`error`일 때도 이미 동기화된 로컬 데이터는 아래에 그대로 보여준다(Zero는 로컬 캐시를 갖고 있다 — 화면을 비우면 오히려 퇴보다).
-**하지 말 것(YAGNI)**: 공용 `<StateBanner>` 컴포넌트를 `@omnis/ui`에 새로 만들지 않는다(소비처가 이 화면 하나다 — 두 번째 화면이 같은 걸 요구하면 그때 올린다), 재시도 버튼·백오프 표시, 인라인 `ApprovalSheet` 전체 4-way 재구현(기존 `ApprovalCardView`를 그대로 재사용).
+**Goal (backlog)**: Greeting `<h1>`, nightly digest entry card (only when a nightly exists), today's calendar, morning briefing list (click an item → thread deep link), pending-approval chip strip (click to expand inline).
+**Deliverables**: `apps/desktop/src/screens/Today.tsx`, `packages/ui/src/components/digest-card.tsx`
+**Verification command**: `pnpm --filter @omnis/desktop test`
+**Depends on**: B23 (morning briefing loop — populates `digests(kind='morning')` rows)
+**Spec to read**: A5 §3.4 (all), §5.2 (`DigestCard` role)
+**This task builds all 4 states (loading/empty/error/offline)** (backlog US-B28 deliverable wording, 2026-09-20 cross review M-B28). The implementation stays small: the state decision is extracted into one pure function `screenState()` and unit-tested, and the screen renders that value as a **single-line banner** `<p role="status">` or `role="alert"` at the very top of the screen. Even in `offline`/`error` the already-synced local data stays visible below (Zero holds a local cache — blanking the screen would be a regression).
+**Do not do (YAGNI)**: do not create a shared `<StateBanner>` component in `@omnis/ui` (this screen is its only consumer — promote it when a second screen needs the same thing), retry button / backoff indicator, a full 4-way reimplementation of the inline `ApprovalSheet` (reuse the existing `ApprovalCardView` as-is).
 
 **Files:**
 - Create: `packages/ui/src/components/digest-card.tsx`, `apps/desktop/src/screens/Today.tsx`
 - Test: `packages/ui/test/digest-card.test.tsx`, `apps/desktop/test/today-screen.test.tsx`
 
 **Interfaces:**
-- Consumes: `OpaqueSurface`, `Button`(기존 `@omnis/ui`), `ApprovalCardView`, `ApprovalCardInterrupt`(기존)
-- Produces: `DigestCard`, `DigestCardProps`(`packages/ui/src/components/digest-card.tsx`); `greetingLine`, `isSameLocalDay`, `screenState`, `ScreenState`, `STATE_COPY`(`apps/desktop/src/screens/Today.tsx`)
+- Consumes: `OpaqueSurface`, `Button` (existing `@omnis/ui`), `ApprovalCardView`, `ApprovalCardInterrupt` (existing)
+- Produces: `DigestCard`, `DigestCardProps` (`packages/ui/src/components/digest-card.tsx`); `greetingLine`, `isSameLocalDay`, `screenState`, `ScreenState`, `STATE_COPY` (`apps/desktop/src/screens/Today.tsx`)
 
 **Steps:**
 
-1. [ ] `DigestCard`(morning/nightly 공용) 테스트를 먼저 쓴다.
+1. [ ] Write the test for `DigestCard` (shared by morning/nightly) first.
    ```tsx
    // packages/ui/test/digest-card.test.tsx
    import { describe, expect, it, vi } from "vitest";
    import { render, screen, fireEvent } from "@testing-library/react";
    import { DigestCard } from "../src/components/digest-card.js";
 
-   describe("DigestCard (A5 §5.2 morning/nightly 공용)", () => {
+   describe("DigestCard (A5 §5.2 shared by morning/nightly)", () => {
      it("renders headline + body and calls onOpen", () => {
        const onOpen = vi.fn();
        render(
-         <DigestCard kind="nightly" headline="밤 다이제스트 준비됨 · 42개 보관됨" body="9월 19일" onOpen={onOpen} />,
+         <DigestCard kind="nightly" headline="Nightly digest ready · 42 archived" body="September 19" onOpen={onOpen} />,
        );
-       expect(screen.getByText("밤 다이제스트 준비됨 · 42개 보관됨")).toBeInTheDocument();
-       fireEvent.click(screen.getByText("보기 →"));
+       expect(screen.getByText("Nightly digest ready · 42 archived")).toBeInTheDocument();
+       fireEvent.click(screen.getByText("View →"));
        expect(onOpen).toHaveBeenCalled();
      });
      it("omits the open button when onOpen is not given", () => {
-       render(<DigestCard kind="morning" headline="아침 브리핑" body="" />);
-       expect(screen.queryByText("보기 →")).not.toBeInTheDocument();
+       render(<DigestCard kind="morning" headline="Morning briefing" body="" />);
+       expect(screen.queryByText("View →")).not.toBeInTheDocument();
      });
    });
    ```
 
-2. [ ] 실행 → 실패.
+2. [ ] Run → fail.
    ```bash
    pnpm --filter @omnis/ui test
    ```
-   기대 출력: `Cannot find module '../src/components/digest-card.js'`.
+   Expected output: `Cannot find module '../src/components/digest-card.js'`.
 
-3. [ ] `DigestCard`를 구현한다.
+3. [ ] Implement `DigestCard`.
    ```tsx
    // packages/ui/src/components/digest-card.tsx
    import { Button } from "./button.js";
@@ -860,7 +860,7 @@
      onOpen?: () => void;
    }
 
-   /** A5 §5.2: morning/nightly 다이제스트 공용 카드(카테고리 아코디언은 Digest 화면 쪽 책임, 여기는 진입 카드 형태). */
+   /** A5 §5.2: card shared by the morning/nightly digests (the category accordion is the Digest screen's responsibility; this is just the entry-card form). */
    export function DigestCard({ kind, headline, body, onOpen }: DigestCardProps) {
      return (
        <OpaqueSurface className="digest-card" data-digest-kind={kind}>
@@ -868,23 +868,23 @@
          {body !== "" && <p className="digest-card__body">{body}</p>}
          {onOpen && (
            <Button variant="ghost" onClick={onOpen}>
-             보기 →
+             View →
            </Button>
          )}
        </OpaqueSurface>
      );
    }
    ```
-   그리고 `packages/ui/src/index.ts`에 `export * from "./components/digest-card.js";`를 추가한다.
+   Then add `export * from "./components/digest-card.js";` to `packages/ui/src/index.ts`.
 
-4. [ ] 재실행 → 통과, 커밋.
+4. [ ] Re-run → pass, commit.
    ```bash
    pnpm --filter @omnis/ui test
    ```
    ```bash
    git add packages/ui/src/components/digest-card.tsx packages/ui/src/index.ts packages/ui/test/digest-card.test.tsx
    git commit -m "$(cat <<'EOF'
-   US-B28: DigestCard component (A5 §5.2, morning/nightly 공용)
+   US-B28: DigestCard component (A5 §5.2, shared by morning/nightly)
 
    Implemented-by: Claude Sonnet
    Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
@@ -892,26 +892,26 @@
    )"
    ```
 
-5. [ ] Today 화면의 순수 로직(인사말 문구, "오늘" 판정)부터 테스트한다 — Inbox.tsx 전례(순수 함수를 export해 Zero 마운트 없이 테스트)를 그대로 따른다.
+5. [ ] Test the Today screen's pure logic first (greeting text, "today" decision) — following the Inbox.tsx precedent of exporting pure functions and testing them without mounting Zero.
    ```ts
    // apps/desktop/test/today-screen.test.tsx
    import { describe, expect, it } from "vitest";
    import { STATE_COPY, greetingLine, isSameLocalDay, screenState } from "../src/screens/Today";
 
-   describe("greetingLine (A5 §3.4 인사말 <h1>)", () => {
+   describe("greetingLine (A5 §3.4 greeting <h1>)", () => {
      it("includes the pending item count and approval count", () => {
        expect(greetingLine("Logan", 12, 4)).toBe(
-         "좋은 아침이에요, Logan. 오늘 처리할 항목 12개, 대기 중 승인 4건.",
+         "Good morning, Logan. 12 items to handle today, 4 approvals pending.",
        );
      });
      it("still reads naturally with zero of both", () => {
        expect(greetingLine("Logan", 0, 0)).toBe(
-         "좋은 아침이에요, Logan. 오늘 처리할 항목 0개, 대기 중 승인 0건.",
+         "Good morning, Logan. 0 items to handle today, 0 approvals pending.",
        );
      });
    });
 
-   describe("isSameLocalDay (오늘 캘린더 필터 판정)", () => {
+   describe("isSameLocalDay (today-calendar filter decision)", () => {
      it("is true for two timestamps on the same calendar day", () => {
        expect(isSameLocalDay(new Date("2026-09-20T01:00:00"), new Date("2026-09-20T23:00:00"))).toBe(true);
      });
@@ -920,7 +920,7 @@
      });
    });
 
-   describe("screenState (US-B28 4상태 — 로딩/빈/오류/오프라인)", () => {
+   describe("screenState (US-B28 4 states — loading/empty/error/offline)", () => {
      const ok = { online: true, resultTypes: ["complete", "complete"] as const };
      it("error wins over everything — a failed query is the most specific thing we know", () => {
        expect(screenState({ online: false, resultTypes: ["error", "unknown"], hasContent: true })).toBe("error");
@@ -937,7 +937,7 @@
      it("ready when every query completed and there is something to show", () => {
        expect(screenState({ ...ok, hasContent: true })).toBe("ready");
      });
-     // 오프라인이어도 이미 동기화된 로컬 데이터는 화면에 남는다 — 배너만 뜨고 목록은 살아 있다.
+     // Even offline, already-synced local data stays on screen — only the banner appears, the lists stay alive.
      it("offline still reports content so the caller keeps rendering the cached lists", () => {
        expect(STATE_COPY.offline).not.toBe("");
        expect(STATE_COPY.ready).toBe("");
@@ -945,13 +945,13 @@
    });
    ```
 
-6. [ ] 실행 → 실패.
+6. [ ] Run → fail.
    ```bash
    pnpm --filter @omnis/desktop test
    ```
-   기대 출력: `Cannot find module '../src/screens/Today'`.
+   Expected output: `Cannot find module '../src/screens/Today'`.
 
-7. [ ] `Today.tsx`를 구현한다. 데이터 바인딩은 A5 §3.4 의사코드 그대로 — `digests`(morning/nightly), `items(kind='event')`, `pending_approvals` 4개를 각각 Zero로 읽고 클라이언트에서 조합한다(Inbox.tsx가 이미 증명한 패턴: 관계가 아니라 각자 쿼리 후 `useMemo`로 조인).
+7. [ ] Implement `Today.tsx`. The data binding follows the A5 §3.4 pseudocode verbatim — read `digests` (morning/nightly), `items(kind='event')`, and `pending_approvals` separately through Zero and combine them client-side (the pattern Inbox.tsx already proves: query each one rather than relying on relationships, then join with `useMemo`).
    ```tsx
    // apps/desktop/src/screens/Today.tsx
    import { OpaqueSurface } from "@omnis/ui";
@@ -962,9 +962,9 @@
    import { decideApproval } from "../api/approvals.js";
    import { useZeroClient } from "../zero-client.js";
 
-   /** A5 §3.4: 인사말 텍스트, 스크린리더가 페이지 요지를 즉시 읽도록 <h1>으로 렌더링된다. */
+   /** A5 §3.4: greeting text, rendered as an <h1> so a screen reader announces the page's gist immediately. */
    export function greetingLine(name: string, pendingCount: number, approvalCount: number): string {
-     return `좋은 아침이에요, ${name}. 오늘 처리할 항목 ${pendingCount}개, 대기 중 승인 ${approvalCount}건.`;
+     return `Good morning, ${name}. ${pendingCount} items to handle today, ${approvalCount} approvals pending.`;
    }
 
    export function isSameLocalDay(a: Date, b: Date): boolean {
@@ -977,9 +977,9 @@
 
    export type ScreenState = "error" | "offline" | "loading" | "empty" | "ready";
 
-   /** US-B28 4상태. Zero의 쿼리 결과 타입은 'unknown' | 'complete' | 'error'이고(@rocicorp/zero
-    * 1.9.0 `ResultType`), 오프라인이면 쿼리가 영영 'complete'에 못 간다 — 그래서 offline이
-    * loading보다 먼저다. error는 가장 구체적인 정보라 맨 앞. */
+   /** US-B28 4 states. Zero's query result type is 'unknown' | 'complete' | 'error' (@rocicorp/zero
+    * 1.9.0 `ResultType`), and while offline a query never reaches 'complete' — that is why offline
+    * comes before loading. error carries the most specific information, so it comes first. */
    export function screenState(input: {
      online: boolean;
      resultTypes: readonly ("unknown" | "complete" | "error")[];
@@ -991,22 +991,22 @@
      return input.hasContent ? "ready" : "empty";
    }
 
-   /** 배너 문구. `ready`는 빈 문자열 = 배너를 그리지 않는다. */
+   /** Banner copy. `ready` is an empty string = draw no banner. */
    export const STATE_COPY: Record<ScreenState, string> = {
-     error: "오늘 화면을 불러오지 못했어요. 허브 로그를 확인해 주세요.",
-     offline: "오프라인이에요. 마지막으로 받아 둔 내용을 보여주는 중입니다.",
-     loading: "불러오는 중…",
-     empty: "오늘은 비어 있어요. 새 항목이 오면 여기에 쌓입니다.",
+     error: "Couldn't load the Today screen. Check the hub logs.",
+     offline: "You're offline. Showing the last content we received.",
+     loading: "Loading…",
+     empty: "Today is empty. New items will pile up here.",
      ready: "",
    };
 
-   /** zero.online을 React 상태로 읽는다(zero.onOnline이 구독 해제 함수를 돌려준다). */
+   /** Reads zero.online as React state (zero.onOnline returns an unsubscribe function). */
    function useZeroOnline(zero: ReturnType<typeof useZeroClient>): boolean {
      const subscribe = useCallback((cb: () => void) => zero.onOnline(() => cb()), [zero]);
      return useSyncExternalStore(
        subscribe,
        () => zero.online,
-       () => true, // 서버 렌더·테스트 기본값: 온라인으로 본다
+       () => true, // server-render/test default: assume online
      );
    }
 
@@ -1061,19 +1061,19 @@
          {nightly && (
            <DigestCard
              kind="nightly"
-             headline={`밤 다이제스트 준비됨 · ${nightly.item_ids.length}개 보관됨`}
+             headline={`Nightly digest ready · ${nightly.item_ids.length} archived`}
              body=""
              onOpen={() => {}}
            />
          )}
 
-         <section aria-label="오늘 일정">
-           <h2>⏰ 오늘 일정</h2>
+         <section aria-label="Today's schedule">
+           <h2>⏰ Today's schedule</h2>
            <ul>
              {todaysEvents.map((e) => (
                <li key={e.id}>
                  <button type="button" onClick={() => onOpenThread?.(e.thread_id)}>
-                   {e.subject ?? "(제목 없음)"}
+                   {e.subject ?? "(no subject)"}
                  </button>
                </li>
              ))}
@@ -1081,20 +1081,20 @@
          </section>
 
          {morning && (
-           <section aria-label="아침 브리핑">
-             <h2>📋 아침 브리핑</h2>
+           <section aria-label="Morning briefing">
+             <h2>📋 Morning briefing</h2>
              <p>{morning.body}</p>
            </section>
          )}
 
-         <section aria-label="대기 중 승인">
-           <h2>⏳ 대기 중 승인 ({approvals.length})</h2>
+         <section aria-label="Pending approvals">
+           <h2>⏳ Pending approvals ({approvals.length})</h2>
            <div className="today-screen__approval-chips">
              {approvals.map((a) => (
                <button
                  key={a.id}
                  type="button"
-                 aria-label={`대기 중 승인: ${a.description}`}
+                 aria-label={`Pending approval: ${a.description}`}
                  onClick={() => setExpandedApprovalId(expandedApprovalId === a.id ? null : a.id)}
                >
                  {a.description}
@@ -1127,11 +1127,11 @@
    }
    ```
 
-8. [ ] 재실행 → 통과, 커밋.
+8. [ ] Re-run → pass, commit.
    ```bash
    pnpm --filter @omnis/desktop test
    ```
-   기대 출력: `greetingLine`/`isSameLocalDay`/`screenState` 10개 PASS.
+   Expected output: 10 `greetingLine`/`isSameLocalDay`/`screenState` PASS.
    ```bash
    git add apps/desktop/src/screens/Today.tsx apps/desktop/test/today-screen.test.tsx
    git commit -m "$(cat <<'EOF'
@@ -1147,30 +1147,30 @@
    )"
    ```
 
-**열린 질문**: `digests.for_date`가 Zero 스키마에서 `number()`(epoch ms)로 선언돼 있다 — Postgres `date` 컬럼이 실제로 자정 UTC epoch로 오는지 KST 자정 기준인지 A21/Zero 변환 스파이크에서 확인되지 않았다. `isSameLocalDay`는 브라우저 로컬 타임존(맥이 KST면 문제 없음) 기준으로 짰다 — 서버가 UTC 자정을 보내면 밤 9시~자정 사이 브리핑이 하루 밀릴 수 있다.
+**Open questions**: `digests.for_date` is declared as `number()` (epoch ms) in the Zero schema — the A21/Zero conversion spike did not confirm whether the Postgres `date` column actually arrives as midnight UTC epoch or as KST midnight. `isSameLocalDay` was written against the browser's local timezone (fine if the Mac is on KST) — if the server sends midnight UTC, briefings between 9pm and midnight could slip a day.
 
 ---
 
-### Task 4: Tasks 화면 (US-B29, tier: Sonnet)
+### Task 4: Tasks screen (US-B29, tier: Sonnet)
 
-**목표(백로그)**: 뷰 탭 4개(Today/This week/Someday/Delegated), `TaskRow`(네이티브 체크박스 + 출처 딥링크 + `kind` 아이콘 + `due_basis='inferred'` 점선), `t` 단축키 빠른 추가, Delegated 행 → Agent Session 이동, 위임 승인 카드 인라인.
-**산출물**: `apps/desktop/src/screens/Tasks.tsx`, `packages/ui/src/components/task-row.tsx`
-**검증 명령**: `pnpm --filter @omnis/desktop test`
-**의존**: B19(투두 추출), B20(위임)
-**읽을 스펙**: A5 §3.5(전체)
-**하지 말 것(YAGNI)**: `t` 전역 단축키 배선(App.tsx 키맵 통합은 셸 소유 — 이 태스크는 빠른 추가용 입력 필드만 화면 안에 둔다, 실제 전역 키 리스너는 별도 범위), 위임 승인 카드의 커스텀 렌더링(기존 `ApprovalCardView` 재사용).
+**Goal (backlog)**: Four view tabs (Today/This week/Someday/Delegated), `TaskRow` (native checkbox + source deep link + `kind` icon + dotted `due_basis='inferred'`), `t` shortcut quick add, Delegated row → Agent Session navigation, delegation approval card inline.
+**Deliverables**: `apps/desktop/src/screens/Tasks.tsx`, `packages/ui/src/components/task-row.tsx`
+**Verification command**: `pnpm --filter @omnis/desktop test`
+**Depends on**: B19 (todo extraction), B20 (delegation)
+**Spec to read**: A5 §3.5 (all)
+**Do not do (YAGNI)**: wiring the global `t` shortcut (App.tsx keymap integration is owned by the shell — this task only puts the quick-add input field in the screen; the actual global key listener is a separate scope), custom rendering for the delegation approval card (reuse the existing `ApprovalCardView`).
 
 **Files:**
 - Create: `packages/ui/src/components/task-row.tsx`, `apps/desktop/src/screens/Tasks.tsx`
 - Test: `packages/ui/test/task-row.test.tsx`, `apps/desktop/test/tasks-screen.test.tsx`
 
 **Interfaces:**
-- Consumes: `Button`, `OpaqueSurface`(기존)
-- Produces: `TaskRow`, `TaskRowProps`(`packages/ui/src/components/task-row.tsx`); `filterTasksByView`, `TasksView`, `dueBasisFor`(`apps/desktop/src/screens/Tasks.tsx`)
+- Consumes: `Button`, `OpaqueSurface` (existing)
+- Produces: `TaskRow`, `TaskRowProps` (`packages/ui/src/components/task-row.tsx`); `filterTasksByView`, `TasksView`, `dueBasisFor` (`apps/desktop/src/screens/Tasks.tsx`)
 
 **Steps:**
 
-1. [ ] `TaskRow`의 실패하는 테스트를 쓴다.
+1. [ ] Write the failing test for `TaskRow`.
    ```tsx
    // packages/ui/test/task-row.test.tsx
    import { describe, expect, it, vi } from "vitest";
@@ -1178,8 +1178,8 @@
    import { TaskRow } from "../src/components/task-row.js";
 
    const base = {
-     id: "t1", title: "Davich PPT 초안 리뷰", kind: "todo" as const, state: "open" as const,
-     dueBasis: "explicit" as const, dueLabel: "오늘 마감", sourceLabel: "Gmail",
+     id: "t1", title: "Review Davich PPT draft", kind: "todo" as const, state: "open" as const,
+     dueBasis: "explicit" as const, dueLabel: "Due today", sourceLabel: "Gmail",
      onToggleDone: vi.fn(), onOpenSource: vi.fn(),
    };
 
@@ -1193,7 +1193,7 @@
      });
      it("marks an inferred due date with a dotted data attribute (A5 §3.5)", () => {
        render(<TaskRow {...base} dueBasis="inferred" />);
-       expect(screen.getByText("오늘 마감")).toHaveAttribute("data-due-basis", "inferred");
+       expect(screen.getByText("Due today")).toHaveAttribute("data-due-basis", "inferred");
      });
      it("calls onOpenSource when the source link is clicked", () => {
        render(<TaskRow {...base} />);
@@ -1203,12 +1203,12 @@
    });
    ```
 
-2. [ ] 실행 → 실패.
+2. [ ] Run → fail.
    ```bash
    pnpm --filter @omnis/ui test
    ```
 
-3. [ ] `TaskRow`를 구현한다.
+3. [ ] Implement `TaskRow`.
    ```tsx
    // packages/ui/src/components/task-row.tsx
    import type { ElementType } from "react";
@@ -1222,14 +1222,14 @@
      followup: UserCheck,
      delegation: Share2,
    };
-   const KIND_LABEL: Record<TaskKind, string> = { todo: "할 일", followup: "팔로업", delegation: "위임" };
+   const KIND_LABEL: Record<TaskKind, string> = { todo: "To-do", followup: "Follow-up", delegation: "Delegated" };
 
    export interface TaskRowProps {
      id: string;
      title: string;
      kind: TaskKind;
      state: TaskState;
-     /** A3에는 컬럼이 없다 — created_by==='agent'면 inferred로 취급한다(Task 4 열린 질문 참고). */
+     /** A3 has no such column — treat created_by==='agent' as inferred (see Task 4 open questions). */
      dueBasis: "explicit" | "inferred";
      dueLabel: string | null;
      sourceLabel: string | null;
@@ -1249,7 +1249,7 @@
            aria-label={props.title}
            onChange={(e) => props.onToggleDone(props.id, e.target.checked)}
          />
-         <Icon size={14} aria-label={`${KIND_LABEL[props.kind]} 아이템`} />
+         <Icon size={14} aria-label={`${KIND_LABEL[props.kind]} item`} />
          <span className="task-row__title" data-done={done} style={done ? { textDecoration: "line-through" } : undefined}>
            {props.title}
          </span>
@@ -1265,16 +1265,16 @@
          )}
          {props.kind === "delegation" && (
            <button type="button" onClick={() => props.onOpenDelegation?.()}>
-             진행 중
+             In progress
            </button>
          )}
        </div>
      );
    }
    ```
-   `packages/ui/src/index.ts`에 `export * from "./components/task-row.js";` 추가.
+   Add `export * from "./components/task-row.js";` to `packages/ui/src/index.ts`.
 
-4. [ ] 재실행 → 통과, 커밋.
+4. [ ] Re-run → pass, commit.
    ```bash
    pnpm --filter @omnis/ui test
    ```
@@ -1289,7 +1289,7 @@
    )"
    ```
 
-5. [ ] 뷰 필터(`filterTasksByView`)와 `dueBasisFor` 순수 함수의 실패하는 테스트를 쓴다.
+5. [ ] Write the failing tests for the view filter (`filterTasksByView`) and the `dueBasisFor` pure function.
    ```ts
    // apps/desktop/test/tasks-screen.test.tsx
    import { describe, expect, it } from "vitest";
@@ -1304,7 +1304,7 @@
      { id: "5", ownerKind: "me", dueAt: new Date("2026-09-19T09:00:00").getTime(), state: "done" },
    ];
 
-   describe("filterTasksByView (A5 §3.5 뷰 탭 4개)", () => {
+   describe("filterTasksByView (A5 §3.5 four view tabs)", () => {
      it("today = due within today, excluding done/dropped", () => {
        expect(filterTasksByView(rows, "today", now).map((r) => r.id)).toEqual(["1"]);
      });
@@ -1319,7 +1319,7 @@
      });
    });
 
-   describe("dueBasisFor (A3에 due_basis 컬럼이 없어 created_by로 추론)", () => {
+   describe("dueBasisFor (A3 has no due_basis column, so infer from created_by)", () => {
      it("is inferred for agent-created tasks", () => {
        expect(dueBasisFor("agent")).toBe("inferred");
      });
@@ -1329,12 +1329,12 @@
    });
    ```
 
-6. [ ] 실행 → 실패.
+6. [ ] Run → fail.
    ```bash
    pnpm --filter @omnis/desktop test
    ```
 
-7. [ ] `Tasks.tsx`를 구현한다.
+7. [ ] Implement `Tasks.tsx`.
    ```tsx
    // apps/desktop/src/screens/Tasks.tsx
    import { OpaqueSurface } from "@omnis/ui";
@@ -1356,7 +1356,7 @@
      state: string;
    }
 
-   /** A5 §3.5: Today/This week/Someday는 due_at 기준, Delegated는 owner_kind='agent'만(마감일 무관). */
+   /** A5 §3.5: Today/This week/Someday key off due_at; Delegated is owner_kind='agent' only (regardless of due date). */
    export function filterTasksByView<T extends TaskViewRow>(tasks: T[], view: TasksView, now: Date): T[] {
      const open = tasks.filter((t) => t.state !== "done" && t.state !== "dropped");
      if (view === "delegated") return open.filter((t) => t.ownerKind === "agent");
@@ -1373,7 +1373,7 @@
      return open.filter((t) => t.dueAt === null || t.dueAt > weekEnd.getTime());
    }
 
-   /** A3 tasks 테이블에 due_basis 컬럼이 없다 — agent가 만든 task는 L3 추출(추론), 내가 만든 건 명시로 다룬다. */
+   /** The A3 tasks table has no due_basis column — an agent-created task is treated as L3 extraction (inferred), one I created as explicit. */
    export function dueBasisFor(createdBy: string): "explicit" | "inferred" {
      return createdBy === "agent" ? "inferred" : "explicit";
    }
@@ -1402,7 +1402,7 @@
 
      return (
        <OpaqueSurface className="tasks-screen">
-         <div role="tablist" aria-label="Tasks 뷰">
+         <div role="tablist" aria-label="Tasks views">
            {TASKS_VIEWS.map((v) => (
              <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)}>
                {VIEW_LABEL[v]}
@@ -1416,10 +1416,10 @@
            }}
          >
            <input
-             aria-label="빠른 할 일 추가"
+             aria-label="Quick add task"
              value={quickAdd}
              onChange={(e) => setQuickAdd(e.target.value)}
-             placeholder="새 할 일…"
+             placeholder="New task…"
            />
          </form>
          <ul>
@@ -1435,7 +1435,7 @@
                    state={t.state as TaskState}
                    dueBasis={dueBasisFor(t.created_by)}
                    dueLabel={t.due_at ? new Date(t.due_at).toLocaleDateString("ko-KR") : null}
-                   sourceLabel={t.source_item_id ? "출처 보기" : null}
+                   sourceLabel={t.source_item_id ? "View source" : null}
                    onToggleDone={() => {}}
                    onOpenSource={() => t.source_item_id && onOpenSource?.(t.source_item_id)}
                    onOpenDelegation={() => t.delegated_session_id && onOpenDelegation?.(t.delegated_session_id)}
@@ -1449,7 +1449,7 @@
    }
    ```
 
-8. [ ] 재실행 → 통과, 커밋.
+8. [ ] Re-run → pass, commit.
    ```bash
    pnpm --filter @omnis/desktop test
    ```
@@ -1464,52 +1464,52 @@
    )"
    ```
 
-**열린 질문**: `t` 전역 단축키(빠른 추가 포커스 이동)와 체크박스의 실제 `state:'done'` 낙관적 업데이트(hub PATCH 라우트)는 계약에 없다 — Phase A `use-keymap.ts`에 `t` 등록 + 새 hub 라우트(예: `POST /tasks/:id/toggle`) 신설이 필요할 수 있다, 실행 시점에 agents 플랜(L3 산출물 owner)과 라우트 소유를 조율해야 한다. `dueBasisFor`의 `created_by==='agent'` 추론은 A3에 전용 컬럼이 없어서 나온 근사치다.
+**Open questions**: The global `t` shortcut (focus jump to quick add) and a real optimistic `state:'done'` update for the checkbox (a hub PATCH route) are not in the contract — this may require registering `t` in the Phase A `use-keymap.ts` plus a new hub route (e.g. `POST /tasks/:id/toggle`); route ownership must be coordinated with the agents plan (owner of the L3 deliverables) when this runs. The `created_by==='agent'` inference in `dueBasisFor` is an approximation that exists only because A3 has no dedicated column.
 
 ---
 
-### Task 5: Network 화면 (US-B30, tier: Sonnet)
+### Task 5: Network screen (US-B30, tier: Sonnet)
 
-**목표(백로그)**: `PersonCard`(이니셜 아바타, 소속·직함, 관계 dot 3단 + 텍스트 레이블), 팔로업 큐 상단 스트립, 사람 상세 pane, 병합/분리 UI.
-**산출물**: `apps/desktop/src/screens/Network.tsx`, `packages/ui/src/components/person-card.tsx`
-**검증 명령**: `pnpm --filter @omnis/desktop test`
-**의존**: B03(person 신원 해석), B22(팔로업 루프 — `persons.next_followup_at`/`priority_score`를 채움)
-**읽을 스펙**: A5 §3.6(전체)
-**하지 말 것(YAGNI)**: "같은 사람입니다" 병합/분리 UI의 실제 동작(백엔드 `mergePersons`/`splitIdentity`는 memory-ingestion 플랜 소유 — 이 태스크는 진입 버튼만 두고 다이얼로그 내용은 후속 범위로 남긴다, 열린 질문에 기록), 그리드/리스트 토글.
+**Goal (backlog)**: `PersonCard` (initials avatar, org·title, 3-tier relationship dot + text label), follow-up queue strip at the top, person detail pane, merge/split UI.
+**Deliverables**: `apps/desktop/src/screens/Network.tsx`, `packages/ui/src/components/person-card.tsx`
+**Verification command**: `pnpm --filter @omnis/desktop test`
+**Depends on**: B03 (person identity resolution), B22 (follow-up loop — populates `persons.next_followup_at`/`priority_score`)
+**Spec to read**: A5 §3.6 (all)
+**Do not do (YAGNI)**: the real behavior of the "same person" merge/split UI (the backend `mergePersons`/`splitIdentity` are owned by the memory-ingestion plan — this task only places the entry button and leaves the dialog contents to follow-up scope; recorded under open questions), grid/list toggle.
 
 **Files:**
 - Create: `packages/ui/src/components/person-card.tsx`, `apps/desktop/src/screens/Network.tsx`
 - Test: `packages/ui/test/person-card.test.tsx`, `apps/desktop/test/network-screen.test.tsx`
 
 **Interfaces:**
-- Consumes: `OpaqueSurface`, `Button`(`@omnis/ui`), `initialsFromName`/`pastelFromName`(`@omnis/ui/lib/row-meta`), `formatRelativeTime`(`@omnis/ui/lib/relative-time`)
+- Consumes: `OpaqueSurface`, `Button` (`@omnis/ui`), `initialsFromName`/`pastelFromName` (`@omnis/ui/lib/row-meta`), `formatRelativeTime` (`@omnis/ui/lib/relative-time`)
 
-**소비 심볼 출처 실측(2026-09-20 교차 리뷰 M-B30 — 새로 만들지 않는다):** 아래 셋은 **Wave 4/5에서 이미 main에 들어간 코드**다. 새 헬퍼를 발명하거나 이름을 바꾸지 말고 그대로 import한다.
+**Verified provenance of the consumed symbols (2026-09-20 cross review M-B30 — do not create them):** the three below are **code already merged to main in Wave 4/5**. Do not invent new helpers or rename them — import them as-is.
 
-| 심볼 | 파일 | 시그니처 |
+| Symbol | File | Signature |
 |---|---|---|
-| `initialsFromName` | `packages/ui/src/lib/row-meta.ts` | `(name: string) => string` — 공백 분리 후 첫/마지막 이니셜, 한 단어면 앞 2글자, 빈 이름은 `"?"` |
-| `pastelFromName` | `packages/ui/src/lib/row-meta.ts` | `(name: string) => string` — 이름 해시 → `oklch(0.88 0.06 <hue>)` CSS 색 문자열(같은 이름 = 항상 같은 색) |
-| `formatRelativeTime` | `packages/ui/src/lib/relative-time.ts` | `(timestampMs: number, now?: number) => string` — `"now"`/`"3m"`/`"5h"`/`"2d"`/`"3w"`/`"4 Aug"`. **epoch ms를 받는다**(Date 아님) — `persons.last_contact_at`이 Zero에서 `number`로 내려오므로 그대로 넣으면 된다 |
+| `initialsFromName` | `packages/ui/src/lib/row-meta.ts` | `(name: string) => string` — first/last initial after splitting on whitespace; a single word takes its first 2 characters; an empty name yields `"?"` |
+| `pastelFromName` | `packages/ui/src/lib/row-meta.ts` | `(name: string) => string` — name hash → an `oklch(0.88 0.06 <hue>)` CSS color string (same name = always the same color) |
+| `formatRelativeTime` | `packages/ui/src/lib/relative-time.ts` | `(timestampMs: number, now?: number) => string` — `"now"`/`"3m"`/`"5h"`/`"2d"`/`"3w"`/`"4 Aug"`. **Takes epoch ms** (not a Date) — `persons.last_contact_at` arrives from Zero as a `number`, so pass it straight through |
 
-서브패스 import가 되는 이유: `packages/ui/package.json`의 `exports`가 `"./*": "./src/*.ts"`와 `"./components/*": "./src/components/*.tsx"`를 갖는다(실측). `apps/desktop/src/screens/Inbox.tsx`가 이미 같은 세 심볼을 같은 경로로 쓴다 — 의심되면 그 파일을 먼저 읽는다.
+Subpath imports work because `packages/ui/package.json`'s `exports` has `"./*": "./src/*.ts"` and `"./components/*": "./src/components/*.tsx"` (verified). `apps/desktop/src/screens/Inbox.tsx` already uses all three symbols via the same paths — if in doubt, read that file first.
 
-시작 전에 존재를 확인한다(없으면 Wave 4/5 머지 전이라는 뜻이다):
+Confirm they exist before starting (if they do not, Wave 4/5 has not merged yet):
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromName\|export function pastelFromName" packages/ui/src/lib/row-meta.ts && grep -n "export function formatRelativeTime" packages/ui/src/lib/relative-time.ts
 ```
-- Produces: `PersonCard`, `PersonCardProps`, `relationshipDot`, `RelationshipDot`(`packages/ui/src/components/person-card.tsx`); `followupQueue`(`apps/desktop/src/screens/Network.tsx`)
+- Produces: `PersonCard`, `PersonCardProps`, `relationshipDot`, `RelationshipDot` (`packages/ui/src/components/person-card.tsx`); `followupQueue` (`apps/desktop/src/screens/Network.tsx`)
 
 **Steps:**
 
-1. [ ] `relationshipDot` + `PersonCard` 렌더링의 실패하는 테스트를 쓴다.
+1. [ ] Write the failing tests for `relationshipDot` + `PersonCard` rendering.
    ```tsx
    // packages/ui/test/person-card.test.tsx
    import { describe, expect, it, vi } from "vitest";
    import { render, screen } from "@testing-library/react";
    import { PersonCard, relationshipDot } from "../src/components/person-card.js";
 
-   describe("relationshipDot (A5 §3.6 관계 상태 3단 + unknown은 dot 없음)", () => {
+   describe("relationshipDot (A5 §3.6 three relationship tiers + unknown has no dot)", () => {
      it("maps active → active", () => expect(relationshipDot("active")).toBe("active"));
      it("maps new and warming → warming", () => {
        expect(relationshipDot("new")).toBe("warming");
@@ -1526,21 +1526,21 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      it("renders name, org/role, and a text label alongside the dot (not color-only)", () => {
        render(
          <PersonCard id="p1" name="David Park" org="Davich" role="CTO" relationshipState="active"
-           lastContactLabel="3일 전" onOpen={vi.fn()} />,
+           lastContactLabel="3 days ago" onOpen={vi.fn()} />,
        );
        expect(screen.getByText("David Park")).toBeInTheDocument();
        expect(screen.getByText("Davich · CTO")).toBeInTheDocument();
-       expect(screen.getByLabelText("관계 상태: 활성")).toBeInTheDocument();
+       expect(screen.getByLabelText("Relationship: Active")).toBeInTheDocument();
      });
    });
    ```
 
-2. [ ] 실행 → 실패.
+2. [ ] Run → fail.
    ```bash
    pnpm --filter @omnis/ui test
    ```
 
-3. [ ] `PersonCard`를 구현한다.
+3. [ ] Implement `PersonCard`.
    ```tsx
    // packages/ui/src/components/person-card.tsx
    import { Button } from "./button.js";
@@ -1550,7 +1550,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    export type PersonRelationshipState = "unknown" | "new" | "warming" | "active" | "dormant" | "closed";
    export type RelationshipDot = "active" | "warming" | "dormant" | "unknown";
 
-   /** A5 §3.6: 카드에 노출하는 3단 + unknown(dot 없음, 텍스트만). */
+   /** A5 §3.6: the three tiers shown on the card + unknown (no dot, text only). */
    export function relationshipDot(state: PersonRelationshipState): RelationshipDot {
      switch (state) {
        case "active":
@@ -1567,10 +1567,10 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    }
 
    const DOT_LABEL: Record<RelationshipDot, string> = {
-     active: "활성",
-     warming: "관계 형성 중",
-     dormant: "방치 위험",
-     unknown: "정보 부족",
+     active: "Active",
+     warming: "Warming up",
+     dormant: "At risk",
+     unknown: "Not enough info",
    };
 
    export interface FollowupDraft {
@@ -1600,24 +1600,24 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
            </span>
            <span className="person-card__name">{props.name}</span>
            {orgRole !== "" && <span className="person-card__org">{orgRole}</span>}
-           <span className="person-card__dot" data-dot={dot} aria-label={`관계 상태: ${DOT_LABEL[dot]}`}>
+           <span className="person-card__dot" data-dot={dot} aria-label={`Relationship: ${DOT_LABEL[dot]}`}>
              {DOT_LABEL[dot]}
            </span>
-           <span className="person-card__last-contact">마지막 연락: {props.lastContactLabel}</span>
+           <span className="person-card__last-contact">Last contact: {props.lastContactLabel}</span>
          </button>
          {props.followupDraft && (
            <div className="person-card__followup">
              <p>{props.followupDraft.body}</p>
-             <Button onClick={props.followupDraft.onEditAndSend}>수정 후 보내기</Button>
+             <Button onClick={props.followupDraft.onEditAndSend}>Edit and send</Button>
            </div>
          )}
        </OpaqueSurface>
      );
    }
    ```
-   `packages/ui/src/index.ts`에 `export * from "./components/person-card.js";` 추가.
+   Add `export * from "./components/person-card.js";` to `packages/ui/src/index.ts`.
 
-4. [ ] 재실행 → 통과, 커밋.
+4. [ ] Re-run → pass, commit.
    ```bash
    pnpm --filter @omnis/ui test
    ```
@@ -1632,7 +1632,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    )"
    ```
 
-5. [ ] 팔로업 큐 정렬(`followupQueue`)의 실패하는 테스트를 쓴다 — L6 루프(B22)가 이미 `next_followup_at`/`priority_score`를 채워 두므로 화면은 그 값을 필터+정렬만 한다.
+5. [ ] Write the failing test for the follow-up queue sort (`followupQueue`) — the L6 loop (B22) already populates `next_followup_at`/`priority_score`, so the screen only filters and sorts those values.
    ```ts
    // apps/desktop/test/network-screen.test.tsx
    import { describe, expect, it } from "vitest";
@@ -1641,25 +1641,25 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    const now = new Date("2026-09-20T00:00:00").getTime();
    const persons: FollowupCandidate[] = [
      { id: "1", nextFollowupAt: now - 1000, priorityScore: 0.5, mergedInto: null },
-     { id: "2", nextFollowupAt: now + 100_000, priorityScore: 0.9, mergedInto: null }, // 아직 안 됨
+     { id: "2", nextFollowupAt: now + 100_000, priorityScore: 0.9, mergedInto: null }, // not due yet
      { id: "3", nextFollowupAt: now - 5000, priorityScore: 0.9, mergedInto: null },
-     { id: "4", nextFollowupAt: now - 1000, priorityScore: 0.1, mergedInto: "1" }, // 병합된 person 제외
+     { id: "4", nextFollowupAt: now - 1000, priorityScore: 0.1, mergedInto: "1" }, // merged person excluded
      { id: "5", nextFollowupAt: null, priorityScore: 0.3, mergedInto: null },
    ];
 
-   describe("followupQueue (persons.next_followup_at ≤ now, priority_score 내림차순, 병합 제외)", () => {
+   describe("followupQueue (persons.next_followup_at ≤ now, priority_score descending, merged excluded)", () => {
      it("returns only due, non-merged persons ordered by priority", () => {
        expect(followupQueue(persons, now).map((p) => p.id)).toEqual(["3", "1"]);
      });
    });
    ```
 
-6. [ ] 실행 → 실패.
+6. [ ] Run → fail.
    ```bash
    pnpm --filter @omnis/desktop test
    ```
 
-7. [ ] `Network.tsx`를 구현한다.
+7. [ ] Implement `Network.tsx`.
    ```tsx
    // apps/desktop/src/screens/Network.tsx
    import { OpaqueSurface } from "@omnis/ui";
@@ -1676,8 +1676,8 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      mergedInto: string | null;
    }
 
-   /** A3 persons_followup_idx와 같은 조건: 병합 안 됐고 next_followup_at이 지났으면 큐에 들어가고,
-    * priority_score 내림차순(L6 팔로업 루프, US-B22가 이미 계산해 둔 값 — 화면은 재계산하지 않는다). */
+   /** Same conditions as A3 persons_followup_idx: not merged and next_followup_at has passed means it
+    * enters the queue; descending priority_score (the L6 follow-up loop, US-B22 already computed these — the screen does not recompute). */
    export function followupQueue<T extends FollowupCandidate>(persons: T[], now: number): T[] {
      return persons
        .filter((p) => p.mergedInto === null && p.nextFollowupAt !== null && p.nextFollowupAt <= now)
@@ -1718,8 +1718,8 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
                  org={p.org ?? null}
                  role={p.role ?? null}
                  relationshipState={p.relationship_state as PersonRelationshipState}
-                 lastContactLabel={p.last_contact_at ? formatRelativeTime(p.last_contact_at) : "없음"}
-                 followupDraft={queueIds.has(p.id) ? { body: "팔로업 초안 준비 중", onEditAndSend: () => {} } : null}
+                 lastContactLabel={p.last_contact_at ? formatRelativeTime(p.last_contact_at) : "None"}
+                 followupDraft={queueIds.has(p.id) ? { body: "Preparing follow-up draft", onEditAndSend: () => {} } : null}
                  onOpen={(id) => onOpenPerson?.(id)}
                />
              ))}
@@ -1729,7 +1729,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    }
    ```
 
-8. [ ] 재실행 → 통과, 커밋.
+8. [ ] Re-run → pass, commit.
    ```bash
    pnpm --filter @omnis/desktop test
    ```
@@ -1744,37 +1744,37 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    )"
    ```
 
-**열린 질문**: 사람 상세 pane(타임라인 + 전 채널 링크 + 메모)과 "같은 사람입니다" 병합/분리 다이얼로그는 이 태스크에서 진입 버튼만 있고 내용은 없다 — `mergePersons`/`splitIdentity`(memory-ingestion US-B03)를 호출하는 후속 태스크가 필요하다. `persons.primary_thread_id`를 통한 팔로업 draft 실조회(A5 §3.6 데이터 바인딩의 `related("primaryThread", …)`)도 스텁이다 — zeroSchema에 `persons→primaryThread` 관계가 없어 Inbox.tsx 패턴대로 별도 `threads`/`items` 쿼리를 조인해야 하는데, 이 태스크는 그 조인 없이 고정 문구를 쓴다.
+**Open questions**: The person detail pane (timeline + all-channel links + notes) and the "same person" merge/split dialog exist here only as an entry button with no contents — a follow-up task calling `mergePersons`/`splitIdentity` (memory-ingestion US-B03) is needed. The real follow-up draft lookup via `persons.primary_thread_id` (the `related("primaryThread", …)` data binding in A5 §3.6) is also a stub — zeroSchema has no `persons→primaryThread` relationship, so the Inbox.tsx pattern would require joining separate `threads`/`items` queries, and this task uses fixed copy instead of that join.
 
 ---
 
-### Task 6: Notes 화면 (US-B31, tier: Sonnet)
+### Task 6: Notes screen (US-B31, tier: Sonnet)
 
-**목표(백로그)**: 한 줄 입력(`n` 전역 단축키, 저장 후 포커스 유지), `RoutingSuggestion` 3버튼(수락/다른 대상/라우팅 안 함), 신뢰도는 텍스트로만, 오류와 no-match를 구분하지 않는다.
-**산출물**: `apps/desktop/src/screens/Notes.tsx`
-**검증 명령**: `pnpm --filter @omnis/desktop test`
-**의존**: B21(노트 라우팅 루프 — `notes.route_state`/`routed_to_*`를 채움)
-**읽을 스펙**: A4 §8.3(신뢰도 게이팅 — 낮으면 제안 자체를 안 만듦, 그래서 화면은 숫자 신뢰도를 다룰 필요가 없다), A5 §3.7(전체)
-**하지 말 것(YAGNI)**: "다른 대상 선택" 피커 UI(사람/스레드 검색 재사용은 B27 완료 후 후속 범위 — 이 태스크는 버튼만 두고 클릭 핸들러는 no-op), `n` 전역 단축키 배선(Today의 `t`와 같은 이유로 셸 통합은 범위 밖).
+**Goal (backlog)**: Single-line input (`n` global shortcut, focus retained after save), `RoutingSuggestion` 3 buttons (accept / pick another target / don't route), confidence as text only, no distinction between error and no-match.
+**Deliverables**: `apps/desktop/src/screens/Notes.tsx`
+**Verification command**: `pnpm --filter @omnis/desktop test`
+**Depends on**: B21 (note routing loop — populates `notes.route_state`/`routed_to_*`)
+**Spec to read**: A4 §8.3 (confidence gating — when it is low no suggestion is produced at all, so the screen never has to deal with a numeric confidence), A5 §3.7 (all)
+**Do not do (YAGNI)**: the "pick another target" picker UI (reusing people/thread search is follow-up scope after B27 — this task ships the button with a no-op click handler), wiring the global `n` shortcut (shell integration is out of scope for the same reason as `t` in Today).
 
 **Files:**
 - Create: `apps/hub/src/notes.ts`, `apps/desktop/src/api/notes.ts`, `apps/desktop/src/screens/Notes.tsx`
-- Modify: `apps/hub/src/http.ts`(POST /notes/:id/route 라우트 추가)
+- Modify: `apps/hub/src/http.ts` (add the POST /notes/:id/route route)
 - Test: `apps/hub/src/notes.test.ts`, `apps/desktop/test/notes-screen.test.tsx`
 
 **Interfaces:**
-- Consumes: `query`/`one`(`@omnis/db`), `Audit`(선택 — 이 태스크는 `audit_log` 직접 insert로 단순화, Task 8 settings.ts와 같은 패턴)
-- Produces: `decideNoteRouting`(`apps/hub/src/notes.ts`, **이 델타에는 없던 라우트라 이 플랜이 새로 소유한다** — 아래 열린 질문 참고), `routeNote`(`apps/desktop/src/api/notes.ts`), `routingSuggestionCopy`, `hasRoutingSuggestion`(`apps/desktop/src/screens/Notes.tsx`)
+- Consumes: `query`/`one` (`@omnis/db`), `Audit` (optional — this task simplifies to a direct `audit_log` insert, same pattern as Task 8 settings.ts)
+- Produces: `decideNoteRouting` (`apps/hub/src/notes.ts`, **a route that was not in the delta, so this plan owns it anew** — see open questions below), `routeNote` (`apps/desktop/src/api/notes.ts`), `routingSuggestionCopy`, `hasRoutingSuggestion` (`apps/desktop/src/screens/Notes.tsx`)
 
 **Steps:**
 
-1. [ ] 라우팅 카피 순수 함수의 실패하는 테스트를 쓴다 — A4 §8.3 덕에 신뢰도 숫자가 아니라 "제안이 있는가"만 보면 된다(있으면 이미 임계를 넘긴 것).
+1. [ ] Write the failing test for the routing-copy pure functions — thanks to A4 §8.3 it only needs to look at "is there a suggestion", not a confidence number (if there is one, the threshold was already crossed).
    ```ts
    // apps/desktop/test/notes-screen.test.tsx
    import { describe, expect, it } from "vitest";
    import { hasRoutingSuggestion, routingSuggestionCopy, type NoteRouteRow } from "../src/screens/Notes";
 
-   describe("hasRoutingSuggestion (A4 §8.3: 낮은 신뢰도는 제안 자체가 없다)", () => {
+   describe("hasRoutingSuggestion (A4 §8.3: low confidence means no suggestion at all)", () => {
      it("is true only when route_state is 'proposed'", () => {
        expect(hasRoutingSuggestion({ route_state: "proposed" } as NoteRouteRow)).toBe(true);
        expect(hasRoutingSuggestion({ route_state: "none" } as NoteRouteRow)).toBe(false);
@@ -1782,32 +1782,32 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      });
    });
 
-   describe("routingSuggestionCopy (A5 §3.7: 신뢰도는 텍스트로만, 퍼센트 없음)", () => {
-     it("names the target and says 신뢰도 높음 when a suggestion exists", () => {
-       expect(routingSuggestionCopy({ route_state: "proposed" } as NoteRouteRow, "David Park 스레드")).toBe(
-         "라우팅 제안: David Park 스레드에 공유 (신뢰도 높음)",
+   describe("routingSuggestionCopy (A5 §3.7: confidence as text only, no percentages)", () => {
+     it("names the target and says high confidence when a suggestion exists", () => {
+       expect(routingSuggestionCopy({ route_state: "proposed" } as NoteRouteRow, "David Park thread")).toBe(
+         "Routing suggestion: share to David Park thread (high confidence)",
        );
      });
      it("falls back to the no-match copy otherwise — same copy for error and no-match", () => {
        expect(routingSuggestionCopy({ route_state: "none" } as NoteRouteRow, null)).toBe(
-         "라우팅 대상을 찾지 못했어요 — 수동으로 선택",
+         "Couldn't find a routing target — pick one manually",
        );
      });
    });
    ```
 
-2. [ ] 실행 → 실패.
+2. [ ] Run → fail.
    ```bash
    pnpm --filter @omnis/desktop test
    ```
 
-3. [ ] `apps/hub/src/notes.ts` + `apps/desktop/src/api/notes.ts`의 실패하는 테스트를 쓴다(허브 클라이언트 계약, `search.ts`/`approvals.ts`와 같은 패턴).
+3. [ ] Write the failing tests for `apps/hub/src/notes.ts` + `apps/desktop/src/api/notes.ts` (the hub client contract, same pattern as `search.ts`/`approvals.ts`).
    ```ts
    // apps/hub/src/notes.test.ts
    import { describe, expect, it, vi } from "vitest";
    import { decideNoteRouting } from "./notes.js";
 
-   describe("decideNoteRouting (US-B31 — 계약에 없던 라우트, 이 플랜이 신설)", () => {
+   describe("decideNoteRouting (US-B31 — a route absent from the contract, added by this plan)", () => {
      it("accept: sets route_state to accepted using the already-proposed target", async () => {
        const query = vi.fn().mockResolvedValue([{ id: "n1", routed_to_thread_id: "t1", routed_to_person_id: null }]);
        await decideNoteRouting({ query } as never, "n1", { decision: "accept" });
@@ -1829,12 +1829,12 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    });
    ```
 
-4. [ ] 실행 → 실패.
+4. [ ] Run → fail.
    ```bash
    pnpm --filter @omnis/hub test
    ```
 
-5. [ ] `apps/hub/src/notes.ts`를 구현한다.
+5. [ ] Implement `apps/hub/src/notes.ts`.
    ```ts
    // apps/hub/src/notes.ts
    import { query } from "@omnis/db";
@@ -1842,7 +1842,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
 
    export interface NoteRouteDecision {
      decision: "accept" | "none";
-     /** "다른 대상 선택"(후속 범위)에서만 쓴다 — 이 태스크는 accept/none만 지원한다. */
+     /** Used only by "pick another target" (follow-up scope) — this task supports accept/none only. */
      threadId?: string;
      personId?: string;
    }
@@ -1864,12 +1864,12 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    }
    ```
 
-6. [ ] 재실행 → 통과, `http.ts`에 라우트를 배선한다(기존 `/search` 분기 근처에 추가), 커밋.
+6. [ ] Re-run → pass, wire the route into `http.ts` (added near the existing `/search` branch), commit.
    ```bash
    pnpm --filter @omnis/hub test
    ```
    ```ts
-   // apps/hub/src/http.ts — handle() 안에 추가
+   // apps/hub/src/http.ts — added inside handle()
    import { decideNoteRouting } from "./notes.js";
 
    const noteRoute = /^\/notes\/([0-9a-fA-F-]{36})\/route$/.exec(path);
@@ -1902,7 +1902,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    )"
    ```
 
-7. [ ] `apps/desktop/src/api/notes.ts`(클라이언트) + `Notes.tsx`(화면)를 구현한다.
+7. [ ] Implement `apps/desktop/src/api/notes.ts` (client) + `Notes.tsx` (screen).
    ```ts
    // apps/desktop/src/api/notes.ts
    const HUB_HTTP_URL = import.meta.env.OMNIS_HUB_HTTP_URL ?? "http://127.0.0.1:8787";
@@ -1936,12 +1936,12 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      return note.route_state === "proposed";
    }
 
-   /** A5 §3.7: 신뢰도는 텍스트로만("신뢰도 높음"), 에러와 no-match는 같은 문구로 수렴한다. */
+   /** A5 §3.7: confidence as text only ("high confidence"); errors and no-match converge on the same copy. */
    export function routingSuggestionCopy(note: NoteRouteRow, targetLabel: string | null): string {
      if (hasRoutingSuggestion(note) && targetLabel !== null) {
-       return `라우팅 제안: ${targetLabel}에 공유 (신뢰도 높음)`;
+       return `Routing suggestion: share to ${targetLabel} (high confidence)`;
      }
-     return "라우팅 대상을 찾지 못했어요 — 수동으로 선택";
+     return "Couldn't find a routing target — pick one manually";
    }
 
    export function Notes() {
@@ -1955,22 +1955,22 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
            onSubmit={(e) => {
              e.preventDefault();
              if (body.trim() === "") return;
-             // 실제 insert는 hub POST /notes(계약 밖, 후속 범위) — 이 태스크는 입력·초기화만 증명한다.
+             // The actual insert is hub POST /notes (outside the contract, follow-up scope) — this task only proves input + reset.
              setBody("");
            }}
          >
            <input
-             aria-label="새 노트"
+             aria-label="New note"
              value={body}
              onChange={(e) => setBody(e.target.value)}
-             placeholder="새 노트…"
+             placeholder="New note…"
            />
-           <button type="submit">저장</button>
+           <button type="submit">Save</button>
          </form>
 
          <ul>
            {notes.map((n) => {
-             const targetLabel = n.routed_to_person_id ? "Network 대상" : n.routed_to_thread_id ? "스레드" : null;
+             const targetLabel = n.routed_to_person_id ? "Network target" : n.routed_to_thread_id ? "thread" : null;
              const route: NoteRouteRow = { route_state: n.route_state as NoteRouteRow["route_state"] };
              return (
                <li key={n.id}>
@@ -1979,13 +1979,13 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
                  {hasRoutingSuggestion(route) && (
                    <div>
                      <button type="button" onClick={() => void routeNote(n.id, "accept")}>
-                       수락
+                       Accept
                      </button>
                      <button type="button" disabled>
-                       다른 대상 선택
+                       Pick another target
                      </button>
                      <button type="button" onClick={() => void routeNote(n.id, "none")}>
-                       라우팅 안 함
+                       Don't route
                      </button>
                    </div>
                  )}
@@ -1998,7 +1998,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    }
    ```
 
-8. [ ] 재실행 → 통과, 커밋.
+8. [ ] Re-run → pass, commit.
    ```bash
    pnpm --filter @omnis/desktop test
    ```
@@ -2013,39 +2013,39 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    )"
    ```
 
-**열린 질문**: `POST /notes` (노트 생성 자체)와 `POST /notes/:id/route`의 "다른 대상 선택"은 Phase B 인터페이스 델타 §7 라우트 표에 없다 — 이 플랜이 후자의 최소 버전(accept/none)만 신설했다. 노트 생성 라우트와 대상 피커는 별도 후속 태스크가 필요하다(B27의 검색 인프라를 재사용할 여지가 크다).
+**Open questions**: `POST /notes` (note creation itself) and the "pick another target" flavor of `POST /notes/:id/route` are absent from the Phase B interface delta §7 route table — this plan added only the minimal version of the latter (accept/none). A separate follow-up task is needed for the note-creation route and the target picker (there is a good chance it reuses B27's search infrastructure).
 
 ---
 
-### Task 7: Digest 화면 (US-B32, tier: Sonnet)
+### Task 7: Digest screen (US-B32, tier: Sonnet)
 
-**목표(백로그)**: 카테고리 아코디언, 그룹·개별 되살리기(낙관적 업데이트 + toast), 월간 비용 리포트 섹션, Thread 헤더의 자동 보관 배너(7일 이내만).
-**산출물**: `apps/desktop/src/screens/Digest.tsx`
-**검증 명령**: `pnpm --filter @omnis/desktop test`
-**의존**: B24(밤 다이제스트 루프 — `digests(kind='nightly').metrics`를 채움)
-**읽을 스펙**: A4 §6.4(`NightlyDigest`/`DigestGroup` 모델), A5 §3.8(전체)
-**하지 말 것(YAGNI)**: Thread 헤더 배너 자체 구현(§3.2가 소유 — 이 태스크는 배너가 쓰는 것과 같은 `unarchiveItem` 클라이언트 함수만 만든다), toast 라이브러리 배선(Sonner는 A5 §5.1에 있지만 실제 토스트 연결은 후속 범위, 여기서는 `onRestored` 콜백만 노출).
+**Goal (backlog)**: Category accordion, group and individual unarchive (optimistic update + toast), monthly cost report section, auto-archive banner in the Thread header (only within 7 days).
+**Deliverables**: `apps/desktop/src/screens/Digest.tsx`
+**Verification command**: `pnpm --filter @omnis/desktop test`
+**Depends on**: B24 (nightly digest loop — populates `digests(kind='nightly').metrics`)
+**Spec to read**: A4 §6.4 (`NightlyDigest`/`DigestGroup` models), A5 §3.8 (all)
+**Do not do (YAGNI)**: implementing the Thread header banner itself (§3.2 owns it — this task only builds the same `unarchiveItem` client function the banner uses), wiring a toast library (Sonner is in A5 §5.1, but actually connecting toasts is follow-up scope; here we only expose the `onRestored` callback).
 
 **Files:**
 - Create: `apps/desktop/src/api/digest.ts`, `apps/desktop/src/screens/Digest.tsx`
-- Modify: `apps/hub/src/http.ts`(POST /items/:id/unarchive, POST /digests/:id/undo 라우트 추가)
+- Modify: `apps/hub/src/http.ts` (add POST /items/:id/unarchive and POST /digests/:id/undo routes)
 - Test: `apps/hub/src/archive-routes.test.ts`, `apps/desktop/test/digest-screen.test.tsx`
 
 **Interfaces:**
-- Consumes: `undoArchive`(`@omnis/kernel`, agents US-B18 산출물), `query`/`one`(`@omnis/db`)
-- Produces: `handleUnarchiveItem`, `handleDigestUndo`(`apps/hub/src/http.ts`에 인라인 — 별도 모듈 없이 기존 `kernel.approvals`류 얇은 핸들러 패턴), `unarchiveItem`, `undoDigestGroup`(`apps/desktop/src/api/digest.ts`); `groupsFromMetrics`, `monthlyCostLine`(`apps/desktop/src/screens/Digest.tsx`)
+- Consumes: `undoArchive` (`@omnis/kernel`, an agents US-B18 deliverable), `query`/`one` (`@omnis/db`)
+- Produces: `handleUnarchiveItem`, `handleDigestUndo` (inline in `apps/hub/src/http.ts` — following the existing thin-handler pattern used by `kernel.approvals` et al., with no separate module), `unarchiveItem`, `undoDigestGroup` (`apps/desktop/src/api/digest.ts`); `groupsFromMetrics`, `monthlyCostLine` (`apps/desktop/src/screens/Digest.tsx`)
 
 **Steps:**
 
-1. [ ] `groupsFromMetrics`/`monthlyCostLine` 순수 함수의 실패하는 테스트를 쓴다. `digests.metrics`(jsonb, 컬럼 변경 없음 — 델타 §6)가 `NightlyDigest`의 `auto_archived`/`cost` 필드를 그대로 담는다고 가정한다(아래 열린 질문 참고).
+1. [ ] Write the failing tests for the `groupsFromMetrics`/`monthlyCostLine` pure functions. Assume `digests.metrics` (jsonb, no column change — delta §6) holds `NightlyDigest`'s `auto_archived`/`cost` fields as-is (see open questions below).
    ```ts
    // apps/desktop/test/digest-screen.test.tsx
    import { describe, expect, it } from "vitest";
    import { groupsFromMetrics, monthlyCostLine } from "../src/screens/Digest";
 
-   describe("groupsFromMetrics (digests.metrics에 담긴 NightlyDigest.auto_archived를 안전하게 읽기)", () => {
+   describe("groupsFromMetrics (safely read NightlyDigest.auto_archived out of digests.metrics)", () => {
      it("returns the groups array when shaped correctly", () => {
-       const metrics = { auto_archived: [{ reason: "뉴스레터", count: 12, samples: [], undo_token: "tok1" }] };
+       const metrics = { auto_archived: [{ reason: "newsletters", count: 12, samples: [], undo_token: "tok1" }] };
        expect(groupsFromMetrics(metrics)).toEqual(metrics.auto_archived);
      });
      it("returns an empty array for missing or malformed metrics (no crash on a bad row)", () => {
@@ -2055,21 +2055,21 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      });
    });
 
-   describe("monthlyCostLine (A5 §3.8 '이번 달 비용 리포트: $34 / $60 (57%)')", () => {
+   describe("monthlyCostLine (A5 §3.8 'monthly cost report: $34 / $60 (57%)')", () => {
      it("formats month-to-date over cap with a rounded percentage", () => {
        expect(monthlyCostLine({ month_to_date_usd: 34, cap_usd: 60 })).toBe(
-         "이번 달 비용 리포트: $34 / $60 (57%)",
+         "Monthly cost report: $34 / $60 (57%)",
        );
      });
    });
    ```
 
-2. [ ] 실행 → 실패.
+2. [ ] Run → fail.
    ```bash
    pnpm --filter @omnis/desktop test
    ```
 
-3. [ ] 허브 라우트(`POST /items/:id/unarchive`, `POST /digests/:id/undo`)의 실패하는 테스트를 쓴다. `http.ts`를 통째로 `node:http` 목업으로 띄우는 대신(비용이 크다), 위임 대상 핸들러를 별도 함수로 export해 직접 단위 테스트한다 — 두 라우트 모두 `@omnis/kernel`의 `undoArchive`(B18)를 호출하는 얇은 위임이라 새 모듈은 이 함수 둘만 담는다.
+3. [ ] Write the failing tests for the hub routes (`POST /items/:id/unarchive`, `POST /digests/:id/undo`). Rather than standing up all of `http.ts` behind a `node:http` mock (expensive), export the delegated handlers as separate functions and unit-test them directly — both routes are thin delegations to `@omnis/kernel`'s `undoArchive` (B18), so the new module holds just these two functions.
    ```ts
    // apps/hub/src/archive-routes.test.ts
    import { describe, expect, it, vi } from "vitest";
@@ -2094,16 +2094,16 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    });
    ```
 
-4. [ ] 실행 → 실패.
+4. [ ] Run → fail.
    ```bash
    pnpm --filter @omnis/hub test
    ```
-   기대 출력: `Cannot find module './archive-routes.js'`.
+   Expected output: `Cannot find module './archive-routes.js'`.
 
-5. [ ] `apps/hub/src/archive-routes.ts`를 구현하고 `http.ts`에 배선한다.
+5. [ ] Implement `apps/hub/src/archive-routes.ts` and wire it into `http.ts`.
    ```ts
    // apps/hub/src/archive-routes.ts
-   /** pool은 http.ts가 이미 갖고 있으므로 부분적용해 넘긴다 — 이 모듈은 pg를 몰라도 된다. */
+   /** http.ts already holds the pool, so partially apply it and pass it in — this module never has to know about pg. */
    export interface ArchiveDeps {
      undoArchive(ref: { itemId?: string; undoToken?: string }, actor: string): Promise<number>;
    }
@@ -2125,10 +2125,10 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    }
    ```
    ```ts
-   // apps/hub/src/http.ts — 추가 import + 라우트(handle() 안, /search 근처)
+   // apps/hub/src/http.ts — added import + routes (inside handle(), near /search)
    import { handleDigestUndo, handleUnarchiveItem, type ArchiveDeps } from "./archive-routes.js";
    import { undoArchive } from "@omnis/kernel";
-   // (createHubServer 함수 상단, pool을 부분적용해 archive-routes.ts가 pg를 직접 의존하지 않게 한다)
+   // (top of the createHubServer function; partially apply the pool so archive-routes.ts never depends on pg directly)
    const archiveDeps: ArchiveDeps = { undoArchive: (ref, actor) => undoArchive(pool, ref, actor) };
 
    const unarchive = /^\/items\/([0-9a-fA-F-]{36})\/unarchive$/.exec(path);
@@ -2158,7 +2158,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    }
    ```
 
-6. [ ] 재실행 → 통과, 커밋.
+6. [ ] Re-run → pass, commit.
    ```bash
    pnpm --filter @omnis/hub test
    ```
@@ -2173,7 +2173,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    )"
    ```
 
-7. [ ] `apps/desktop/src/api/digest.ts` + `Digest.tsx`를 구현한다.
+7. [ ] Implement `apps/desktop/src/api/digest.ts` + `Digest.tsx`.
    ```ts
    // apps/desktop/src/api/digest.ts
    const HUB_HTTP_URL = import.meta.env.OMNIS_HUB_HTTP_URL ?? "http://127.0.0.1:8787";
@@ -2209,8 +2209,8 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      undo_token: string;
    }
 
-   /** A3 digests.metrics는 컬럼 변경 없이 jsonb다(델타 §6) — NightlyDigest.auto_archived를 여기 담는다고
-    * 가정하고 방어적으로 읽는다(형태가 안 맞으면 빈 배열, 화면이 죽지 않는다). */
+   /** A3 digests.metrics is jsonb with no column change (delta §6) — assume it holds
+    * NightlyDigest.auto_archived and read it defensively (a bad shape yields an empty array; the screen never crashes). */
    export function groupsFromMetrics(metrics: unknown): DigestGroup[] {
      if (typeof metrics !== "object" || metrics === null) return [];
      const auto = (metrics as { auto_archived?: unknown }).auto_archived;
@@ -2219,7 +2219,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
 
    export function monthlyCostLine(cost: { month_to_date_usd: number; cap_usd: number }): string {
      const pct = Math.round((cost.month_to_date_usd / cost.cap_usd) * 100);
-     return `이번 달 비용 리포트: $${cost.month_to_date_usd} / $${cost.cap_usd} (${pct}%)`;
+     return `Monthly cost report: $${cost.month_to_date_usd} / $${cost.cap_usd} (${pct}%)`;
    }
 
    export function Digest() {
@@ -2230,7 +2230,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      );
      const digest = nightlyDigests[0] ?? null;
      if (!digest) {
-       return <OpaqueSurface className="digest-screen">오늘 밤 다이제스트는 아직 생성 전이에요, 23:00에 생성됩니다</OpaqueSurface>;
+       return <OpaqueSurface className="digest-screen">Tonight's digest hasn't been generated yet — it runs at 23:00</OpaqueSurface>;
      }
      const groups = groupsFromMetrics(digest.metrics);
      const cost = (digest.metrics as { cost?: { month_to_date_usd: number; cap_usd: number } }).cost;
@@ -2254,7 +2254,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
                {g.reason} ({g.count})
              </button>
              <button type="button" onClick={() => void undoDigestGroup(digest.id, g.undo_token)}>
-               모두 되살리기
+               Restore all
              </button>
            </section>
          ))}
@@ -2264,7 +2264,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    }
    ```
 
-8. [ ] 재실행 → 통과, 커밋.
+8. [ ] Re-run → pass, commit.
    ```bash
    pnpm --filter @omnis/desktop test
    ```
@@ -2279,31 +2279,31 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    )"
    ```
 
-**열린 질문**: `digests.metrics`가 `NightlyDigest.auto_archived`/`cost`를 그대로 담는다는 것은 이 플랜의 **가정**이다 — A3/델타 어디에도 `metrics`의 내부 shape이 고정돼 있지 않다(컬럼은 jsonb일 뿐). 밤 다이제스트 생성 루프(agents US-B24, `packages/agents/src/loops/digest-nightly.ts`)가 정확히 이 shape으로 쓰는지 실행 시점에 맞춰봐야 한다.
+**Open questions**: That `digests.metrics` holds `NightlyDigest.auto_archived`/`cost` verbatim is an **assumption** of this plan — nothing in A3 or the delta fixes the inner shape of `metrics` (the column is just jsonb). Whether the nightly digest generation loop (agents US-B24, `packages/agents/src/loops/digest-nightly.ts`) really writes exactly this shape has to be reconciled at run time.
 
 ---
 
-### Task 8: Settings 화면 + `settings` 쓰기 경로 (US-B33, tier: Sonnet)
+### Task 8: Settings screen + the `settings` write path (US-B33, tier: Sonnet)
 
-**목표(백로그)**: 서브 nav 4개(Accounts/Autonomy/Model tiers/General), 비용 상한 편집 가능 입력 + 진행률 바(예비비 10% 세그먼트, 80%/100% 색+텍스트 병기), 자율 허용 토글(기본 꺼짐 + 경고), allowlist 편집, kill switch 2단계 확인.
-**산출물**: `apps/desktop/src/screens/Settings.tsx`, `apps/hub/src/settings.ts`
-**검증 명령**: `pnpm --filter @omnis/desktop test && pnpm --filter @omnis/hub test`
-**의존**: B09/B11(allowlist 대상), B14(비용 정책 — `costState`/`currentPolicy`), B18(자동 보관 임계)
-**읽을 스펙**: 델타 §5(`SettingKey`/`getSetting`/`setSetting`/`SETTING_DEFAULTS`), §6(`0009_settings.sql`), §7(`/settings`·`/cost`), §10(Zero 복제에 `settings` 추가), A5 §3.9(전체)
-**하지 말 것(YAGNI)**: KakaoTalk D-9 카운트다운 배지(계정 연결 상태 자체가 이 태스크 범위 밖 — Accounts 서브탭은 `zero.query.accounts` 나열만), Model tiers의 민감도 규칙 읽기 전용 표(값이 정적이라 하드코드 텍스트로 충분, YAGNI).
+**Goal (backlog)**: Four sub-nav sections (Accounts/Autonomy/Model tiers/General), editable cost-cap input + progress bar (10% reserve segment, 80%/100% color paired with text), autonomy-enable toggle (off by default + warning), allowlist editing, 2-step kill switch confirmation.
+**Deliverables**: `apps/desktop/src/screens/Settings.tsx`, `apps/hub/src/settings.ts`
+**Verification command**: `pnpm --filter @omnis/desktop test && pnpm --filter @omnis/hub test`
+**Depends on**: B09/B11 (allowlist targets), B14 (cost policy — `costState`/`currentPolicy`), B18 (auto-archive threshold)
+**Spec to read**: delta §5 (`SettingKey`/`getSetting`/`setSetting`/`SETTING_DEFAULTS`), §6 (`0009_settings.sql`), §7 (`/settings`·`/cost`), §10 (add `settings` to Zero replication), A5 §3.9 (all)
+**Do not do (YAGNI)**: the KakaoTalk D-9 countdown badge (account connection state is itself out of scope for this task — the Accounts sub-tab only lists `zero.query.accounts`), a read-only sensitivity-rule table for Model tiers (the values are static, so hardcoded text is enough, YAGNI).
 
 **Files:**
 - Create: `packages/db/migrations/0009_settings.sql`, `packages/db/migrations/0013_publication_phase_b.sql`, `packages/kernel/src/settings.ts`, `apps/hub/src/settings.ts`, `apps/desktop/src/api/settings.ts`, `apps/desktop/src/screens/Settings.tsx`
-- Modify: `packages/kernel/src/zero-schema.ts`(`settings` 테이블 추가), `packages/kernel/src/index.ts`(settings re-export), `apps/hub/src/http.ts`(GET/PUT /settings, GET /cost 라우트), `apps/hub/src/config.ts`(변화 없음 — 참고만)
+- Modify: `packages/kernel/src/zero-schema.ts` (add the `settings` table), `packages/kernel/src/index.ts` (settings re-export), `apps/hub/src/http.ts` (GET/PUT /settings, GET /cost routes), `apps/hub/src/config.ts` (no change — for reference only)
 - Test: `packages/kernel/test/settings.test.ts`, `apps/hub/src/settings.test.ts`, `apps/desktop/test/settings-screen.test.tsx`
 
 **Interfaces:**
-- Consumes: `query`(`@omnis/db`), `currentPolicy`(`@omnis/kernel`, agents US-B14 산출물)
-- Produces: `SettingKey`, `SETTING_DEFAULTS`, `getSetting`, `setSetting`(`packages/kernel/src/settings.ts`, 델타 §5 그대로); `getAllSettings`, `putSetting`(`apps/hub/src/settings.ts`); `getSetting`/`putSetting` 클라이언트(`apps/desktop/src/api/settings.ts`); `costBarSegments`, `costBarState`(`apps/desktop/src/screens/Settings.tsx`)
+- Consumes: `query` (`@omnis/db`), `currentPolicy` (`@omnis/kernel`, an agents US-B14 deliverable)
+- Produces: `SettingKey`, `SETTING_DEFAULTS`, `getSetting`, `setSetting` (`packages/kernel/src/settings.ts`, delta §5 verbatim); `getAllSettings`, `putSetting` (`apps/hub/src/settings.ts`); the `getSetting`/`putSetting` client (`apps/desktop/src/api/settings.ts`); `costBarSegments`, `costBarState` (`apps/desktop/src/screens/Settings.tsx`)
 
 **Steps:**
 
-1. [ ] `packages/db/migrations/0009_settings.sql`을 쓴다(델타 §6 표 그대로 — 이 태스크의 검증 명령에 `test:integration`이 없으므로 실제 DB 적용 테스트는 이 태스크 범위 밖, 다음 웨이브의 통합 테스트가 검증한다).
+1. [ ] Write `packages/db/migrations/0009_settings.sql` (delta §6 table verbatim — this task's verification command has no `test:integration`, so actually applying it to a DB is out of scope here; the next wave's integration tests verify it).
    ```sql
    -- packages/db/migrations/0009_settings.sql
    CREATE TABLE settings (
@@ -2312,7 +2312,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      updated_at timestamptz NOT NULL DEFAULT now()
    );
 
-   -- omnis_control은 이미 0007_notify.sql이 만든 채널이다 — settings 변경을 얹어 탄다(델타 §6: 새 NOTIFY 채널 없음).
+   -- omnis_control is a channel 0007_notify.sql already created — ride along on it for settings changes (delta §6: no new NOTIFY channel).
    CREATE OR REPLACE FUNCTION notify_settings_change() RETURNS trigger AS $$
    BEGIN
      PERFORM pg_notify('omnis_control', json_build_object('settings', NEW.key)::text);
@@ -2338,13 +2338,13 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      ('kakao.send_enabled_at', 'null');
    ```
 
-2. [ ] `packages/db/migrations/0013_publication_phase_b.sql`을 쓴다(델타 §6 — `ingest_sources`/`push_subscriptions`는 넣지 않는다).
+2. [ ] Write `packages/db/migrations/0013_publication_phase_b.sql` (delta §6 — do not add `ingest_sources`/`push_subscriptions`).
    ```sql
    -- packages/db/migrations/0013_publication_phase_b.sql
    ALTER PUBLICATION zero_omnis ADD TABLE settings;
    ```
 
-3. [ ] 커밋(마이그레이션은 append-only 파일이라 그 자체로 검증 가능한 단위 — 별도 red/green 없이 파일 추가로 커밋한다).
+3. [ ] Commit (a migration is an append-only file and is a verifiable unit on its own — commit the added files without a separate red/green cycle).
    ```bash
    git add packages/db/migrations/0009_settings.sql packages/db/migrations/0013_publication_phase_b.sql
    git commit -m "$(cat <<'EOF'
@@ -2356,7 +2356,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    )"
    ```
 
-4. [ ] `packages/kernel/src/settings.ts`의 실패하는 테스트를 쓴다(pg Pool을 실제 DB 없이 흉내 — `@omnis/db`의 `query()`가 `pool.query(sql, params)`를 그대로 부르므로 `{query: vi.fn()}`이면 충분하다).
+4. [ ] Write the failing tests for `packages/kernel/src/settings.ts` (fake the pg Pool without a real DB — `@omnis/db`'s `query()` calls `pool.query(sql, params)` directly, so `{query: vi.fn()}` is enough).
    ```ts
    // packages/kernel/test/settings.test.ts
    import { describe, expect, it, vi } from "vitest";
@@ -2367,7 +2367,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    }
 
    describe("SETTING_DEFAULTS", () => {
-     it("has every allowlist key defaulting to an empty array (계약 §5)", () => {
+     it("has every allowlist key defaulting to an empty array (contract §5)", () => {
        expect(SETTING_DEFAULTS["ingest.local_roots.mini"]).toEqual([]);
        expect(SETTING_DEFAULTS["ingest.drive_folders"]).toEqual([]);
        expect(SETTING_DEFAULTS["ingest.github_repos"]).toEqual([]);
@@ -2406,13 +2406,13 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    });
    ```
 
-5. [ ] 실행 → 실패.
+5. [ ] Run → fail.
    ```bash
    pnpm --filter @omnis/kernel test
    ```
-   기대 출력: `Cannot find module '../src/settings.js'`.
+   Expected output: `Cannot find module '../src/settings.js'`.
 
-6. [ ] `packages/kernel/src/settings.ts`를 구현한다(델타 §5 시그니처 그대로).
+6. [ ] Implement `packages/kernel/src/settings.ts` (delta §5 signatures verbatim).
    ```ts
    // packages/kernel/src/settings.ts
    import { query } from "@omnis/db";
@@ -2452,8 +2452,8 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      return rows[0]?.value ?? fallback;
    }
 
-   /** audit_log는 계약 §5가 필수로 못박는다 — settings.ts는 pool만 받는 낮은 레벨 모듈이라
-    * Kernel.audit(순환 의존 유발)을 거치지 않고 직접 insert한다(identity.ts와 같은 패턴). */
+   /** Contract §5 makes audit_log mandatory — settings.ts is a low-level module that only takes
+    * a pool, so it inserts directly rather than going through Kernel.audit (which would create a circular dependency), same pattern as identity.ts. */
    export async function setSetting(
      pool: Pool,
      key: SettingKey,
@@ -2474,9 +2474,9 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      );
    }
    ```
-   `packages/kernel/src/index.ts`에 `export * from "./settings.js";` 추가.
+   Add `export * from "./settings.js";` to `packages/kernel/src/index.ts`.
 
-7. [ ] 재실행 → 통과, 커밋.
+7. [ ] Re-run → pass, commit.
    ```bash
    pnpm --filter @omnis/kernel test
    ```
@@ -2491,7 +2491,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    )"
    ```
 
-8. [ ] `apps/hub/src/settings.ts`(전체 키 열거 + PUT 검증)의 실패하는 테스트를 쓴다.
+8. [ ] Write the failing tests for `apps/hub/src/settings.ts` (enumerate all keys + validate PUT).
    ```ts
    // apps/hub/src/settings.test.ts
    import { describe, expect, it, vi } from "vitest";
@@ -2524,12 +2524,12 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    });
    ```
 
-9. [ ] 실행 → 실패.
+9. [ ] Run → fail.
    ```bash
    pnpm --filter @omnis/hub test
    ```
 
-10. [ ] `apps/hub/src/settings.ts`를 구현한다.
+10. [ ] Implement `apps/hub/src/settings.ts`.
     ```ts
     // apps/hub/src/settings.ts
     import { SETTING_DEFAULTS, type SettingKey } from "@omnis/kernel";
@@ -2567,12 +2567,12 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
     }
     ```
 
-11. [ ] 재실행 → 통과. `http.ts`에 `/settings`·`/cost` 라우트를 배선한다(agents US-B14의 `currentPolicy`를 가정 — 웨이브 순서상 이미 머지돼 있다).
+11. [ ] Re-run → pass. Wire the `/settings`·`/cost` routes into `http.ts` (assuming agents US-B14's `currentPolicy` — merged already, given the wave order).
     ```bash
     pnpm --filter @omnis/hub test
     ```
     ```ts
-    // apps/hub/src/http.ts — 추가 import + 라우트
+    // apps/hub/src/http.ts — added imports + routes
     import { getAllSettings, getSetting, isValidSettingKey, putSetting, setSetting } from "@omnis/kernel";
     import { currentPolicy } from "@omnis/kernel";
 
@@ -2606,7 +2606,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
     }
     ```
 
-12. [ ] 커밋.
+12. [ ] Commit.
     ```bash
     git add apps/hub/src/settings.ts apps/hub/src/settings.test.ts apps/hub/src/http.ts
     git commit -m "$(cat <<'EOF'
@@ -2618,9 +2618,9 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
     )"
     ```
 
-13. [ ] `zero-schema.ts`에 `settings` 테이블을 추가한다(관계 없음 — 단순 키-값이라 조인이 필요 없다).
+13. [ ] Add the `settings` table to `zero-schema.ts` (no relationships — it is a plain key-value table, so no join is needed).
     ```ts
-    // packages/kernel/src/zero-schema.ts — table() 정의 목록에 추가
+    // packages/kernel/src/zero-schema.ts — added to the table() definition list
     const settings = table("settings")
       .columns({
         key: string(),
@@ -2628,9 +2628,9 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
         updated_at: number(),
       })
       .primaryKey("key");
-    // tables: [...] 배열에 settings 추가, ZERO_TABLES가 자동으로 잡는다(Object.keys(zeroSchema.tables)).
+    // add settings to the tables: [...] array; ZERO_TABLES picks it up automatically (Object.keys(zeroSchema.tables)).
     ```
-    커밋.
+    Commit.
     ```bash
     git add packages/kernel/src/zero-schema.ts
     git commit -m "$(cat <<'EOF'
@@ -2642,13 +2642,13 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
     )"
     ```
 
-14. [ ] 비용 진행률 바 순수 함수(`costBarSegments`/`costBarState`)의 실패하는 테스트를 쓴다.
+14. [ ] Write the failing tests for the cost progress-bar pure functions (`costBarSegments`/`costBarState`).
     ```ts
     // apps/desktop/test/settings-screen.test.tsx
     import { describe, expect, it } from "vitest";
     import { costBarSegments, costBarState } from "../src/screens/Settings";
 
-    describe("costBarSegments (A5 §3.9: 마지막 10%는 예비비 세그먼트)", () => {
+    describe("costBarSegments (A5 §3.9: the last 10% is the reserve segment)", () => {
       it("computes the spend percentage and a fixed 90% reserve boundary", () => {
         const seg = costBarSegments({ mtdUsd: 34, capUsd: 60, reserveRatio: 0.1 });
         expect(seg.spendPct).toBeCloseTo(56.666, 2);
@@ -2656,19 +2656,19 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
       });
     });
 
-    describe("costBarState (80%/100% 임계 — 색은 컴포넌트가, 여기는 상태 이름만)", () => {
+    describe("costBarState (80%/100% thresholds — the component owns color, this owns only the state name)", () => {
       it("normal below 80%", () => expect(costBarState(30, 60)).toBe("normal"));
       it("warn between 80% and 100%", () => expect(costBarState(49, 60)).toBe("warn"));
       it("danger at or over 100%", () => expect(costBarState(60, 60)).toBe("danger"));
     });
     ```
 
-15. [ ] 실행 → 실패.
+15. [ ] Run → fail.
     ```bash
     pnpm --filter @omnis/desktop test
     ```
 
-16. [ ] `apps/desktop/src/api/settings.ts` + `Settings.tsx`를 구현한다.
+16. [ ] Implement `apps/desktop/src/api/settings.ts` + `Settings.tsx`.
     ```ts
     // apps/desktop/src/api/settings.ts
     const HUB_HTTP_URL = import.meta.env.OMNIS_HUB_HTTP_URL ?? "http://127.0.0.1:8787";
@@ -2705,7 +2705,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
 
     export type CostBarState = "normal" | "warn" | "danger";
 
-    /** A5 §3.9: 마지막 10%는 VIP·민감 예비비 — 편집 불가, 고정 계산값. */
+    /** A5 §3.9: the last 10% is the VIP/sensitive reserve — not editable, a fixed computed value. */
     export function costBarSegments(i: { mtdUsd: number; capUsd: number; reserveRatio: number }) {
       return {
         spendPct: (i.mtdUsd / i.capUsd) * 100,
@@ -2721,7 +2721,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
     }
 
     const COST_STATE_TEXT: Record<CostBarState, string> = {
-      normal: "정상", warn: "T2→T1 강등", danger: "비VIP 초안 중단",
+      normal: "Normal", warn: "T2→T1 downgrade", danger: "Non-VIP drafts halted",
     };
 
     export function Settings() {
@@ -2731,13 +2731,13 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
       const [settingsRows] = useQuery(zero.query.settings);
       const byKey = new Map(settingsRows.map((s) => [s.key, s.value]));
       const capUsd = (byKey.get("cost.cap_usd") as number | undefined) ?? 60;
-      const mtdUsd = 0; // GET /cost가 실시간 값을 주지만 이 태스크는 Settings 화면의 배선까지만
+      const mtdUsd = 0; // GET /cost provides the live value, but this task stops at wiring the Settings screen
       const state = costBarState(mtdUsd, capUsd);
       const [killSwitchConfirming, setKillSwitchConfirming] = useState(false);
 
       return (
         <OpaqueSurface className="settings-screen">
-          <nav aria-label="Settings 서브 nav">
+          <nav aria-label="Settings sub-nav">
             {SETTINGS_TABS.map((t) => (
               <button key={t} aria-current={tab === t} onClick={() => setTab(t)}>
                 {TAB_LABEL[t]}
@@ -2757,10 +2757,10 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
 
           {tab === "model-tiers" && (
             <div>
-              <p>이번 달 사용량: ${mtdUsd} / ${capUsd} — {COST_STATE_TEXT[state]}</p>
+              <p>This month's usage: ${mtdUsd} / ${capUsd} — {COST_STATE_TEXT[state]}</p>
               <input
                 type="number"
-                aria-label="월 비용 상한"
+                aria-label="Monthly cost cap"
                 defaultValue={capUsd}
                 onBlur={(e) => void putSetting("cost.cap_usd", Number(e.target.value))}
               />
@@ -2771,13 +2771,13 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
             <h2>⚠ Kill switch</h2>
             {!killSwitchConfirming ? (
               <button type="button" onClick={() => setKillSwitchConfirming(true)}>
-                모든 자율 실행 중지
+                Stop all autonomous runs
               </button>
             ) : (
-              <div role="alertdialog" aria-label="정말로 모든 자율 실행을 멈추시겠어요?">
-                <p>정말로 모든 자율 실행을 멈추시겠어요?</p>
-                <button type="button" onClick={() => setKillSwitchConfirming(false)}>확인</button>
-                <button type="button" onClick={() => setKillSwitchConfirming(false)}>취소</button>
+              <div role="alertdialog" aria-label="Really stop all autonomous runs?">
+                <p>Really stop all autonomous runs?</p>
+                <button type="button" onClick={() => setKillSwitchConfirming(false)}>Confirm</button>
+                <button type="button" onClick={() => setKillSwitchConfirming(false)}>Cancel</button>
               </div>
             )}
           </section>
@@ -2786,7 +2786,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
     }
     ```
 
-17. [ ] 재실행 → 통과, 커밋.
+17. [ ] Re-run → pass, commit.
     ```bash
     pnpm --filter @omnis/desktop test
     ```
@@ -2801,31 +2801,31 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
     )"
     ```
 
-**열린 질문**: `Settings.tsx`의 `mtdUsd`는 이 태스크에서 `0`으로 고정돼 있다 — 실사용 값은 `GET /cost`를 호출해야 하는데(`apps/desktop/src/api/settings.ts`에 `fetchCost()` 추가 필요), Zero가 아니라 일반 fetch라 `useEffect` 폴링 배선이 필요하다(범위를 좁히려 이 태스크에서는 뺐다). Autonomy 서브탭의 토글+경고 다이얼로그, allowlist 편집기(로컬/Drive/GitHub 3종 chip 입력), 조용시간 편집기는 전부 `settings` 테이블의 읽기 배선만 증명했을 뿐 이 태스크에서 만들지 않았다 — 후속 태스크가 각 키(`autonomy.rules`/`ingest.*`/`notify.quiet_hours`)를 `putSetting`으로 잇기만 하면 된다(패턴은 비용 상한 입력과 동일).
+**Open questions**: `mtdUsd` in `Settings.tsx` is pinned to `0` in this task — the real value requires calling `GET /cost` (adding `fetchCost()` to `apps/desktop/src/api/settings.ts`), and since that is a plain fetch rather than Zero it needs `useEffect` polling wired up (left out here to narrow scope). The Autonomy sub-tab's toggle + warning dialog, the allowlist editor (chip inputs for the three local/Drive/GitHub kinds), and the quiet-hours editor all proved only the read wiring from the `settings` table and were not built in this task — a follow-up task just needs to connect each key (`autonomy.rules`/`ingest.*`/`notify.quiet_hours`) to `putSetting` (the pattern is identical to the cost-cap input).
 
 ---
 
-### Task 9: `apps/web` PWA 셸 (US-B35, tier: Sonnet)
+### Task 9: `apps/web` PWA shell (US-B35, tier: Sonnet)
 
-**목표(백로그)**: Vite + `@omnis/ui`, 하단 탭바 5칸(Inbox/Today/Tasks/Network/Notes), manifest + 서비스 워커 + 설치 안내 3단계 카드, 스와이프 액션, 스누즈 프리셋 4개, quick-reply 칩 3개.
-**산출물**: `apps/web/src/**`, `apps/web/public/manifest.webmanifest`
-**검증 명령**: `pnpm --filter @omnis/web test`
-**의존**: B28(Today 화면 — PWA가 재사용할 데이터 패턴), B34(ops 플랜의 Tailscale Serve 마운트, 이 태스크는 빌드만 낸다)
-**읽을 스펙**: 델타 §1(`@omnis/web` 패키지 정의), §9(`OMNIS_WEB_PORT`), A5 §4.1~§4.3, §4.5(전체), §5(컴포넌트 맵 — `@omnis/ui` 재사용)
-**하지 말 것(YAGNI)**: 오프라인 캐싱 전략(Workbox precache 목록 튜닝은 후속 — 서비스 워커는 설치 가능하게만 등록), 실제 화면 5개(Inbox/Today/Tasks/Network/Notes)를 PWA에서 다시 구현(desktop과 같은 `@omnis/ui` 컴포넌트 + Zero 쿼리를 재사용하는 것이 원칙이나, 이 태스크는 셸(탭바+스와이프+설치 카드)만 — 화면 재사용 배선은 열린 질문).
+**Goal (backlog)**: Vite + `@omnis/ui`, 5-slot bottom tab bar (Inbox/Today/Tasks/Network/Notes), manifest + service worker + 3-step install guide card, swipe actions, 4 snooze presets, 3 quick-reply chips.
+**Deliverables**: `apps/web/src/**`, `apps/web/public/manifest.webmanifest`
+**Verification command**: `pnpm --filter @omnis/web test`
+**Depends on**: B28 (Today screen — the data pattern the PWA reuses), B34 (the ops plan's Tailscale Serve mount; this task only produces the build)
+**Spec to read**: delta §1 (`@omnis/web` package definition), §9 (`OMNIS_WEB_PORT`), A5 §4.1–§4.3, §4.5 (all), §5 (component map — reuse `@omnis/ui`)
+**Do not do (YAGNI)**: offline caching strategy (tuning the Workbox precache list is a follow-up — the service worker only needs to register so the app is installable), reimplementing the five real screens (Inbox/Today/Tasks/Network/Notes) in the PWA (reusing the same `@omnis/ui` components + Zero queries as desktop is the principle, but this task covers only the shell (tab bar + swipe + install card) — wiring up screen reuse is an open question).
 
 **Files:**
 - Create: `apps/web/package.json`, `apps/web/tsconfig.json`, `apps/web/vite.config.ts`, `apps/web/index.html`, `apps/web/public/manifest.webmanifest`, `apps/web/src/main.tsx`, `apps/web/src/App.tsx`, `apps/web/src/components/BottomTabBar.tsx`, `apps/web/src/components/InstallGuideCard.tsx`, `apps/web/src/lib/swipe.ts`
-- Modify: `tsconfig.json`(루트 references에 `apps/web` 추가)
+- Modify: `tsconfig.json` (add `apps/web` to the root references)
 - Test: `apps/web/test/bottom-tab-bar.test.tsx`, `apps/web/test/swipe.test.ts`, `apps/web/test/install-guide-card.test.tsx`
 
 **Interfaces:**
-- Consumes: `@omnis/ui`(패키지 그대로 — `apps/desktop`과 동일 의존 규칙), `@omnis/kernel/zero`(서브패스만)
-- Produces: `WEB_TABS`, `WebTab`, `BottomTabBar`(`apps/web/src/components/BottomTabBar.tsx`); `classifySwipe`, `SwipeAction`(`apps/web/src/lib/swipe.ts`); `InstallGuideCard`(`apps/web/src/components/InstallGuideCard.tsx`)
+- Consumes: `@omnis/ui` (the package as-is — same dependency rules as `apps/desktop`), `@omnis/kernel/zero` (subpath only)
+- Produces: `WEB_TABS`, `WebTab`, `BottomTabBar` (`apps/web/src/components/BottomTabBar.tsx`); `classifySwipe`, `SwipeAction` (`apps/web/src/lib/swipe.ts`); `InstallGuideCard` (`apps/web/src/components/InstallGuideCard.tsx`)
 
 **Steps:**
 
-1. [ ] 스캐폴드 파일부터 만든다(패키지가 없으면 vitest가 이 디렉터리를 아예 안 본다 — 테스트보다 먼저 필요한 유일한 비-TDD 스텝, 루트 `pnpm-workspace.yaml`의 `apps/*`가 이미 덮으므로 workspace 파일은 안 건드린다).
+1. [ ] Create the scaffold files first (without a package, vitest will not even look at this directory — the only non-TDD step that must precede the tests; the root `pnpm-workspace.yaml`'s `apps/*` already covers it, so no workspace file is touched).
    ```json
    // apps/web/package.json
    {
@@ -2886,7 +2886,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
        react(),
        VitePWA({
          registerType: "prompt",
-         manifest: false, // public/manifest.webmanifest를 그대로 서빙 — 델타 §9 OMNIS_WEB_PORT
+         manifest: false, // serve public/manifest.webmanifest as-is — delta §9 OMNIS_WEB_PORT
          includeAssets: ["favicon.svg"],
        }),
      ],
@@ -2935,15 +2935,15 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      </StrictMode>,
    );
    ```
-   루트 `tsconfig.json`의 `references` 배열에 `{ "path": "./apps/web" }`를 추가한다.
+   Add `{ "path": "./apps/web" }` to the root `tsconfig.json`'s `references` array.
 
-2. [ ] `classifySwipe`(스와이프 판정)의 실패하는 테스트를 쓴다.
+2. [ ] Write the failing test for `classifySwipe` (the swipe decision).
    ```ts
    // apps/web/test/swipe.test.ts
    import { describe, expect, it } from "vitest";
    import { classifySwipe } from "../src/lib/swipe.js";
 
-   describe("classifySwipe (A5 §4.2: 오른쪽=Archive, 왼쪽 부분=메뉴, 왼쪽 끝까지=Snooze)", () => {
+   describe("classifySwipe (A5 §4.2: right=archive, partial left=menu, full left=snooze)", () => {
      it("returns none below the partial threshold", () => {
        expect(classifySwipe(20)).toBe("none");
        expect(classifySwipe(-20)).toBe("none");
@@ -2961,12 +2961,12 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    });
    ```
 
-3. [ ] 실행 → 실패.
+3. [ ] Run → fail.
    ```bash
    pnpm --filter @omnis/web test
    ```
 
-4. [ ] `apps/web/src/lib/swipe.ts`를 구현한다.
+4. [ ] Implement `apps/web/src/lib/swipe.ts`.
    ```ts
    // apps/web/src/lib/swipe.ts
    export type SwipeAction = "archive" | "menu" | "snooze" | "none";
@@ -2974,8 +2974,8 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    const PARTIAL_PX = 60;
    const FULL_PX = 160;
 
-   /** A5 §4.2: 오른쪽 부분/끝까지 = Archive(둘 다 같은 액션, UI 어포던스만 다르다).
-    * 왼쪽 부분 = 메뉴(Snooze/Label/Delegate), 왼쪽 끝까지 = 기본 액션(Snooze). */
+   /** A5 §4.2: partial or full rightward = Archive (same action either way, only the UI affordance differs).
+    * Partial leftward = menu (Snooze/Label/Delegate); full leftward = the default action (Snooze). */
    export function classifySwipe(deltaX: number): SwipeAction {
      if (deltaX >= PARTIAL_PX) return "archive";
      if (deltaX <= -FULL_PX) return "snooze";
@@ -2984,7 +2984,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    }
    ```
 
-5. [ ] 재실행 → 통과, 커밋.
+5. [ ] Re-run → pass, commit.
    ```bash
    pnpm --filter @omnis/web test
    ```
@@ -2999,45 +2999,45 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    )"
    ```
 
-6. [ ] `BottomTabBar`의 실패하는 테스트를 쓴다.
+6. [ ] Write the failing test for `BottomTabBar`.
    ```tsx
    // apps/web/test/bottom-tab-bar.test.tsx
    import { describe, expect, it, vi } from "vitest";
    import { render, screen, fireEvent } from "@testing-library/react";
    import { BottomTabBar, WEB_TABS } from "../src/components/BottomTabBar.js";
 
-   describe("BottomTabBar (A5 §4.1: 5칸 고정, Digest·Settings 없음)", () => {
+   describe("BottomTabBar (A5 §4.1: fixed 5 slots, no Digest·Settings)", () => {
      it("renders exactly the 5 fixed tabs", () => {
        expect(WEB_TABS).toEqual(["inbox", "today", "tasks", "network", "notes"]);
      });
      it("marks the active tab and calls onSelect on click", () => {
        const onSelect = vi.fn();
        render(<BottomTabBar active="inbox" onSelect={onSelect} />);
-       expect(screen.getByRole("tab", { name: "받은 편지함" })).toHaveAttribute("aria-selected", "true");
-       fireEvent.click(screen.getByRole("tab", { name: "홈" }));
+       expect(screen.getByRole("tab", { name: "Inbox" })).toHaveAttribute("aria-selected", "true");
+       fireEvent.click(screen.getByRole("tab", { name: "Today" }));
        expect(onSelect).toHaveBeenCalledWith("today");
      });
    });
    ```
 
-7. [ ] 실행 → 실패.
+7. [ ] Run → fail.
    ```bash
    pnpm --filter @omnis/web test
    ```
 
-8. [ ] `BottomTabBar` + `InstallGuideCard`를 구현한다.
+8. [ ] Implement `BottomTabBar` + `InstallGuideCard`.
    ```tsx
    // apps/web/src/components/BottomTabBar.tsx
    export const WEB_TABS = ["inbox", "today", "tasks", "network", "notes"] as const;
    export type WebTab = (typeof WEB_TABS)[number];
 
    const TAB_LABEL: Record<WebTab, string> = {
-     inbox: "받은 편지함", today: "홈", tasks: "할 일", network: "네트워크", notes: "노트",
+     inbox: "Inbox", today: "Today", tasks: "Tasks", network: "Network", notes: "Notes",
    };
 
    export function BottomTabBar({ active, onSelect }: { active: WebTab; onSelect: (t: WebTab) => void }) {
      return (
-       <nav className="bottom-tab-bar" role="tablist" aria-label="주요 화면">
+       <nav className="bottom-tab-bar" role="tablist" aria-label="Main screens">
          {WEB_TABS.map((tab) => (
            <button
              key={tab}
@@ -3055,11 +3055,11 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    ```
    ```tsx
    // apps/web/src/components/InstallGuideCard.tsx
-   /** A5 §4.5: 공유 버튼 탭 → 홈 화면에 추가 → 완료, 3단계 카드. */
+   /** A5 §4.5: tap the share button → Add to Home Screen → done, a 3-step card. */
    export function InstallGuideCard({ onDismiss }: { onDismiss: () => void }) {
-     const steps = ["공유 버튼을 탭하세요", "'홈 화면에 추가'를 선택하세요", "완료!"];
+     const steps = ["Tap the share button", "Choose 'Add to Home Screen'", "Done!"];
      return (
-       <div className="install-guide-card" role="dialog" aria-label="홈 화면에 추가">
+       <div className="install-guide-card" role="dialog" aria-label="Add to Home Screen">
          <ol>
            {steps.map((s, i) => (
              <li key={s}>
@@ -3068,14 +3068,14 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
            ))}
          </ol>
          <button type="button" onClick={onDismiss}>
-           닫기
+           Close
          </button>
        </div>
      );
    }
    ```
 
-9. [ ] `apps/web/src/App.tsx`를 구현해 셸을 조립한다(화면 본문은 열린 질문에 남긴 대로 후속 — 이 태스크는 탭 전환 + 설치 카드 노출만 증명).
+9. [ ] Implement `apps/web/src/App.tsx` to assemble the shell (screen bodies are follow-up, as noted under open questions — this task proves only tab switching + install-card display).
    ```tsx
    // apps/web/src/App.tsx
    import { useState } from "react";
@@ -3096,14 +3096,14 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
            <h1>{tab}</h1>
          </header>
          {showInstallGuide && <InstallGuideCard onDismiss={() => setShowInstallGuide(false)} />}
-         <main className="web-shell__main">{/* 화면 본문은 후속 태스크 — 열린 질문 참고 */}</main>
+         <main className="web-shell__main">{/* screen bodies are a follow-up task — see open questions */}</main>
          <BottomTabBar active={tab} onSelect={setTab} />
        </div>
      );
    }
    ```
 
-10. [ ] 재실행 → 통과, 커밋.
+10. [ ] Re-run → pass, commit.
     ```bash
     pnpm --filter @omnis/web test
     ```
@@ -3118,40 +3118,40 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
     )"
     ```
 
-**열린 질문**: 5개 탭의 실제 화면 본문(Inbox/Today/Tasks/Network/Notes)은 이 태스크에서 비어 있다 — desktop이 이미 가진 `Inbox.tsx`/`Today.tsx`/`Tasks.tsx`/`Network.tsx`/`Notes.tsx`를 그대로 재사용할지(반응형 CSS만 다르게), 아니면 PWA 전용 컴팩트 버전을 새로 짤지 결정이 필요하다 — 전자가 명백히 더 라조이(YAGNI: 같은 Zero 쿼리를 두 번 안 짠다)하지만 `apps/desktop`이 Tauri `@tauri-apps/api`를 의존하고 있어 화면 컴포넌트를 그대로 import하면 안 되므로, 화면의 순수 로직만 `packages/ui`나 별도 공유 위치로 뽑아야 한다. 스와이프 제스처의 실제 포인터 이벤트 배선(`classifySwipe`를 호출하는 컴포넌트)과 quick-reply 칩 3개, 스누즈 프리셋 4개 바텀시트도 아직 없다.
+**Open questions**: The five tabs' actual screen bodies (Inbox/Today/Tasks/Network/Notes) are empty in this task — a decision is needed on whether to reuse the `Inbox.tsx`/`Today.tsx`/`Tasks.tsx`/`Network.tsx`/`Notes.tsx` desktop already has (differing only in responsive CSS) or to write new PWA-specific compact versions. The former is obviously lazier (YAGNI: don't write the same Zero queries twice), but `apps/desktop` depends on Tauri's `@tauri-apps/api`, so the screen components cannot be imported as-is; only the screens' pure logic can be extracted into `packages/ui` or another shared location. The actual pointer-event wiring for the swipe gesture (the component that calls `classifySwipe`), the 3 quick-reply chips, and the 4-snooze-preset bottom sheet are also still missing.
 
 ---
 
-### Task 10: PWA Web Push 구독 (US-B36, tier: Sonnet)
+### Task 10: PWA Web Push subscription (US-B36, tier: Sonnet)
 
-**목표(백로그)**: 권한 요청은 첫 승인 대기 항목이 생겼을 때, `POST /push/subscribe` + `push_subscriptions` 저장, 서비스 워커 `notificationclick`(Approve=`pending_approvals` accept, Open=딥링크), 알림 종류 6종 문구.
-**산출물**: `apps/web/src/push/*.ts`, `apps/hub/src/push.ts`
-**검증 명령**: `pnpm --filter @omnis/web test`
-**의존**: B17(알림 전달 — `createNotifier`/`PushPayload` 발송 인프라), B35(이 플랜 Task 9)
-**읽을 스펙**: 델타 §2.3(`PushSubscription`/`PushPayload`), §6(`0011_push_subscriptions.sql`), §7(`/push/*`), A5 §4.4(전체)
-**Web Push 단일 오너(2026-09-20 교차 리뷰 M-webpush):** VAPID 설정·서명·실제 발송·410/404 구독 정리는 **agents 계획 Task 12의 `packages/kernel/src/notify/webpush.ts`가 유일한 오너**다(`vapidFromEnv`/`sendWebPush`/`pruneSubscription`/`WEBPUSH_GONE_CODES`/`VapidKeys`). 이 태스크는 **라우트 3개만** 만든다 — `GET /push/vapid-public-key`, `POST /push/subscribe`, `DELETE /push/subscribe` — 그리고 구독 행 저장·삭제(`saveSubscription`/`removeSubscription`)까지다. `apps/hub`에 두 번째 발송 구현(`sendPush`/`configureWebPush`/`PushSender`)을 만들지 않고 `web-push` 의존도 `apps/hub`에 추가하지 않는다.
+**Goal (backlog)**: Request permission when the first pending-approval item appears, `POST /push/subscribe` + `push_subscriptions` storage, service worker `notificationclick` (Approve=`pending_approvals` accept, Open=deep link), copy for the 6 notification kinds.
+**Deliverables**: `apps/web/src/push/*.ts`, `apps/hub/src/push.ts`
+**Verification command**: `pnpm --filter @omnis/web test`
+**Depends on**: B17 (notification delivery — `createNotifier`/`PushPayload` sending infrastructure), B35 (this plan's Task 9)
+**Spec to read**: delta §2.3 (`PushSubscription`/`PushPayload`), §6 (`0011_push_subscriptions.sql`), §7 (`/push/*`), A5 §4.4 (all)
+**Single owner of Web Push (2026-09-20 cross review M-webpush):** VAPID configuration, signing, actual sending, and 410/404 subscription pruning have **exactly one owner: `packages/kernel/src/notify/webpush.ts` from agents plan Task 12** (`vapidFromEnv`/`sendWebPush`/`pruneSubscription`/`WEBPUSH_GONE_CODES`/`VapidKeys`). This task creates **only the three routes** — `GET /push/vapid-public-key`, `POST /push/subscribe`, `DELETE /push/subscribe` — plus subscription row save/delete (`saveSubscription`/`removeSubscription`). Do not build a second sending implementation in `apps/hub` (`sendPush`/`configureWebPush`/`PushSender`), and do not add the `web-push` dependency to `apps/hub` either.
 
-**하지 말 것(YAGNI)**: 실제 알림 6종의 발송 트리거 배선(그건 agents US-B17의 `createNotifier`가 이미 소유 — 이 태스크는 구독 저장 + 클릭 핸들러만), 허브 쪽 발송 함수(위 단일 오너 규칙), Approve 버튼이 성공했는지 재시도 로직(실패해도 앱을 열면 되므로 fire-and-forget으로 충분, YAGNI).
+**Do not do (YAGNI)**: wiring the send triggers for the actual 6 notification kinds (agents US-B17's `createNotifier` already owns that — this task covers only subscription storage + the click handler), a hub-side send function (per the single-owner rule above), retry logic for whether the Approve button succeeded (opening the app is enough on failure, so fire-and-forget suffices, YAGNI).
 
 **Files:**
 - Create: `apps/hub/src/push.ts`, `apps/web/src/push/subscribe.ts`, `apps/web/src/push/sw-push.ts`
-- Modify: `apps/hub/src/http.ts`(GET /push/vapid-public-key, POST/DELETE /push/subscribe), `apps/hub/src/config.ts`(VAPID 3개 env 필드 추가)
+- Modify: `apps/hub/src/http.ts` (GET /push/vapid-public-key, POST/DELETE /push/subscribe), `apps/hub/src/config.ts` (add 3 VAPID env fields)
 - Test: `apps/hub/src/push.test.ts`, `apps/web/test/push-subscribe.test.ts`, `apps/web/test/sw-push.test.ts`
-- **만들지 않음**: `packages/db/migrations/0011_push_subscriptions.sql`(W0 스키마 번들 소유, 델타 §6 — 교차 리뷰 M3), `packages/kernel/src/notify/webpush.ts`(agents 계획 Task 12 소유)
+- **Not created**: `packages/db/migrations/0011_push_subscriptions.sql` (owned by the W0 schema bundle, delta §6 — cross review M3), `packages/kernel/src/notify/webpush.ts` (owned by agents plan Task 12)
 
 **Interfaces:**
-- Consumes: `PushSubscription`, `PushPayload`(`@omnis/protocol`, 델타 §2.3), `query`(`@omnis/db`), `sendWebPush`/`pruneSubscription`/`vapidFromEnv`/`VapidKeys`(`@omnis/kernel`, agents Task 12 — 이 태스크는 import만 하고 호출은 `createNotifier`가 한다)
-- Produces: `saveSubscription`, `removeSubscription`(`apps/hub/src/push.ts`); `toSubscriptionPayload`(`apps/web/src/push/subscribe.ts`); `buildNotificationOptions`, `resolveNotificationClick`(`apps/web/src/push/sw-push.ts`)
+- Consumes: `PushSubscription`, `PushPayload` (`@omnis/protocol`, delta §2.3), `query` (`@omnis/db`), `sendWebPush`/`pruneSubscription`/`vapidFromEnv`/`VapidKeys` (`@omnis/kernel`, agents Task 12 — this task only imports them; `createNotifier` does the calling)
+- Produces: `saveSubscription`, `removeSubscription` (`apps/hub/src/push.ts`); `toSubscriptionPayload` (`apps/web/src/push/subscribe.ts`); `buildNotificationOptions`, `resolveNotificationClick` (`apps/web/src/push/sw-push.ts`)
 
 **Steps:**
 
-1. [ ] **선행 확인** — 이 태스크는 스키마도 발송기도 만들지 않는다. 둘 다 이미 있어야 시작한다.
+1. [ ] **Precondition check** — this task creates neither the schema nor the sender. Both must already exist before starting.
    ```bash
    cd /Users/logankim/AI-Workspaces/omnis && ls packages/db/migrations/0011_push_subscriptions.sql && grep -n "export async function sendWebPush\|export async function pruneSubscription\|export function vapidFromEnv" packages/kernel/src/notify/webpush.ts
    ```
-   기대 출력: 마이그레이션 파일 1줄 + `webpush.ts`의 export 3줄. 없으면 **중단**한다 — `0011`은 **W0 스키마 번들**(델타 §6), `webpush.ts`는 **agents 계획 Task 12**가 낸다. 둘 다 이 워크트리에서 다시 만들지 않는다(마이그레이션 러너가 sha256 변경을 throw하고, 발송기를 두 벌 두면 VAPID 설정이 두 군데서 갈린다).
+   Expected output: 1 line for the migration file + 3 export lines from `webpush.ts`. If they are missing, **stop** — `0011` comes from the **W0 schema bundle** (delta §6) and `webpush.ts` from **agents plan Task 12**. Do not recreate either in this worktree (the migration runner throws on a sha256 change, and two copies of the sender would split VAPID configuration across two places).
 
-2. [ ] `apps/hub/src/push.ts`(구독 저장/삭제)의 실패하는 테스트를 쓴다. 발송은 여기 없다 — `@omnis/kernel`의 `sendWebPush`가 한다.
+2. [ ] Write the failing tests for `apps/hub/src/push.ts` (subscription save/delete). There is no sending here — `@omnis/kernel`'s `sendWebPush` handles that.
    ```ts
    // apps/hub/src/push.test.ts
    import { describe, expect, it, vi } from "vitest";
@@ -3187,17 +3187,17 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    });
    ```
 
-3. [ ] 실행 → 실패.
+3. [ ] Run → fail.
    ```bash
    pnpm --filter @omnis/hub test
    ```
 
-4. [ ] `apps/hub/src/push.ts`를 구현한다 — 구독 행 저장·삭제만. `web-push`를 import하지 않는다.
+4. [ ] Implement `apps/hub/src/push.ts` — subscription row save/delete only. Do not import `web-push`.
    ```ts
    // apps/hub/src/push.ts
-   // 발송은 여기 없다: VAPID 설정·서명·410/404 정리는 @omnis/kernel의 notify/webpush.ts가
-   // 유일한 오너다(agents 계획 Task 12, 교차 리뷰 M-webpush). 이 파일은 PWA가 보내온 구독을
-   // push_subscriptions에 넣고 빼는 것까지만 한다.
+   // Sending is not here: VAPID config, signing, and 410/404 pruning have exactly one owner,
+   // @omnis/kernel's notify/webpush.ts (agents plan Task 12, cross review M-webpush). This file only
+   // inserts and removes the subscriptions the PWA sends into push_subscriptions.
    import { query } from "@omnis/db";
    import type { Pool } from "pg";
 
@@ -3229,29 +3229,29 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    }
    ```
 
-5. [ ] 재실행 → 통과. `apps/hub/src/config.ts`에 VAPID 필드를 더하고(`zeroAuthSecret`과 같은 "빈 문자열=미설정" 패턴), `http.ts`에 `/push/*` 3개 라우트를 배선한다.
+5. [ ] Re-run → pass. Add the VAPID fields to `apps/hub/src/config.ts` (the same "empty string = unset" pattern as `zeroAuthSecret`), and wire the three `/push/*` routes into `http.ts`.
    ```bash
    pnpm --filter @omnis/hub test
    ```
    ```ts
-   // apps/hub/src/config.ts — HubConfig에 필드 3개 추가, readConfig에 배선
+   // apps/hub/src/config.ts — add 3 fields to HubConfig, wire them into readConfig
    export interface HubConfig {
-     // ...기존 필드
+     // ...existing fields
      webpushVapidPublic: string;
      webpushVapidPrivate: string;
      webpushSubject: string;
    }
-   // readConfig() 반환 객체에 추가:
+   // added to the readConfig() return object:
    webpushVapidPublic: env.OMNIS_WEBPUSH_VAPID_PUBLIC ?? "",
    webpushVapidPrivate: env.OMNIS_WEBPUSH_VAPID_PRIVATE ?? "",
    webpushSubject: env.OMNIS_WEBPUSH_SUBJECT ?? "mailto:281932556+jinhologankim@users.noreply.github.com",
    ```
    ```ts
-   // apps/hub/src/http.ts — 추가 import + createHubServer 상단 + 라우트
+   // apps/hub/src/http.ts — added import + top of createHubServer + routes
    import { removeSubscription, saveSubscription } from "./push.js";
-   // (createHubServer 함수 상단, config가 이미 있으므로)
-   // VAPID 키를 web-push에 물리는 쪽(setVapidDetails)은 @omnis/kernel의 sendWebPush다 —
-   // 허브는 "설정됐는지"만 보고 공개키를 내려준다. 설정이 없으면 /push/*는 503(델타 §7).
+   // (top of the createHubServer function; config is already in scope)
+   // The side that hands the VAPID keys to web-push (setVapidDetails) is @omnis/kernel's sendWebPush —
+   // the hub only checks "is it configured" and returns the public key. With no config, /push/* is 503 (delta §7).
    const webpushConfigured = config.webpushVapidPublic !== "" && config.webpushVapidPrivate !== "";
 
    if (path === "/push/vapid-public-key") {
@@ -3297,9 +3297,9 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      return send(res, 405, { error: "method not allowed" });
    }
    ```
-   발송 경로는 이 태스크에 없다 — agents US-B17의 `createNotifier`가 `@omnis/kernel`의 `sendWebPush(deps, payload)`를 부른다(계약 §5 `Notifier.send`). 허브는 구독을 받아 저장하는 쪽만 책임진다.
+   There is no sending path in this task — agents US-B17's `createNotifier` calls `@omnis/kernel`'s `sendWebPush(deps, payload)` (contract §5 `Notifier.send`). The hub is only responsible for receiving and storing subscriptions.
 
-6. [ ] 커밋.
+6. [ ] Commit.
    ```bash
    git add apps/hub/src/push.ts apps/hub/src/push.test.ts apps/hub/src/config.ts apps/hub/src/http.ts
    git commit -m "$(cat <<'EOF'
@@ -3313,7 +3313,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    )"
    ```
 
-7. [ ] PWA 쪽 구독 변환(`toSubscriptionPayload`)과 서비스 워커 알림 핸들러(`buildNotificationOptions`/`resolveNotificationClick`)의 실패하는 테스트를 쓴다 — 브라우저 Push API 자체(`navigator.serviceWorker`/`PushManager`)는 jsdom에 없으므로 그 앞뒤의 순수 변환 함수만 테스트한다.
+7. [ ] Write the failing tests for the PWA-side subscription conversion (`toSubscriptionPayload`) and the service worker notification handlers (`buildNotificationOptions`/`resolveNotificationClick`) — the browser Push API itself (`navigator.serviceWorker`/`PushManager`) does not exist in jsdom, so only the pure conversion functions around it are tested.
    ```ts
    // apps/web/test/push-subscribe.test.ts
    import { describe, expect, it } from "vitest";
@@ -3341,10 +3341,10 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    import { describe, expect, it } from "vitest";
    import { buildNotificationOptions, resolveNotificationClick } from "../src/push/sw-push.js";
 
-   describe("buildNotificationOptions (A5 §4.4: Approve/Open 최대 2개, 본문 80자)", () => {
+   describe("buildNotificationOptions (A5 §4.4: at most 2 actions Approve/Open, body 80 chars)", () => {
      it("includes an Approve action only when approval_id is present", () => {
        const withApproval = buildNotificationOptions({
-         kind: "draft", title: "새 초안", body: "확인 부탁드립니다", deep_link: "omnis://thread/t1",
+         kind: "draft", title: "New draft", body: "Please confirm", deep_link: "omnis://thread/t1",
          approval_id: "ap1",
        });
        expect(withApproval.actions).toEqual([
@@ -3352,13 +3352,13 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
          { action: "open", title: "Open" },
        ]);
        const withoutApproval = buildNotificationOptions({
-         kind: "digest", title: "밤 다이제스트 준비됨 · 42개 보관", body: "", deep_link: "omnis://digest",
+         kind: "digest", title: "Nightly digest ready · 42 archived", body: "", deep_link: "omnis://digest",
        });
        expect(withoutApproval.actions).toEqual([{ action: "open", title: "Open" }]);
      });
    });
 
-   describe("resolveNotificationClick (Approve = pending_approvals accept, Open = 딥링크)", () => {
+   describe("resolveNotificationClick (Approve = pending_approvals accept, Open = deep link)", () => {
      const payload = {
        kind: "draft" as const, title: "t", body: "b", deep_link: "omnis://thread/t1", approval_id: "ap1",
      };
@@ -3372,12 +3372,12 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    });
    ```
 
-8. [ ] 실행 → 실패.
+8. [ ] Run → fail.
    ```bash
    pnpm --filter @omnis/web test
    ```
 
-9. [ ] `apps/web/src/push/subscribe.ts` + `apps/web/src/push/sw-push.ts`를 구현한다.
+9. [ ] Implement `apps/web/src/push/subscribe.ts` + `apps/web/src/push/sw-push.ts`.
    ```ts
    // apps/web/src/push/subscribe.ts
    export interface PushSubscriptionPayload {
@@ -3398,7 +3398,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
 
    const HUB_HTTP_URL = import.meta.env.OMNIS_HUB_HTTP_URL ?? "http://127.0.0.1:8787";
 
-   /** A5 §4.5: 권한 요청은 첫 승인 대기 항목이 생겼을 때 이 함수를 호출하는 쪽(App.tsx, 후속 범위)이 결정한다. */
+   /** A5 §4.5: the caller of this function (App.tsx, follow-up scope) decides when to ask for permission — when the first pending approval appears. */
    export async function subscribeToPush(): Promise<void> {
      const reg = await navigator.serviceWorker.ready;
      const keyRes = await fetch(`${HUB_HTTP_URL}/push/vapid-public-key`);
@@ -3415,7 +3415,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    }
    ```
    ```ts
-   // apps/web/src/push/sw-push.ts — 서비스 워커 컨텍스트에서 import된다(self.addEventListener 배선은 후속)
+   // apps/web/src/push/sw-push.ts — imported in the service worker context (the self.addEventListener wiring is follow-up)
    export interface PushPayload {
      kind: "draft" | "approval" | "vip" | "briefing" | "digest" | "followup" | "adapter_down";
      title: string;
@@ -3424,7 +3424,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      approval_id?: string;
    }
 
-   /** A5 §4.4: 본문은 80자까지만(이미 hub PushPayload.body가 그렇게 잘려 온다 — 여기서 다시 자르지 않는다). */
+   /** A5 §4.4: the body is at most 80 chars (the hub's PushPayload.body already arrives trimmed — don't trim it again here). */
    export function buildNotificationOptions(payload: PushPayload): { body: string; actions: { action: string; title: string }[] } {
      const actions = payload.approval_id !== undefined
        ? [{ action: "approve", title: "Approve" }, { action: "open", title: "Open" }]
@@ -3436,7 +3436,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      | { kind: "approve"; approvalId: string }
      | { kind: "open"; url: string };
 
-   /** action==='' 는 알림 본문(액션 버튼이 아닌 부분) 클릭 — Open과 동일하게 취급한다(A5 §4.4). */
+   /** action==='' is a click on the notification body (not an action button) — treat it the same as Open (A5 §4.4). */
    export function resolveNotificationClick(action: string, payload: PushPayload): NotificationClickIntent {
      if (action === "approve" && payload.approval_id !== undefined) {
        return { kind: "approve", approvalId: payload.approval_id };
@@ -3445,7 +3445,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    }
    ```
 
-10. [ ] 재실행 → 통과, 커밋.
+10. [ ] Re-run → confirm pass, commit.
     ```bash
     pnpm --filter @omnis/web test
     ```
@@ -3464,33 +3464,33 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
     )"
     ```
 
-**열린 질문**: `self.addEventListener("push", …)`/`self.addEventListener("notificationclick", …)`의 실제 서비스 워커 등록(`sw-push.ts`의 함수를 호출하는 진입점)은 이 태스크에 없다 — `vite-plugin-pwa`의 `injectManifest` 전략으로 커스텀 서비스 워커 소스를 지정해야 하는데(Task 9는 `registerType: "prompt"`의 기본 생성 서비스 워커만 썼다), `vite.config.ts`를 `strategies: "injectManifest"`로 바꾸고 `srcDir`/`filename`을 지정하는 배선이 후속 필요하다. `resolveNotificationClick`이 돌려준 `{kind:"approve"}`가 실제로 기존 `POST /approvals/:id/decide`를 호출하는 연결(Global Constraints에서 "새 경로를 만들지 않는다"고 약속한 부분)도 서비스 워커 진입점과 함께 후속 태스크다.
+**Open questions**: The actual service worker registration for `self.addEventListener("push", …)`/`self.addEventListener("notificationclick", …)` (the entry point that calls `sw-push.ts`'s functions) is not in this task — it requires specifying a custom service worker source via `vite-plugin-pwa`'s `injectManifest` strategy (Task 9 only used the default generated service worker from `registerType: "prompt"`), so switching `vite.config.ts` to `strategies: "injectManifest"` and specifying `srcDir`/`filename` is a follow-up wiring task. The wiring that makes the `{kind:"approve"}` returned by `resolveNotificationClick` actually call the existing `POST /approvals/:id/decide` (the part Global Constraints promises with "don't create new routes") is also a follow-up task, together with the service worker entry point.
 
 ---
 
-### Task 11: `GET /transcript/:session_id` — 에이전트 세션 트랜스크립트 (US-B39 허브 몫, tier: Sonnet)
+### Task 11: `GET /transcript/:session_id` — agent session transcript (US-B39 hub portion, tier: Sonnet)
 
-**왜 이 플랜에 있나(2026-09-20 교차 리뷰 M8)**: 델타 §7이 이 라우트를 US-B39에 달았지만, channels 플랜의 US-B39 산출물은 `apps/local-agent/src/bridges/hermes.ts` 하나뿐이라 아무도 구현하지 않는 **고아 라우트**였다. `apps/hub/src/http.ts`는 이 플랜 Task 1(`/search`)·Task 8(`/settings`)·Task 10(`/push/*`)이 이미 건드리는 파일이라 여기로 옮긴다. 델타 §7 표의 오너 열도 `surfaces 계획 Task 11`로 갱신되어 있다.
+**Why it's in this plan (2026-09-20 cross review M8)**: Delta §7 attached this route to US-B39, but the channels plan's US-B39 deliverable is just `apps/local-agent/src/bridges/hermes.ts`, making this an **orphan route** nobody would implement. `apps/hub/src/http.ts` is already touched by this plan's Task 1 (`/search`), Task 8 (`/settings`) and Task 10 (`/push/*`), so the route moves here. The owner column in the delta §7 table is updated to `surfaces plan Task 11` as well.
 
-**목표**: `GET /transcript/:session_id?last_n` → `SessionSummary`(A3 §7, 스키마는 `@omnis/protocol`의 `SessionSummary`가 정본). durable 요약(`agent_sessions.summary`) + 그 세션 스레드의 **마지막 N턴**을 `items`에서 읽어 돌려준다.
-**산출물**: `apps/hub/src/transcript.ts`, `apps/hub/src/http.ts`(수정)
-**검증 명령**: `pnpm --filter @omnis/hub test`
-**의존**: 없음 — `agent_sessions`/`agent_runtimes`/`items`는 전부 Phase A 스키마다. Task 1~10과 병렬 가능하고 `http.ts` 한 줄 충돌만 조심하면 된다.
-**읽을 스펙**: A2 §6(`SessionSummary`), A3 §7(예고된 경로), 델타 §7, `packages/protocol/src/bridge.ts`의 `SessionSummary`(FIXED, 필드 정본), `apps/hub/src/sessions.ts`(`purposeOf`/`runtimeOf`/`writeAgentItem` — 같은 테이블을 쓰는 코드)
-**하지 말 것(YAGNI)**: `open_questions`/`artifacts`를 추론하는 LLM 호출(A2-D13이 raw 델타·reasoning 원문 저장을 금지했고 지금 스키마에 근거가 없다 — **빈 배열**로 두고 열린 질문에 적는다), `session_key`로도 조회되는 별칭 라우트(델타 §7은 `:session_id` 하나다), 페이지네이션(`last_n`이 상한 10이라 필요 없다).
+**Goal**: `GET /transcript/:session_id?last_n` → `SessionSummary` (A3 §7; `@omnis/protocol`'s `SessionSummary` is the canonical schema). It reads the durable summary (`agent_sessions.summary`) plus the **last N turns** of that session's thread from `items` and returns them.
+**Deliverables**: `apps/hub/src/transcript.ts`, `apps/hub/src/http.ts` (modified)
+**Verification command**: `pnpm --filter @omnis/hub test`
+**Depends on**: nothing — `agent_sessions`/`agent_runtimes`/`items` are all Phase A schema. Can run in parallel with Tasks 1–10; just watch for the one-line conflict in `http.ts`.
+**Spec to read**: A2 §6 (`SessionSummary`), A3 §7 (the announced route), delta §7, `SessionSummary` in `packages/protocol/src/bridge.ts` (FIXED, canonical fields), `apps/hub/src/sessions.ts` (`purposeOf`/`runtimeOf`/`writeAgentItem` — code that uses the same tables)
+**Do not do (YAGNI)**: an LLM call to infer `open_questions`/`artifacts` (A2-D13 forbids storing raw deltas and reasoning text, so there is no basis for them in the current schema — leave them as **empty arrays** and note it in Open questions), an alias route that also looks up by `session_key` (delta §7 has only `:session_id`), pagination (`last_n` caps at 10, so it isn't needed).
 
 **Files:**
 - Create: `apps/hub/src/transcript.ts`, `apps/hub/src/transcript.test.ts`
-- Modify: `apps/hub/src/http.ts`(`GET /transcript/:session_id` 라우트 추가)
+- Modify: `apps/hub/src/http.ts` (add the `GET /transcript/:session_id` route)
 - Test: `apps/hub/src/transcript.test.ts`
 
 **Interfaces:**
-- Consumes: `SessionSummary`(`@omnis/protocol`), `query`(`@omnis/db`), `purposeOf`/`runtimeOf`(`apps/hub/src/sessions.ts`)
-- Produces: `toSessionState`, `clampLastN`, `buildSessionSummary`, `loadTranscript`, `TranscriptSessionRow`, `TranscriptItemRow`(`apps/hub/src/transcript.ts`)
+- Consumes: `SessionSummary` (`@omnis/protocol`), `query` (`@omnis/db`), `purposeOf`/`runtimeOf` (`apps/hub/src/sessions.ts`)
+- Produces: `toSessionState`, `clampLastN`, `buildSessionSummary`, `loadTranscript`, `TranscriptSessionRow`, `TranscriptItemRow` (`apps/hub/src/transcript.ts`)
 
 **Steps:**
 
-1. [ ] 순수 변환부터 실패하는 테스트를 쓴다. DB 행 모양(`TranscriptSessionRow`/`TranscriptItemRow`)을 받아 `SessionSummary`를 만드는 함수가 본체다 — Pool은 `loadTranscript`에서만 만난다.
+1. [ ] Write the failing test for the pure conversion first. The core is the function that takes DB row shapes (`TranscriptSessionRow`/`TranscriptItemRow`) and builds a `SessionSummary` — the Pool is only encountered in `loadTranscript`.
    ```ts
    // apps/hub/src/transcript.test.ts
    import { SessionSummary } from "@omnis/protocol";
@@ -3509,19 +3509,19 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      runtime: "claude_code",
      host: "macbook",
      state: "running",
-     summary: "Phase B 계획 교차 리뷰 반영 중",
+     summary: "Applying the Phase B plan cross review",
      started_at: new Date("2026-09-20T01:00:00.000Z"),
      last_turn_at: new Date("2026-09-20T04:00:00.000Z"),
      turn_count: 42,
    };
 
    const items: TranscriptItemRow[] = [
-     { id: "i1", kind: "agent_turn", body: "계획을 읽었습니다", tool: null, author_is_me: false, sent_at: new Date("2026-09-20T03:58:00.000Z") },
+     { id: "i1", kind: "agent_turn", body: "I've read the plan", tool: null, author_is_me: false, sent_at: new Date("2026-09-20T03:58:00.000Z") },
      { id: "i2", kind: "tool_call", body: "", tool: { label: "Read docs/plan.md", state: "ok" }, author_is_me: false, sent_at: new Date("2026-09-20T03:59:00.000Z") },
-     { id: "i3", kind: "agent_turn", body: "다음 태스크로 갑니다", tool: null, author_is_me: true, sent_at: new Date("2026-09-20T04:00:00.000Z") },
+     { id: "i3", kind: "agent_turn", body: "Moving on to the next task", tool: null, author_is_me: true, sent_at: new Date("2026-09-20T04:00:00.000Z") },
    ];
 
-   describe("toSessionState (agent_sessions.state 6값 → SessionState 5값)", () => {
+   describe("toSessionState (agent_sessions.state 6 values → SessionState 5 values)", () => {
      it("maps starting/idle/ended to the protocol's three", () => {
        expect(toSessionState("starting")).toBe("idle");
        expect(toSessionState("idle")).toBe("idle");
@@ -3534,7 +3534,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
        expect(toSessionState("running")).toBe("running");
        expect(toSessionState("failed")).toBe("failed");
      });
-     // DB CHECK 제약이 6값을 강제하지만, 새 값이 늘면 조용히 'idle'로 뭉개지 않는다.
+     // The DB CHECK constraint enforces the 6 values, but if a new one appears we don't silently flatten it to 'idle'.
      it("throws on an unknown state instead of guessing", () => {
        expect(() => toSessionState("teleporting")).toThrow();
      });
@@ -3546,7 +3546,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
        expect(clampLastN("3")).toBe(3);
        expect(clampLastN("0")).toBe(1);
        expect(clampLastN("99")).toBe(10);
-       expect(clampLastN("맥주")).toBe(10);
+       expect(clampLastN("beer")).toBe(10);
      });
    });
 
@@ -3556,7 +3556,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
        expect(() => SessionSummary.parse(out)).not.toThrow();
        expect(out.purpose).toBe("omnis");
        expect(out.state).toBe("running");
-       expect(out.summary).toBe("Phase B 계획 교차 리뷰 반영 중");
+       expect(out.summary).toBe("Applying the Phase B plan cross review");
        expect(out.open_questions).toEqual([]);
        expect(out.artifacts).toEqual([]);
      });
@@ -3573,18 +3573,18 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
        expect(out.recent_turns.map((t) => t.role)).toEqual(["agent", "user"]);
      });
 
-     // SessionSummary.text는 max(1000)이다 — 넘치면 parse가 throw하므로 여기서 잘라야 한다.
+     // SessionSummary.text is max(1000) — parse throws on overflow, so it must be truncated here.
      it("truncates turn text to 1000 chars so the schema never rejects a long turn", () => {
-       // noUncheckedIndexedAccess 때문에 items[0]을 스프레드하지 않는다 — 행을 직접 만든다.
+       // noUncheckedIndexedAccess means we don't spread items[0] — build the row directly.
        const long: TranscriptItemRow[] = [
-         { id: "i9", kind: "agent_turn", body: "가".repeat(2000), tool: null, author_is_me: false, sent_at: new Date("2026-09-20T04:01:00.000Z") },
+         { id: "i9", kind: "agent_turn", body: "a".repeat(2000), tool: null, author_is_me: false, sent_at: new Date("2026-09-20T04:01:00.000Z") },
        ];
        const out = buildSessionSummary(session, long);
        expect(out.recent_turns[0]?.text.length).toBe(1000);
        expect(() => SessionSummary.parse(out)).not.toThrow();
      });
 
-     // summary가 NULL인 세션(아직 요약 잡이 안 돈 세션)도 200을 줘야 한다 — 404가 아니다.
+     // A session with a NULL summary (the summary job hasn't run yet) must still return 200 — not 404.
      it("uses an empty summary when the session has none yet", () => {
        const out = buildSessionSummary({ ...session, summary: null, last_turn_at: null }, []);
        expect(out.summary).toBe("");
@@ -3594,18 +3594,19 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    });
    ```
 
-2. [ ] 실행 → 실패 확인.
+2. [ ] Run → confirm failure.
    ```bash
    pnpm --filter @omnis/hub test
    ```
-   기대 출력: `Cannot find module './transcript.js'`.
+   Expected output: `Cannot find module './transcript.js'`.
 
-3. [ ] `apps/hub/src/transcript.ts`를 구현한다.
+3. [ ] Implement `apps/hub/src/transcript.ts`.
    ```ts
    // apps/hub/src/transcript.ts
-   // 델타 §7 GET /transcript/:session_id. A3 §7이 예고한 경로이고 스키마 정본은
-   // @omnis/protocol의 SessionSummary다(A2 §6). raw 델타·reasoning 원문은 애초에 저장되지
-   // 않으므로(A2-D13) 여기서 재구성할 것도 없다 — items에 남은 turn/tool_call만 읽는다.
+   // Delta §7 GET /transcript/:session_id. This is the route A3 §7 announced, and the canonical
+   // schema is @omnis/protocol's SessionSummary (A2 §6). Raw deltas and reasoning text are never
+   // stored in the first place (A2-D13), so there is nothing to reconstruct here — we only read the
+   // turn/tool_call items left in `items`.
    import { query } from "@omnis/db";
    import type { SessionState, SessionSummary } from "@omnis/protocol";
    import type { Pool } from "pg";
@@ -3632,7 +3633,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      sent_at: Date;
    }
 
-   /** agent_sessions.state(6값, 0004 CHECK)는 protocol의 SessionState(5값)와 이름이 다르다. */
+   /** agent_sessions.state (6 values, 0004 CHECK) has different names from the protocol's SessionState (5 values). */
    const STATE_MAP: Readonly<Record<string, SessionState>> = {
      starting: "idle",
      idle: "idle",
@@ -3644,7 +3645,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
 
    export function toSessionState(dbState: string): SessionState {
      const mapped = STATE_MAP[dbState];
-     // 모르는 값을 idle로 뭉개면 "끝난 세션"과 "새로 생긴 상태"를 구분할 수 없게 된다.
+     // Flattening an unknown value to idle would make "finished session" indistinguishable from "newly appeared state".
      if (mapped === undefined) throw new Error(`unknown agent_sessions.state: ${dbState}`);
      return mapped;
    }
@@ -3658,9 +3659,10 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      return Math.min(MAX_RECENT_TURNS, Math.max(1, n));
    }
 
-   /** `items`는 sent_at 오름차순으로 들어온다. tool_call은 자기 턴이 아니라 **직전 턴에 접힌다**
-    * (A2 §3.3: reasoning/tool은 item이 아니라 그 턴의 부속이다). 첫 tool_call이 턴보다 먼저
-    * 오면 붙일 곳이 없으므로 버린다 — SessionSummary에 tool 전용 턴은 없다. */
+   /** `items` arrive in ascending sent_at order. A tool_call folds into the **preceding turn**, not
+    * its own (A2 §3.3: reasoning/tool are attachments of that turn, not items). If the first
+    * tool_call arrives before any turn there is nothing to attach it to, so it is dropped —
+    * SessionSummary has no tool-only turns. */
    export function buildSessionSummary(
      session: TranscriptSessionRow,
      items: readonly TranscriptItemRow[],
@@ -3700,7 +3702,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      };
    }
 
-   /** 없으면 null → 라우트가 404를 준다. */
+   /** If nothing is found, null → the route returns 404. */
    export async function loadTranscript(
      pool: Pool,
      sessionId: string,
@@ -3720,8 +3722,9 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
      const session = sessions[0];
      if (session === undefined) return null;
 
-     // 턴 N개를 채우려면 사이에 낀 tool_call까지 받아야 한다 — 넉넉히 뽑고 buildSessionSummary가
-     // 마지막 N턴만 남긴다. ponytail: 상한 N*8. 한 턴에 tool이 8개를 넘으면 앞 턴이 밀린다.
+     // Filling N turns means also fetching the tool_calls interleaved between them — pull generously
+     // and let buildSessionSummary keep only the last N turns. ponytail: cap is N*8. If a single turn
+     // has more than 8 tools, earlier turns get pushed out.
      const rows = await query<TranscriptItemRow>(
        pool,
        `SELECT id, kind, body, tool, author_is_me, sent_at
@@ -3740,22 +3743,22 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    }
    ```
 
-4. [ ] 재실행 → 통과 확인.
+4. [ ] Re-run → confirm pass.
    ```bash
    pnpm --filter @omnis/hub test
    ```
-   기대 출력: `transcript` 10개 테스트 PASS.
+   Expected output: `transcript` 10 tests PASS.
 
-5. [ ] `apps/hub/src/http.ts`에 라우트를 배선한다 — Task 1이 고친 것과 **같은 분기 자리**다(마지막 "다른 부록이 소유한다" 주석 앞). Task 1·8·10과 같은 파일이므로 머지 순서만 지키면 한 줄 충돌이다.
+5. [ ] Wire the route into `apps/hub/src/http.ts` — it goes in **the same branch spot** Task 1 modified (just before the final "owned by another appendix" comment). It shares a file with Tasks 1, 8 and 10, so as long as the merge order is respected it's a one-line conflict.
    ```ts
-   // apps/hub/src/http.ts — import 추가
+   // apps/hub/src/http.ts — added import
    import { clampLastN, loadTranscript } from "./transcript.js";
 
-   // /search·/memory/search 분기 옆
+   // next to the /search and /memory/search branches
    if (path.startsWith("/transcript/")) {
      if (method !== "GET") return send(res, 405, { error: "method not allowed" });
      const sessionId = path.slice("/transcript/".length);
-     // uuid가 아니면 Postgres가 22P02로 throw한다 — 400으로 먼저 끊는다.
+     // If it isn't a uuid, Postgres throws 22P02 — cut it off with a 400 first.
      if (!/^[0-9a-f-]{36}$/i.test(sessionId)) return send(res, 400, { error: "invalid session_id" });
      const summary = await loadTranscript(pool, sessionId, clampLastN(url.searchParams.get("last_n")));
      if (summary === null) return send(res, 404, { error: "session not found" });
@@ -3763,7 +3766,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    }
    ```
 
-6. [ ] 전체 검증 후 커밋한다.
+6. [ ] Run the full verification, then commit.
    ```bash
    pnpm --filter @omnis/hub test && pnpm typecheck && pnpm lint
    ```
@@ -3783,22 +3786,22 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    )"
    ```
 
-**열린 질문**: `SessionSummary.open_questions`와 `artifacts`를 빈 배열로 둔다. 둘 다 A2 §6에 필드로는 있지만 Phase A 스키마에 근거가 없다(`items.tool`의 `{name,args,state,label,icon}`에 파일 경로가 들어오는 경우가 있지만 `action: created|modified|read` 구분이 없다). 채우려면 ① 브리지가 `TurnCompleted`에 artifacts를 싣게 하거나 ② 요약 잡(US-A?? `summarize-job.ts`)이 `agent_sessions`에 컬럼을 더해야 한다 — 어느 쪽이든 Phase C 범위다.
+**Open questions**: `SessionSummary.open_questions` and `artifacts` are left as empty arrays. Both exist as fields in A2 §6 but have no basis in the Phase A schema (`items.tool`'s `{name,args,state,label,icon}` can carry a file path, but there is no `action: created|modified|read` distinction). To fill them, either ① the bridge would need to include artifacts in `TurnCompleted`, or ② the summary job (US-A?? `summarize-job.ts`) would need to add columns to `agent_sessions` — either way it's Phase C scope.
 
 ---
 
-## 완료 체크
+## Completion check
 
-- 스토리 10개(US-B26, B27, B28, B29, B30, B31, B32, B33, B35, B36) 전부 태스크 ≥1개(각 정확히 1개, Task 1~10)로 커버됨. **Task 11은 스토리 밖**이다 — 델타 §7의 `GET /transcript/:session_id`를 US-B39(channels)에서 넘겨받은 허브 몫이다(2026-09-20 교차 리뷰 M8).
-- 금지 표현(TBD/TODO/"implement later"/"add appropriate error handling"/"similar to Task N"/코드 없는 스텝/미정의 심볼) 없음 — 셀프체크 결과 없음 확인.
-- 이 문서가 소비하는 모든 심볼은 델타 §2~§5(`SearchHit` 계열, `PushSubscription`/`PushPayload`, `getSetting`/`setSetting`/`SettingKey`/`SETTING_DEFAULTS`) 또는 다른 Phase B 플랜이 웨이브 순서상 먼저 만드는 것(`searchMemories`/`MemoryHit`, `undoArchive`, `currentPolicy`)뿐이고, 전부 Global Constraints에 명시했다.
-- 이 플랜이 새로 고정한 심볼(델타에 없던 것, "심볼 산출물" 참고): `runSearch`/`createSearchDeps`/`SearchDeps`(Task 1), `matchesAnyAction`/`UiSearchHit`/`UiSearchGroup`(Task 2), `DigestCard`(Task 3), `TaskRow`/`filterTasksByView`(Task 4), `PersonCard`/`relationshipDot`/`followupQueue`(Task 5), `decideNoteRouting`/`POST /notes/:id/route`(Task 6, 델타에 없던 라우트 — 열린 질문에 기록), `handleUnarchiveItem`/`handleDigestUndo`(Task 7), `packages/kernel/src/settings.ts` 전체(Task 8, 델타 §5를 최초로 구현), `BottomTabBar`/`classifySwipe`/`InstallGuideCard`(Task 9), `apps/hub/src/push.ts`의 구독 저장·삭제(Task 10 — 발송은 `@omnis/kernel` 단일 오너), `toSessionState`/`clampLastN`/`buildSessionSummary`/`loadTranscript`(Task 11).
+- All 10 stories (US-B26, B27, B28, B29, B30, B31, B32, B33, B35, B36) are covered by ≥1 task (exactly one each, Tasks 1–10). **Task 11 is outside the story list** — it is the hub portion of delta §7's `GET /transcript/:session_id`, handed over from US-B39 (channels) (2026-09-20 cross review M8).
+- No forbidden phrasing (TBD/TODO/"implement later"/"add appropriate error handling"/"similar to Task N"/steps without code/undefined symbols) — self-check confirms none.
+- Every symbol this document consumes is either from delta §2–§5 (the `SearchHit` family, `PushSubscription`/`PushPayload`, `getSetting`/`setSetting`/`SettingKey`/`SETTING_DEFAULTS`) or produced earlier in the wave order by another Phase B plan (`searchMemories`/`MemoryHit`, `undoArchive`, `currentPolicy`), and all of them are spelled out in Global Constraints.
+- Symbols this plan newly pins down (not in the delta, see "Symbol deliverables"): `runSearch`/`createSearchDeps`/`SearchDeps` (Task 1), `matchesAnyAction`/`UiSearchHit`/`UiSearchGroup` (Task 2), `DigestCard` (Task 3), `TaskRow`/`filterTasksByView` (Task 4), `PersonCard`/`relationshipDot`/`followupQueue` (Task 5), `decideNoteRouting`/`POST /notes/:id/route` (Task 6, a route absent from the delta — recorded in Open questions), `handleUnarchiveItem`/`handleDigestUndo` (Task 7), all of `packages/kernel/src/settings.ts` (Task 8, the first implementation of delta §5), `BottomTabBar`/`classifySwipe`/`InstallGuideCard` (Task 9), subscription store/delete in `apps/hub/src/push.ts` (Task 10 — sending is single-owned by `@omnis/kernel`), `toSessionState`/`clampLastN`/`buildSessionSummary`/`loadTranscript` (Task 11).
 
-**2026-09-20 교차 리뷰 반영분(이 문서에서 바뀐 것)**:
-- M8 — `GET /transcript/:session_id`를 **Task 11**로 신설(델타 §7 오너 열도 갱신됨).
-- M13 — `truncateSnippet`을 이 플랜이 만들지 않는다. memory-ingestion 계획 Task 4가 `packages/memory/src/search.ts`에 내고 Task 1은 import만 한다.
-- M-B28 — Task 3(US-B28)의 4상태(로딩/빈/오류/오프라인)를 YAGNI에서 빼고 `screenState()` + 배너 한 줄로 실제 구현했다.
-- M-B30 — Task 5(US-B30)가 쓰는 `initialsFromName`/`pastelFromName`/`formatRelativeTime`의 파일·시그니처를 실측해 표로 박았다(전부 Wave 4/5에서 이미 main에 있다 — 새로 만들지 않는다).
-- M-webpush — Web Push 발송 단일 오너는 agents 계획 Task 12의 `packages/kernel/src/notify/webpush.ts`다. Task 10은 라우트 3개 + 구독 저장/삭제만 하고 `0011`도 만들지 않는다(W0 번들 소유).
-- 배선 교정 — 화면 6개가 모듈 최상단 `const zero = initZero()`를 쓰고 있었다. `apps/desktop/src/zero-client.ts`가 "화면들이 각자 `initZero()`를 부르던 배선으로는 브라우저에서 한 화면도 뜨지 않았다"고 기록해 둔 실패 모드라, 기존 화면 3종(Inbox/Thread/AgentSession)과 같이 **컴포넌트 안에서 `useZeroClient()`**를 부르도록 전부 고쳤다.
+**2026-09-20 cross review items reflected (what changed in this document)**:
+- M8 — added `GET /transcript/:session_id` as **Task 11** (the delta §7 owner column is updated too).
+- M13 — this plan does not create `truncateSnippet`. The memory-ingestion plan's Task 4 ships it in `packages/memory/src/search.ts`; Task 1 only imports it.
+- M-B28 — Task 3 (US-B28)'s 4 states (loading/empty/error/offline) were pulled out of YAGNI and actually implemented with `screenState()` + a one-line banner.
+- M-B30 — measured the file and signature of `initialsFromName`/`pastelFromName`/`formatRelativeTime` used by Task 5 (US-B30) and pinned them in a table (all already on main from Waves 4/5 — we don't create them).
+- M-webpush — the single owner for Web Push sending is `packages/kernel/src/notify/webpush.ts` in the agents plan's Task 12. Task 10 only does the 3 routes plus subscription store/delete, and does not create `0011` either (owned by the W0 bundle).
+- Wiring fix — six screens were using a module-top-level `const zero = initZero()`. `apps/desktop/src/zero-client.ts` records this as a known failure mode: "with the wiring where screens each called `initZero()` themselves, not a single screen rendered in the browser", so all of them were changed to call **`useZeroClient()` inside the component**, like the three existing screens (Inbox/Thread/AgentSession).
 
