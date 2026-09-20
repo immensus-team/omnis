@@ -43,6 +43,22 @@ importers:
         specifier: 2.1.9
         version: 2.1.9(@types/node@22.7.5)(jsdom@25.0.1)
 
+  packages/adapters/google-calendar:
+    dependencies:
+      '@omnis/protocol':
+        specifier: workspace:*
+        version: link:../../protocol
+      googleapis:
+        specifier: ^161.0.0
+        version: 161.0.0
+    devDependencies:
+      typescript:
+        specifier: 5.6.3
+        version: 5.6.3
+      vitest:
+        specifier: 2.1.9
+        version: 2.1.9(@types/node@22.7.5)(jsdom@25.0.1)
+
   packages/adapters/slack:
     dependencies:
       '@omnis/protocol':
