@@ -8,7 +8,8 @@ const pool = new Pool({
 afterAll(() => pool.end());
 
 beforeEach(async () => {
-  await pool.query("DELETE FROM agent_runs WHERE model = 'cost-test'");
+  // mtd 합계는 agent_runs 전량이 입력이라 다른 파일이 남긴 행도 상태를 바꾼다 — 테이블을 비운다.
+  await pool.query("DELETE FROM agent_runs");
   await pool.query(
     `INSERT INTO settings (key, value) VALUES ('cost.cap_usd','60'::jsonb),
                                               ('cost.reserve_ratio','0.1'::jsonb)

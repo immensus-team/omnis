@@ -5,6 +5,7 @@ import {
   assertZeroPublication,
   createKernel,
   createLogger,
+  registerCostDailyJob,
   registerHealthcheckJob,
 } from "@omnis/kernel";
 import { createBridgeHub } from "./bridge.js";
@@ -27,6 +28,7 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
   await assertZeroPublication(pool);
 
   registerHealthcheckJob(kernel.scheduler, { pool, events: kernel.events });
+  registerCostDailyJob(kernel.scheduler, { pool, audit: kernel.audit, logger });
   await kernel.scheduler.start();
 
   // B3: kinso 인박스 행의 AI 한 줄 요약 — @omnis/agents는 모듈 싱글톤 pool을 쓴다(pool.ts).
