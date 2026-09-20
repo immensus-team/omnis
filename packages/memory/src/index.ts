@@ -78,3 +78,10 @@ export {
   type RunIngestDeps,
 } from "./ingest/run.js";
 export { createCalendarProvider } from "./ingest/calendar.js";
+export {
+  scanRoots,
+  createLocalMiniProvider,
+  watchLocalRoots,
+  type LocalFile,
+  type ScanOptions,
+} from "./ingest/local-mini.js";
