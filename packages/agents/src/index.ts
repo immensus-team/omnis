@@ -64,3 +64,12 @@ export {
   ProposeTaskInput,
 } from "./tools/propose.js";
 export { toolRegistry } from "./tools/registry.js";
+export {
+  CHANNEL_DRAFT_SHAPE,
+  NEEDS_REPLY_MIN,
+  needsReplyScore,
+  pickRegister,
+  type DraftShape,
+  type Register,
+} from "./draft/register.js";
+export { SELF_CHECK_ITEMS, selfCheck, type SelfCheckCtx } from "./draft/selfcheck.js";
