@@ -157,16 +157,35 @@ function Shell() {
               The scope is the open thread — an approval that belongs to the conversation in front
               of you is the one you are working on; with nothing open the whole queue is the scope.
               The decision still goes to the hub over HTTP (contract §5) — Zero only carries the
-              read. */}
-          <ApprovalStack
-            approvals={approvals as unknown as ApprovalStackItem[]}
-            openThreadId={open?.threadId ?? null}
-            onDecide={onDecide}
-          />
-          {open === null ? null : open.agentSession ? (
-            <AgentSession sessionThreadId={open.threadId} />
+              read.
+
+              With nothing open the pane *is* the queue, so the stack is the whole pane. With a
+              thread open the stack is handed to the screen instead, which draws it under the
+              thread's own title: the pane has to open on what it is about. (An agent session has
+              no header of its own, so there it stays on top.) */}
+          {open === null ? (
+            <ApprovalStack
+              approvals={approvals as unknown as ApprovalStackItem[]}
+              openThreadId={null}
+              onDecide={onDecide}
+            />
+          ) : open.agentSession ? (
+            <>
+              <ApprovalStack
+                approvals={approvals as unknown as ApprovalStackItem[]}
+                openThreadId={open.threadId}
+                onDecide={onDecide}
+              />
+              <AgentSession sessionThreadId={open.threadId} />
+            </>
           ) : (
-            <Thread threadId={open.threadId} />
+            <Thread threadId={open.threadId}>
+              <ApprovalStack
+                approvals={approvals as unknown as ApprovalStackItem[]}
+                openThreadId={open.threadId}
+                onDecide={onDecide}
+              />
+            </Thread>
           )}
         </section>
       )}

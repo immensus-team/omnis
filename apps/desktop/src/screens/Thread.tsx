@@ -12,7 +12,7 @@ import {
 import { formatRelativeTime } from "@omnis/ui/lib/relative-time";
 import { CHANNEL_LABEL } from "@omnis/ui/lib/row-meta";
 import { useQuery } from "@rocicorp/zero/react";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { setThreadArchived } from "../api/threads.js";
 import { useZeroClient } from "../zero-client.js";
 
@@ -73,7 +73,11 @@ interface ThreadRowQuery {
   archived_at?: number | null;
 }
 
-export function Thread({ threadId }: { threadId: string }) {
+/** `children` is the slot directly under the header, above the segment body — US-D03 puts the
+ *  approval stack there. The stack belongs to this thread, so it has to sit under the line that
+ *  names the thread; drawn above (where it used to be) the pane opened on the approval instead of
+ *  on its own title, and the reference's card leads with the title. */
+export function Thread({ threadId, children }: { threadId: string; children?: ReactNode }) {
   const zero = useZeroClient();
   const [segment, setSegment] = useState<ThreadSegment>("conversation");
   const [labelsOpen, setLabelsOpen] = useState(false);
@@ -207,6 +211,7 @@ export function Thread({ threadId }: { threadId: string }) {
           {metaOpen && <KeyValueTable rows={metaRows} />}
         </div>
       )}
+      {children}
       {segment === "summary" && (
         <p className="thread-panel">{thread?.meta?.summary ?? "No summary for this thread yet."}</p>
       )}

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// 루트 `pnpm test`(vitest.workspace.ts)는 packages/ui/vitest.config.ts를 읽지 않는다.
-// 환경과 셋업(jest-dom matchers + afterEach(cleanup))을 파일 자체가 선언한다.
+// The root `pnpm test` (vitest.workspace.ts) does not read packages/ui/vitest.config.ts, so the
+// file declares its own environment and setup (jest-dom matchers + afterEach(cleanup)).
 import "./setup";
 
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -11,17 +11,19 @@ describe("DraftCard (A5-D9)", () => {
   it("shows full body (no truncation) and rationale", () => {
     render(
       <DraftCard
-        body="네 확인했습니다, 내일 오전에 코멘트 드릴게요"
+        body="Yes, confirmed — I will leave comments tomorrow morning."
         rationale="PROJECTS.md #davich"
         onEditAndSend={vi.fn()}
         onDiscard={vi.fn()}
         onRegenerate={vi.fn()}
       />,
     );
-    expect(screen.getByText("네 확인했습니다, 내일 오전에 코멘트 드릴게요")).toBeInTheDocument();
+    expect(
+      screen.getByText("Yes, confirmed — I will leave comments tomorrow morning."),
+    ).toBeInTheDocument();
     expect(screen.getByText(/PROJECTS.md #davich/)).toBeInTheDocument();
   });
-  it("wires the 3 buttons to their callbacks (§8 마이크로카피 한국어)", () => {
+  it("wires the 3 buttons to their callbacks (§8 microcopy, en source locale)", () => {
     const onEditAndSend = vi.fn();
     const onDiscard = vi.fn();
     const onRegenerate = vi.fn();
@@ -34,11 +36,11 @@ describe("DraftCard (A5-D9)", () => {
         onRegenerate={onRegenerate}
       />,
     );
-    fireEvent.click(screen.getByText("수정 후 보내기"));
+    fireEvent.click(screen.getByText("Edit & send"));
     expect(onEditAndSend).toHaveBeenCalledOnce();
-    fireEvent.click(screen.getByText("버리기"));
+    fireEvent.click(screen.getByText("Discard"));
     expect(onDiscard).toHaveBeenCalledOnce();
-    fireEvent.click(screen.getByText("다시 생성"));
+    fireEvent.click(screen.getByText("Regenerate"));
     expect(onRegenerate).toHaveBeenCalledOnce();
   });
 });

@@ -9,19 +9,21 @@ export interface DraftCardProps {
   onRegenerate: () => void;
 }
 
-/** A5-D9: draft는 항상 전문 노출(요약 금지). */
+/** A5-D9: the draft is always shown in full — never a summary. The copy is the `en` dictionary's
+ *  (i18n/en.ts §8); `en` is the source locale, and the Korean in i18n/ko.ts is the optional
+ *  add-on. */
 export function DraftCard(props: DraftCardProps) {
   return (
     <OpaqueSurface className="draft-card">
-      <p className="draft-card__rationale">omnis 초안 · 근거: {props.rationale}</p>
+      <p className="draft-card__rationale">omnis draft · rationale: {props.rationale}</p>
       <p className="draft-card__body">{props.body}</p>
       <div className="draft-card__actions">
-        <Button onClick={props.onEditAndSend}>수정 후 보내기</Button>
+        <Button onClick={props.onEditAndSend}>Edit &amp; send</Button>
         <Button variant="ghost" onClick={props.onDiscard}>
-          버리기
+          Discard
         </Button>
         <Button variant="ghost" onClick={props.onRegenerate}>
-          다시 생성
+          Regenerate
         </Button>
       </div>
     </OpaqueSurface>
