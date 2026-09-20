@@ -15,6 +15,10 @@ import { readKeychainSecret } from "./keychain.js";
 
 export const CHANNEL = "telegram" as const;
 
+// A1 §2.5 + 백로그 US-B40 "backfill 상한(채널별 30일·500건)" — 이 어댑터가 직접 강제한다.
+export const BACKFILL_MAX_DAYS = 30;
+export const BACKFILL_MAX_ITEMS = 500;
+
 const CAPABILITIES: Capabilities = {
   read: true,
   write: true,
@@ -106,16 +110,37 @@ export function createTelegramAdapter(deps: TelegramAdapterDeps = {}): Adapter {
       status = "down";
     },
 
-    backfill(): AsyncIterable<NormalizedItem> {
-      throw new AdapterError("fatal_unsupported", CHANNEL, "backfill not implemented until Task 9");
+    async *backfill(since?: Date): AsyncIterable<NormalizedItem> {
+      if (client === undefined)
+        throw new AdapterError("fatal_protocol", CHANNEL, "backfill() called before connect()");
+      const cutoff = since ?? new Date(now().getTime() - BACKFILL_MAX_DAYS * 86_400_000);
+      let raws: unknown[];
+      try {
+        raws = await client.getHistory("me", {
+          limit: BACKFILL_MAX_ITEMS,
+          offsetUnixSec: Math.floor(cutoff.getTime() / 1000),
+        });
+      } catch (cause) {
+        throw mapApiError(cause);
+      }
+      let done = 0;
+      for (const raw of raws) {
+        if (done >= BACKFILL_MAX_ITEMS) break;
+        for (const item of normalize(raw)) {
+          yield item;
+          done += 1;
+        }
+      }
+      queue.push({ kind: "backfill_progress", done, total: raws.length, at: now().toISOString() });
     },
 
     subscribe(): AsyncIterable<NormalizedItem | AdapterEvent> {
-      throw new AdapterError(
-        "fatal_unsupported",
-        CHANNEL,
-        "subscribe not implemented until Task 9",
-      );
+      if (client === undefined)
+        throw new AdapterError("fatal_protocol", CHANNEL, "subscribe() called before connect()");
+      unsubscribe = client.onUpdate((raw) => {
+        for (const item of normalize(raw)) queue.push(item);
+      });
+      return queue;
     },
 
     async send(): Promise<never> {
