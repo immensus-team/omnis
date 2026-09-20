@@ -245,8 +245,9 @@ body {
 }
 
 /* U1 ask/search pill — rendered by CommandPalette mode="inline".
-   A gradient stroke instead of .glass-surface's default hairline border (--ask-gradient on
-   focus). */
+   A gradient stroke instead of .glass-surface's default hairline border (--aurora-stroke on
+   focus, US-D06 §4.1.2 — the retired --ask-gradient's teal→orange was the last hue on the
+   canvas that was not part of the aurora palette). */
 .ask-bar {
   position: relative;
 }
@@ -282,7 +283,7 @@ body {
   inset: -1px;
   border-radius: 999px;
   padding: 1.5px;
-  background: var(--ask-gradient);
+  background: var(--aurora-stroke);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
@@ -301,7 +302,10 @@ body {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: var(--ask-gradient);
+  /* US-D06 §4.1.2: the photograph in miniature — butter core, peach bloom, indigo body, a void edge
+     so the 18px bead does not go flat. A radial, not the pill's linear stroke: at 19:1 the linear
+     one puts all its amber in the left ~200px and reads as neither shape. */
+  background: var(--aurora-orb);
 }
 
 /* min-width: 0 — without releasing an input's default min-content (about 20 characters), the bar
@@ -419,7 +423,16 @@ body {
 
 /* US-D01: the floating glass panel that unfolds under the ask bar (.glass-surface + the palette
    slot). The reference's AI chat panel (ref-glass-mail-ai-panel.webp): anchored directly below the
-   bar, entering downward from it. */
+   bar, entering downward from it.
+   US-D06 §4.1.2: the panel is two elements now. This one is the aurora wrapper — it owns the
+   shape, the lift and the entrance. The glass inside (.glass-surface.ask-panel__glass) owns the
+   padding, the height cap and the scroll. The split is forced: `.aurora` clips with
+   `overflow: hidden` and its texture layers are positioned against it, so it may not be the scroll
+   container itself. Which subtree scrolls is unchanged — the glass wraps both render branches (the
+   cmdk list and the suggestions), so neither can scroll independently of the other.
+   This selector stays single-class (0,1,0) on purpose: the US-D04 reduce block below overrides
+   `animation-name` at the same specificity, and a `.aurora.ask-panel` here would silently beat it
+   and leave a reduced-motion user with the full 320ms spring. */
 .ask-panel {
   position: absolute;
   top: calc(100% + 8px);
@@ -428,6 +441,25 @@ body {
      full width — stretched across the bar at 1440px it becomes a 4.4:1 empty band. */
   width: min(420px, 100%);
   z-index: 5;
+  border-radius: 20px;
+  /* `.aurora` clips the panel's outer --shadow-glass off at the rounded edge (§4.1.1's accepted
+     cost, same fix): the drop shadow moves out to the wrapper and the glass inside keeps only its
+     inset highlight. */
+  box-shadow: var(--shadow-glass);
+  transform-origin: top left;
+  /* Spring entrance (320ms — the layer rung of DESIGN-DIRECTION's ladder, --ease-spring). Under
+     reduce the duration drops to the shared fade and the travelled transform is stripped by the
+     consolidated @media block at the end of this file (US-D04). */
+  animation: ask-panel-in var(--dur-panel) var(--ease-spring);
+}
+
+/* §3.2's dawn blur for this surface: ~10% of the 420px short side. Two-class (0,2,0) so it beats
+   the `[data-aurora="dawn"]` block whatever order the stylesheets load in. */
+.aurora.ask-panel {
+  --aurora-blur: 42px;
+}
+
+.glass-surface.ask-panel__glass {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -436,11 +468,7 @@ body {
   /* The command-list tab can get long — capped here so the panel never outgrows the viewport. */
   max-height: min(60vh, 420px);
   overflow-y: auto;
-  transform-origin: top left;
-  /* Spring entrance (320ms — the layer rung of DESIGN-DIRECTION's ladder, --ease-spring). Under
-     reduce the duration drops to the shared fade and the travelled transform is stripped by the
-     consolidated @media block at the end of this file (US-D04). */
-  animation: ask-panel-in var(--dur-panel) var(--ease-spring);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 
 @keyframes ask-panel-in {

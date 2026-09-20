@@ -149,3 +149,41 @@ describe("AskPanel context line (US-D01)", () => {
     expect(screen.getByText("No thread selected")).toBeInTheDocument();
   });
 });
+
+// US-D06 §4.1.2: the panel is two elements — an aurora wrapper and the glass that scrolls inside it.
+// The split is load-bearing, not cosmetic: `.aurora` clips with `overflow: hidden` and positions its
+// texture layers against itself, so it may never be the scroll container.
+describe("AskPanel aurora backdrop (US-D06)", () => {
+  const renderPanel = () => {
+    const { container } = render(panel(true, "Test summary"));
+    return container;
+  };
+
+  it("separates the aurora wrapper from the glass scroller", () => {
+    const container = renderPanel();
+    const aura = container.querySelector(".ask-panel");
+    const glass = container.querySelector(".ask-panel__glass");
+
+    expect(aura).toHaveAttribute("data-aurora", "dawn");
+    expect(aura).toContainElement(glass);
+    // §2.7: one element carrying both classes would give `.aurora`'s background-color and
+    // `.glass-surface`'s background the same specificity, and the panel stops being glass.
+    expect(aura).not.toHaveClass("glass-surface");
+    expect(glass).not.toHaveClass("aurora");
+    // The glass is the scroller, so the aurora around it never is.
+    expect(glass).toHaveClass("glass-surface");
+  });
+
+  it("keeps the dialog role on the wrapper, where the close spring lands", () => {
+    // The role used to sit on the glass, which *was* the outer element. It moved out with the box:
+    // `.ask-panel--closing` is applied to the wrapper, and a dialog that is not the element carrying
+    // the panel's state is a worse answer than a dialog that is.
+    const { container } = render(
+      <AskPanel commands={null} threadSelected summary={null} closing onClose={vi.fn()} />,
+    );
+    const dialog = screen.getByRole("dialog", { name: "AI panel" });
+    expect(dialog).toHaveClass("ask-panel");
+    expect(dialog).toHaveClass("ask-panel--closing");
+    expect(dialog).toContainElement(container.querySelector(".ask-panel__glass"));
+  });
+});

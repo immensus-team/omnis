@@ -1,6 +1,7 @@
 import { ListChecks, PenLine, Sparkles, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { cn } from "../lib/cn.js";
+import { AuroraSurface } from "./aurora-surface.js";
 import { GlassSurface } from "./glass-surface.js";
 
 /** US-D01: the floating glass panel the ask bar expands into. It is the reference
@@ -55,97 +56,111 @@ export function AskPanel({
   }
   const tab: Tab = override ?? (query.trim() === "" ? "suggest" : "commands");
 
+  // US-D06 §4.1.2: the panel's glass now stands on the `dawn` aurora — reference image 1's soft
+  // indigo ridge with its warm bloom. The wrapper owns position, radius, shadow and the entrance
+  // spring; the glass inside owns padding, the height cap and the scroll. Two elements on purpose
+  // (§2.7): `.aurora` and `.glass-surface` both set a background at (0,1,0), so one element carrying
+  // both would either stop being glass or lose the vignette to the glass tint.
+  // Aurora goes on fixed-size boxes only, and this one scrolls — hence the split rather than a
+  // single element that both paints and scrolls.
+  // The dialog role moves out to the wrapper with the panel's outer box: the wrapper is now the
+  // panel's root element (it is what is positioned, sized and animated), and `.ask-panel--closing`
+  // lands on it — so the element a test or a screen reader finds by role is still the element that
+  // carries the panel's state. The two aurora layers inside are `aria-hidden`, so the accessible
+  // name and the announced subtree are unchanged from the single-element version.
   return (
-    <GlassSurface
-      slot="palette"
+    <AuroraSurface
+      variant="dawn"
       className={cn("ask-panel", closing && "ask-panel--closing")}
-      // biome-ignore lint/a11y/useSemanticElements: GlassSurface is the shared glass wrapper (rail/toolbar/sheet/palette all use it) — a native <dialog> would need its own backdrop/blur styling duplicated here.
+      // biome-ignore lint/a11y/useSemanticElements: AuroraSurface is a shared presentational wrapper (rail/toolbar/palette all use it) — a native <dialog> would need its own backdrop/blur styling duplicated here.
       role="dialog"
       aria-label="AI panel"
     >
-      <div className="ask-panel__head">
-        {/* biome-ignore lint/a11y/useSemanticElements: tab-like toggle, not a form fieldset. */}
-        <div className="ask-panel__tabs" role="group" aria-label="Panel views">
-          <button
-            type="button"
-            aria-pressed={tab === "suggest"}
-            onClick={() => setOverride("suggest")}
-          >
-            Suggestions
-          </button>
-          <button
-            type="button"
-            aria-pressed={tab === "commands"}
-            onClick={() => setOverride("commands")}
-          >
-            Commands
-          </button>
-        </div>
-        <button type="button" className="ask-panel__close" aria-label="Close" onClick={onClose}>
-          <X size={14} aria-hidden="true" />
-        </button>
-      </div>
-      {tab === "commands" ? (
-        commands
-      ) : (
-        <>
-          {/* Say what the panel is working on first — this is the reference's conversation area
-              (leaving it an empty band reads as "a wide dropdown"). */}
-          <div className="ask-panel__context">
-            <p className="ask-panel__context-title">
-              {threadSelected ? (threadTitle ?? "Untitled thread") : "No thread selected"}
-            </p>
-            <p
-              className={cn(
-                "ask-panel__context-body",
-                (!summaryShown || summary === null) && "ask-panel__context-body--muted",
-              )}
-            >
-              {summaryShown
-                ? (summary ?? "No summary yet")
-                : threadSelected
-                  ? "The suggestions below run against this thread."
-                  : "Suggestions come alive once you pick a thread."}
-            </p>
-          </div>
-          <div className="ask-panel__actions">
-            {/* US-D01 fallback: there is no route to attach drafts or todo extraction to —
-                disabled, with title="Phase B". Saying it cannot be pressed is more honest than
-                pretending it can. */}
-            <button type="button" className="ask-panel__action" disabled title="Phase B">
-              <PenLine size={15} aria-hidden="true" />
-              Draft a reply
-              <span className="ask-panel__tag" aria-hidden="true">
-                Phase B
-              </span>
-            </button>
-            {/* Only this one is actually wired up — threads.meta.summary (filled by the T1
-                summarization loop). */}
+      <GlassSurface slot="palette" className="ask-panel__glass">
+        <div className="ask-panel__head">
+          {/* biome-ignore lint/a11y/useSemanticElements: tab-like toggle, not a form fieldset. */}
+          <div className="ask-panel__tabs" role="group" aria-label="Panel views">
             <button
               type="button"
-              className="ask-panel__action"
-              disabled={!threadSelected}
-              {...(threadSelected ? {} : { title: "Select a thread" })}
-              onClick={() => setSummaryShown(true)}
+              aria-pressed={tab === "suggest"}
+              onClick={() => setOverride("suggest")}
             >
-              <Sparkles size={15} aria-hidden="true" />
-              Summarize this thread
-              {!threadSelected && (
-                <span className="ask-panel__tag" aria-hidden="true">
-                  Thread required
-                </span>
-              )}
+              Suggestions
             </button>
-            <button type="button" className="ask-panel__action" disabled title="Phase B">
-              <ListChecks size={15} aria-hidden="true" />
-              Extract to-dos
-              <span className="ask-panel__tag" aria-hidden="true">
-                Phase B
-              </span>
+            <button
+              type="button"
+              aria-pressed={tab === "commands"}
+              onClick={() => setOverride("commands")}
+            >
+              Commands
             </button>
           </div>
-        </>
-      )}
-    </GlassSurface>
+          <button type="button" className="ask-panel__close" aria-label="Close" onClick={onClose}>
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
+        {tab === "commands" ? (
+          commands
+        ) : (
+          <>
+            {/* Say what the panel is working on first — this is the reference's conversation area
+                (leaving it an empty band reads as "a wide dropdown"). */}
+            <div className="ask-panel__context">
+              <p className="ask-panel__context-title">
+                {threadSelected ? (threadTitle ?? "Untitled thread") : "No thread selected"}
+              </p>
+              <p
+                className={cn(
+                  "ask-panel__context-body",
+                  (!summaryShown || summary === null) && "ask-panel__context-body--muted",
+                )}
+              >
+                {summaryShown
+                  ? (summary ?? "No summary yet")
+                  : threadSelected
+                    ? "The suggestions below run against this thread."
+                    : "Suggestions come alive once you pick a thread."}
+              </p>
+            </div>
+            <div className="ask-panel__actions">
+              {/* US-D01 fallback: there is no route to attach drafts or todo extraction to —
+                  disabled, with title="Phase B". Saying it cannot be pressed is more honest than
+                  pretending it can. */}
+              <button type="button" className="ask-panel__action" disabled title="Phase B">
+                <PenLine size={15} aria-hidden="true" />
+                Draft a reply
+                <span className="ask-panel__tag" aria-hidden="true">
+                  Phase B
+                </span>
+              </button>
+              {/* Only this one is actually wired up — threads.meta.summary (filled by the T1
+                  summarization loop). */}
+              <button
+                type="button"
+                className="ask-panel__action"
+                disabled={!threadSelected}
+                {...(threadSelected ? {} : { title: "Select a thread" })}
+                onClick={() => setSummaryShown(true)}
+              >
+                <Sparkles size={15} aria-hidden="true" />
+                Summarize this thread
+                {!threadSelected && (
+                  <span className="ask-panel__tag" aria-hidden="true">
+                    Thread required
+                  </span>
+                )}
+              </button>
+              <button type="button" className="ask-panel__action" disabled title="Phase B">
+                <ListChecks size={15} aria-hidden="true" />
+                Extract to-dos
+                <span className="ask-panel__tag" aria-hidden="true">
+                  Phase B
+                </span>
+              </button>
+            </div>
+          </>
+        )}
+      </GlassSurface>
+    </AuroraSurface>
   );
 }

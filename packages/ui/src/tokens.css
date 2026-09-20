@@ -44,10 +44,28 @@
   --accent: var(--ink-600);
   --accent-fg: oklch(0.992 0.002 80);
   --shadow-row-selected: 0 4px 16px oklch(0 0 0 / 0.1), 0 1px 2px oklch(0 0 0 / 0.08);
-  /* Approximating the gradient stops measured in the kinso teardown (23) — for the ask bar's orb
-     and focus stroke only. The "one accent" rule still holds for --accent itself; this gradient is
-     the exception (one decorative place). */
-  --ask-gradient: linear-gradient(135deg, oklch(0.68 0.1 190), oklch(0.72 0.16 55));
+  /* US-D06 §4.1.2: `--ask-gradient` (teal→orange, the kinso teardown's approximation) is retired.
+     Its two consumers now take the aurora palette, and they are two tokens rather than one because
+     the two shapes have nothing in common geometrically: the orb is 18x18 and the focus ring is a
+     1.5px stroke around a roughly 820x44 pill. A single radial on a 19:1 box puts all the amber in
+     the left ~200px and indigo everywhere else, which reads as neither shape.
+     The orb is the photograph in miniature — butter core, peach bloom, indigo body, a void edge to
+     keep it from going flat. The stroke is one traverse of the long axis, so all four stops are
+     visible along the pill's length instead of bunched under the orb. */
+  --aurora-orb: radial-gradient(
+    70% 70% at 30% 26%,
+    var(--aurora-butter) 0%,
+    var(--aurora-peach) 34%,
+    var(--aurora-indigo) 74%,
+    var(--aurora-void) 100%
+  );
+  --aurora-stroke: linear-gradient(
+    100deg,
+    var(--aurora-indigo) 0%,
+    var(--aurora-peach) 46%,
+    var(--aurora-butter) 62%,
+    var(--aurora-indigo) 100%
+  );
   /* Canvas background: a faint grid over a warm off-white. US-D06 §1.3 removes the two radials
      (peach at 15%/0%, mint at 100%/20%) that used to wash the canvas — the 2026-09-21 monotone
      directive supersedes them; colour lives on the aurora surfaces only. The film grain that used to
