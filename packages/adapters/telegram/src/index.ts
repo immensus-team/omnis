@@ -1,6 +1,138 @@
-import { AdapterError, type Attachment, type NormalizedItem } from "@omnis/protocol";
+import {
+  type Adapter,
+  AdapterError,
+  type AdapterEvent,
+  type Attachment,
+  type AuthRef,
+  type Capabilities,
+  type Health,
+  type NormalizedItem,
+  type Outbound,
+  type SendResult,
+  type ThreadRef,
+} from "@omnis/protocol";
+import { readKeychainSecret } from "./keychain.js";
 
 export const CHANNEL = "telegram" as const;
+
+const CAPABILITIES: Capabilities = {
+  read: true,
+  write: true,
+  realtime: true,
+  history: true,
+  media: true,
+  markRead: true,
+  typing: false,
+  archive: false, // v1은 커널 내부 라벨만(A1 §2.5)
+  delete: false,
+};
+
+class AsyncQueue<T> {
+  private buffered: T[] = [];
+  private waiters: Array<(v: IteratorResult<T>) => void> = [];
+  push(value: T): void {
+    const waiter = this.waiters.shift();
+    if (waiter) {
+      waiter({ value, done: false });
+      return;
+    }
+    this.buffered.push(value);
+  }
+  private async next(): Promise<IteratorResult<T>> {
+    const value = this.buffered.shift();
+    if (value !== undefined) return { value, done: false };
+    return new Promise((resolve) => this.waiters.push(resolve));
+  }
+  [Symbol.asyncIterator](): AsyncIterator<T> {
+    return { next: () => this.next() };
+  }
+}
+
+/** mtcute `TelegramClient`가 실제로 이 부분집합을 만족하는지는 UNVERIFIED — A1-⑦ 스파이크가 실계정
+ *  연결 시점에 확인한다(B-D5). 이 인터페이스는 어댑터가 실제로 부르는 메서드만 좁게 정의해
+ *  fixture/mock 테스트가 mtcute 없이도 전부 돌게 한다. */
+export interface TelegramClientLike {
+  start(): Promise<void>;
+  getHistory(chatId: string, opts: { limit: number; offsetUnixSec?: number }): Promise<unknown[]>;
+  onUpdate(cb: (raw: unknown) => void): () => void; // 반환값은 unsubscribe
+  sendText(chatId: string, text: string): Promise<{ id: number; date: number }>;
+  readHistory(chatId: string): Promise<void>;
+}
+
+export interface TelegramAdapterDeps {
+  client?: TelegramClientLike;
+  sink?: (thread: ThreadRef, draft: Outbound) => Promise<SendResult>;
+  now?: () => Date;
+}
+
+export function createTelegramAdapter(deps: TelegramAdapterDeps = {}): Adapter {
+  const now = deps.now ?? ((): Date => new Date());
+  const client: TelegramClientLike | undefined = deps.client;
+  const queue = new AsyncQueue<NormalizedItem | AdapterEvent>();
+  let status: Health["status"] = "down";
+  let lastEventAt: string | null = null;
+  let lastError: Health["lastError"];
+  let unsubscribe: (() => void) | undefined;
+
+  return {
+    id: "telegram",
+    channel: CHANNEL,
+    capabilities: () => CAPABILITIES,
+
+    async connect(auth: AuthRef): Promise<void> {
+      // 세션 파일 자체가 아니라 그걸 감싸는 암호화 키만 Keychain에 있다(A1 §2.5) — 로그로 찍지 않는다.
+      await readKeychainSecret(auth.keychainService, auth.keychainAccount, CHANNEL);
+      if (client === undefined) {
+        status = "down";
+        throw new AdapterError(
+          "fatal_protocol",
+          CHANNEL,
+          "mtcute client not wired — real Telegram connect deferred to A1-⑦ (B-D5)",
+        );
+      }
+      try {
+        await client.start();
+      } catch (cause) {
+        status = "down";
+        throw mapApiError(cause);
+      }
+      status = "healthy";
+      lastEventAt = now().toISOString();
+      queue.push({ kind: "connected", at: lastEventAt });
+    },
+
+    async disconnect(): Promise<void> {
+      unsubscribe?.();
+      status = "down";
+    },
+
+    backfill(): AsyncIterable<NormalizedItem> {
+      throw new AdapterError("fatal_unsupported", CHANNEL, "backfill not implemented until Task 9");
+    },
+
+    subscribe(): AsyncIterable<NormalizedItem | AdapterEvent> {
+      throw new AdapterError(
+        "fatal_unsupported",
+        CHANNEL,
+        "subscribe not implemented until Task 9",
+      );
+    },
+
+    async send(): Promise<never> {
+      throw new AdapterError("fatal_unsupported", CHANNEL, "send not implemented until Task 10");
+    },
+
+    async health(): Promise<Health> {
+      return {
+        channel: CHANNEL,
+        accountExternalId: "",
+        status,
+        lastEventAt,
+        ...(lastError ? { lastError } : {}),
+      };
+    },
+  };
+}
 
 interface TgSender {
   id?: number;
