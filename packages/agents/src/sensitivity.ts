@@ -1,10 +1,10 @@
-// A4 §2.4: sensitivity는 L1이 유일 생산자이고, 겹치면 health > legal > finance > personal 우선순위로 하나만 고른다.
-// Phase A 범위(A7 §7 US-A23b): 기본 'normal' + VIP면 'personal' 승격까지. T2 강제 라우팅은 Phase B 비용 정책 스토리.
+// A4 §2.4: L1 is the sole producer of sensitivity; on a tie, pick exactly one by health > legal > finance > personal.
+// Phase A scope (A7 §7 US-A23b): default 'normal', plus 'personal' promotion when the sender is a VIP. Forced T2 routing is a Phase B cost-policy story.
 import type { Sensitivity } from "@omnis/protocol";
 import type { ClassifyCtx } from "./classify/rules.js";
 import type { ItemRow } from "./types.js";
 
-/** 높은 것이 앞. 같은 메일이 실행마다 다른 값을 받지 않게 하는 게 이 순서의 목적이다. */
+/** Highest first. The point of this order is that the same mail never gets a different value per run. */
 export const SENSITIVITY_PRIORITY: readonly Sensitivity[] = [
   "health",
   "legal",

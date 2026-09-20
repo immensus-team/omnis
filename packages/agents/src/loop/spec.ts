@@ -1,9 +1,9 @@
-// A4 §1.1·§1.2. 커널은 루프를 알지 못하고 이 계약만 안다.
+// A4 §1.1·§1.2. The kernel knows nothing about loops; it knows only this contract.
 import type { z } from "zod";
 import type { AssembledContext } from "../context/assemble.js";
 import type { ToolName } from "../tools/names.js";
 
-/** A4 §1.1. agent_runs.loop의 부분집합이다 — Phase A가 더한 'summarize'는 루프가 아니라 B3 요약 헬퍼다. */
+/** A4 §1.1. A subset of agent_runs.loop — the 'summarize' Phase A added is not a loop but the B3 summary helper. */
 export type LoopId =
   | "classify"
   | "draft"
@@ -19,9 +19,9 @@ export type LoopKind = "reactive" | "deliberate";
 
 export interface LoopTrigger {
   kind: "event" | "schedule" | "manual";
-  /** kind='event': 커널 이벤트 kind. 예: 'item.labeled' */
+  /** kind='event': kernel event kind. e.g. 'item.labeled' */
   on?: string;
-  /** kind='event': 허브에서 평가되는 술어. 모델이 평가하지 않는다. */
+  /** kind='event': predicate evaluated in the hub. Not evaluated by a model. */
   where?: string;
   /** kind='schedule': TZ=Asia/Seoul 5-field cron */
   cron?: string;
@@ -35,10 +35,10 @@ export interface LoopBudget {
   maxSteps: number;
 }
 
-/** 루프가 "무엇에 대해 도는가"를 담는 봉투다(델타 §4가 이 계획 Task 1을 오너로 지정). */
+/** Envelope holding what a loop runs against (delta §4 names this plan's Task 1 as the owner). */
 export interface TriggerContext {
   trigger_kind: "event" | "cron" | "manual";
-  /** cron 잡 이름만. item 트리거는 trigger_ref가 아니라 item_id를 쓴다(A4 §1.7). */
+  /** Cron job name only. Item triggers use item_id, not trigger_ref (A4 §1.7). */
   trigger_ref?: string;
   item_id?: string;
   thread_id?: string;
@@ -64,19 +64,19 @@ export interface LoopSpec<TOut> {
   id: LoopId;
   kind: LoopKind;
   trigger: LoopTrigger;
-  /** 비가역 tool은 여기 들어갈 수 없다 — registerLoop이 PhantomToolError로 막는다(A4-D3). */
+  /** Irreversible tools cannot go in here — registerLoop blocks them with PhantomToolError (A4-D3). */
   palette: ReadonlyArray<ToolName>;
   budget: LoopBudget;
   tier: "T0" | "T1" | "T2";
-  /** 입력 타입을 unknown으로 열어 둔다 — `.default([])`가 붙은 필드(집안 규칙: classify-t1.ts,
-   *  propose.ts)는 파싱 입력이 출력과 달라 `z.ZodType<TOut>`에 대입되지 않는다. 파싱만 하므로
-   *  출력 타입만 고정하면 된다. */
+  /** The input type is left open as unknown — fields carrying `.default([])` (house rule:
+   *  classify-t1.ts, propose.ts) have a parse input that differs from the output, so they do not
+   *  fit `z.ZodType<TOut>`. We only parse, so pinning just the output type is enough. */
   outputSchema: z.ZodType<TOut, z.ZodTypeDef, unknown>;
-  /** 모델 없이 결론이 나는 T0 경로. null을 돌려주면 모델 경로로 내려간다.
-   *  A4 §9.2의 자동 보관 ①③④가 이 자리에 들어간다. */
+  /** T0 path that reaches a conclusion with no model. Returning null falls through to the model path.
+   *  Auto-archive ①③④ from A4 §9.2 goes in this slot. */
   decide?(ctx: TriggerContext): Promise<Omit<LoopResult<TOut>, "run_id"> | null>;
   assemble(ctx: TriggerContext): Promise<AssembledContext>;
-  /** 제안만 쓴다. egress 모듈은 여기서도 import 금지(A4 §1.1). */
+  /** Writes proposals only. Egress modules must not be imported here either (A4 §1.1). */
   apply(result: LoopResult<TOut>, ctx: TriggerContext): Promise<void>;
 }
 

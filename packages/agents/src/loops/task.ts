@@ -1,4 +1,4 @@
-// A4 §4. 정밀도 우선 — 거짓 투두는 진짜 투두를 묻는다.
+// A4 §4. Precision first — a false todo buries a real one.
 import { z } from "zod";
 import { buildContext } from "../context/assemble.js";
 import {
@@ -33,8 +33,8 @@ export const TaskOutput = z.object({
     .max(8),
   confidence: z.number().min(0).max(1),
   rationale: z.string().max(200),
-  // A4 §1.6: runLoopSpec의 flagsOf()가 이 필드를 읽는다. default를 걸면 z.input과 z.output이
-  // 갈라져 LoopSpec<TaskOutputT>에 안 붙는다 — 모델이 빈 배열이라도 항상 적게 한다.
+  // A4 §1.6: runLoopSpec's flagsOf() reads this field. Adding a default would split z.input from
+  // z.output so it no longer fits LoopSpec<TaskOutputT> — make the model always emit it, even empty.
   injection_flags: z.array(z.string()),
 });
 export type TaskOutputT = z.infer<typeof TaskOutput>;
@@ -42,8 +42,8 @@ export type TaskOutputT = z.infer<typeof TaskOutput>;
 export const taskLoop: LoopSpec<TaskOutputT> = {
   id: "task",
   kind: "reactive",
-  // A4 §4.1은 event 트리거 2종(item.labeled / item.sent)을 요구하지만 LoopTrigger는 하나만
-  // 담는다(US-B06 계약). 내가 보낸 약속(item.sent)은 허브가 같은 루프를 manual로 깨워 태운다.
+  // A4 §4.1 calls for two event triggers (item.labeled / item.sent) but LoopTrigger carries only
+  // one (US-B06 contract). For promises I sent (item.sent) the hub wakes this loop as manual instead.
   trigger: { kind: "event", on: "item.labeled", where: "author <> 'me'", debounceMs: 20_000 },
   palette: ["read_thread", "read_tasks", "search_memory", "propose_task", "propose_delegation"],
   budget: { inputTokens: 2800, outputTokens: 400, wallClockMs: 15_000, maxSteps: 2 },
@@ -82,12 +82,12 @@ export const taskLoop: LoopSpec<TaskOutputT> = {
         { toolCallId: result.run_id, messages: [], context: undefined },
       )) as { task_id: string } | undefined;
 
-      // A4 §4.4: owner='agent'면 같은 실행 안에서 routeByRule을 돌린다(LLM 호출 없음, ~1ms).
+      // A4 §4.4: when owner='agent', run routeByRule inside the same execution (no LLM call, ~1ms).
       if (out === undefined || t.owner !== "agent" || t.duplicate_of !== undefined) continue;
-      if (result.injection_flags.length > 0) continue; // 폭주 방지 ④
+      if (result.injection_flags.length > 0) continue; // runaway guard ④
       const hints = extractHints(`${t.title}\n${t.detail ?? ""}\n${t.agent_hint ?? ""}`);
       const routing = routeByRule(hints, await hostHealth());
-      if (routing === null) continue; // 규칙이 못 가름 → L4가 깨어난다
+      if (routing === null) continue; // no rule matched → L4 wakes up
       if (!(await underDelegationCaps(ctx.thread_id ?? null))) continue;
       await PROPOSE_TOOLS.propose_delegation?.execute?.(
         {
@@ -107,7 +107,7 @@ export const taskLoop: LoopSpec<TaskOutputT> = {
   },
 };
 
-/** A4 §4.4 폭주 방지 ①②: 하루 5건, 같은 스레드 24h 2건. */
+/** A4 §4.4 runaway guards ①②: 5 per day, 2 per thread in 24h. */
 async function underDelegationCaps(threadId: string | null): Promise<boolean> {
   const pool = getAgentsPool();
   const day = await pool.query<{ n: string }>(

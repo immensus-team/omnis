@@ -1,4 +1,4 @@
-// A4 §10.5 실패 처리. 조용히 실패하지 않는 것이 이 설계의 규칙이다(A4 §1.6).
+// A4 §10.5 failure handling. Not failing silently is the rule of this design (A4 §1.6).
 import { one, query } from "@omnis/db";
 import type { MemorySourceKind } from "@omnis/protocol";
 import type { Pool } from "pg";
@@ -15,9 +15,10 @@ export interface IngestSource {
 
 export const DEAD_LETTER_THRESHOLD = 3;
 export const RETRY_BACKOFF_MS: readonly number[] = [1000, 4000, 16000];
-/** retryAfterMs 힌트의 상한. GitHub의 x-ratelimit-reset은 최대 한 시간 뒤를 가리키는데,
- *  스케줄러 tick()은 잡 핸들러를 순차로 돌리므로 여기서 그만큼 자면 healthcheck까지
- *  전부 같이 멈춘다. 상한을 넘는 힌트는 잘라내고 다음 틱에 맡긴다. */
+/** Upper bound on the retryAfterMs hint. GitHub's x-ratelimit-reset can point up to an hour
+ *  ahead, and the scheduler's tick() runs job handlers sequentially, so sleeping that long here
+ *  would stall everything, healthcheck included. Hints above the bound are clipped and left to
+ *  the next tick. */
 export const MAX_RETRY_AFTER_MS = 60_000;
 
 interface RawSource extends Omit<IngestSource, "last_ok_at"> {
@@ -62,7 +63,7 @@ export async function recordSuccess(pool: Pool, id: string): Promise<void> {
   );
 }
 
-/** 누적 fail_count를 돌려준다. 호출자가 DEAD_LETTER_THRESHOLD와 비교한다. */
+/** Returns the cumulative fail_count. The caller compares it against DEAD_LETTER_THRESHOLD. */
 export async function recordFailure(pool: Pool, id: string, error: string): Promise<number> {
   const row = await one<{ fail_count: number }>(
     pool,
@@ -82,8 +83,9 @@ const defaultSleep = (ms: number): Promise<void> =>
     setTimeout(r, ms).unref?.();
   });
 
-/** A4 §10.5: API 5xx/네트워크는 1s → 4s → 16s로 3회. GitHub처럼 리셋 시각을 알려주는 쪽은
- *  에러에 retryAfterMs를 실어 보내면 그 값을 쓴다. 그 이상은 하지 않는다 — 다음 틱이 온다. */
+/** A4 §10.5: API 5xx/network errors retry 3 times at 1s → 4s → 16s. Sources that report a reset
+ *  time, like GitHub, can attach retryAfterMs to the error and that value is used. Nothing beyond
+ *  that — the next tick will come. */
 export async function withRetry<T>(fn: () => Promise<T>, deps: RetryDeps = {}): Promise<T> {
   const sleep = deps.sleep ?? defaultSleep;
   let lastError: unknown;
@@ -104,10 +106,11 @@ export async function withRetry<T>(fn: () => Promise<T>, deps: RetryDeps = {}): 
   throw lastError;
 }
 
-/** 시스템 Item 한 행(A4 §10.5 dead-letter, 마스터 §15와 같은 경로). ingestion은 채널이 아니므로
- *  전용 system 계정·스레드를 한 번 만들어 재사용한다.
- *  ponytail: @omnis/agents의 writeSystemItem과 같은 4줄짜리 INSERT지만 계약 §1이
- *  @omnis/memory → @omnis/agents 의존을 금지한다(커널·apps/hub도 각자 갖고 있다). 의도된 중복. */
+/** One system Item row (A4 §10.5 dead-letter, the same path as master §15). ingestion is not a
+ *  channel, so it creates a dedicated system account and thread once and reuses them.
+ *  ponytail: the same four-line INSERT as @omnis/agents' writeSystemItem, but contract §1 forbids
+ *  a @omnis/memory → @omnis/agents dependency (kernel and apps/hub each carry their own too).
+ *  Intentional duplication. */
 export async function writeIngestSystemItem(
   pool: Pool,
   i: { subject: string; body: string },

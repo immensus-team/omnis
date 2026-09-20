@@ -1,5 +1,6 @@
-// A4 §2.2 2단 — 임베딩 kNN (T0, $0, ~20ms). 가중치 = sim².
-// 임계값 두 개는 첫 2주 라벨 로그로 재보정한다(A4 §2.2). 지금은 보수적으로 잡아 T1으로 많이 흘린다.
+// A4 §2.2 stage 2 — embedding kNN (T0, $0, ~20ms). Weight = sim².
+// The two thresholds get recalibrated from the first two weeks of label logs (A4 §2.2). For now they
+// are set conservatively so a lot falls through to T1.
 import type { Scope } from "@omnis/protocol";
 import type { ItemRow } from "../types.js";
 import type { ClassifyCtx } from "./rules.js";

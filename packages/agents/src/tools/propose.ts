@@ -1,6 +1,6 @@
-// A4 §1.5·A4-D3: 제안 tool은 row를 쓸 뿐 아무것도 내보내지 않는다.
-// propose_delegation은 pending_approvals(action='delegate') 한 행을 만드는 게 전부이고,
-// 실제 실행은 커널의 승인 핸들러가 runEgress 경로에서 한다(A4 §5.4).
+// A4 §1.5·A4-D3: a propose tool writes a row and emits nothing.
+// All propose_delegation does is create one pending_approvals row (action='delegate');
+// the actual execution happens in the kernel's approval handler on the runEgress path (A4 §5.4).
 import { type ToolSet, tool } from "ai";
 import { z } from "zod";
 import { getAgentsPool } from "../pool.js";
@@ -48,7 +48,7 @@ export const ProposeTaskInput = z.object({
 });
 export const ProposeDelegationInput = z.object({
   task_id: z.string().uuid(),
-  runtime: z.enum(["claude_code", "codex", "claude_ds", "omnis"]), // B-D7: hermes 제외
+  runtime: z.enum(["claude_code", "codex", "claude_ds", "omnis"]), // B-D7: hermes excluded
   host: z.enum(["mini", "macbook"]),
   brief: z.string().max(2000),
   acceptance: z.array(z.string()).min(1),
@@ -90,7 +90,7 @@ const OMNIS_RUNTIME = "SELECT id FROM agent_runtimes WHERE runtime = 'omnis' LIM
 
 export const PROPOSE_TOOLS: ToolSet = {
   propose_label: tool({
-    description: "item에 라벨을 제안해 저장한다. 발송하지 않는다.",
+    description: "Propose a label for an item and store it. Does not send anything.",
     inputSchema: ProposeLabelInput,
     execute: async (i) => {
       await getAgentsPool().query(
@@ -114,7 +114,7 @@ export const PROPOSE_TOOLS: ToolSet = {
   }),
 
   propose_draft: tool({
-    description: "답장 초안을 items(status='draft')로 저장한다. 발송하지 않는다.",
+    description: "Store a reply draft in items (status='draft'). Does not send anything.",
     inputSchema: ProposeDraftInput,
     execute: async (i) => {
       const { rows } = await getAgentsPool().query<{ id: string }>(
@@ -147,7 +147,8 @@ export const PROPOSE_TOOLS: ToolSet = {
   }),
 
   propose_task: tool({
-    description: "할 일을 tasks에 저장한다. duplicate_of가 있으면 기존 task에 출처만 더한다.",
+    description:
+      "Store a todo in tasks. When duplicate_of is set, only the source is added to the existing task.",
     inputSchema: ProposeTaskInput,
     execute: async (i) => {
       const pool = getAgentsPool();
@@ -179,7 +180,7 @@ export const PROPOSE_TOOLS: ToolSet = {
   }),
 
   propose_delegation: tool({
-    description: "위임 승인 카드를 만든다. 승인 없이는 아무것도 실행되지 않는다.",
+    description: "Create a delegation approval card. Nothing runs without approval.",
     inputSchema: ProposeDelegationInput,
     execute: async (i) => {
       const pool = getAgentsPool();
@@ -196,7 +197,7 @@ export const PROPOSE_TOOLS: ToolSet = {
          RETURNING id`,
         [
           JSON.stringify(i),
-          `${i.runtime} on ${i.host}에게 이 작업을 맡깁니다. 예상 ${i.est_minutes ?? "?"}분.`,
+          `Handing this task to ${i.runtime} on ${i.host}. Estimated ${i.est_minutes ?? "?"} min.`,
           (i.est_minutes ?? 0) > 30 ? "high" : "normal",
           i.task_id,
         ],
@@ -209,7 +210,8 @@ export const PROPOSE_TOOLS: ToolSet = {
   }),
 
   propose_route: tool({
-    description: "노트를 붙일 후보를 최대 3개 제안한다. 자동 첨부는 하지 않는다(A4-D10).",
+    description:
+      "Propose up to 3 candidates to attach the note to. No automatic attachment (A4-D10).",
     inputSchema: ProposeRouteInput,
     execute: async (i) => {
       await getAgentsPool().query(
@@ -224,14 +226,15 @@ export const PROPOSE_TOOLS: ToolSet = {
   }),
 
   propose_self_model_patch: tool({
-    description: "self-model 파일 패치를 승인 카드로 만든다. 적용은 승인 뒤 커널이 한다.",
+    description:
+      "Turn a self-model file patch into an approval card. The kernel applies it after approval.",
     inputSchema: ProposeSelfModelPatchInput,
     execute: async (i) => {
       const { rows } = await getAgentsPool().query<{ id: string }>(
         `INSERT INTO pending_approvals (action, args, description, risk, requested_by)
          VALUES ('self_model_edit', $1::jsonb, $2, 'normal', (${OMNIS_RUNTIME}))
          RETURNING id`,
-        [JSON.stringify(i), `${i.file} 수정 제안 — ${i.rationale}`],
+        [JSON.stringify(i), `Proposed edit to ${i.file} — ${i.rationale}`],
       );
       const id = rows[0]?.id;
       if (id === undefined) throw new Error("pending_approvals insert returned no id");

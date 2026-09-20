@@ -1,15 +1,15 @@
-// A4 §12.1: T2 = Claude Sonnet 5 하나뿐이다. 게이트웨이는 OpenRouter(토큰 마크업 없음).
-// Anthropic 직접 경로는 Message Batches(§6.5)에서만 쓴다 — 그건 SDK 없이 fetch로 친다.
+// A4 §12.1: T2 = Claude Sonnet 5, and nothing else. The gateway is OpenRouter (no token markup).
+// The direct Anthropic path is used only for Message Batches (§6.5) — that one goes over raw fetch, no SDK.
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { LanguageModel } from "ai";
 
 export const T2_BASE_URL = "https://openrouter.ai/api/v1";
-/** OpenRouter 라우팅 슬러그. */
+/** OpenRouter routing slug. */
 export const T2_MODEL_ID = "anthropic/claude-sonnet-5";
-/** A3 §4 agent_runs.model에 기록하는 값(A4 §12.1 표기 그대로). */
+/** The value recorded in the A3 §4 agent_runs.model column (A4 §12.1 notation, verbatim). */
 export const T2_RUN_MODEL = "claude-sonnet-5";
 
-/** 키는 Keychain `omnis.openrouter.api_key`(A6-D9)에서 launchd가 env로 주입한다. 값은 로그에 넣지 않는다. */
+/** The key is injected as env by launchd from Keychain `omnis.openrouter.api_key` (A6-D9). Never put the value in a log. */
 export function t2Model(): LanguageModel {
   const apiKey = process.env.OMNIS_OPENROUTER_API_KEY;
   if (apiKey === undefined || apiKey === "") {

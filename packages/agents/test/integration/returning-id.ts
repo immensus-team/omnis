@@ -1,7 +1,7 @@
 /**
- * `INSERT ... RETURNING id`는 반드시 한 행을 돌려준다. 행이 없으면 테스트 셋업이 깨진 것이므로
- * 빈 문자열을 흘려보내 나중에 알 수 없는 uuid 오류로 터지게 두지 않고 여기서 멈춘다.
- * (biome noNonNullAssertion 때문에 `rows[0]!.id`를 쓸 수 없어 이 헬퍼로 모은다.)
+ * `INSERT ... RETURNING id` must return exactly one row. No row means the test setup is broken,
+ * so stop here instead of leaking an empty string and later blowing up with an unrecognizable
+ * uuid error. (biome's noNonNullAssertion forbids `rows[0]!.id`, so this helper collects it.)
  */
 export function returningId(r: { rows: { id: string }[] }): string {
   const id = r.rows[0]?.id;

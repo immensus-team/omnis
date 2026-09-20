@@ -1,9 +1,9 @@
-// A4 §10.1 로컬 파일(맥북): 허브가 A2 §3.2 ingest.scan → ingest.read로 가져온다.
-// drive_poll 틱(10분)에 동승하고, 브리지가 오프라인이면 건너뛰고 다음 틱에 since로 따라잡는다.
+// A4 §10.1 local files (MacBook): the hub fetches them via A2 §3.2 ingest.scan → ingest.read.
+// Rides along on the drive_poll tick (10 minutes); if the bridge is offline, skip and catch up with since on the next tick.
 import type { IngestReadResult, IngestScanResult } from "@omnis/protocol";
 import type { IngestDoc, IngestProvider } from "./run.js";
 
-/** apps/hub의 `BridgeHub.call(host, method, params)`를 맥북 호스트에 고정한 얇은 함수. */
+/** A thin function that pins apps/hub's `BridgeHub.call(host, method, params)` to the MacBook host. */
 export type BridgeCall = (
   method: "ingest.scan" | "ingest.read",
   params: Record<string, unknown>,
@@ -17,7 +17,7 @@ export function createLocalMacbookProvider(opts: {
     kind: "file",
     ref: "macbook",
     async *list(ctx): AsyncIterable<IngestDoc> {
-      if (opts.roots.length === 0) return; // allowlist가 비어 있으면 브리지를 부르지도 않는다
+      if (opts.roots.length === 0) return; // when the allowlist is empty, do not even call the bridge
 
       const since = typeof ctx.cursor.since === "string" ? ctx.cursor.since : undefined;
       let scan: IngestScanResult;
@@ -27,7 +27,7 @@ export function createLocalMacbookProvider(opts: {
           ...(since === undefined ? {} : { since }),
         })) as IngestScanResult;
       } catch (e) {
-        // 오프라인은 실패가 아니다 — 커서를 그대로 두고 다음 틱이 따라잡는다.
+        // Offline is not a failure — leave the cursor as it is and the next tick catches up.
         ctx.logger.info("macbook bridge offline, skipping ingest tick", {
           err: e instanceof Error ? e.message : String(e),
         });
@@ -48,7 +48,7 @@ export function createLocalMacbookProvider(opts: {
             max_bytes: 1_048_576,
           })) as IngestReadResult;
         } catch (e) {
-          // 한 파일이 거부돼도(비밀 목록·바이너리·사라짐) 나머지는 계속 가져온다.
+          // One rejected file (secret list, binary, vanished) does not stop the rest.
           ctx.logger.debug("ingest.read skipped", {
             source_ref: f.path,
             err: e instanceof Error ? e.message : String(e),

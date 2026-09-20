@@ -8,7 +8,7 @@ import {
   isDenied,
 } from "../src/ingest/deny.js";
 
-describe("isDenied — A4 §10.2 하드 제외", () => {
+describe("isDenied — A4 §10.2 hard exclusion", () => {
   const denied = [
     "/Users/logan/proj/.env",
     "/Users/logan/proj/.env.local",
@@ -45,8 +45,8 @@ describe("isDenied — A4 §10.2 하드 제외", () => {
     "/Users/logan/proj/README.md",
     "/Users/logan/proj/src/index.ts",
     "/Users/logan/notes/2026-09-20.md",
-    "/Users/logan/proj/environment.md", // .env 접두가 아니다
-    "/Users/logan/proj/keys.md", // *.key가 아니다
+    "/Users/logan/proj/environment.md", // not a .env prefix
+    "/Users/logan/proj/keys.md", // not a *.key
     "/Users/logan/proj/docs/gitignore.md",
   ];
 
@@ -55,7 +55,7 @@ describe("isDenied — A4 §10.2 하드 제외", () => {
   });
 
   it("judges by path only and never opens the file", () => {
-    // 순수 함수여야 한다 — 존재하지 않는 경로도 같은 답을 준다.
+    // It must be a pure function — a path that does not exist gives the same answer.
     expect(isDenied("/nowhere/at/all/.env")).toBe(true);
     expect(isDenied("/nowhere/at/all/notes.md")).toBe(false);
   });
@@ -67,7 +67,7 @@ describe("isDenied — A4 §10.2 하드 제외", () => {
 });
 
 describe("gitignoreMatcher", () => {
-  const gi = ["# 주석", "", "dist/", "*.log", "/build", "coverage"].join("\n");
+  const gi = ["# comment", "", "dist/", "*.log", "/build", "coverage"].join("\n");
   const match = gitignoreMatcher("/repo", gi);
 
   it("matches directory patterns anywhere below the root", () => {
@@ -87,7 +87,7 @@ describe("gitignoreMatcher", () => {
 
   it("ignores comments and blank lines and leaves other files alone", () => {
     expect(match("/repo/src/index.ts")).toBe(false);
-    expect(match("/repo/주석")).toBe(false);
+    expect(match("/repo/comment")).toBe(false);
   });
 
   it("never matches outside the root", () => {
@@ -102,7 +102,7 @@ describe("isBinary / size cap", () => {
   });
 
   it("calls ordinary utf-8 text non-binary", () => {
-    expect(isBinary(Buffer.from("한글과 english 섞인 본문\n"))).toBe(false);
+    expect(isBinary(Buffer.from("ordinary utf-8 english text\n"))).toBe(false);
   });
 
   it("only looks at the first 8KB", () => {

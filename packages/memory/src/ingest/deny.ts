@@ -1,5 +1,5 @@
-// 정의는 @omnis/protocol에 있다(허브와 브리지가 같은 목록을 써야 하기 때문 — A2 §3.2).
-// 델타 §3이 요구하는 @omnis/memory export는 여기서 re-export로 만족시킨다.
+// The definition lives in @omnis/protocol (because the hub and the bridge must use the same list — A2 §3.2).
+// The @omnis/memory export that delta §3 requires is satisfied here with a re-export.
 export {
   DENY_PATTERNS,
   MAX_INGEST_FILE_BYTES,

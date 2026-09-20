@@ -1,5 +1,5 @@
-// A4 §10.1 GitHub: ETag conditional request + If-None-Match. 304면 본문을 받지 않는다.
-// rate-limit 헤더를 보고 리셋 시각까지 기다린다(GitHub 공식 권고).
+// A4 §10.1 GitHub: ETag conditional request + If-None-Match. On a 304 the body is not fetched.
+// Read the rate-limit headers and wait until the reset time (GitHub's official recommendation).
 import type { IngestDoc, IngestProvider } from "./run.js";
 
 export type GithubFetch = (url: string, init?: RequestInit) => Promise<Response>;
@@ -9,7 +9,7 @@ const API = "https://api.github.com";
 export class GithubRateLimitError extends Error {
   constructor(
     message: string,
-    /** withRetry가 이 값을 보고 고정 백오프 대신 리셋 시각까지 잔다(Task 16). */
+    /** withRetry reads this value and sleeps until the reset time instead of a fixed backoff (Task 16). */
     readonly retryAfterMs: number,
   ) {
     super(message);
@@ -40,14 +40,14 @@ export function createGithubProvider(opts: {
     kind: "github",
     ref: "repos",
     async *list(ctx): AsyncIterable<IngestDoc> {
-      if (opts.repos.length === 0) return; // allowlist가 비면 API를 호출조차 하지 않는다
+      if (opts.repos.length === 0) return; // an empty allowlist means the API is not even called
 
       const cursorEtags =
         ctx.cursor.etags !== null && typeof ctx.cursor.etags === "object"
           ? ({ ...(ctx.cursor.etags as Record<string, string>) } as Record<string, string>)
           : {};
-      // since는 레포마다 따로 올린다 — 하나로 묶으면 활발한 레포가 조용한 레포의 커밋을
-      // 건너뛴다. 예전 커서의 평평한 since는 아직 sinces에 없는 레포의 기본값으로만 쓴다.
+      // since advances per repo — with a single shared value, a busy repo would skip over a quiet
+      // repo's commits. The old cursor's flat since is used only as the default for repos not yet in sinces.
       const sinces =
         ctx.cursor.sinces !== null && typeof ctx.cursor.sinces === "object"
           ? ({ ...(ctx.cursor.sinces as Record<string, string>) } as Record<string, string>)
@@ -77,7 +77,7 @@ export function createGithubProvider(opts: {
         if (limited !== null) throw limited;
         if (res.status === 304) {
           ctx.logger.debug("github unchanged", { repo });
-          continue; // 본문을 받지 않는다
+          continue; // the body is not fetched
         }
         if (!res.ok) throw new Error(`github commits failed for ${repo}: ${res.status}`);
 
@@ -85,9 +85,9 @@ export function createGithubProvider(opts: {
         if (newEtag !== null) cursorEtags[repo] = newEtag;
         const commits = (await res.json()) as CommitRow[];
 
-        // 다음 폴링이 이미 넣은 커밋을 다시 추출하지 않도록 가장 최신 커밋 시각까지 올린다.
-        // ETag가 바뀌는 순간 200이 per_page=50을 통째로 주므로, 이게 없으면 활발한 레포에서
-        // 폴링마다 50청크씩 T1 추출이 다시 돈다(upsertMemory는 행만 dedupe한다).
+        // Advance to the newest commit time so the next poll does not re-extract commits already stored.
+        // The moment the ETag changes, a 200 hands back all per_page=50 commits, so without this a busy
+        // repo re-runs T1 extraction over 50 chunks on every poll (upsertMemory only dedupes rows).
         const newest = commits.reduce<string | undefined>((max, c) => {
           const d = c.commit.author?.date;
           return d !== undefined && (max === undefined || d > max) ? d : max;
@@ -99,14 +99,14 @@ export function createGithubProvider(opts: {
           yield {
             source_ref: c.html_url,
             text: [
-              `레포: ${repo}`,
-              `커밋: ${c.sha}`,
-              `작성자: ${c.commit.author?.name ?? "알 수 없음"}`,
-              `시각: ${date}`,
+              `repo: ${repo}`,
+              `commit: ${c.sha}`,
+              `author: ${c.commit.author?.name ?? "unknown"}`,
+              `time: ${date}`,
               "",
               c.commit.message,
             ].join("\n"),
-            // A4 §10.4 표: 커밋 시각이 valid_from이다.
+            // A4 §10.4 table: the commit time is valid_from.
             validFrom: date,
             meta: { repo, sha: c.sha },
             nextCursor: cursorNow(),
@@ -114,7 +114,7 @@ export function createGithubProvider(opts: {
         }
 
         if (commits.length === 0 && newEtag !== null) {
-          // 커밋이 없어도 새 ETag는 남겨야 다음 폴링이 304를 받는다.
+          // Even with no commits, the new ETag must be kept so the next poll gets a 304.
           yield {
             source_ref: "__github_etag__",
             text: null,

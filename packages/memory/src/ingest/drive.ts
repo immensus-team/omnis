@@ -1,13 +1,13 @@
-// A4 §10.1 Drive: changes.getStartPageToken()으로 베이스라인 → changes.list(pageToken) 폴링.
-// 웹훅(changes.watch)은 공인 HTTPS 엔드포인트를 요구하는데 미니는 tailnet 전용이라 못 쓴다.
+// A4 §10.1 Drive: baseline via changes.getStartPageToken() → poll changes.list(pageToken).
+// Webhooks (changes.watch) require a public HTTPS endpoint, and the mini is tailnet-only, so they are out.
 import type { IngestDoc, IngestProvider } from "./run.js";
 
 export type DriveFetch = (url: string, init?: RequestInit) => Promise<Response>;
 
 const API = "https://www.googleapis.com/drive/v3";
 
-/** v1은 export 변환이 필요 없는 것만 읽는다. Google Docs 네이티브 포맷은 files.export가
- *  필요하고 그건 별도 스코프·별도 실패 모드라 지금 붙이지 않는다. */
+/** v1 reads only what needs no export conversion. Google Docs native formats need files.export,
+ *  which is a separate scope and a separate failure mode, so we do not add it now. */
 export const DRIVE_TEXT_MIME: readonly string[] = [
   "text/plain",
   "text/markdown",
@@ -57,7 +57,7 @@ export function createDriveProvider(opts: {
     async *list(ctx): AsyncIterable<IngestDoc> {
       const pageToken = typeof ctx.cursor.pageToken === "string" ? ctx.cursor.pageToken : null;
       if (pageToken === null) {
-        // 첫 실행: 베이스라인만 잡고 끝. 과거 전체를 긁지 않는다.
+        // First run: capture the baseline only and stop. Do not scrape the whole past.
         const token = await baseline();
         ctx.logger.info("drive baseline established", { pageToken: token });
         yield {
@@ -76,8 +76,8 @@ export function createDriveProvider(opts: {
         const res = await opts.fetch(url, { headers: await auth() });
 
         if (res.status === 404 || res.status === 410) {
-          // A4 §10.5: 토큰 유실 → 베이스라인 재수립. 그 사이 변경은 포기한다.
-          // 전체 재스캔은 하지 않는다 — 며칠치를 놓치는 비용보다 전체 재임베딩 비용이 크다.
+          // A4 §10.5: token lost → re-establish the baseline. Changes in between are given up.
+          // No full rescan — a full re-embedding costs more than missing a few days.
           const token = await baseline();
           ctx.logger.warn("drive pageToken expired, re-baselined", { pageToken: token });
           yield {
@@ -110,7 +110,7 @@ export function createDriveProvider(opts: {
             const parents = file.parents ?? [];
             if (!parents.some((p) => opts.folderIds?.includes(p))) continue;
           }
-          if (!DRIVE_TEXT_MIME.includes(file.mimeType)) continue; // 다운로드조차 하지 않는다
+          if (!DRIVE_TEXT_MIME.includes(file.mimeType)) continue; // not even downloaded
 
           const body = await opts.fetch(`${API}/files/${file.id}?alt=media`, {
             headers: await auth(),

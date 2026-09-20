@@ -1,5 +1,5 @@
-// A4 §10.1 로컬 파일(미니): FSEvents 실시간 + 부팅 시 1회 재스캔. allowlist는 주입된다
-// (@omnis/memory는 @omnis/kernel의 getSetting을 부를 수 없다 — 허브가 읽어서 꽂는다).
+// A4 §10.1 local files (mini): FSEvents real-time + one rescan at boot. The allowlist is injected
+// (@omnis/memory cannot call @omnis/kernel's getSetting — the hub reads it and plugs it in).
 import { type FSWatcher, watch } from "node:fs";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -17,8 +17,8 @@ export interface ScanOptions {
   maxFiles?: number;
 }
 
-/** ponytail: 루트당 .gitignore 하나만 읽는다. 중첩 .gitignore는 무시 — 과다 포함이 아니라
- *  과다 제외 쪽으로 틀리는 게 이 루프에서는 안전하다. */
+/** ponytail: reads only one .gitignore per root. Nested .gitignore files are ignored — erring toward
+ *  over-exclusion rather than over-inclusion is the safe direction for this loop. */
 async function ignoreFor(root: string): Promise<(path: string) => boolean> {
   try {
     return gitignoreMatcher(root, await readFile(join(root, ".gitignore"), "utf8"));
@@ -45,7 +45,7 @@ export async function scanRoots(
       try {
         entries = await readdir(dir, { withFileTypes: true });
       } catch {
-        continue; // 권한 없음·사라짐 — 조용히 건너뛴다
+        continue; // no permission or gone — skip silently
       }
       for (const entry of entries) {
         const path = join(dir, entry.name);
@@ -97,7 +97,7 @@ export function createLocalMiniProvider(opts: { roots: readonly string[] }): Ing
         yield {
           source_ref: f.path,
           text,
-          // A4 §10.4 표: 문서가 시점을 말하지 않으면 파일 mtime이 valid_from이다.
+          // A4 §10.4 table: if the document does not state a time, the file mtime is valid_from.
           validFrom: f.mtime,
           meta: { host: "mini", size: f.size },
           nextCursor: { since: newest },
@@ -107,8 +107,8 @@ export function createLocalMiniProvider(opts: { roots: readonly string[] }): Ing
   };
 }
 
-/** A4 §10.1: FSEvents. macOS의 fs.watch(recursive)가 그대로 FSEvents를 쓴다 — 별도 패키지 없음.
- *  변경 통지는 "이 경로를 다시 읽어라"는 힌트일 뿐이고, 실제 읽기는 provider가 한다. */
+/** A4 §10.1: FSEvents. macOS's fs.watch(recursive) uses FSEvents directly — no separate package.
+ *  A change notification is only a hint to "re-read this path"; the actual read is done by the provider. */
 export function watchLocalRoots(opts: {
   roots: readonly string[];
   logger: Logger;

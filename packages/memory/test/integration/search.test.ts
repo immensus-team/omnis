@@ -37,19 +37,19 @@ describe("searchMemories", () => {
     await upsertMemory(pool, {
       ...base,
       kind: "fact",
-      content: "다비치 PoC 기획서 마감 9월 23일",
+      content: "Davich PoC proposal due September 23",
       source_ref: "/a.md",
     });
     await upsertMemory(pool, {
       ...base,
       kind: "fact",
-      content: "점심 메뉴는 김치찌개",
+      content: "Lunch menu is soup",
       source_ref: "/b.md",
     });
 
-    const hits = await searchMemories(pool, { query: "다비치 PoC 기획서 마감", k: 2 });
+    const hits = await searchMemories(pool, { query: "Davich PoC proposal due", k: 2 });
     expect(hits).toHaveLength(2);
-    expect(hits[0]?.content).toContain("다비치");
+    expect(hits[0]?.content).toContain("Davich");
     expect(hits[0]?.score).toBeGreaterThan(hits[1]?.score ?? 1);
     expect(hits[0]?.source_kind).toBe("file");
     expect(hits[0]?.source_ref).toBe("/a.md");
@@ -58,16 +58,18 @@ describe("searchMemories", () => {
     expect(hits[0]?.source_item_id).toBeNull();
   });
 
-  // 부분 HNSW의 WHERE와 같은 술어를 쓰지 않으면 무효화된 기억이 되살아난다.
+  // Unless the same predicate as the partial HNSW's WHERE is used, invalidated memories come back.
   it("never returns invalidated memories", async () => {
     await upsertMemory(pool, {
       ...base,
       kind: "fact",
-      content: "옛 사무실 주소는 강남",
+      content: "The old office address was downtown",
       source_ref: "/old.md",
     });
     await invalidateBySource(pool, "file", "/old.md");
-    expect(await searchMemories(pool, { query: "옛 사무실 주소는 강남", k: 5 })).toEqual([]);
+    expect(
+      await searchMemories(pool, { query: "The old office address was downtown", k: 5 }),
+    ).toEqual([]);
   });
 
   it("never returns rows whose embedding is still NULL", async () => {
@@ -75,65 +77,70 @@ describe("searchMemories", () => {
     await upsertMemory(pool, {
       ...base,
       kind: "fact",
-      content: "임베딩 없는 기억",
+      content: "Memory with no embedding",
       source_ref: "/n.md",
     });
     process.env.OLLAMA_HOST = ollama.host;
-    expect(await searchMemories(pool, { query: "임베딩 없는 기억", k: 5 })).toEqual([]);
+    expect(await searchMemories(pool, { query: "Memory with no embedding", k: 5 })).toEqual([]);
   });
 
   it("filters by kind and still fills k when enough rows match", async () => {
     await upsertMemory(pool, {
       ...base,
       kind: "preference",
-      content: "회의는 오전을 선호한다",
+      content: "Prefers morning meetings",
       source_ref: "/p1.md",
     });
     await upsertMemory(pool, {
       ...base,
       kind: "fact",
-      content: "회의는 오전 10시에 있었다",
+      content: "The meeting was at 10am",
       source_ref: "/f1.md",
     });
 
-    const hits = await searchMemories(pool, { query: "회의는 오전", k: 5, kinds: ["preference"] });
+    const hits = await searchMemories(pool, {
+      query: "morning meetings",
+      k: 5,
+      kinds: ["preference"],
+    });
     expect(hits).toHaveLength(1);
-    expect(hits[0]?.content).toContain("선호");
+    expect(hits[0]?.content).toContain("Prefers");
   });
 
   it("drops hits below minScore", async () => {
     await upsertMemory(pool, {
       ...base,
       kind: "fact",
-      content: "전혀 다른 이야기 자전거 정비",
+      content: "Completely unrelated bicycle repair",
       source_ref: "/x.md",
     });
-    expect(await searchMemories(pool, { query: "다비치 PoC 마감", k: 5, minScore: 0.5 })).toEqual(
-      [],
-    );
+    expect(
+      await searchMemories(pool, { query: "Davich PoC deadline", k: 5, minScore: 0.5 }),
+    ).toEqual([]);
   });
 
-  // A4 §10.6: 벡터만으로는 한국어 짧은 질의에서 recall이 0.80을 못 넘는다. 조사가 붙어 낱말이
-  // 안 겹치면 임베딩은 직교에 가까워지지만 문자 트라이그램은 여전히 겹친다 — 그 가지가 실제로
-  // 순위를 바꾸는지 본다. 디코이 11건은 질의와 낱말도 트라이그램도 겹치지 않아 코사인이 모두
-  // 같고(공유 토큰 없음), 목표 행을 1위로 올릴 수 있는 것은 렉시컬 가지뿐이다.
+  // A4 §10.6: vectors alone cannot reach 0.80 recall on short queries. When the query word does
+  // not match the document's word (poll vs polling) the embeddings come out near-orthogonal, but
+  // the character trigrams still overlap — this checks that the branch really changes the ranking.
+  // The 11 decoys share neither words nor trigrams with the query, so their cosines are all equal
+  // (no shared tokens) and only the lexical branch can lift the target row to rank 1.
   it("lexical trigram branch outranks vector ties", async () => {
     await upsertMemory(pool, {
       ...base,
       kind: "fact",
-      content: "드라이브는 폴링으로 변경분을 가져온다",
+      content: "Drive pulls changes by polling",
       source_ref: "/target.md",
     });
     for (let i = 0; i < 11; i += 1) {
       await upsertMemory(pool, {
         ...base,
         kind: "fact",
-        content: `자전거 정비 기록 ${i}`,
+        content: `Bicycle repair log ${i}`,
         source_ref: `/d${i}.md`,
       });
     }
 
-    const hits = await searchMemories(pool, { query: "폴링 방식", k: 5 });
+    const hits = await searchMemories(pool, { query: "how often does it poll", k: 5 });
     expect(hits[0]?.source_ref).toBe("/target.md");
   });
 
@@ -142,18 +149,19 @@ describe("searchMemories", () => {
       await upsertMemory(pool, {
         ...base,
         kind: "fact",
-        content: `회의 기록 ${i}`,
+        content: `Meeting note ${i}`,
         source_ref: `/m${i}.md`,
       });
     }
-    expect(await searchMemories(pool, { query: "회의 기록" })).toHaveLength(10);
+    expect(await searchMemories(pool, { query: "Meeting note" })).toHaveLength(10);
   });
 
-  // 질의 임베딩이 실패하면 "결과 없음"이 아니라 에러다 — 조용히 빈 컨텍스트를 만들면 안 된다.
+  // A failed query embedding is an error, not "no results" — silently building an empty context
+  // would let the loop assume it has no memories.
   it("throws MemoryEmbedError when the query itself cannot be embedded", async () => {
     process.env.OLLAMA_HOST = "127.0.0.1:1";
     try {
-      await expect(searchMemories(pool, { query: "아무거나" })).rejects.toThrow(MemoryEmbedError);
+      await expect(searchMemories(pool, { query: "anything" })).rejects.toThrow(MemoryEmbedError);
     } finally {
       process.env.OLLAMA_HOST = ollama.host;
     }

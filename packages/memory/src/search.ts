@@ -1,5 +1,6 @@
-// A3 §5의 부분 HNSW(`WHERE invalidated_at IS NULL`)를 타는 유일한 질의. WHERE 술어가
-// 인덱스 조건과 어긋나면 플래너가 seq scan으로 떨어지고, 더 나쁘게는 무효화된 기억이 돌아온다.
+// The only query that rides A3 §5's partial HNSW (`WHERE invalidated_at IS NULL`). If the WHERE
+// predicate drifts from the index condition, the planner falls back to a seq scan — and worse,
+// invalidated memories come back.
 import { query } from "@omnis/db";
 import type { MemoryKind, MemorySourceKind } from "@omnis/protocol";
 import type { Pool } from "pg";
@@ -29,15 +30,17 @@ interface HitRow {
   source_ref: string | null;
 }
 
-// A4 §10.6: 벡터 단독은 한국어 짧은 질의에서 recall@10 0.78로 목표(0.80)를 못 넘는다 —
-// nomic-embed-text-v1.5가 한국어 의미 유사도에서 약해 같은 "허브" 문서 몇 개가 거의 모든 질의의
-// 상위를 먹는다. 그래서 pg_trgm 문자 트라이그램 거리(조사 변화에 강하다 — 0001의 확장을 그대로
-// 쓴다)를 두 번째 후보 목록으로 두고 RRF(k=60, 표준값)로 섞는다. 실측 0.780 → 0.920.
-// score는 여전히 코사인 유사도다 — minScore 소비자(assemble.ts)의 의미를 바꾸지 않는다.
+// A4 §10.6: vectors alone give recall@10 0.78 on short Korean queries, short of the 0.80 target —
+// nomic-embed-text-v1.5 is weak on Korean semantic similarity, so a few of the same "hub" documents
+// eat the top of nearly every query. So we keep pg_trgm character-trigram distance (robust to
+// particle changes — reusing 0001's extension as-is) as a second candidate list and fuse with
+// RRF (k=60, the standard value). Measured 0.780 → 0.920. score is still cosine similarity — this
+// does not change the meaning of minScore for its consumer (assemble.ts).
 const RRF_K = 60;
 
-// ponytail: 렉시컬 가지는 `content <-> $4`라서 live memories를 seq scan한다. 수만 row가 되면
-// `CREATE INDEX ... USING gist (content gist_trgm_ops)`로 KNN을 인덱스에 태운다.
+// ponytail: the lexical branch uses `content <-> $4`, so it seq scans live memories. Once there
+// are tens of thousands of rows, put the KNN on an index with
+// `CREATE INDEX ... USING gist (content gist_trgm_ops)`.
 const SQL = `
   WITH vec AS (
     SELECT id, row_number() OVER (ORDER BY d) AS rank FROM (
@@ -74,10 +77,11 @@ export async function searchMemories(
   const k = q.k ?? 10;
   const [vec] = await embed([EMBED_QUERY_PREFIX + q.query]);
   if (vec === null || vec === undefined) {
-    // 조용히 빈 배열을 돌려주면 루프가 "기억이 없다"로 오해하고 근거 없는 초안을 쓴다.
+    // Silently returning an empty array makes the loop mistake it for "no memories" and write an
+    // unsupported draft.
     throw new MemoryEmbedError("query embedding failed — ollama unreachable");
   }
-  // 두 가지 후보를 섞으려면 k개보다 깊게 떠야 RRF가 순위를 바꿀 수 있다. 가지마다 4k개.
+  // Fusing two candidate lists requires fetching deeper than k for RRF to reorder anything. 4k per branch.
   const rows = await query<HitRow>(pool, SQL, [
     toVectorLiteral(vec),
     k * 4,
@@ -102,9 +106,10 @@ export async function searchMemories(
     .slice(0, k);
 }
 
-// A4 §14.4: 통합 검색(US-B26, surfaces 계획 Task 1)이 memory hit의 snippet을 ≤160자로 자른다.
-// items는 ts_headline이 있지만 memories는 없어서 절단만 한다. 소비자가 두 곳(hub search.ts,
-// search_memory tool)이라 여기서 한 번만 정의한다 — hub 쪽에 복제하지 않는다.
+// A4 §14.4: unified search (US-B26, surfaces plan Task 1) truncates a memory hit's snippet to
+// ≤160 characters. items have ts_headline but memories do not, so this only truncates. Two
+// consumers (hub search.ts, the search_memory tool), so it is defined once here — not duplicated
+// on the hub side.
 export function truncateSnippet(text: string, max = 160): string {
   if (text.length <= max) return text;
   return `${text.slice(0, max - 3)}...`;

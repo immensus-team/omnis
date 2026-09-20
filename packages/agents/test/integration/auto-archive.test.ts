@@ -41,7 +41,7 @@ async function mkItem(over: Record<string, unknown> = {}): Promise<string> {
       accountId,
       over.kind ?? "email",
       over.sensitivity ?? "normal",
-      over.body ?? "주간 뉴스레터입니다",
+      over.body ?? "This is the weekly newsletter.",
       JSON.stringify(over.meta ?? {}),
     ],
   );
@@ -80,7 +80,7 @@ describe("autoArchiveLoop hard gates (A4 §9.2)", () => {
     expect((await hardGate(pool, plain)).blocked).toBe(false);
     await pool.query(
       `INSERT INTO pending_approvals (action, args, description, thread_id)
-       VALUES ('send','{}'::jsonb,'승인 대기',$1)`,
+       VALUES ('send','{}'::jsonb,'pending approval',$1)`,
       [threadId],
     );
     expect((await hardGate(pool, plain)).blocked).toBe(true);
@@ -107,6 +107,7 @@ describe("autoArchiveLoop hard gates (A4 §9.2)", () => {
   });
 
   it("archives a newsletter entirely at T0 (no model call)", async () => {
+    // Frozen: this Korean body is the newsletter fixture the UNSUBSCRIBE matcher must keep matching.
     const id = await mkItem({ body: "이번 주 소식입니다. 구독 해지는 아래에서." });
     await pool.query(
       `UPDATE items SET meta = meta || '{"headers":{"List-Unsubscribe":"<x>"}}'::jsonb WHERE id = $1`,
@@ -130,7 +131,7 @@ describe("autoArchiveLoop hard gates (A4 §9.2)", () => {
 
   it("falls through to the model path when the body asks something", async () => {
     const id = await mkItem({
-      body: "안내드립니다. 참석 가능하신가요?",
+      body: "Just a heads-up. Are you able to attend?",
       meta: { headers: { "List-Unsubscribe": "<x>" } },
     });
     const decided = await autoArchiveLoop.decide?.({
@@ -158,11 +159,11 @@ describe("autoArchiveLoop hard gates (A4 §9.2)", () => {
         run_id: "00000000-0000-0000-0000-000000000000",
         output: {
           archive: true,
-          reason: "뉴스레터",
+          reason: "newsletter",
           rule_ids: [],
           tier: "T1",
           confidence: T1_ARCHIVE_CONFIDENCE_MIN - 0.01,
-          rationale: "애매하다",
+          rationale: "ambiguous",
           injection_flags: [],
         },
         confidence: 0.84,
@@ -184,11 +185,11 @@ describe("autoArchiveLoop hard gates (A4 §9.2)", () => {
         run_id: "00000000-0000-0000-0000-000000000000",
         output: {
           archive: true,
-          reason: "뉴스레터",
+          reason: "newsletter",
           rule_ids: ["ar_sender_nonhuman"],
           tier: "T0",
           confidence: 0.95,
-          rationale: "보관",
+          rationale: "archive",
           injection_flags: [],
         },
         confidence: 0.95,
@@ -204,7 +205,7 @@ describe("autoArchiveLoop hard gates (A4 §9.2)", () => {
       [low],
     );
     expect(done.rows[0]?.status).toBe("archived");
-    expect(done.rows[0]?.reason).toBe("뉴스레터");
+    expect(done.rows[0]?.reason).toBe("newsletter");
   });
 
   it("sweepAutoArchive hands today's untouched items to the runner", async () => {

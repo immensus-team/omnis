@@ -1,6 +1,8 @@
-// A4 §1.3: 조립기 함수는 하나다. 루프는 슬롯만 선언한다.
-// 캐시 경계 규율: tools → system → selfModel 스냅샷까지가 cachedPrefix, 그 뒤가 volatile.
-// 타임스탬프·run_id·nonce는 반드시 경계 뒤다(어기면 cache-hit $0.003/M → miss $0.15/M).
+// A4 §1.3: there is exactly one assembler function. A loop only declares slots.
+// Cache boundary discipline: tools → system → up to the selfModel snapshot is cachedPrefix;
+// everything after it is volatile.
+// Timestamps, run_id, and nonce must always sit after the boundary (breach it and cache-hit
+// $0.003/M becomes miss $0.15/M).
 import {
   type SelfModelFile,
   asOf,
@@ -36,9 +38,10 @@ export interface AssembledContext {
   provenance: Array<{ slot: string; itemIds: string[]; memoryIds: string[] }>;
 }
 
-/** ponytail: LoopSpec.budget.inputTokens(US-B06)가 루프별 예산을 갖고 있지만 ContextRequest에는
- *  예산 슬롯이 없다(델타 §4 고정). 모듈 기본값을 두고 루프 러너가 호출 전에 setContextBudget()으로
- *  자기 예산을 건다. 슬롯이 계약에 추가되면 이 전역은 사라진다. */
+/** ponytail: LoopSpec.budget.inputTokens (US-B06) carries a per-loop budget, but ContextRequest has
+ *  no budget slot (fixed by delta §4). Keep a module default and let the loop runner arm its own
+ *  budget with setContextBudget() before the call. Once the slot is added to the contract, this
+ *  global goes away. */
 export const CONTEXT_INPUT_BUDGET_TOKENS = 12_000;
 let budget = CONTEXT_INPUT_BUDGET_TOKENS;
 
@@ -74,20 +77,23 @@ function renderPrefix(files: Partial<Record<SelfModelFile, string>>): string {
     parts.push(body.trimEnd());
   }
   if (parts.length === 0) return "";
-  return `## 나(사용자)에 대하여\n${parts.join("\n\n")}\n`;
+  return `## About me (the user)\n${parts.join("\n\n")}\n`;
 }
 
-/** A4 §1.3 절삭 4단계: "상대별 샘플 → 채널 기본 샘플로 대체". VOICE.md의 `## 상대별`로
- *  시작하는 섹션만 떼어낸다 — 파일 형식을 더 강제하지 않는다.
- *  `(?:(?!^##\s)[\s\S])*`는 "다음 `## ` 줄 또는 파일 끝까지"다. JS에는 `\Z`가 없어서
- *  `(?=^##\s|\Z)` 같은 lookahead는 조용히 리터럴 `Z`를 찾다가 아무것도 안 지운다. */
+/** A4 §1.3 truncation stage 4: "per-recipient samples → fall back to channel default samples".
+ *  It only peels off the section in VOICE.md that starts with `## 상대별` (the Korean heading for
+ *  "per recipient") — that Korean matcher is FROZEN, so leave it verbatim. No further file-format
+ *  enforcement.
+ *  `(?:(?!^##\s)[\s\S])*` means "up to the next `## ` line or end of file". JS has no `\Z`, so a
+ *  lookahead like `(?=^##\s|\Z)` silently searches for a literal `Z` and deletes nothing. */
 function stripVoiceSamples(voice: string): string {
   return voice.replace(/^##\s*상대별[^\n]*\n(?:(?!^##\s)[\s\S])*/gm, "").trimEnd();
 }
 
 export async function buildContext(req: ContextRequest): Promise<AssembledContext> {
-  // ponytail: pool은 DB 슬롯을 실제로 요청했을 때만 집는다. selfModel만 요청한 루프(와 유닛
-  // 테스트)까지 configureAgents()를 강제하면 조립기가 DB에 묶인다.
+  // ponytail: the pool is only acquired when a DB-backed slot is actually requested. Forcing
+  // configureAgents() on a loop (or unit test) that only asks for selfModel would tie the
+  // assembler to the DB.
   let poolRef: Pool | null = null;
   const db = (): Pool => {
     poolRef ??= getAgentsPool();
@@ -134,7 +140,7 @@ export async function buildContext(req: ContextRequest): Promise<AssembledContex
         : ["message", "email", "event", "agent_turn", "system"];
     const { rows } = await db().query<ThreadTurn>(
       `SELECT i.id AS item_id,
-              COALESCE(p.display_name, CASE WHEN i.author_is_me THEN '나' ELSE '알 수 없음' END) AS author,
+              COALESCE(p.display_name, CASE WHEN i.author_is_me THEN 'me' ELSE 'unknown' END) AS author,
               i.sent_at, i.body
          FROM items i
          LEFT JOIN persons p ON p.id = i.author_person_id
@@ -149,7 +155,7 @@ export async function buildContext(req: ContextRequest): Promise<AssembledContex
 
   if (req.calendar !== undefined) {
     const { rows } = await db().query<Slots["calendar"][number]>(
-      `SELECT ce.item_id, COALESCE(i.subject, '(제목 없음)') AS title, ce.start_at, ce.end_at
+      `SELECT ce.item_id, COALESCE(i.subject, '(no title)') AS title, ce.start_at, ce.end_at
          FROM calendar_events ce JOIN items i ON i.id = ce.item_id
         WHERE ce.status <> 'cancelled'
           AND ce.start_at BETWEEN $1::timestamptz - make_interval(hours => $2)
@@ -199,7 +205,7 @@ export async function buildContext(req: ContextRequest): Promise<AssembledContex
     provenance.push({ slot: "sessions", itemIds: [], memoryIds: [] });
   }
 
-  // ── 렌더 + 절삭 ──────────────────────────────────────────────────────────
+  // ── render + truncate ────────────────────────────────────────────────────
   const render = (): { prefix: string; blocks: DataBlock[]; tokens: number } => {
     const prefix = renderPrefix(slots.selfModel);
     const blocks = renderBlocks(slots, nonce, now);
@@ -208,24 +214,24 @@ export async function buildContext(req: ContextRequest): Promise<AssembledContex
     return { prefix, blocks, tokens };
   };
 
-  // A4-D15의 5단계. 각 함수는 "한 단계만큼 더 깎았으면 true"를 돌려준다.
-  // USER.md와 스레드의 마지막 3턴은 어떤 단계도 건드리지 않는다.
+  // The 5 stages of A4-D15. Each function returns "true if it trimmed one stage's worth".
+  // USER.md and the last 3 turns of the thread are touched by no stage.
   const steps: Array<() => boolean> = [
     () => {
-      // 1. 스레드 중간 턴(가장 오래된 것부터). 첫 턴과 마지막 3턴은 보존.
+      // 1. Middle turns of the thread (oldest first). The first turn and the last 3 turns are preserved.
       const first = slots.turns[0];
       if (first === undefined || slots.turns.length <= 4) return false;
       slots.turns = [first, ...slots.turns.slice(2)];
       return true;
     },
     () => {
-      // 2. memories 하위 스코어부터 (k를 절반으로) — searchMemories가 이미 점수순이다.
+      // 2. Lower-scoring memories first (halve k) — searchMemories is already in score order.
       if (slots.memoryHits.length <= 1) return false;
       slots.memoryHits = slots.memoryHits.slice(0, Math.floor(slots.memoryHits.length / 2));
       return true;
     },
     () => {
-      // 3. 캘린더 창(±window)을 절반으로
+      // 3. Halve the calendar window (±window)
       if (slots.calendar.length === 0 || slots.calendarHours <= 1) return false;
       slots.calendarHours = Math.floor(slots.calendarHours / 2);
       const cutoffMs = slots.calendarHours * 3_600_000;
@@ -235,7 +241,7 @@ export async function buildContext(req: ContextRequest): Promise<AssembledContex
       return true;
     },
     () => {
-      // 4. VOICE.md의 상대별 샘플을 제거(채널 기본 샘플만 남긴다)
+      // 4. Remove the per-recipient samples from VOICE.md (leaving only the channel default samples)
       const voice = slots.selfModel["VOICE.md"];
       if (voice === undefined) return false;
       const stripped = stripVoiceSamples(voice);
@@ -244,7 +250,7 @@ export async function buildContext(req: ContextRequest): Promise<AssembledContex
       return true;
     },
     () => {
-      // 5. PROJECTS.md 전체 제거
+      // 5. Remove PROJECTS.md entirely
       if (slots.selfModel["PROJECTS.md"] === undefined) return false;
       const { "PROJECTS.md": _dropped, ...rest } = slots.selfModel;
       slots.selfModel = rest;
@@ -328,7 +334,7 @@ function renderBlocks(slots: Slots, nonce: string, now: Date): DataBlock[] {
     push(
       "sessions",
       slots.sessions
-        .map((s) => `[${s.session_key} ${s.state}] ${s.summary ?? "(요약 없음)"}`)
+        .map((s) => `[${s.session_key} ${s.state}] ${s.summary ?? "(no summary)"}`)
         .join("\n"),
     );
   }

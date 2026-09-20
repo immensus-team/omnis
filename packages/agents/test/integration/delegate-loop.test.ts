@@ -21,26 +21,26 @@ afterAll(() => pool.end());
 describe("renderBrief (A4 §5.3)", () => {
   it("renders all eight sections and keeps acceptance non-empty", () => {
     const b = renderBrief({
-      goal: "리포트 스크립트를 고친다",
-      background: ["지난주 실패했다 (item:it_1)", "로그는 ops/logs에 있다 (memory:m_2)"],
-      steps: ["원인 파악", "수정"],
-      acceptance: ["pnpm test가 통과한다"],
+      goal: "Fix the report script",
+      background: ["It failed last week (item:it_1)", "The logs are in ops/logs (memory:m_2)"],
+      steps: ["Diagnose the cause", "Fix it"],
+      acceptance: ["pnpm test passes"],
       verifyCmd: "pnpm test",
       workdir: "/Users/logankim/AI-Workspaces/omnis",
     });
     for (const h of [
-      "## 목표",
-      "## 배경",
-      "## 해야 할 일",
-      "## 수용 기준",
-      "## 검증 명령",
-      "## 작업 디렉터리",
-      "## 금지",
+      "## Goal",
+      "## Background",
+      "## Steps",
+      "## Acceptance Criteria",
+      "## Verify Command",
+      "## Workdir",
+      "## Do Not",
     ]) {
       expect(b).toContain(h);
     }
-    expect(b).toContain("- [ ] pnpm test가 통과한다");
-    expect(b).toContain("커밋/푸시하지 않는다");
+    expect(b).toContain("- [ ] pnpm test passes");
+    expect(b).toContain("Do not commit or push");
   });
 
   it("refuses an empty acceptance list", () => {
@@ -135,7 +135,7 @@ describe("delegateLoop (A4 §5)", () => {
   it("creates a pending approval row, never an execution", async () => {
     const taskId = returningId(
       await pool.query<{ id: string }>(
-        "INSERT INTO tasks (title, owner_kind, created_by) VALUES ('위임 후보','agent','agent') RETURNING id",
+        "INSERT INTO tasks (title, owner_kind, created_by) VALUES ('delegation candidate','agent','agent') RETURNING id",
       ),
     );
     await delegateLoop.apply(
@@ -145,19 +145,19 @@ describe("delegateLoop (A4 §5)", () => {
         output: {
           runtime: "claude_code",
           host: "mini",
-          goal: "고친다",
+          goal: "Fix it",
           background: [],
           steps: ["a"],
-          acceptance: ["테스트 통과"],
+          acceptance: ["tests pass"],
           verify_cmd: "pnpm test",
           workdir: "/Users/logankim/AI-Workspaces/omnis",
           est_minutes: 20,
           confidence: 0.8,
-          rationale: "레포 안 작업",
+          rationale: "work inside the repo",
           injection_flags: [],
         },
         confidence: 0.8,
-        rationale: "레포 안 작업",
+        rationale: "work inside the repo",
         escalate: false,
         injection_flags: [],
         unresolved: [],
@@ -171,7 +171,7 @@ describe("delegateLoop (A4 §5)", () => {
       args: { brief: string };
     }>("SELECT state, action, risk, args FROM pending_approvals WHERE task_id = $1", [taskId]);
     expect(rows[0]).toMatchObject({ state: "pending", action: "delegate", risk: "normal" });
-    expect(rows[0]?.args.brief).toContain("## 수용 기준");
+    expect(rows[0]?.args.brief).toContain("## Acceptance Criteria");
     const sessions = await pool.query<{ n: string }>(
       "SELECT count(*)::text AS n FROM agent_sessions",
     );

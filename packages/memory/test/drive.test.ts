@@ -26,7 +26,7 @@ function provider(handler: DriveFetch) {
   return createDriveProvider({ fetch: handler, accessToken: async () => "token" });
 }
 
-describe("createDriveProvider — 베이스라인", () => {
+describe("createDriveProvider — baseline", () => {
   it("takes a start page token on the first run and yields no content, only a cursor signal", async () => {
     const urls: string[] = [];
     const p = provider(async (url) => {
@@ -56,7 +56,7 @@ describe("createDriveProvider — 베이스라인", () => {
   });
 });
 
-describe("createDriveProvider — 변경 폴링", () => {
+describe("createDriveProvider — change polling", () => {
   const change = (id: string, name: string, mime: string, removed = false) => ({
     fileId: id,
     removed,
@@ -68,7 +68,7 @@ describe("createDriveProvider — 변경 폴링", () => {
   it("emits one doc per changed text file, with the drive fileId as source_ref", async () => {
     const p = provider(async (url) => {
       if (url.includes("startPageToken")) return json({ startPageToken: "100" });
-      if (url.includes("alt=media")) return new Response("드라이브 본문", { status: 200 });
+      if (url.includes("alt=media")) return new Response("drive body", { status: 200 });
       return json({
         changes: [change("f1", "notes.md", "text/markdown")],
         newStartPageToken: "101",
@@ -77,7 +77,7 @@ describe("createDriveProvider — 변경 폴링", () => {
     const docs = await collect(p.list({ pool: {} as never, logger, cursor: { pageToken: "100" } }));
     expect(docs).toHaveLength(1);
     expect(docs[0]?.source_ref).toBe("f1");
-    expect(docs[0]?.text).toBe("드라이브 본문");
+    expect(docs[0]?.text).toBe("drive body");
     expect(docs[0]?.validFrom).toBe("2026-09-20T00:00:00.000Z");
     expect(docs[0]?.nextCursor).toEqual({ pageToken: "101" });
   });
@@ -140,7 +140,7 @@ describe("createDriveProvider — 변경 폴링", () => {
     let page = 0;
     const p = provider(async (url) => {
       if (url.includes("startPageToken")) return json({ startPageToken: "100" });
-      if (url.includes("alt=media")) return new Response("본문", { status: 200 });
+      if (url.includes("alt=media")) return new Response("body", { status: 200 });
       page += 1;
       return page === 1
         ? json({ changes: [change("f5", "a.md", "text/markdown")], nextPageToken: "200" })
@@ -152,7 +152,7 @@ describe("createDriveProvider — 변경 폴링", () => {
   });
 });
 
-describe("createDriveProvider — 토큰 유실 (A4 §10.5)", () => {
+describe("createDriveProvider — token loss (A4 §10.5)", () => {
   it("re-baselines on 404 instead of rescanning everything", async () => {
     const urls: string[] = [];
     const p = provider(async (url) => {
@@ -167,7 +167,7 @@ describe("createDriveProvider — 토큰 유실 (A4 §10.5)", () => {
       expect.objectContaining({ source_ref: "__drive_baseline__", text: null, deleted: false }),
     ]);
     expect(urls.some((u) => u.includes("startPageToken"))).toBe(true);
-    // 전체 재스캔(files.list)은 절대 부르지 않는다.
+    // A full rescan (files.list) is never called.
     expect(urls.some((u) => u.includes("/files?"))).toBe(false);
   });
 

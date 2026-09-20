@@ -1,4 +1,4 @@
-// A4 §6.4. 판정은 §9(L8)가 소유하고, 여기는 그 결과를 사람이 볼 수 있게 노출하는 쪽만 정의한다.
+// A4 §6.4. §9 (L8) owns the verdict; this file only defines how that result is exposed to a human.
 import { createHash } from "node:crypto";
 import type { Channel } from "@omnis/protocol";
 import type { Pool } from "pg";
@@ -26,19 +26,19 @@ export interface NightlyDigest {
   agents: { runs: number; failed: number; delegated: number };
 }
 
-/** 7일 창은 meta.archived_by.at이 판정하므로 토큰은 저장하지 않는다 — 재계산 가능한 값이다. */
+/** The 7-day window is decided by meta.archived_by.at, so the token is not stored — it is recomputable. */
 export function undoTokenFor(digestId: string, reason: string): string {
   return createHash("sha256").update(`${digestId}::${reason}`).digest("hex").slice(0, 16);
 }
 
-/** 모델이 쓰는 건 headline과 one_liner 두 문장뿐이다(A4 §6.4). */
+/** headline and one_liner are the only two sentences the model writes (A4 §6.4). */
 export const NightlyDigestOutput = z.object({
   headline: z.string().max(120),
   one_liner: z.string().max(160),
   confidence: z.number().min(0).max(1),
   rationale: z.string().max(200),
-  // ponytail: digest-morning.ts와 같은 이유로 .default()를 쓰지 않는다 — z.input과 z.output이
-  // 갈리면 LoopSpec의 ZodType<TOut>에 대입되지 않는다.
+  // ponytail: no .default() here, for the same reason as digest-morning.ts — once z.input and
+  // z.output diverge it will not assign to LoopSpec's ZodType<TOut>.
   injection_flags: z.array(z.string()),
 });
 export type NightlyDigestOutputT = z.infer<typeof NightlyDigestOutput>;
@@ -49,7 +49,7 @@ const ZERO_COST: NightlyDigest["cost"] = {
   tier_state: "normal",
 };
 
-/** A4 §9.4: 자동 보관은 전량 노출한다 — count는 전체 수, samples만 3건으로 자른다. */
+/** A4 §9.4: auto-archive is exposed in full — count is the total, only samples is cut to 3. */
 export async function nightlyGroups(
   pool: Pool,
   since: Date,
@@ -60,7 +60,7 @@ export async function nightlyGroups(
     count: string;
     samples: { id: string; line: string }[] | null;
   }>(
-    `SELECT COALESCE(meta->'archived_by'->>'reason','기타') AS reason,
+    `SELECT COALESCE(meta->'archived_by'->>'reason','other') AS reason,
             count(*)::text AS count,
             jsonb_agg(jsonb_build_object('id', id, 'line', left(COALESCE(subject, body), 90))
                       ORDER BY sent_at DESC) AS samples
@@ -136,7 +136,7 @@ export const nightlyDigestLoop: LoopSpec<NightlyDigestOutputT> = {
       headline: result.output.headline,
       auto_archived: await nightlyGroups(pool, dayStart, digestId),
       handled: await handledToday(pool, ctx.now),
-      // 열린 항목 6: "내일 아침 예고"의 선정 규칙이 A4 §6.4에 없다 — 비워 둔다.
+      // Open item 6: A4 §6.4 has no selection rule for the "tomorrow morning preview" — leave it empty.
       still_open: [],
       cost,
       agents: await agentStats(pool, ctx.now),
@@ -158,4 +158,4 @@ export const nightlyDigestLoop: LoopSpec<NightlyDigestOutputT> = {
     );
   },
 };
-// morningDigestLoop과 같은 이유로 레지스트리에 넣지 않는다(LoopId 'digest' 공유).
+// Not registered in the registry for the same reason as morningDigestLoop (shared LoopId 'digest').

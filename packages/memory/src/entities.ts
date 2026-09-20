@@ -1,5 +1,5 @@
-// A3 §5 Graphiti 4-timestamp. 규칙은 하나다: 사실은 수정되지 않고 대체된다.
-// valid_from/valid_until = 사실의 시간, recorded_at/invalidated_at = 시스템이 안 시간.
+// A3 §5 Graphiti 4-timestamp. There is one rule: facts are never edited, they are superseded.
+// valid_from/valid_until = the fact's own time, recorded_at/invalidated_at = when the system learned it.
 import { one, query, tx } from "@omnis/db";
 import type { PoolClient } from "@omnis/db";
 import type { Pool } from "pg";
@@ -11,7 +11,7 @@ export interface EntityInput {
   name: string;
   person_id?: string;
   attributes?: Record<string, unknown>;
-  valid_from: string; // 필수 — 4-timestamp를 안 채우는 쓰기 경로를 타입으로 막는다
+  valid_from: string; // required — the type blocks any write path that skips the 4-timestamp
   valid_until?: string;
 }
 
@@ -47,7 +47,8 @@ function toRow(r: RawEntity): EntityRow {
   };
 }
 
-/** 타입만으로는 빈 문자열을 못 막는다 — 추출기가 채우지 못한 값이 여기까지 오는 길목을 닫는다. */
+/** The type alone cannot block an empty string — this closes the path by which a value the
+ *  extractor failed to fill would reach here. */
 function assertValidFrom(v: string, what: string): void {
   if (v === "" || Number.isNaN(Date.parse(v))) {
     throw new TypeError(
@@ -60,8 +61,9 @@ function sameJson(a: unknown, b: unknown): boolean {
   return JSON.stringify(a ?? {}) === JSON.stringify(b ?? {});
 }
 
-/** live 유니크(`entities (type, lower(name)) WHERE invalidated_at IS NULL`) 충돌 시
- *  기존 row를 무효화하고 새 row를 넣는다 — 같은 트랜잭션이어야 유니크 위반이 안 난다. */
+/** On a live-unique collision (`entities (type, lower(name)) WHERE invalidated_at IS NULL`),
+ *  invalidate the existing row and insert a new one — both in the same transaction, or the
+ *  unique index fires. */
 export async function upsertEntity(pool: Pool, e: EntityInput): Promise<string> {
   assertValidFrom(e.valid_from, "EntityInput");
   return tx(pool, async (c) => {
@@ -114,8 +116,8 @@ export interface RelationInput {
   valid_until?: string;
 }
 
-/** relations에는 live 유니크 인덱스가 없다(A3 §5). 같은 (from,to,type)의 live row를 손으로
- *  찾아 같은 규칙을 적용한다 — 엔티티와 동작이 갈리면 as-of 질의가 둘을 다르게 본다. */
+/** relations has no live-unique index (A3 §5). Find the live row for the same (from,to,type) by
+ *  hand and apply the same rule — if the two diverge, as-of queries would see them differently. */
 export async function assertRelation(pool: Pool, r: RelationInput): Promise<string> {
   assertValidFrom(r.valid_from, "RelationInput");
   return tx(pool, async (c) => {
@@ -160,8 +162,8 @@ export async function assertRelation(pool: Pool, r: RelationInput): Promise<stri
   });
 }
 
-/** 죽은 엔티티에 붙은 관계는 같이 죽는다 — 안 그러면 as-of가 존재하지 않는 엔티티로 가는
- *  간선을 돌려준다. */
+/** Relations attached to a dead entity die with it — otherwise as-of would return edges pointing
+ *  at an entity that does not exist. */
 export async function invalidateEntity(
   pool: Pool,
   id: string,
@@ -191,7 +193,7 @@ const AS_OF_SQL = `
      AND (invalidated_at IS NULL OR invalidated_at > $3)
    ORDER BY valid_from DESC`;
 
-/** A3 §5의 3조건 질의. 'now'는 서버 시각이다 — 호출자가 시계를 들고 오지 않는다. */
+/** A3 §5's three-condition query. 'now' means server time — the caller does not bring its own clock. */
 export async function asOf(
   pool: Pool,
   q: { entityId?: string; personId?: string; at: "now" | string },

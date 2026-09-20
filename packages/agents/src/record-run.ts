@@ -58,7 +58,7 @@ const COLUMNS = [
   "raw_output",
 ] as const;
 
-/** A4-D16: 여기 없는 실행은 존재하지 않은 것으로 취급한다. 모든 L3 호출이 이 헬퍼를 거친다. */
+/** A4-D16: a run that is not recorded here does not exist. Every L3 call goes through this helper. */
 export async function recordRun(input: RecordRunInput): Promise<string> {
   const values = COLUMNS.map((c) => {
     const v = (input as unknown as Record<string, unknown>)[c];
@@ -97,7 +97,7 @@ const PATCHABLE = [
   "raw_output",
 ] as const;
 
-/** 실행 종료. 준 컬럼만 덮어쓰고 finished_at을 찍는다. 재시도 판단은 호출자 몫이다(A4 §1.6). */
+/** Ends a run: overwrites only the given columns and stamps finished_at. Retry decisions belong to the caller (A4 §1.6). */
 export async function finishRun(
   id: string,
   patch: Partial<RecordRunInput> & { outcome: RecordRunInput["outcome"] },

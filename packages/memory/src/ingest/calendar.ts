@@ -1,4 +1,5 @@
-// A4 §10.1: 캘린더는 별도 폴링을 두지 않는다 — A1 어댑터가 이미 쓴 calendar_events에서 추출만 한다.
+// A4 §10.1: the calendar gets no separate polling — we only extract from the calendar_events
+// that the A1 adapter already writes.
 import { query } from "@omnis/db";
 import { chunkCalendarEvent } from "./chunk.js";
 import type { IngestDoc, IngestProvider } from "./run.js";
@@ -23,7 +24,7 @@ export function createCalendarProvider(): IngestProvider {
         typeof ctx.cursor.since === "string" ? ctx.cursor.since : "1970-01-01T00:00:00.000Z";
       const rows = await query<EventRow>(
         ctx.pool,
-        `SELECT ce.external_id, COALESCE(i.subject, '(제목 없음)') AS title, ce.start_at, ce.end_at,
+        `SELECT ce.external_id, COALESCE(i.subject, '(no subject)') AS title, ce.start_at, ce.end_at,
                 ce.location, ce.attendees, i.body AS description, ce.updated_at
            FROM calendar_events ce JOIN items i ON i.id = ce.item_id
           WHERE ce.updated_at > $1::timestamptz
@@ -43,7 +44,7 @@ export function createCalendarProvider(): IngestProvider {
         yield {
           source_ref: r.external_id,
           text: chunk.text,
-          validFrom: r.start_at.toISOString(), // 사실이 유효해지는 시점 = 이벤트 시각
+          validFrom: r.start_at.toISOString(), // when the fact becomes valid = the event time
           meta: chunk.meta,
           nextCursor: { since: r.updated_at.toISOString() },
         };

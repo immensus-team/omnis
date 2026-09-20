@@ -40,7 +40,7 @@ export function listLoops(): LoopSpec<unknown>[] {
   return [...registry.values()];
 }
 
-/** 테스트 전용. 프로덕션 코드에서 호출하지 않는다. */
+/** Test-only. Do not call from production code. */
 export function resetLoopRegistryForTest(): void {
   registry.clear();
 }
