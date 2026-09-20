@@ -80,3 +80,15 @@ export {
   noteRouteLoop,
   type RouteOutputT,
 } from "./loops/note-route.js";
+export {
+  FollowupOutput,
+  INACTIVE_SWEEP_LIMIT,
+  NO_COLD_OUTREACH_CHANNELS,
+  followupLoop,
+  inactiveCandidates,
+  isFirstContact,
+  pickFollowupChannel,
+  sweepFollowups,
+  type FollowupOutputT,
+  type InactiveCandidate,
+} from "./loops/followup.js";
