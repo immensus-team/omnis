@@ -96,12 +96,14 @@ export interface LoopResult<T> {
   run_id: string;                 // uuid, = agent_runs.id
   output: T;                      // loop-specific schema
   confidence: number;             // 0.0 ~ 1.0, self-reported by the model (A4-D4)
-  rationale: string;              // Korean, ≤ 400 chars. Shown verbatim in the UI.
+  rationale: string;              // Runtime text in the user's language, ≤ 400 chars. Shown verbatim in the UI.
   escalate: boolean;              // the model itself judges "a stronger model needs to look at this"
   injection_flags: string[];      // e.g. ['instruction_override','credential_request']
   unresolved: string[];           // points of uncertainty (questions to show the human)
 }
 ```
+
+> `rationale` is **runtime output**, not UI copy. A5 §8 ("the default copy is English") governs the static strings shipped in the product; `rationale` is generated per run about the user's own inbound content and follows that content's language — the same reasoning as the §11.2 scanners and the §3.2 `register` rules. For a Korean-reading user on a Korean thread it is Korean; on an English thread it is English. There is no conflict with §8.
 
 `rationale` is not an internal debug field — **it is a field users see**. The draft card, todo card, and routing-suggestion card all display this sentence verbatim. The prompt therefore instructs the model to write an evidence sentence like "Last October, on a similar quote request, you replied within 3 days" rather than "I judged that ~".
 
