@@ -24,6 +24,13 @@ export {
   runCostDaily,
 } from "./jobs/cost-daily.js";
 export type { CostDailyDeps } from "./jobs/cost-daily.js";
+export {
+  TOKEN_REFRESH_CRON,
+  TOKEN_REFRESH_JOB_NAME,
+  TOKEN_REFRESH_WINDOW_MINUTES,
+  registerTokenRefreshJob,
+} from "./jobs/token-refresh.js";
+export type { TokenRefreshDeps, TokenRefresher } from "./jobs/token-refresh.js";
 export { KillSwitchError, createKillSwitch, killSwitchStatus } from "./kill-switch.js";
 export type { KillSwitch, KillSwitchDeps } from "./kill-switch.js";
 export { createLogger } from "./logger.js";
