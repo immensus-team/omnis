@@ -41,3 +41,11 @@ export {
   type Chunk,
   type CalendarChunkInput,
 } from "./ingest/chunk.js";
+export {
+  DENY_PATTERNS,
+  MAX_INGEST_FILE_BYTES,
+  IngestDeniedError,
+  gitignoreMatcher,
+  isBinary,
+  isDenied,
+} from "./ingest/deny.js";
