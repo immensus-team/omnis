@@ -1,10 +1,10 @@
 // packages/agents/src/memory/consolidate.ts
-// A4 §6.5: 지연에 둔감한 유일한 작업이라 배치가 정확히 맞는다(Anthropic Message Batches, -50%).
-// SDK를 새로 핀하지 않는다 — 제출/수확 각각 fetch 한 번이다.
+// A4 §6.5: the only latency-insensitive job, so batching fits it exactly (Anthropic Message Batches, -50%).
+// No new SDK pinned — submit and harvest are one fetch each.
 export const ANTHROPIC_BATCH_URL = "https://api.anthropic.com/v1/messages/batches";
 export const ANTHROPIC_BATCH_MODEL = "claude-sonnet-5";
 export const MEMORY_CONSOLIDATE_CRON = "30 23 * * *";
-/** 다음 아침 브리핑(06:30) 전에 수확한다. */
+/** Harvest before the next morning briefing (06:30). */
 export const MEMORY_HARVEST_CRON = "0 6 * * *";
 
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -31,7 +31,7 @@ function headers(key: string): Record<string, string> {
   };
 }
 
-/** 키가 없으면 null을 돌려준다 — 델타 §9: T2 경로가 스킵되고 시스템 Item이 뜬다. */
+/** Returns null when the key is missing — delta §9: the T2 path is skipped and a system Item appears. */
 export async function submitConsolidation(
   requests: readonly ConsolidationRequest[],
 ): Promise<string | null> {

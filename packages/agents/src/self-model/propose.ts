@@ -1,5 +1,5 @@
 // packages/agents/src/self-model/propose.ts
-// A4 §13. 사용자가 직접 쓴 텍스트는 사용자만 바꾼다 — 이 모듈은 제안 카드까지만 만든다.
+// A4 §13. Only the user changes text the user wrote — this module stops at the proposal card.
 import { createHash } from "node:crypto";
 import type { Pool } from "pg";
 import { getAgentsPool } from "../pool.js";
@@ -29,14 +29,14 @@ function changedLines(diff: string): { added: number; removed: number } {
 
 export function validatePatch(p: SelfModelPatch): { ok: boolean; reason: string | null } {
   const { added, removed } = changedLines(p.diff);
-  if (added + removed === 0) return { ok: false, reason: "빈 diff" };
+  if (added + removed === 0) return { ok: false, reason: "empty diff" };
   if (added + removed > MAX_PATCH_LINES) {
-    return { ok: false, reason: `변경 줄이 ${MAX_PATCH_LINES}줄을 넘었습니다(${added + removed})` };
+    return { ok: false, reason: `more than ${MAX_PATCH_LINES} changed lines (${added + removed})` };
   }
   const deletionOnly = added === 0 && removed > 0;
   const need = p.file === "USER.md" && deletionOnly ? 3 : 2;
   if (p.evidence.length < need) {
-    return { ok: false, reason: `근거가 ${need}개 필요합니다(${p.evidence.length}개)` };
+    return { ok: false, reason: `${need} pieces of evidence required (${p.evidence.length})` };
   }
   return { ok: true, reason: null };
 }
@@ -45,9 +45,9 @@ export function diffHash(diff: string): string {
   return createHash("sha256").update(diff.trim()).digest("hex").slice(0, 32);
 }
 
-/** 무시된 패치는 4주간 다시 제안하지 않는다(A4 §13.2). settings kv를 그대로 쓴다.
- *  @omnis/agents는 @omnis/db·@omnis/kernel을 import할 수 없어(계약 §1) kernel의
- *  SettingKey 유니온을 못 쓴다 — self_model.suppressed.<hash>는 동적 키라 어차피 안 맞는다. */
+/** An ignored patch is not proposed again for four weeks (A4 §13.2). Uses the settings kv directly.
+ *  @omnis/agents cannot import @omnis/db or @omnis/kernel (contract §1), so it cannot use the
+ *  kernel's SettingKey union — and self_model.suppressed.<hash> is a dynamic key that would not fit anyway. */
 export async function suppressPatch(
   pool: Pool,
   hash: string,
@@ -74,7 +74,7 @@ export async function isSuppressed(
   return until !== undefined && new Date(until) > now;
 }
 
-/** 파일당 최대 1개, 전체 최대 3개. 억제된 diff와 제약 위반은 건너뛴다. */
+/** At most one per file, three overall. Suppressed diffs and constraint violations are skipped. */
 export async function proposeSelfModelPatches(
   patches: readonly SelfModelPatch[],
   runId: string,
