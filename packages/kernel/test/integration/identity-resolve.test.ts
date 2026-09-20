@@ -31,10 +31,10 @@ beforeEach(async () => {
 
 describe("resolvePerson (A3 §10)", () => {
   it("creates a new unverified person the first time and reuses it after", async () => {
-    const first = await tx(pool, (c) => resolvePerson(c, "gmail", "A.B+x@Gmail.com", "김진호"));
+    const first = await tx(pool, (c) => resolvePerson(c, "gmail", "A.B+x@Gmail.com", "Jinho Kim"));
     expect(first.created).toBe(true);
 
-    const again = await tx(pool, (c) => resolvePerson(c, "gmail", "ab@gmail.com", "김진호"));
+    const again = await tx(pool, (c) => resolvePerson(c, "gmail", "ab@gmail.com", "Jinho Kim"));
     expect(again.created).toBe(false);
     expect(again.person_id).toBe(first.person_id);
 
@@ -48,9 +48,9 @@ describe("resolvePerson (A3 §10)", () => {
     expect(row.source).toBe("adapter");
   });
 
-  // 2단계: 같은 이메일이 다른 채널에 이미 있으면 그 person에 붙인다.
+  // Step 2: if the same email already exists on another channel, attach to that person.
   it("attaches a new channel to the person who already has that email", async () => {
-    const seed = await tx(pool, (c) => resolvePerson(c, "gmail", "ab@gmail.com", "김진호"));
+    const seed = await tx(pool, (c) => resolvePerson(c, "gmail", "ab@gmail.com", "Jinho Kim"));
     const outlook = await tx(pool, (c) => resolvePerson(c, "outlook", "ab@gmail.com", "Jinho Kim"));
     expect(outlook.created).toBe(false);
     expect(outlook.person_id).toBe(seed.person_id);
@@ -59,30 +59,30 @@ describe("resolvePerson (A3 §10)", () => {
     ).toHaveLength(2);
   });
 
-  // 4단계: 표시 이름이 같다고 붙이지 않는다.
+  // Step 4: matching display names do not justify attaching.
   it("never merges two people just because the display name matches", async () => {
-    const a = await tx(pool, (c) => resolvePerson(c, "gmail", "kim1@corp.com", "김진호"));
-    const b = await tx(pool, (c) => resolvePerson(c, "gmail", "kim2@corp.com", "김진호"));
+    const a = await tx(pool, (c) => resolvePerson(c, "gmail", "kim1@corp.com", "Jinho Kim"));
+    const b = await tx(pool, (c) => resolvePerson(c, "gmail", "kim2@corp.com", "Jinho Kim"));
     expect(b.person_id).not.toBe(a.person_id);
   });
 
-  // 1단계: merged_into tombstone은 끝까지 따라간다.
+  // Step 1: follow the merged_into tombstone all the way.
   it("follows persons.merged_into to the surviving person", async () => {
-    const from = await tx(pool, (c) => resolvePerson(c, "gmail", "old@corp.com", "옛 사람"));
-    const to = await tx(pool, (c) => resolvePerson(c, "gmail", "new@corp.com", "새 사람"));
+    const from = await tx(pool, (c) => resolvePerson(c, "gmail", "old@corp.com", "Old Person"));
+    const to = await tx(pool, (c) => resolvePerson(c, "gmail", "new@corp.com", "New Person"));
     await query(pool, "UPDATE persons SET merged_into = $2 WHERE id = $1", [
       from.person_id,
       to.person_id,
     ]);
 
-    const again = await tx(pool, (c) => resolvePerson(c, "gmail", "old@corp.com", "옛 사람"));
+    const again = await tx(pool, (c) => resolvePerson(c, "gmail", "old@corp.com", "Old Person"));
     expect(again.person_id).toBe(to.person_id);
   });
 
   it("does not create a slack identity from a display name (team:user is required)", async () => {
-    await expect(tx(pool, (c) => resolvePerson(c, "slack", "김진호", "김진호"))).rejects.toThrow(
-      /team_id:user_id/,
-    );
+    await expect(
+      tx(pool, (c) => resolvePerson(c, "slack", "Jinho Kim", "Jinho Kim")),
+    ).rejects.toThrow(/team_id:user_id/);
   });
 });
 
@@ -93,7 +93,7 @@ describe("createIngestSink fills author_person_id (Phase A left it NULL)", () =>
       externalId: "msg-1",
       kind: "email",
       author: { kind: "person", id: "ab@gmail.com" },
-      body: "안녕하세요",
+      body: "Hello",
       attachments: [],
       sentAt: "2026-09-20T01:00:00.000Z",
       status: "received",
@@ -101,8 +101,8 @@ describe("createIngestSink fills author_person_id (Phase A left it NULL)", () =>
       threadMeta: {
         externalId: "thr-1",
         kind: "email",
-        title: "인사",
-        participants: [{ externalId: "ab@gmail.com", displayName: "김진호" }],
+        title: "Greeting",
+        participants: [{ externalId: "ab@gmail.com", displayName: "Jinho Kim" }],
         lastItemAt: "2026-09-20T01:00:00.000Z",
         archivedAt: null,
       },
@@ -125,7 +125,7 @@ describe("createIngestSink fills author_person_id (Phase A left it NULL)", () =>
       "SELECT display_name FROM persons WHERE id = $1",
       [row.author_person_id],
     );
-    expect(person.display_name).toBe("김진호"); // threadMeta.participants에서 가져온다
+    expect(person.display_name).toBe("Jinho Kim"); // taken from threadMeta.participants
 
     const thread = await one<{ participants: string[] }>(
       pool,
@@ -143,7 +143,7 @@ describe("createIngestSink fills author_person_id (Phase A left it NULL)", () =>
       pool,
       "SELECT participants FROM threads WHERE external_id = 'thr-1'",
     );
-    expect(thread.participants).toHaveLength(1); // 중복으로 쌓이지 않는다
+    expect(thread.participants).toHaveLength(1); // does not accumulate duplicates
   });
 
   it("leaves author_person_id NULL for system authors", async () => {
@@ -159,13 +159,18 @@ describe("createIngestSink fills author_person_id (Phase A left it NULL)", () =>
     expect(row.author_person_id).toBeNull();
   });
 
-  // 해석이 터져도 아이템을 잃지 않는다 — 인박스에 안 뜨는 메시지가 최악이다.
+  // Resolution blowing up must not lose the item — a message that never reaches the inbox is
+  // the worst case.
   it("still stores the item when the handle cannot be normalised", async () => {
     await query(pool, "UPDATE accounts SET channel = 'slack' WHERE id = $1", [accountId]);
     const sink = createIngestSink({ pool, logger: createLogger("@omnis/kernel") });
     await sink(
       accountId,
-      item({ externalId: "msg-4", sourceHash: "h4", author: { kind: "person", id: "그냥 이름" } }),
+      item({
+        externalId: "msg-4",
+        sourceHash: "h4",
+        author: { kind: "person", id: "just a name" },
+      }),
     );
     const row = await one<{ author_person_id: string | null }>(
       pool,

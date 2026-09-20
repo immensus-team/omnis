@@ -26,7 +26,7 @@ beforeAll(async () => {
   eventsB = createEvents({ pool, logger });
   a = createKillSwitch({ pool, events: eventsA, audit, logger });
   b = createKillSwitch({ pool, events: eventsB, audit, logger });
-  await new Promise((r) => setTimeout(r, 300)); // LISTEN이 걸릴 시간
+  await new Promise((r) => setTimeout(r, 300)); // time for LISTEN to take effect
 });
 beforeEach(async () => {
   await a.set(false, "test reset");
@@ -41,7 +41,7 @@ afterAll(async () => {
 describe("kill switch", () => {
   it("starts off and reads its state from the newest audit_log row", async () => {
     expect(await a.isOn()).toBe(false);
-    await a.set(true, "인젝션 의심 — 전부 정지");
+    await a.set(true, "suspected injection — stop everything");
     expect(await a.isOn()).toBe(true);
 
     const row = await one<{ actor: string; after: { on: boolean; reason: string } }>(
@@ -50,7 +50,7 @@ describe("kill switch", () => {
     );
     expect(row.actor).toBe("me");
     expect(row.after.on).toBe(true);
-    expect(row.after.reason).toContain("인젝션");
+    expect(row.after.reason).toContain("injection");
   });
 
   it("creates no table of its own", async () => {
@@ -63,23 +63,23 @@ describe("kill switch", () => {
   });
 
   it("invalidates the other process's cache through omnis_control", async () => {
-    expect(await b.isOn()).toBe(false); // b의 캐시를 채운다
+    expect(await b.isOn()).toBe(false); // populates b's cache
     await a.set(true, "from process A");
     await new Promise((r) => setTimeout(r, 400));
     expect(await b.isOn()).toBe(true);
   });
 
   it("reports since and reason for the hub route", async () => {
-    await a.set(true, "점검 중");
+    await a.set(true, "under maintenance");
     const status = await killSwitchStatus(pool);
     expect(status.on).toBe(true);
-    expect(status.reason).toBe("점검 중");
+    expect(status.reason).toBe("under maintenance");
     expect(status.since).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
-    await a.set(false, "점검 끝");
+    await a.set(false, "maintenance done");
     const off = await killSwitchStatus(pool);
     expect(off.on).toBe(false);
-    expect(off.reason).toBe("점검 끝");
+    expect(off.reason).toBe("maintenance done");
   });
 
   it("keeps the whole history because audit_log is append-only", async () => {
