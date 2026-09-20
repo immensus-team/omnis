@@ -11,13 +11,14 @@
 <p align="center">
   <a href="docs/spec/00-omnis-design.md"><img alt="Docs" src="https://img.shields.io/badge/DOCS-DESIGN%20SPEC-FFD21E?style=for-the-badge&labelColor=555555"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/LICENSE-APACHE%202.0-44CC11?style=for-the-badge&labelColor=555555"></a>
-  <a href="https://github.com/Onword-Lab"><img alt="Built by" src="https://img.shields.io/badge/BUILT%20BY-ONWORD%20LAB-8A2BE2?style=for-the-badge&labelColor=555555"></a>
+  <a href="https://github.com/immensus-team"><img alt="Built by Immensus" src="https://img.shields.io/badge/BUILT%20BY-IMMENSUS-8A2BE2?style=for-the-badge&labelColor=555555"></a>
 </p>
 
 <p align="center">
-  <img alt="Status" src="https://img.shields.io/badge/STATUS-PHASE%20B-F59E0B?style=for-the-badge&labelColor=555555">
   <img alt="Platform" src="https://img.shields.io/badge/PLATFORM-MACOS%20%C2%B7%20IPHONE-0EA5E9?style=for-the-badge&labelColor=555555">
   <img alt="Self-hosted" src="https://img.shields.io/badge/SELF--HOSTED-YOUR%20MACHINE-64748B?style=for-the-badge&labelColor=555555">
+  <a href="README.ko.md"><img alt="Korean" src="https://img.shields.io/badge/LANG-%ED%95%9C%EA%B5%AD%EC%96%B4-E11D48?style=for-the-badge&labelColor=555555"></a>
+  <a href="README.md"><img alt="English" src="https://img.shields.io/badge/LANG-ENGLISH-2563EB?style=for-the-badge&labelColor=555555"></a>
 </p>
 
 **The inbox where all communication between people and agents happens.** Messages from people, requests to agents, the questions and approvals that come back, the handoffs between them — one real-time stream, one memory, one place to decide. omnis reads everything before you get there and leaves a one-line summary on every thread, drafts replies in your voice, files what does not need you, turns messages into tasks, and briefs you every night. Nothing leaves without your approval. It runs on a machine you own, reachable only over your own network — no cloud control plane, no third party holding your inbox.

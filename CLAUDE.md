@@ -5,6 +5,7 @@ Everything in this repository is written in English: UI copy, identifiers, comme
 - No Korean (or any non-English) strings in `apps/`, `packages/`, `tools/`, `ops/`, `eval/`, `docs/`.
 - If an i18n layer exists, `en` is the source locale and must be complete; other locales are optional add-ons, never the source of truth.
 - Reviewers reject changes that add non-English text.
+- One exception: translated READMEs at the repo root (`README.<lang>.md`, linked from the LANG badges). They are deliberate and must stay in sync with `README.md`.
 - Fixture/seed data that imitates real messages may quote non-English content only when the test is specifically about non-English input; label it as such.
 
 ## Design
