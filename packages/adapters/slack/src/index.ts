@@ -173,8 +173,8 @@ export function createSlackAdapter(deps: SlackAdapterDeps = {}): Adapter {
       return queue;
     },
 
-    // 승인 게이트(US-A07)가 아직 없다 — 실제 chat.postMessage는 절대 호출하지 않는다.
-    // deps.sink가 없으면 SendResult를 합성만 하는 기본 mock sink를 쓴다.
+    // The approval gate (US-A07) does not exist yet — the real chat.postMessage is never called.
+    // Without deps.sink it uses a default mock sink that only synthesizes a SendResult.
     async send(thread: ThreadRef, draft: Outbound): Promise<SendResult> {
       const sink =
         deps.sink ??
@@ -224,8 +224,8 @@ interface SlackMessageEvent {
   type?: string;
   subtype?: string;
   channel?: string;
-  /** 슬랙이 채널 이름을 같이 싣는 페이로드(outgoing webhook / slash command)에만 있다.
-   *  Events API의 message 이벤트에는 없어서 optional이다. */
+  /** Present only in payloads where Slack carries the channel name along (outgoing webhook / slash command).
+   *  It is absent from Events API message events, hence optional. */
   channel_name?: string;
   user?: string;
   text?: string;
@@ -289,10 +289,10 @@ export function normalize(raw: unknown): NormalizedItem[] {
       sentAt,
       status: "received",
       sourceHash: m.ts,
-      // kind는 슬랙 채널 id 규약(D... = DM)에서, 제목은 페이로드가 채널 이름을 실어 줄 때만
-      // 나온다(`channel_name`). 멤버 명단은 message 이벤트에 없다 — conversations.info를
-      // 불러야 하는데 normalize()는 raw 이벤트의 순수 함수다. 이벤트가 증명하는 유일한
-      // 멤버인 작성자만 넣는다.
+      // kind comes from Slack's channel-id convention (D... = DM); the title only when the payload carries
+      // a channel name (`channel_name`). The member roster is absent from message events — conversations.info would
+      // have to be called, but normalize() is a pure function of the raw event. The only member the event
+      // proves is the author, so only that one is added.
       threadMeta: {
         externalId: channel,
         kind: isDm ? "dm" : "group",

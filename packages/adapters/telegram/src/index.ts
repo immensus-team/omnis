@@ -15,7 +15,7 @@ import { readKeychainSecret } from "./keychain.js";
 
 export const CHANNEL = "telegram" as const;
 
-// A1 §2.5 + 백로그 US-B40 "backfill 상한(채널별 30일·500건)" — 이 어댑터가 직접 강제한다.
+// A1 §2.5 + backlog US-B40 "backfill cap (30 days / 500 messages per channel)" — this adapter enforces it directly.
 export const BACKFILL_MAX_DAYS = 30;
 export const BACKFILL_MAX_ITEMS = 500;
 
@@ -27,7 +27,7 @@ const CAPABILITIES: Capabilities = {
   media: true,
   markRead: true,
   typing: false,
-  archive: false, // v1은 커널 내부 라벨만(A1 §2.5)
+  archive: false, // v1 keeps kernel-internal labels only (A1 §2.5)
   delete: false,
 };
 
@@ -52,13 +52,13 @@ class AsyncQueue<T> {
   }
 }
 
-/** mtcute `TelegramClient`가 실제로 이 부분집합을 만족하는지는 UNVERIFIED — A1-⑦ 스파이크가 실계정
- *  연결 시점에 확인한다(B-D5). 이 인터페이스는 어댑터가 실제로 부르는 메서드만 좁게 정의해
- *  fixture/mock 테스트가 mtcute 없이도 전부 돌게 한다. */
+/** Whether mtcute's `TelegramClient` actually satisfies this subset is UNVERIFIED — the A1-⑦ spike checks it
+ *  when connecting to a real account (B-D5). This interface narrowly defines only the methods the adapter actually calls, so
+ *  the fixture/mock tests all run without mtcute. */
 export interface TelegramClientLike {
   start(): Promise<void>;
   getHistory(chatId: string, opts: { limit: number; offsetUnixSec?: number }): Promise<unknown[]>;
-  onUpdate(cb: (raw: unknown) => void): () => void; // 반환값은 unsubscribe
+  onUpdate(cb: (raw: unknown) => void): () => void; // the return value unsubscribes
   sendText(chatId: string, text: string): Promise<{ id: number; date: number }>;
   readHistory(chatId: string): Promise<void>;
 }
@@ -84,7 +84,7 @@ export function createTelegramAdapter(deps: TelegramAdapterDeps = {}): Adapter {
     capabilities: () => CAPABILITIES,
 
     async connect(auth: AuthRef): Promise<void> {
-      // 세션 파일 자체가 아니라 그걸 감싸는 암호화 키만 Keychain에 있다(A1 §2.5) — 로그로 찍지 않는다.
+      // The Keychain holds only the encryption key wrapping the session file, not the file itself (A1 §2.5) — it is never logged.
       await readKeychainSecret(auth.keychainService, auth.keychainAccount, CHANNEL);
       if (client === undefined) {
         status = "down";
@@ -143,10 +143,10 @@ export function createTelegramAdapter(deps: TelegramAdapterDeps = {}): Adapter {
       return queue;
     },
 
-    // 승인 게이트(US-A07) 전까지 실제 client.sendText는 deps.sink가 없을 때만 호출한다(테스트 기본값은
-    // mock sink). client가 주입돼 있고 deps.sink가 없으면 실제 전송처럼 보이는 경로를 열게 되므로,
-    // 기본값은 항상 mock — 실제 전송이 필요해지면 승인 실행 경로(runEgress)가 deps.sink로 client.sendText를
-    // 명시적으로 주입한다.
+    // Until the approval gate (US-A07) exists, the real client.sendText is called only when deps.sink is absent (the test default is
+    // the mock sink). With a client injected and no deps.sink this would open a path that looks like a real send, so
+    // the default is always mock — when a real send is needed, the approval execution path (runEgress) passes client.sendText
+    // explicitly as deps.sink.
     async send(thread: ThreadRef, draft: Outbound): Promise<SendResult> {
       const sink =
         deps.sink ??
@@ -200,7 +200,7 @@ interface TgMessage {
   date?: number | string;
   editDate?: number | string;
   media?: TgMedia;
-  // 삭제 업데이트는 메시지가 아니라 별개 shape(mtcute DeleteMessageUpdate 계열)라 이 키로 판별한다.
+  // A delete update is not a message but a separate shape (the mtcute DeleteMessageUpdate family), so it is identified by this key.
   deletedMessageIds?: number[];
 }
 
@@ -240,7 +240,7 @@ function parseSentAt(date?: number | string, editDate?: number | string): string
 
 export function normalize(raw: unknown): NormalizedItem[] {
   const m = raw as TgMessage;
-  if (m.deletedMessageIds !== undefined) return []; // 삭제 업데이트는 콘텐츠가 없다 — 아이템을 만들지 않는다
+  if (m.deletedMessageIds !== undefined) return []; // a delete update has no content — no item is produced
   if (m.id === undefined || m.chat?.id === undefined || m.sender?.id === undefined) return [];
   // With neither text nor media there is nothing this adapter can represent: that is the case where a
   // service message like new_chat_members arrives carrying only an action (actions are not mapped).
