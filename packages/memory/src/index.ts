@@ -49,3 +49,14 @@ export {
   isBinary,
   isDenied,
 } from "./ingest/deny.js";
+export {
+  DEAD_LETTER_THRESHOLD,
+  RETRY_BACKOFF_MS,
+  getSource,
+  saveCursor,
+  recordSuccess,
+  recordFailure,
+  withRetry,
+  writeIngestSystemItem,
+  type IngestSource,
+} from "./ingest/source.js";
