@@ -212,6 +212,14 @@ interface SlackFile {
   url_private?: string;
   name?: string;
 }
+/** 레거시 rich attachment(PagerDuty 같은 봇 알림이 쓴다). Slack은 rich 렌더가 불가능한
+ *  클라이언트를 위해 `fallback`에 같은 내용의 평문을 실어 보낸다 — text/files가 비어 있을 때
+ *  읽을거리가 남아 있는 곳이 정확히 여기다. */
+interface SlackLegacyAttachment {
+  fallback?: string;
+  title?: string;
+  text?: string;
+}
 interface SlackMessageEvent {
   type?: string;
   subtype?: string;
@@ -224,6 +232,7 @@ interface SlackMessageEvent {
   ts?: string;
   thread_ts?: string;
   files?: SlackFile[];
+  attachments?: SlackLegacyAttachment[];
 }
 
 function mimeToAttachmentKind(mimetype: string | undefined): Attachment["kind"] {
@@ -234,6 +243,15 @@ function mimeToAttachmentKind(mimetype: string | undefined): Attachment["kind"] 
   return "file";
 }
 
+/** 레거시 attachment에서 사람이 읽을 평문을 뽑는다: fallback → title → text. Slack이 이 셋을
+ *  다 실어 보내면 fallback이 가장 완전한 한 줄이다(제목+본문이 이미 합쳐져 있다). */
+function legacyAttachmentText(attachments: SlackLegacyAttachment[] | undefined): string {
+  return (attachments ?? [])
+    .map((a) => a.fallback || a.title || a.text || "")
+    .filter((text) => text.length > 0)
+    .join("\n");
+}
+
 export function normalize(raw: unknown): NormalizedItem[] {
   const m = raw as SlackMessageEvent;
   // channel is intentionally NOT required here (deviation from plan text): real
@@ -242,10 +260,12 @@ export function normalize(raw: unknown): NormalizedItem[] {
   // events (Events API / Socket Mode) do carry `channel`, which is used when present.
   if (m.type !== "message" || !m.ts) return [];
   if (m.subtype === "message_changed" || m.subtype === "message_deleted") return [];
-  // text도 files도 없으면 이 어댑터가 표현할 수 있는 내용이 없다: 레거시 `attachments` 필드만
-  // 싣는 봇 메시지(PagerDuty 등)가 여기 해당한다. 빈 body/attachments 아이템을 내보내는 대신
+  // text도 files도 없을 때 마지막으로 남는 건 레거시 `attachments`의 평문이다: 레거시 필드만 싣는
+  // 봇 메시지(PagerDuty 등)도 Slack이 렌더 불가 클라이언트용으로 `fallback`에 진짜 내용을 넣어
+  // 보내므로, 여기서 버리면 알림이 통째로 사라진다(데이터 손실). 읽을 게 정말 하나도 없을 때만
   // message_changed/message_deleted와 같은 방식으로 버린다.
-  if (!m.text && !m.files?.length) return [];
+  const body = m.text || legacyAttachmentText(m.attachments);
+  if (!body && !m.files?.length) return [];
 
   const attachments: Attachment[] = (m.files ?? []).map((f) => ({
     kind: mimeToAttachmentKind(f.mimetype),
@@ -264,7 +284,7 @@ export function normalize(raw: unknown): NormalizedItem[] {
       externalId: m.ts,
       kind: "message",
       author: { kind: "person", id: m.user ?? "" },
-      body: m.text ?? "",
+      body,
       attachments,
       sentAt,
       status: "received",

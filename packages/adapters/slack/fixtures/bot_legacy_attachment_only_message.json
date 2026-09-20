@@ -26,5 +26,27 @@
       }
     ]
   },
-  "expected": { "items": [] }
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISEN",
+        "externalId": "1715678540.000700",
+        "kind": "message",
+        "author": { "kind": "person", "id": "" },
+        "body": "Triggered: HIGH api-gateway 5xx rate",
+        "attachments": [],
+        "sentAt": "2024-05-14T09:22:20.000Z",
+        "status": "received",
+        "sourceHash": "1715678540.000700",
+        "threadMeta": {
+          "externalId": "C07OMNISEN",
+          "kind": "group",
+          "title": "#omnis-eng",
+          "participants": [],
+          "lastItemAt": "2024-05-14T09:22:20.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
 }

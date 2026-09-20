@@ -50,6 +50,8 @@ describe("Slack contract: invariants on every normalized item", () => {
       expect(bad((item) => !isNonEmptyString(item.externalId))).toEqual([]);
       expect(bad((item) => !isNonEmptyString(item.threadExternalId))).toEqual([]);
       expect(bad((item) => !isParsableDate(item.sentAt))).toEqual([]);
+      // 어댑터는 항상 `.SSSZ`로 왕복시켜 내보낸다(src의 sentAt 계산) — 폴백이 그 포맷을 깨면 여기서 걸린다.
+      expect(bad((item) => new Date(item.sentAt).toISOString() !== item.sentAt)).toEqual([]);
       expect(bad((item) => !item.author || !isNonEmptyString(item.author.kind))).toEqual([]);
       expect(
         bad((item) => !(isNonEmptyString(item.body) || (item.attachments?.length ?? 0) > 0)),
