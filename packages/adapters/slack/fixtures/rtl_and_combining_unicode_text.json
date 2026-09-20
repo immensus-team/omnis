@@ -5,7 +5,7 @@
     "channel": "C07OMNISEN",
     "channel_name": "omnis-eng",
     "user": "U07MIN0001",
-    "text": "الاجتماع غداً الساعة ١٠ صباحاً بتوقيت سيول — שלום לכולם — café / 한글 jamo: 한글 — zero width: ​‍ — end",
+    "text": "الاجتماع غداً الساعة ١٠ صباحاً بتوقيت سيول — שלום לכולם — café / Hangul jamo: 한글 — zero width: ​‍ — end",
     "ts": "1715678670.002000",
     "team": "T07OMNISTM"
   },
@@ -16,7 +16,7 @@
         "externalId": "1715678670.002000",
         "kind": "message",
         "author": { "kind": "person", "id": "U07MIN0001" },
-        "body": "الاجتماع غداً الساعة ١٠ صباحاً بتوقيت سيول — שלום לכולם — café / 한글 jamo: 한글 — zero width: ​‍ — end",
+        "body": "الاجتماع غداً الساعة ١٠ صباحاً بتوقيت سيول — שלום לכולם — café / Hangul jamo: 한글 — zero width: ​‍ — end",
         "attachments": [],
         "sentAt": "2024-05-14T09:24:30.002Z",
         "status": "received",

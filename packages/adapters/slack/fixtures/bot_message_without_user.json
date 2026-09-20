@@ -7,13 +7,13 @@
     "channel_name": "omnis-eng",
     "bot_id": "B07OMNISBOT",
     "username": "omnis-ci",
-    "text": "배포 완료: omnis-web@1.4.2 → production ✅",
+    "text": "Deploy complete: omnis-web@1.4.2 → production ✅",
     "ts": "1715678530.000600",
     "team": "T07OMNISTM",
     "blocks": [
       {
         "type": "section",
-        "text": { "type": "mrkdwn", "text": "*배포 완료* omnis-web@1.4.2" }
+        "text": { "type": "mrkdwn", "text": "*Deploy complete* omnis-web@1.4.2" }
       }
     ]
   },
@@ -24,7 +24,7 @@
         "externalId": "1715678530.000600",
         "kind": "message",
         "author": { "kind": "person", "id": "" },
-        "body": "배포 완료: omnis-web@1.4.2 → production ✅",
+        "body": "Deploy complete: omnis-web@1.4.2 → production ✅",
         "attachments": [],
         "sentAt": "2024-05-14T09:22:10.000Z",
         "status": "received",

@@ -5,7 +5,7 @@
     "channel": "C07OMNISLA",
     "channel_name": "omnis-launch",
     "user": "U07JIN0001",
-    "text": "초 단위가 아니라 마이크로초까지 붙는 실제 ts 형식입니다",
+    "text": "This is the real ts format: microseconds, not just whole seconds",
     "ts": "1715678690.123456",
     "team": "T07OMNISTM"
   },
@@ -16,7 +16,7 @@
         "externalId": "1715678690.123456",
         "kind": "message",
         "author": { "kind": "person", "id": "U07JIN0001" },
-        "body": "초 단위가 아니라 마이크로초까지 붙는 실제 ts 형식입니다",
+        "body": "This is the real ts format: microseconds, not just whole seconds",
         "attachments": [],
         "sentAt": "2024-05-14T09:24:50.123Z",
         "status": "received",

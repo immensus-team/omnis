@@ -5,7 +5,7 @@
     "channel": "G07OMNISMP",
     "channel_type": "mpim",
     "user": "U07DANA001",
-    "text": "셋이서만 얘기합시다 — 계약 조건 변경 건",
+    "text": "Let's keep this between the three of us — contract terms change",
     "ts": "1715678620.001500",
     "team": "T07OMNISTM",
     "inviter": "U07JIN0001"
@@ -17,7 +17,7 @@
         "externalId": "1715678620.001500",
         "kind": "message",
         "author": { "kind": "person", "id": "U07DANA001" },
-        "body": "셋이서만 얘기합시다 — 계약 조건 변경 건",
+        "body": "Let's keep this between the three of us — contract terms change",
         "attachments": [],
         "sentAt": "2024-05-14T09:23:40.001Z",
         "status": "received",

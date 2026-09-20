@@ -11,7 +11,7 @@
     "previous_message": {
       "type": "message",
       "user": "U07DANA001",
-      "text": "잘못 올린 공지입니다",
+      "text": "This announcement was posted by mistake",
       "ts": "1715678400.000100"
     },
     "event_ts": "1715678720.002400"

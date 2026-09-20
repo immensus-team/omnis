@@ -6,7 +6,7 @@
     "channel": "C07OMNISLA",
     "channel_name": "omnis-launch",
     "user": "U07DANA001",
-    "text": "런칭 자료 일괄 첨부 📦",
+    "text": "Attaching all the launch materials 📦",
     "ts": "1715678600.001300",
     "team": "T07OMNISTM",
     "upload": true,
@@ -50,7 +50,7 @@
         "externalId": "1715678600.001300",
         "kind": "message",
         "author": { "kind": "person", "id": "U07DANA001" },
-        "body": "런칭 자료 일괄 첨부 📦",
+        "body": "Attaching all the launch materials 📦",
         "attachments": [
           { "kind": "image", "mimeType": "image/png", "sizeBytes": 81920, "caption": "cover.png" },
           {

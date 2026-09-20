@@ -6,7 +6,7 @@
     "channel": "C07OMNISEN",
     "channel_name": "omnis-eng",
     "user": "U07MIN0001",
-    "text": "계약서 사본과 데이터 덤프 첨부합니다",
+    "text": "Attaching the contract copy and the data dump",
     "ts": "1715678590.001200",
     "team": "T07OMNISTM",
     "upload": true,
@@ -33,7 +33,7 @@
         "externalId": "1715678590.001200",
         "kind": "message",
         "author": { "kind": "person", "id": "U07MIN0001" },
-        "body": "계약서 사본과 데이터 덤프 첨부합니다",
+        "body": "Attaching the contract copy and the data dump",
         "attachments": [
           {
             "kind": "file",

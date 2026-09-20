@@ -5,7 +5,7 @@
     "channel": "C07OMNISEN",
     "channel_name": "omnis-eng",
     "user": "U07MIN0001",
-    "text": "👍🏽 좋아요 / 🏳️‍🌈 프라이드 배너 추가 / 🧑🏽‍🚀 파일럿 테스트 / 👩‍💻 코드리뷰 대기 / 🇰🇷 리전 배포 완료",
+    "text": "👍🏽 Looks good / 🏳️‍🌈 adding the pride banner / 🧑🏽‍🚀 pilot test / 👩‍💻 waiting on code review / 🇰🇷 region deploy complete",
     "ts": "1715678660.001900",
     "team": "T07OMNISTM",
     "reactions": [{ "name": "thumbsup", "users": ["U07DANA001", "U07JIN0001"], "count": 2 }]
@@ -17,7 +17,7 @@
         "externalId": "1715678660.001900",
         "kind": "message",
         "author": { "kind": "person", "id": "U07MIN0001" },
-        "body": "👍🏽 좋아요 / 🏳️‍🌈 프라이드 배너 추가 / 🧑🏽‍🚀 파일럿 테스트 / 👩‍💻 코드리뷰 대기 / 🇰🇷 리전 배포 완료",
+        "body": "👍🏽 Looks good / 🏳️‍🌈 adding the pride banner / 🧑🏽‍🚀 pilot test / 👩‍💻 waiting on code review / 🇰🇷 region deploy complete",
         "attachments": [],
         "sentAt": "2024-05-14T09:24:20.001Z",
         "status": "received",

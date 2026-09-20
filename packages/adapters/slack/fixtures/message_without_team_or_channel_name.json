@@ -4,7 +4,7 @@
     "type": "message",
     "channel": "C07OMNISEN",
     "user": "U07DANA001",
-    "text": "team도 channel_name도 없는 최소 페이로드",
+    "text": "Minimal payload with neither team nor channel_name",
     "ts": "1715678700.002200"
   },
   "expected": {
@@ -14,7 +14,7 @@
         "externalId": "1715678700.002200",
         "kind": "message",
         "author": { "kind": "person", "id": "U07DANA001" },
-        "body": "team도 channel_name도 없는 최소 페이로드",
+        "body": "Minimal payload with neither team nor channel_name",
         "attachments": [],
         "sentAt": "2024-05-14T09:25:00.002Z",
         "status": "received",

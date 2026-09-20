@@ -6,7 +6,7 @@
     "channel": "C07OMNISLA",
     "channel_name": "omnis-launch",
     "user": "U07JIN0001",
-    "text": "데모 영상 올립니다 🎬",
+    "text": "Uploading the demo video 🎬",
     "ts": "1715678580.001100",
     "team": "T07OMNISTM",
     "upload": true,
@@ -28,7 +28,7 @@
         "externalId": "1715678580.001100",
         "kind": "message",
         "author": { "kind": "person", "id": "U07JIN0001" },
-        "body": "데모 영상 올립니다 🎬",
+        "body": "Uploading the demo video 🎬",
         "attachments": [
           {
             "kind": "video",

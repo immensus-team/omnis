@@ -6,7 +6,7 @@
     "channel_name": "omnis-hiring",
     "channel_type": "group",
     "user": "U07MIN0001",
-    "text": "2차 면접 피드백 올렸습니다 (비공개)",
+    "text": "Posted the second-round interview feedback (private)",
     "ts": "1715678630.001600",
     "team": "T07OMNISTM"
   },
@@ -17,7 +17,7 @@
         "externalId": "1715678630.001600",
         "kind": "message",
         "author": { "kind": "person", "id": "U07MIN0001" },
-        "body": "2차 면접 피드백 올렸습니다 (비공개)",
+        "body": "Posted the second-round interview feedback (private)",
         "attachments": [],
         "sentAt": "2024-05-14T09:23:50.001Z",
         "status": "received",

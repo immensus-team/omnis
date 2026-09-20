@@ -6,7 +6,7 @@
     "channel": "C07OMNISEN",
     "channel_name": "omnis-eng",
     "user": "U07MIN0001",
-    "text": "회의 녹음 남겨둡니다",
+    "text": "Leaving the meeting recording here",
     "ts": "1715678570.001000",
     "team": "T07OMNISTM",
     "upload": true,
@@ -28,7 +28,7 @@
         "externalId": "1715678570.001000",
         "kind": "message",
         "author": { "kind": "person", "id": "U07MIN0001" },
-        "body": "회의 녹음 남겨둡니다",
+        "body": "Leaving the meeting recording here",
         "attachments": [
           {
             "kind": "audio",

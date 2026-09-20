@@ -10,14 +10,14 @@
     "message": {
       "type": "message",
       "user": "U07JIN0001",
-      "text": "배포는 목요일입니다",
+      "text": "The deploy is on Thursday",
       "ts": "1715678400.000100",
       "edited": { "user": "U07JIN0001", "ts": "1715678710.000000" }
     },
     "previous_message": {
       "type": "message",
       "user": "U07JIN0001",
-      "text": "배포는 수요일입니다",
+      "text": "The deploy is on Wednesday",
       "ts": "1715678400.000100"
     },
     "event_ts": "1715678710.002300"
