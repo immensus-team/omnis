@@ -4,16 +4,16 @@ import type { Logger } from "../logger.js";
 import type { Scheduler } from "../scheduler.js";
 
 export const GMAIL_REWATCH_JOB_NAME = "gmail_rewatch";
-export const GMAIL_REWATCH_CRON = "0 3 * * *"; // 0006 seed와 동일 — watch 만료 7일, 매일 갱신(A1 §2.2)
+export const GMAIL_REWATCH_CRON = "0 3 * * *"; // 0006 seed — watch TTL 7d, daily(A1 §2.2)
 export const GRAPH_SUB_RENEW_JOB_NAME = "graph_sub_renew";
-export const GRAPH_SUB_RENEW_CRON = "0 4 * * 1"; // 0006 seed와 동일 — 구독 만료 10,080분, 주 단위(A1 §2.4)
+export const GRAPH_SUB_RENEW_CRON = "0 4 * * 1"; // 0006 seed — sub TTL 10080m, weekly(A1 §2.4)
 
 export type RewatchFn = (accountExternalId: string) => Promise<void>;
 
 export interface RewatchDeps {
   pool: Pool;
   logger: Logger;
-  // 이 호스트에 그 채널 어댑터가 없으면 undefined — 잡은 정상(ok)으로 스킵한다.
+  // undefined when this host has no adapter for that channel — the job then skips as ok.
   rewatch?: RewatchFn;
 }
 

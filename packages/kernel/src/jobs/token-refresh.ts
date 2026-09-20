@@ -5,9 +5,9 @@ import type { Logger } from "../logger.js";
 import type { Scheduler } from "../scheduler.js";
 
 export const TOKEN_REFRESH_JOB_NAME = "token_refresh";
-export const TOKEN_REFRESH_CRON = "*/30 * * * *"; // 0006 seed와 동일(A3 소유 인프라 잡)
-// ponytail: 만료 60분 전 일괄 갱신. 채널별로 실제 만료 여유가 다르면(Slack 토큰 무기한 등)
-// 그때 채널별 창으로 세분화한다.
+export const TOKEN_REFRESH_CRON = "*/30 * * * *"; // 0006 seed (A3-owned infra job)
+// ponytail: refresh everything 60 minutes before expiry. If channels turn out to need different
+// expiry slack (Slack tokens never expire, etc.), split into per-channel windows then.
 export const TOKEN_REFRESH_WINDOW_MINUTES = 60;
 
 export type TokenRefresher = (auth: AuthRef) => Promise<void>;
@@ -15,8 +15,8 @@ export type TokenRefresher = (auth: AuthRef) => Promise<void>;
 export interface TokenRefreshDeps {
   pool: Pool;
   logger: Logger;
-  // 이 호스트에 붙어 있는 어댑터가 채널별로 주입한다(허브 부트스트랩 소관, 이 플랜 밖).
-  // 없는 채널은 조용히 스킵한다 — 다른 호스트의 local-agent가 그 채널을 담당한다.
+  // Adapters attached to this host inject these per channel (hub bootstrap, outside this plan).
+  // Channels with no entry are skipped silently — a local-agent on another host owns that channel.
   refreshers: Partial<Record<Channel, TokenRefresher>>;
   windowMinutes?: number;
 }

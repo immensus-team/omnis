@@ -15,10 +15,11 @@ export interface SchedulerDeps {
   events: Events;
   logger: Logger;
   now?: () => Date;
-  /** 기본 10초(계약 §5). 테스트만 줄인다. */
+  /** 10 seconds by default (contract §5). Only tests lower it. */
   tickMs?: number;
-  /** 마스터 §7: kill switch 하나로 모든 자율 루프가 멈춘다. 스케줄러 틱이 Phase A의 유일한 자율 루프다.
-   *  이미 claim된 잡은 끝까지 돌고, 다음 틱부터 멈춘다. 없으면 항상 꺼진 것으로 본다. */
+  /** master §7: one kill switch stops every autonomous loop. The scheduler tick is Phase A's only
+   *  autonomous loop. A job already claimed runs to completion and stops from the next tick on.
+   *  Without this, the switch is treated as always off. */
   isKillSwitchOn?: () => Promise<boolean>;
 }
 
@@ -35,7 +36,8 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
   let ticking = false;
 
   async function runOne(name: string, handler: () => Promise<void>): Promise<void> {
-    // 계약 §5의 claim 문장 그대로. 0행이면 다른 틱/프로세스가 이미 잡았거나 아직 때가 아니다.
+    // The claim statement from contract §5, verbatim. Zero rows means another tick or process took
+    // it already, or it is not due yet.
     const claimed = await query<{ id: string; schedule: string }>(
       pool,
       `UPDATE jobs SET claimed_at = now()
@@ -96,7 +98,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 
   return {
     register(name, cron, handler) {
-      nextRunAt(cron, now()); // 잘못된 cron은 등록 시점에 터진다
+      nextRunAt(cron, now()); // an invalid cron blows up at registration time
       handlers.set(name, handler);
       schedules.set(name, cron);
     },
@@ -124,7 +126,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
         clearInterval(timer);
         timer = null;
       }
-      // 진행 중인 틱이 claimed_at을 들고 끝나도록 잠깐 기다린다.
+      // Wait briefly so an in-flight tick finishes while holding claimed_at.
       for (let i = 0; i < 100 && ticking; i += 1) {
         await new Promise((r) => setTimeout(r, 20));
       }
