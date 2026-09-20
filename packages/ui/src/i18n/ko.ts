@@ -114,4 +114,95 @@ export const ko = {
     placeholder: "메시지를 입력하세요",
     send: "보내기",
   },
+  today: {
+    // §3.4 다이어그램 인사말/요약 2문장 — 접근성상 <h1> 하나로 읽히는 페이지 요지.
+    greeting: "좋은 아침이에요, {name}.",
+    summary: "오늘 처리할 항목 {items}개, 대기 중 승인 {approvals}건.",
+    // 밤 다이제스트 진입 카드(kind='nightly'가 있을 때만). 화살표는 장식이라 문구에서 제외.
+    nightlyDigest: {
+      ready: "밤 다이제스트 준비됨 · {n}개 보관됨",
+      view: "보기",
+    },
+    // 캘린더 헤딩의 괄호는 출처 표기(Google Calendar 연동) — 제품명이라 양 로케일 동일.
+    calendarHeading: "오늘 일정",
+    calendarSource: "Google Calendar",
+    // 브리핑 헤딩과 그 부제("밤 사이 생긴 것 중 중요도순")는 다이어그램에서 한 줄이지만 역할이 달라 분리.
+    briefingHeading: "아침 브리핑",
+    briefingSubheading: "밤 사이 생긴 것 중 중요도순",
+    // §3.4 로딩 문구("브리핑 준비 중, N분 후 갱신")는 digest.briefingPreparing과 같은 문자열이라 중복 정의하지 않는다.
+    // inferred, not in §8/§3 verbatim — §3.4는 "브리핑 섹션만 재시도 버튼"이라고만 적고 버튼 라벨은 주지 않음.
+    briefingRetry: "다시 시도",
+    pendingApprovals: "대기 중 승인 ({n})",
+    approvalChipLabel: "대기 중 승인: {summary}, {time} 요청",
+    emptyQuiet: "오늘은 조용하네요",
+    offlineBadge: "{n}시간 전 기준",
+  },
+  tasks: {
+    // §3.5 뷰 탭 4개 — tasks.due_at 기준 + owner_kind='agent'인 것만 Delegated.
+    tabs: {
+      today: "오늘",
+      thisWeek: "이번 주",
+      someday: "언젠가",
+      delegated: "위임함",
+    },
+    // TaskRow 출처 딥링크 접두어("from: Gmail · 오늘 마감") — 다이어그램이 영문 표기라 inbox.filters와 같은 방식으로 옮김.
+    source: "from: {source}",
+    due: {
+      today: "오늘",
+      todayDeadline: "오늘 마감",
+    },
+    // 위임 행의 소유자 배지(다이어그램 "delegated · 진행 중"의 앞 토막).
+    delegatedBadge: "위임",
+    state: {
+      inProgress: "진행 중",
+      done: "완료",
+      unknown: "상태 확인 불가",
+    },
+    // inferred, not in §8/§3 verbatim — §3.5는 "t 단축키로 빠른 task 추가 입력(제목만)"만 말하고 placeholder는 없음.
+    quickAddPlaceholder: "할 일 추가",
+  },
+  network: {
+    // §3.6 상단 스트립 — 스펙 다이어그램이 영문("Follow-up queue (3)")이라 inbox.filters와 같은 방식으로 옮김.
+    followUpQueue: "팔로업 큐 ({n})",
+    searchPlaceholder: "검색",
+    lastContact: "마지막 연락: {when}",
+    followUpSuggestion: "팔로업 제안: {suggestion}",
+    // 관계 상태 dot의 텍스트 레이블(§3.6 접근성: 색만으로 전달하지 않음).
+    // unknown은 dot 없이 텍스트만, dormantDays는 dot 대신 쓰는 "방치 5일" 형식.
+    relationship: {
+      active: "활성",
+      warming: "관계 형성 중",
+      dormant: "방치 위험",
+      unknown: "정보 부족",
+      dormantDays: "방치 {n}일",
+    },
+    // §3.6 사람 상세 pane의 구성요소 이름 — 그대로 섹션 헤딩으로 쓴다("메모"는 사람에 붙는 메모이지 Notes 화면이 아님).
+    detail: {
+      timeline: "상호작용 타임라인",
+      channels: "전 채널 대화",
+      notes: "메모",
+    },
+    // 팔로업 draft 버튼 세트는 thread의 DraftCard와 동일 → common.draftCard 재사용(중복 정의 안 함).
+  },
+  notes: {
+    composerHeading: "새 노트",
+    // inferred, not in §8/§3 verbatim — §3.7 다이어그램의 문장은 예시 내용이고 placeholder 문구는 없음.
+    composerPlaceholder: "노트를 입력하세요",
+    save: "저장",
+    // 라우팅 제안(§3.7). 신뢰도는 퍼센트가 아니라 텍스트("신뢰도 높음"/"낮음") — 접근성 항목.
+    routing: {
+      heading: "라우팅 제안:",
+      shareTo: "{target} 스레드에 공유",
+      confidenceHigh: "신뢰도 높음",
+      confidenceLow: "신뢰도 낮음",
+      accept: "수락",
+      pickOther: "다른 대상 선택",
+      none: "라우팅 안 함",
+    },
+    // §8 표 "Notes 라우팅 낮은 신뢰도" — 신뢰도가 낮으면 제안 자체를 하지 않고 이 문구만 보여준다(§3.7 설계 원칙).
+    lowConfidenceRouting: "라우팅 대상을 찾지 못했어요 — 수동으로 선택",
+    recentHeading: "최근 노트",
+    routedTo: "→ {target}",
+    empty: "아직 노트가 없어요",
+  },
 };
