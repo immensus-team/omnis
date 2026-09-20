@@ -5,12 +5,14 @@ html,
 body {
   height: 100%;
   margin: 0;
-  /* Belt and braces for hallmark's responsive gate: the container queries below are what actually
-     keep every tier inside its box (measured 0px overflow at 320-1440), but nothing should be able
-     to turn a single mis-sized child into a scrolling page. `clip` rather than `hidden` because
-     `hidden` on the root would make the page a scroll container and break `position: sticky`
-     inside it. */
-  overflow-x: clip;
+  /* There is deliberately no `overflow-x` on the root. `html, body { overflow-x: clip }` used to
+     sit here described as "belt and braces", and it was the opposite: it pins
+     `documentElement.scrollWidth` to `clientWidth`, which is the exact number every
+     no-horizontal-overflow guard in tools/e2e used to read — so all of them reported 0 whether or
+     not the page really overflowed (a probe with a 2000px child at 390px read 1610 without the
+     rule and 0 with it). The container queries below are what keep each tier inside its box; the
+     guards exist to catch the day one stops doing that, and they cannot do it if the root clips
+     the evidence away. tools/e2e/overflow.ts measures `body.scrollWidth` for the same reason. */
 }
 
 /* US-D02b: the shell responds to its own box, not the viewport — hence @container rather than
@@ -862,6 +864,9 @@ body {
   align-items: center;
   gap: 6px;
   justify-self: end;
+  /* The hover-only Archive/Restore button is absolute inside this slot (see
+     .inbox-row__action) — this is its containing block. */
+  position: relative;
 }
 
 .inbox-row__channel-icon {
@@ -874,8 +879,21 @@ body {
 }
 
 /* US-A36: archive/restore appears on hover (and keyboard focus) only — a row does not carry a
-   button at all times. */
+   button at all times.
+   US-D02b: it is taken out of flow as well as faded. `opacity: 0` alone still laid the button
+   out, so column 3 (`auto`) was sized to include it and every row paid ~65px of its width for a
+   control nobody could see — width the title and the summary only get back here. Absolute inside
+   `.inbox-row__side` means the grid column is sized by the brand mark alone; the pill floats over
+   the mark's end of the row while hovered, which is legible because it carries `--bg-base` over
+   the row's `--state-hover` fill. `pointer-events` rides along with `opacity` so the invisible
+   pill is not a click target — this also keeps it reachable by keyboard, which `display: none`
+   would not (a display:none button is not focusable, so the row's `:focus-within` rule could
+   never fire). The narrow tier still switches it off entirely; see the <900px block. */
 .inbox-row__action {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
   border: var(--hairline);
   border-radius: 999px;
   padding: 1px 8px;
@@ -885,6 +903,7 @@ body {
   font-size: 11px;
   cursor: pointer;
   opacity: 0;
+  pointer-events: none;
 }
 
 /* US-D02: the row's own hover fill. What shows that the 400ms hover card came out of *this* row
@@ -907,6 +926,7 @@ body {
 .inbox-row:hover .inbox-row__action,
 .inbox-row:focus-within .inbox-row__action {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .inbox-row__approval-dot {
@@ -1533,14 +1553,16 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* The hover-only Archive/Restore button is `opacity: 0`, which still takes its box — ~65px of
-     every row's right column for a control that is invisible. This is the tier where the rail has
-     already collapsed to a bottom bar, i.e. the coarse-pointer layout: `:hover` is not something a
-     finger does, and there is no swipe or long-press standing in for it, so here the control is
-     not merely hidden, it is unreachable. Hiding it hands that column back to the title and the
-     summary (at 390px it was 17% of the viewport). Scoped to this tier rather than global, because
-     in the wide tier `:focus-within` still reveals it for the keyboard. Archiving from a touch
-     layout goes through the thread itself until there is a gesture for it. */
+  /* This is the tier where the rail has already collapsed to a bottom bar, i.e. the coarse-pointer
+     layout: `:hover` is not something a finger does, and there is no swipe or long-press standing
+     in for it, so the hover-only Archive/Restore button is not merely hidden here, it is
+     unreachable — and a pill that fades in over the brand mark is worse than nothing on a screen
+     where it can never legitimately appear. Switching it off entirely also keeps the row's grid
+     column free of it, which is what the responsive sweep asserts at these widths.
+     (It does not need switching off to stop taking layout — `.inbox-row__action` is absolute at
+     every width now, so the column is sized by the brand mark alone. This is purely about a
+     control that cannot be operated.) Archiving from a touch layout goes through the thread itself
+     until there is a gesture for it. */
   .inbox-row__action {
     display: none;
   }

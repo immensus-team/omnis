@@ -16,6 +16,12 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { type Page, chromium } from "@playwright/test";
 import { Pool, one, query } from "../../packages/db/src/index.js";
+import {
+  type OverflowReport,
+  assertNoOverflow,
+  describeOverflow,
+  measureOverflow,
+} from "./overflow.js";
 import { seed } from "./seed.js";
 import {
   HUB_PORT,
@@ -177,7 +183,7 @@ async function densify(pool: Pool): Promise<void> {
 
 interface ShotResult {
   width: number;
-  overflow: number;
+  overflow: OverflowReport;
   filterRow: number;
 }
 
@@ -191,9 +197,7 @@ async function sweep(page: Page, suffix: string): Promise<ShotResult[]> {
 
     await page.screenshot({ path: join(OUT, `${width}${suffix}.png`) });
 
-    const over = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    );
+    const overflow = await page.evaluate(measureOverflow);
     const filterRow = await page.evaluate(() => {
       const el = document.querySelector(".inbox-card__filter-row");
       return el === null ? null : el.getBoundingClientRect().height;
@@ -216,10 +220,10 @@ async function sweep(page: Page, suffix: string): Promise<ShotResult[]> {
         ? "no .channel-rail found"
         : `rail ${rail.height.toFixed(1)}px tall, ${(rail.viewport - rail.bottom).toFixed(1)}px off the bottom`;
     console.log(
-      `[${suffix === "" ? "unfiltered" : "filtered"}] width ${width}: overflow ${over}px, filter row ${filterRow.toFixed(1)}px, ${railPart}`,
+      `[${suffix === "" ? "unfiltered" : "filtered"}] width ${width}: ${describeOverflow(overflow)}, filter row ${filterRow.toFixed(1)}px, ${railPart}`,
     );
 
-    if (over > 0) throw new Error(`horizontal overflow at ${width}px: ${over}px`);
+    assertNoOverflow(`${width}px${suffix}`, overflow);
     if (filterRow > FILTER_ROW_MAX) {
       throw new Error(
         `filter row is ${filterRow.toFixed(1)}px tall at ${width}px (max ${FILTER_ROW_MAX}px) — it wrapped instead of scrolling`,
@@ -261,7 +265,7 @@ async function sweep(page: Page, suffix: string): Promise<ShotResult[]> {
         () => document.querySelector(".inbox-card")?.getBoundingClientRect().width ?? 0,
       );
       if (paneWidth >= NARROW_LIST_PANE) {
-        results.push({ width, overflow: over, filterRow });
+        results.push({ width, overflow, filterRow });
         continue;
       }
       const targets = await page.evaluate((raised) => {
@@ -299,19 +303,17 @@ async function sweep(page: Page, suffix: string): Promise<ShotResult[]> {
       );
     }
 
-    results.push({ width, overflow: over, filterRow });
+    results.push({ width, overflow, filterRow });
   }
 
   for (const width of OVERFLOW_ONLY_WIDTHS) {
     await page.setViewportSize({ width, height: HEIGHT });
     await page.waitForTimeout(SETTLE_MS);
-    const over = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    );
+    const overflow = await page.evaluate(measureOverflow);
     console.log(
-      `[${suffix === "" ? "unfiltered" : "filtered"}] width ${width}: overflow ${over}px`,
+      `[${suffix === "" ? "unfiltered" : "filtered"}] width ${width}: ${describeOverflow(overflow)}`,
     );
-    if (over > 0) throw new Error(`horizontal overflow at ${width}px: ${over}px`);
+    assertNoOverflow(`${width}px${suffix}`, overflow);
   }
 
   return results;

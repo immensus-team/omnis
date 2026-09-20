@@ -1,4 +1,4 @@
-// Phase A 종단 스모크의 UI 단. 스택은 tools/e2e/run.ts가 이미 띄워 놓았다.
+// The UI leg of the Phase A end-to-end smoke. The stack was already brought up by tools/e2e/run.ts.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Page, expect, test } from "@playwright/test";
@@ -42,7 +42,7 @@ function shot(page: Page, file: string): Promise<Buffer> {
   return page.screenshot({ path: join(EVIDENCE, file), fullPage: false });
 }
 
-/** 허브 HTTP는 데스크톱과 같은 127.0.0.1 경계다 — 승인 상태 확인은 여기로 한다(계약 §5). */
+/** Hub HTTP shares the desktop's 127.0.0.1 boundary — approval state is read through it (contract §5). */
 async function hubApprovals(state: string): Promise<{ id: string; state: string }[]> {
   const res = await fetch(`http://127.0.0.1:8787/approvals?state=${state}`);
   return ((await res.json()) as { approvals: { id: string; state: string }[] }).approvals;
@@ -59,7 +59,7 @@ test("Phase A seeded smoke", async ({ page }) => {
   await expect(rows.first()).toBeVisible({ timeout: 30_000 });
 
   await check(
-    "A1 Inbox lists one row per seeded thread (U2: 행이 item이 아니라 thread 단위)",
+    "A1 Inbox lists one row per seeded thread (U2: a row is a thread, not an item)",
     async () => {
       const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
       let expectedThreads: number;
@@ -72,7 +72,7 @@ test("Phase A seeded smoke", async ({ page }) => {
       } finally {
         await pool.end();
       }
-      // Zero의 초기 싱크는 점진적이다 — 시드가 만든 스레드 수가 다 찰 때까지 기다린다.
+      // Zero's initial sync is incremental — wait until every seeded thread has arrived.
       await expect.poll(() => rows.count(), { timeout: 30_000 }).toBe(expectedThreads);
       return `${expectedThreads} thread rows (item count was ${SEED.itemCount})`;
     },
@@ -214,18 +214,19 @@ test("Phase A seeded smoke", async ({ page }) => {
 
   await check("A7 Approval card shows the pending approval", async () => {
     await expect(page.locator(".approval-card").first()).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText("#omnis-launch에 답장을 보낼까요?")).toBeVisible();
+    await expect(page.getByText("Reply to #omnis-launch?")).toBeVisible();
     const pending = await hubApprovals("pending");
     expect(pending.map((a) => a.id)).toContain(SEED.approvalId);
   });
-  // 04와 같은 전체 화면을 또 찍으면 바이트까지 같은 PNG가 나온다(승인 카드가 두 프레임에
-  // 모두 떠 있다) — 카드 자체만 찍어 서로 다른 정보를 남긴다.
+  // Shooting the same full screen as 04 again would produce a byte-identical PNG (the approval card
+  // is up in both frames) — crop to the card itself so the two files hold different information.
   await page
     .locator(".approval-card")
     .first()
     .screenshot({ path: join(EVIDENCE, "05-approval-card.png") });
 
   await check("A8 Approve → hub moves the approval to decided", async () => {
+    // The "승인" name mirrors approval-card.tsx's still-Korean accept button (owned by US-D01/US-D02) — do not translate.
     await page.getByRole("button", { name: "승인", exact: true }).first().click();
     await expect
       .poll(async () => (await hubApprovals("decided")).map((a) => a.id), { timeout: 20_000 })
@@ -233,11 +234,13 @@ test("Phase A seeded smoke", async ({ page }) => {
     return "pending → decided";
   });
 
-  // US-D01: ⌘K는 별도 모달 팔레트가 아니라 ask 바의 플로팅 AI 패널을 연다(App.tsx 참조) —
-  // 같은 액션 목록을 두 표면에 띄우지 않기로 한 결정이라 여기서 보는 표면도 바뀌었다.
-  // 명령 목록은 모달의 "검색 또는 명령…"이 아니라 바에 타이핑하면 패널 안에 나온다.
+  // US-D01: ⌘K opens the ask bar's floating AI panel rather than a separate modal palette (see
+  // App.tsx) — we decided not to surface the same action list in two places, so the surface this
+  // check watches changed too. The command list appears inside the panel when you type in the bar,
+  // not as the modal's "Search or command…".
   await check("A9 ⌘K opens the floating AI panel and types into the command list", async () => {
     await page.keyboard.press("Meta+k");
+    // The "AI 패널" name mirrors ask-panel.tsx's still-Korean aria-label (owned by US-D01/US-D02) — do not translate.
     const panel = page.getByRole("dialog", { name: "AI 패널" });
     await expect(panel).toBeVisible();
     await page.keyboard.type("Inbox");
@@ -246,53 +249,58 @@ test("Phase A seeded smoke", async ({ page }) => {
   });
   await shot(page, "06-command-palette.png");
   await page.keyboard.press("Escape");
+  // The "AI 패널" name mirrors ask-panel.tsx's still-Korean aria-label (owned by US-D01/US-D02) — do not translate.
   await expect(page.getByRole("dialog", { name: "AI 패널" })).toBeHidden();
 
-  // US-A36: 보관은 승인 게이트를 타지 않는 로컬 상태 전이다 — UI에서 사라지는 것과 허브가
-  // 실제로 threads.archived_at + audit_log를 쓴 것을 둘 다 본다(UI만 보면 낙관적 갱신에 속는다).
-  await check("A-archive 행 보관 → 목록에서 사라지고, 되살리면 돌아온다", async () => {
-    await page.getByRole("radio", { name: "all", exact: true }).click();
-    const before = await rows.count();
-    const target = rows.first();
-    const name = ((await target.locator(".inbox-row__name").textContent()) ?? "").trim();
-    await target.hover();
-    await target.getByRole("button", { name: "Archive", exact: true }).click();
-    await expect.poll(() => rows.count(), { timeout: 20_000 }).toBe(before - 1);
+  // US-A36: archiving is a local state transition that does not go through the approval gate — we
+  // check both that it vanishes from the UI and that the hub really wrote threads.archived_at +
+  // audit_log (watching the UI alone would fall for an optimistic update).
+  await check(
+    "A-archive archiving a row removes it from the list and restoring brings it back",
+    async () => {
+      await page.getByRole("radio", { name: "all", exact: true }).click();
+      const before = await rows.count();
+      const target = rows.first();
+      const name = ((await target.locator(".inbox-row__name").textContent()) ?? "").trim();
+      await target.hover();
+      await target.getByRole("button", { name: "Archive", exact: true }).click();
+      await expect.poll(() => rows.count(), { timeout: 20_000 }).toBe(before - 1);
 
-    const archivedPill = page.getByRole("button", { name: "Archived", exact: true });
-    await archivedPill.click();
-    const archivedRow = rows.filter({ hasText: name }).first();
-    await expect(archivedRow).toBeVisible({ timeout: 20_000 });
-    await shot(page, "08-archived.png");
+      const archivedPill = page.getByRole("button", { name: "Archived", exact: true });
+      await archivedPill.click();
+      const archivedRow = rows.filter({ hasText: name }).first();
+      await expect(archivedRow).toBeVisible({ timeout: 20_000 });
+      await shot(page, "08-archived.png");
 
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
-    try {
-      const { count } = await one<{ count: string }>(
-        pool,
-        "SELECT count(*) AS count FROM threads WHERE archived_at IS NOT NULL",
-      );
-      expect(Number(count)).toBeGreaterThanOrEqual(1);
-      await archivedRow.hover();
-      await archivedRow.getByRole("button", { name: "Restore", exact: true }).click();
-      await archivedPill.click(); // Inbox 뷰로 복귀
-      await expect.poll(() => rows.count(), { timeout: 20_000 }).toBe(before);
-      const { actions } = await one<{ actions: string }>(
-        pool,
-        "SELECT string_agg(DISTINCT action, ',' ORDER BY action) AS actions FROM audit_log WHERE action LIKE 'thread.%archived'",
-      );
-      expect(actions).toBe("thread.archived,thread.unarchived");
-    } finally {
-      await pool.end();
-    }
-    return `"${name}" archived → restored (${before} rows), audit_log 2종 기록`;
-  });
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+      try {
+        const { count } = await one<{ count: string }>(
+          pool,
+          "SELECT count(*) AS count FROM threads WHERE archived_at IS NOT NULL",
+        );
+        expect(Number(count)).toBeGreaterThanOrEqual(1);
+        await archivedRow.hover();
+        await archivedRow.getByRole("button", { name: "Restore", exact: true }).click();
+        await archivedPill.click(); // back to the Inbox view
+        await expect.poll(() => rows.count(), { timeout: 20_000 }).toBe(before);
+        const { actions } = await one<{ actions: string }>(
+          pool,
+          "SELECT string_agg(DISTINCT action, ',' ORDER BY action) AS actions FROM audit_log WHERE action LIKE 'thread.%archived'",
+        );
+        expect(actions).toBe("thread.archived,thread.unarchived");
+      } finally {
+        await pool.end();
+      }
+      return `"${name}" archived → restored (${before} rows), 2 audit_log actions recorded`;
+    },
+  );
 
   await check("G5 a new item reaches the UI in ≤2s", async () => {
     await page.getByRole("radio", { name: "all", exact: true }).click();
     const marker = `G5 latency probe ${Date.now()}`;
     const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
     try {
-      await ingestOneMore(pool, marker); // 허브가 쓰는 것과 같은 커널 IngestSink
+      await ingestOneMore(pool, marker); // the same kernel IngestSink the hub uses
     } finally {
       await pool.end();
     }
@@ -300,7 +308,7 @@ test("Phase A seeded smoke", async ({ page }) => {
     await expect(page.getByText(marker)).toBeVisible({ timeout: 20_000 });
     const ms = Date.now() - ingestedAt;
     expect(ms).toBeLessThanOrEqual(2000);
-    return `${ms}ms ingest → 화면 (목표 ≤2000ms)`;
+    return `${ms}ms ingest → on screen (target ≤2000ms)`;
   });
   await shot(page, "07-g5-live-item.png");
 

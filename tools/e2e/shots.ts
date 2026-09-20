@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { chromium } from "@playwright/test";
 import { Pool, one, query } from "../../packages/db/src/index.js";
 import { createKernel, createLogger } from "../../packages/kernel/src/index.js";
+import { assertNoOverflow, describeOverflow, measureOverflow } from "./overflow.js";
 import { seed } from "./seed.js";
 import {
   HUB_PORT,
@@ -38,9 +39,9 @@ async function densify(pool: Pool): Promise<void> {
       "SELECT id, title FROM threads WHERE kind <> 'agent_session' ORDER BY created_at",
     );
     const asks = [
-      "브라이트스톤 매매계약서 최신본을 공유할까요?",
-      "금요일 14:00 디자인 리뷰를 캘린더에 넣을까요?",
-      "청구서 재발행 요청에 '확인 후 회신드리겠습니다'로 답할까요?",
+      "Share the latest Brightstone purchase agreement?",
+      "Put the Friday 14:00 design review on the calendar?",
+      "Answer the invoice reissue request with 'I will check and get back to you'?",
     ];
     for (const [i, t] of threads.entries()) {
       const description = asks[i % asks.length] ?? asks[0] ?? "";
@@ -57,26 +58,31 @@ async function densify(pool: Pool): Promise<void> {
     await kernel.close();
   }
 
-  // 에이전트 세션 4상태 — 시드가 만든 세션 하나 말고 세 개를 더 얹는다(스크린샷 픽스처).
+  // The four agent session states — add three more on top of the one session the seed created (screenshot fixture).
   const runtime = await one<{ id: string }>(pool, "SELECT id FROM agent_runtimes LIMIT 1");
   const account = await one<{ id: string }>(
     pool,
     "SELECT id FROM accounts WHERE channel = 'slack' LIMIT 1",
   );
-  // 상태당 2건 이상 — 그룹 카운트가 전부 1이면 "밀도 시스템"이 아니라 헤더 네 줄만 보인다.
+  // At least two per state — with every group count at 1 you get four bare headers, not a "density system".
   const extra: [string, string, string, string][] = [
     [
       "running",
-      "인박스 초안 3건 작성",
+      "Drafting 3 inbox replies",
       "answers:draft",
-      "받은 메일 3건 초안을 쓰는 중입니다 (2/3)",
+      "Writing drafts for 3 received mails (2/3)",
     ],
-    ["running", "계약서 diff 요약", "contract:diff", "특약 2개 변경점을 비교하는 중입니다"],
-    ["waiting_approval", "청구서 재발행 회신", "billing:reissue", "회신 문구 승인을 기다립니다"],
-    ["idle", "주간 리포트 수집", "report:weekly", "다음 실행까지 대기 중입니다"],
-    ["idle", "캘린더 충돌 감시", "calendar:watch", "다음 점검까지 대기 중입니다"],
-    ["ended", "라벨 규칙 정리", "labels:tidy", "중복 라벨 4개를 병합하고 끝냈습니다"],
-    ["ended", "스팸 필터 학습", "spam:train", "오탐 6건을 반영하고 끝냈습니다"],
+    ["running", "Summarizing contract diff", "contract:diff", "Comparing 2 changed special terms"],
+    [
+      "waiting_approval",
+      "Invoice reissue reply",
+      "billing:reissue",
+      "Waiting for approval of the reply wording",
+    ],
+    ["idle", "Weekly report collection", "report:weekly", "Waiting for the next run"],
+    ["idle", "Calendar conflict watch", "calendar:watch", "Waiting for the next check"],
+    ["ended", "Label rule cleanup", "labels:tidy", "Finished merging 4 duplicate labels"],
+    ["ended", "Spam filter training", "spam:train", "Finished folding in 6 false positives"],
   ];
   for (const [state, title, key, summary] of extra) {
     const thread = await one<{ id: string }>(
@@ -98,34 +104,34 @@ async function densify(pool: Pool): Promise<void> {
       [thread.id, account.id, summary],
     );
   }
-  // 시드 세션은 "확인 필요"(waiting_approval)로 올려 blocked 그룹을 맨 위에 만든다.
+  // Raise the seed session to waiting_approval so the blocked group lands at the top.
   await query(
     pool,
     "UPDATE agent_sessions SET state = 'waiting_approval' WHERE session_key LIKE '%inbox-draft'",
   );
-  // 호버 카드가 "행이 잘라 낸 것"을 실제로 갖도록: 긴 요약 + 칩 2개로 안 담기는 라벨 수.
+  // Make the hover card actually carry what the row truncated: a long summary + more labels than two chips hold.
   await query(
     pool,
     `UPDATE threads SET meta = jsonb_set(meta, '{summary}', to_jsonb($1::text)), unread_count = 2
        WHERE kind IN ('dm', 'group')`,
     [
-      "브라이트스톤 리얼티 매매계약서 최신본을 공유해 달라는 요청입니다. 지난주 검토본 이후 특약 두 줄이 바뀌었고, 금요일 오전까지 회신이 필요하다고 합니다.",
+      "A request to share the latest Brightstone Realty purchase agreement. Two lines of special terms changed since last week's reviewed copy, and they need a reply by Friday morning.",
     ],
   );
   await query(
     pool,
-    `INSERT INTO labels (name, kind, color) VALUES ('계약', 'topic', '#f59e0b')
+    `INSERT INTO labels (name, kind, color) VALUES ('contract', 'topic', '#f59e0b')
        ON CONFLICT (kind, name) DO NOTHING`,
   );
   await query(
     pool,
     `INSERT INTO thread_labels (thread_id, label_id, by)
        SELECT t.id, l.id, 'rule' FROM threads t, labels l
-        WHERE l.name = '계약' AND t.kind IN ('dm', 'group')
+        WHERE l.name = 'contract' AND t.kind IN ('dm', 'group')
         ON CONFLICT DO NOTHING`,
   );
 
-  // 라벨 칩 필터를 실제로 쓸 수 있게 라벨을 몇 개 더 붙인다.
+  // Attach a few more labels so the label chip filter has something real to work with.
   await query(
     pool,
     `INSERT INTO thread_labels (thread_id, label_id, by)
@@ -169,12 +175,12 @@ async function main(): Promise<void> {
     await page.waitForTimeout(800);
     await page.screenshot({ path: join(OUT, "needs-approval.png") });
 
-    // 2) agents — 상태 그룹 순서(확인 필요 → 작업 중 → 대기 → 완료)
+    // 2) agents — state group order (blocked → working → idle → done)
     await page.getByRole("radio", { name: "agents" }).click();
     await page.waitForTimeout(800);
     await page.screenshot({ path: join(OUT, "agents-density.png") });
 
-    // 3) 필터 칩: 라벨 2개를 실제로 고른 뒤 칩 + 팝오버(✓)를 같이 담는다
+    // 3) Filter chips: actually pick two labels, then frame the chips and the popover (✓) together
     await page.getByRole("radio", { name: "all" }).click();
     await page.waitForTimeout(400);
     await page.getByRole("button", { name: "Add Label filter" }).click();
@@ -189,7 +195,7 @@ async function main(): Promise<void> {
     await page.waitForTimeout(600);
     await page.screenshot({ path: join(OUT, "filter-chips.png") });
 
-    // 4) 행 호버 카드 — 요약이 긴 행 위에서 400ms 이상 머문다
+    // 4) Row hover card — rest on the row with the long summary for more than 400ms
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: "Remove Label filter" }).click();
     await page.waitForTimeout(400);
@@ -198,18 +204,18 @@ async function main(): Promise<void> {
     await page.waitForTimeout(1400);
     await page.screenshot({ path: join(OUT, "row-hover-card.png") });
 
-    // 도달 가능한 최소 폭(src-tauri/tauri.conf.json minWidth 1024)에서 레이아웃이 버텨야 한다.
-    // 페이지 가로 스크롤만 재는 건 증거가 못 된다: 행 안에서 grid 아이템 둘이 같은 칸을 차지해
-    // 겹쳐도 scrollWidth는 그대로 0이다(US-D02 3회차에 실제로 그렇게 통과했다 — 라벨 칩 위에
-    // 채널 글리프·승인 점이 겹쳐 그려지는데도 "overflow 0px"였다). 그래서 폭마다 두 가지를 잰다:
-    // (1) 페이지 가로 스크롤, (2) 렌더된 모든 행에서 .inbox-row__chips와 .inbox-row__side의
-    //     실제 bounding box가 겹치지 않는지.
+    // The layout has to hold at the narrowest reachable width (src-tauri/tauri.conf.json minWidth
+    // 1024). Page-level horizontal scroll alone is not evidence: two grid items inside a row can
+    // share the same track and overlap while scrollWidth stays 0 (that is exactly how round three of
+    // US-D02 passed — the channel glyph and approval dot were painted over the label chips and it
+    // still read "overflow 0px"). So every width is measured three ways: the shared overflow probe
+    // (page scroll off <body> + an element-rect scan, tools/e2e/overflow.ts), and whether
+    // .inbox-row__chips and .inbox-row__side bounding boxes overlap in any rendered row — the
+    // overlap is the one inside a clipped box that neither scroll reading can see.
     for (const width of [1024, 1280, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
       await page.waitForTimeout(400);
-      const over = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      );
+      const overflow = await page.evaluate(measureOverflow);
       const collisions = await page.evaluate(() => {
         const hits: string[] = [];
         for (const row of document.querySelectorAll(".inbox-row")) {
@@ -218,7 +224,7 @@ async function main(): Promise<void> {
           if (!chips || !side) continue;
           const a = chips.getBoundingClientRect();
           const b = side.getBoundingClientRect();
-          // 빈 칩 컨테이너(width 0)는 아무와도 겹칠 수 없다 — 교집합이 양수일 때만 잡는다.
+          // An empty chip container (width 0) cannot overlap anything — only a positive intersection counts.
           const dx = Math.min(a.right, b.right) - Math.max(a.left, b.left);
           const dy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
           if (dx > 0 && dy > 0) {
@@ -230,11 +236,13 @@ async function main(): Promise<void> {
       });
       const rows = await page.locator(".inbox-row").count();
       console.log(
-        `width ${width}: overflow ${over}px, ${rows}개 행 중 칩/우측슬롯 겹침 ${collisions.length}건`,
+        `width ${width}: ${describeOverflow(overflow)}, chip/side-slot overlap in ${collisions.length} of ${rows} rows`,
       );
-      if (over > 0) throw new Error(`가로 스크롤 발생: ${width}px에서 ${over}px`);
+      assertNoOverflow(`${width}px`, overflow);
       if (collisions.length > 0)
-        throw new Error(`행 안에서 칩과 우측 슬롯이 겹침: ${width}px에서 ${collisions.join(", ")}`);
+        throw new Error(
+          `chips overlap the side slot inside a row at ${width}px: ${collisions.join(", ")}`,
+        );
     }
 
     await browser.close();
