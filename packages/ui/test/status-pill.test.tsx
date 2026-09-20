@@ -26,7 +26,7 @@ describe("AgentStatusPill (agent session 5상태)", () => {
   it.each([
     ["idle", "대기", "neutral"],
     ["working", "작업 중", "info"],
-    ["blocked", "차단됨", "danger"],
+    ["blocked", "확인 필요", "danger"],
     ["done", "완료", "success"],
     ["failed", "실패", "danger"],
   ] as const)("%s → %s / tone %s", (state, label, tone) => {

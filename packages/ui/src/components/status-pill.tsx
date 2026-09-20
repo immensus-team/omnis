@@ -61,7 +61,9 @@ export type AgentPillState = AgentSessionKinsoState | "failed";
 const AGENT_META: Record<AgentPillState, { label: string; tone: PillTone }> = {
   idle: { label: "대기", tone: "neutral" },
   working: { label: "작업 중", tone: "info" },
-  blocked: { label: "차단됨", tone: "danger" },
+  // 기존 AgentStatusBadge(status-badge.tsx)·DESIGN-DIRECTION.md("blocked = 내 응답 필요")와 라벨을
+  // 맞춘다 — 브리프 원문은 "차단됨"이었지만 같은 상태를 한 화면에서 두 문구로 보여주면 안 된다.
+  blocked: { label: "확인 필요", tone: "danger" },
   done: { label: "완료", tone: "success" },
   failed: { label: "실패", tone: "danger" },
 };
