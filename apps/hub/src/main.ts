@@ -1,3 +1,4 @@
+import { configureAgents, summarizeThread } from "@omnis/agents";
 import { createPool } from "@omnis/db";
 import {
   type Logger,
@@ -9,6 +10,7 @@ import {
 import { createBridgeHub } from "./bridge.js";
 import { type HubConfig, readConfig } from "./config.js";
 import { createHubServer } from "./http.js";
+import { registerSummaryJob } from "./summarize-job.js";
 
 export interface RunningHub {
   config: HubConfig;
@@ -26,6 +28,14 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
 
   registerHealthcheckJob(kernel.scheduler, { pool, events: kernel.events });
   await kernel.scheduler.start();
+
+  // B3: kinso 인박스 행의 AI 한 줄 요약 — @omnis/agents는 모듈 싱글톤 pool을 쓴다(pool.ts).
+  configureAgents({ pool });
+  const stopSummaryJob = registerSummaryJob({
+    events: kernel.events,
+    logger,
+    summarizeThread,
+  });
 
   const bridge = createBridgeHub({ kernel, pool, logger, token: config.bridgeToken });
   if (config.bridgeToken === "") {
@@ -61,6 +71,7 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
           setTimeout(() => server.closeAllConnections(), 2000).unref();
         });
         await bridge.close();
+        stopSummaryJob();
         // 2) 스케줄러를 멈추고 진행 중 틱이 claimed_at을 풀고 끝나기를 기다린다(Task 14의 stop()).
         // 3) LISTEN 커넥션을 버린다.
         await kernel.close();

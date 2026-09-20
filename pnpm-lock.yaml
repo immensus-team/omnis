@@ -90,6 +90,9 @@ importers:
 
   apps/hub:
     dependencies:
+      '@omnis/agents':
+        specifier: workspace:*
+        version: link:../../packages/agents
       '@omnis/db':
         specifier: workspace:*
         version: link:../../packages/db

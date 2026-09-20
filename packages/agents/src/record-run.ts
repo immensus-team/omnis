@@ -3,6 +3,7 @@ import { getAgentsPool } from "./pool.js";
 export interface RecordRunInput {
   loop:
     | "classify"
+    | "summarize"
     | "draft"
     | "task"
     | "delegate"

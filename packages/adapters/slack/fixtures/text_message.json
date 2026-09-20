@@ -3,6 +3,7 @@
   "raw": {
     "type": "message",
     "channel": "C0123456789",
+    "channel_name": "omnis-launch",
     "user": "U0123456789",
     "text": "hey, can you review the PR?",
     "ts": "1700000000.000100",
@@ -14,12 +15,28 @@
         "threadExternalId": "C0123456789",
         "externalId": "1700000000.000100",
         "kind": "message",
-        "author": { "kind": "person", "id": "U0123456789" },
+        "author": {
+          "kind": "person",
+          "id": "U0123456789"
+        },
         "body": "hey, can you review the PR?",
         "attachments": [],
         "sentAt": "2023-11-14T22:13:20.000Z",
         "status": "received",
-        "sourceHash": "1700000000.000100"
+        "sourceHash": "1700000000.000100",
+        "threadMeta": {
+          "externalId": "C0123456789",
+          "kind": "group",
+          "title": "#omnis-launch",
+          "participants": [
+            {
+              "externalId": "U0123456789",
+              "displayName": "U0123456789"
+            }
+          ],
+          "lastItemAt": "2023-11-14T22:13:20.000Z",
+          "archivedAt": null
+        }
       }
     ]
   }

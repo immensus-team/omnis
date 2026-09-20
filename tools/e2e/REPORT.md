@@ -1,6 +1,6 @@
 # Phase A 종단 스모크 리포트
 
-생성: 2026-09-20T09:17:31.562Z · `pnpm e2e:phase-a` (tools/e2e/run.ts)
+생성: 2026-09-20T10:11:08.099Z · `pnpm e2e:phase-a` (tools/e2e/run.ts)
 
 스택: PostgreSQL `omnis_e2e` (마이그레이션 0001–0008 + Zero permissions) → zero-cache :4848
 → 허브 :8787 (HTTP + WS /bridge) → 로컬 에이전트 브리지(mock 런타임 픽스처, host=macbook)
@@ -10,42 +10,42 @@
 커널 `approvals.propose`, `@omnis/agents`의 `classify()`(T0 규칙 경로, 네트워크 호출 없음),
 `ClaudeCodeAdapter` + `apps/local-agent/test` 픽스처 재생.
 
-## Pass 1 (7.1s, items=13)
+## Pass 1 (7.2s, items=13)
 
 | 결과 | 검증 | 소요 | 비고 |
 | --- | --- | --- | --- |
 | PASS | A1 Inbox lists every seeded item | 106ms | 13 rows |
-| PASS | A2 Inbox rows show a visible channel icon for all three channels | 9ms | SL / GM / GC |
+| PASS | A2 Inbox rows show a visible channel icon for all three channels | 11ms | SL / GM / GC |
 | PASS | A2b Inbox rows show the seeded thread titles | 3ms | #omnis-launch / omnis launch sync |
-| PASS | A3 Inbox rows carry label chips | 1ms |  |
-| PASS | A4 work/personal filter pills change the list | 83ms | all=13 work=7 personal=1 |
-| PASS | A5 Thread screen renders seeded items with status badges | 40ms | 4 status badges |
-| PASS | A6 Agent Session screen shows turns and a ToolCallBadge | 36ms |  |
-| PASS | A7 Approval card shows the pending approval | 11ms |  |
-| PASS | A8 Approve → hub moves the approval to decided | 54ms | pending → decided |
-| PASS | A9 ⌘K opens the command palette | 13ms |  |
-| PASS | G5 a new item reaches the UI in ≤2s | 69ms | 28ms ingest → 화면 (목표 ≤2000ms) |
-| PASS | A8b hub recorded audit_log(approval.decided) | 2ms | 1 row(s) |
+| PASS | A3 Inbox rows carry label chips | 2ms |  |
+| PASS | A4 work/personal filter pills change the list | 97ms | all=13 work=4 personal=1 |
+| PASS | A5 Thread screen renders seeded items with status badges | 44ms | 4 status badges |
+| PASS | A6 Agent Session screen shows turns and a ToolCallBadge | 37ms |  |
+| PASS | A7 Approval card shows the pending approval | 14ms |  |
+| PASS | A8 Approve → hub moves the approval to decided | 42ms | pending → decided |
+| PASS | A9 ⌘K opens the command palette | 15ms |  |
+| PASS | G5 a new item reaches the UI in ≤2s | 86ms | 29ms ingest → 화면 (목표 ≤2000ms) |
+| PASS | A8b hub recorded audit_log(approval.decided) | 1ms | 1 row(s) |
 | PASS | A8c pending_approvals.state moved to decided(accept) | 0ms | state=decided decision=accept |
 | PASS | A10 classify() recorded a T0 run in agent_runs (no network) | 0ms | 1 run(s), tier=T0 |
 | PASS | A11 local-agent registered over WS /bridge | 0ms | agent_runtimes state=online |
 
-## Pass 2 (7.3s, items=13)
+## Pass 2 (7.1s, items=13)
 
 | 결과 | 검증 | 소요 | 비고 |
 | --- | --- | --- | --- |
-| PASS | A1 Inbox lists every seeded item | 106ms | 13 rows |
-| PASS | A2 Inbox rows show a visible channel icon for all three channels | 9ms | SL / GM / GC |
-| PASS | A2b Inbox rows show the seeded thread titles | 2ms | #omnis-launch / omnis launch sync |
+| PASS | A1 Inbox lists every seeded item | 3ms | 13 rows |
+| PASS | A2 Inbox rows show a visible channel icon for all three channels | 12ms | SL / GM / GC |
+| PASS | A2b Inbox rows show the seeded thread titles | 3ms | #omnis-launch / omnis launch sync |
 | PASS | A3 Inbox rows carry label chips | 2ms |  |
-| PASS | A4 work/personal filter pills change the list | 83ms | all=13 work=7 personal=1 |
-| PASS | A5 Thread screen renders seeded items with status badges | 40ms | 4 status badges |
-| PASS | A6 Agent Session screen shows turns and a ToolCallBadge | 36ms |  |
-| PASS | A7 Approval card shows the pending approval | 12ms |  |
-| PASS | A8 Approve → hub moves the approval to decided | 39ms | pending → decided |
-| PASS | A9 ⌘K opens the command palette | 14ms |  |
-| PASS | G5 a new item reaches the UI in ≤2s | 68ms | 29ms ingest → 화면 (목표 ≤2000ms) |
-| PASS | A8b hub recorded audit_log(approval.decided) | 1ms | 1 row(s) |
+| PASS | A4 work/personal filter pills change the list | 98ms | all=13 work=4 personal=1 |
+| PASS | A5 Thread screen renders seeded items with status badges | 41ms | 4 status badges |
+| PASS | A6 Agent Session screen shows turns and a ToolCallBadge | 34ms |  |
+| PASS | A7 Approval card shows the pending approval | 10ms |  |
+| PASS | A8 Approve → hub moves the approval to decided | 56ms | pending → decided |
+| PASS | A9 ⌘K opens the command palette | 11ms |  |
+| PASS | G5 a new item reaches the UI in ≤2s | 71ms | 29ms ingest → 화면 (목표 ≤2000ms) |
+| PASS | A8b hub recorded audit_log(approval.decided) | 2ms | 1 row(s) |
 | PASS | A8c pending_approvals.state moved to decided(accept) | 0ms | state=decided decision=accept |
 | PASS | A10 classify() recorded a T0 run in agent_runs (no network) | 0ms | 1 run(s), tier=T0 |
 | PASS | A11 local-agent registered over WS /bridge | 0ms | agent_runtimes state=online |

@@ -22,8 +22,39 @@ describe("Slack normalize()", () => {
         sentAt: "2023-11-14T22:13:20.000Z",
         status: "received",
         sourceHash: "1700000000.000100",
+        threadMeta: {
+          externalId: "C0123456789",
+          kind: "group",
+          title: null,
+          participants: [{ externalId: "U0123456789", displayName: "U0123456789" }],
+          lastItemAt: "2023-11-14T22:13:20.000Z",
+          archivedAt: null,
+        },
       },
     ]);
+  });
+
+  it("marks a DM channel (D-prefixed id) as threadMeta.kind 'dm'", () => {
+    const raw = {
+      type: "message",
+      channel: "D0123456789",
+      user: "U0123456789",
+      text: "hey",
+      ts: "1700000000.000100",
+    };
+    const [item] = normalize(raw);
+    expect(item?.threadMeta?.kind).toBe("dm");
+  });
+
+  it("titles a channel from channel_name with a # prefix, a DM without one", () => {
+    const base = { type: "message", user: "U0123456789", text: "hey", ts: "1700000000.000100" };
+    expect(
+      normalize({ ...base, channel: "C0123456789", channel_name: "omnis-launch" })[0]?.threadMeta
+        ?.title,
+    ).toBe("#omnis-launch");
+    expect(
+      normalize({ ...base, channel: "D0123456789", channel_name: "dana" })[0]?.threadMeta?.title,
+    ).toBe("dana");
   });
 
   it("uses thread_ts for threadExternalId grouping but keeps ts as externalId/sourceHash", () => {

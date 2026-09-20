@@ -223,6 +223,43 @@ function decodeGmailBody(data: string | undefined): string {
   return Buffer.from(data, "base64url").toString("utf8");
 }
 
+/** RFC 5322 주소 목록을 항목 단위로 자른다. 따옴표 안의 콤마("Lee, Dana" <dana@example.com>)는
+ *  구분자가 아니다. */
+function splitAddressList(headerValue: string): string[] {
+  const out: string[] = [];
+  let quoted = false;
+  let start = 0;
+  for (let i = 0; i < headerValue.length; i += 1) {
+    const ch = headerValue[i];
+    if (ch === '"' && headerValue[i - 1] !== "\\") quoted = !quoted;
+    else if (ch === "," && !quoted) {
+      out.push(headerValue.slice(start, i));
+      start = i + 1;
+    }
+  }
+  out.push(headerValue.slice(start));
+  return out;
+}
+
+// "Name <a@b.com>, Name2 <c@d.com>" → one ParticipantRef per address, in order, deduped.
+// externalId는 메일박스 주소만 쓴다 — 표시 이름이 바뀔 때마다 같은 사람이 다른 신원이 되면
+// Phase B의 person 해석(A3 §10)이 한 사람을 여럿으로 쪼갠다.
+function parseAddressList(headerValue: string): { externalId: string; displayName: string }[] {
+  const seen = new Set<string>();
+  const out: { externalId: string; displayName: string }[] = [];
+  for (const raw of splitAddressList(headerValue)) {
+    const entry = raw.trim();
+    if (!entry) continue;
+    const angled = /^(.*)<([^>]*)>\s*$/.exec(entry);
+    const address = (angled?.[2] ?? entry).trim();
+    const displayName = angled?.[1]?.trim().replace(/^"|"$/g, "") || address;
+    if (!address || seen.has(address)) continue;
+    seen.add(address);
+    out.push({ externalId: address, displayName });
+  }
+  return out;
+}
+
 export function normalize(raw: unknown): NormalizedItem[] {
   const r = raw as {
     id?: string;
@@ -240,6 +277,12 @@ export function normalize(raw: unknown): NormalizedItem[] {
   const bodyText = decodeGmailBody(r.payload?.body?.data);
   const sentAt = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString();
 
+  const participants = [
+    ...parseAddressList(from),
+    ...parseAddressList(header("To")),
+    ...parseAddressList(header("Cc")),
+  ].filter((p, i, all) => all.findIndex((other) => other.externalId === p.externalId) === i);
+
   return [
     {
       threadExternalId: r.threadId,
@@ -251,6 +294,14 @@ export function normalize(raw: unknown): NormalizedItem[] {
       sentAt,
       status: "received",
       sourceHash: messageId || r.id,
+      threadMeta: {
+        externalId: r.threadId,
+        kind: "email",
+        title: subject || null,
+        participants,
+        lastItemAt: sentAt,
+        archivedAt: null,
+      },
     },
   ];
 }

@@ -12,6 +12,7 @@
     "test:integration": "vitest run test/integration"
   },
   "dependencies": {
+    "@omnis/agents": "workspace:*",
     "@omnis/db": "workspace:*",
     "@omnis/kernel": "workspace:*",
     "@omnis/protocol": "workspace:*",

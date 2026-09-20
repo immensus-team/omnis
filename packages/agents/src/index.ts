@@ -7,3 +7,5 @@ export { knnVote, KNN_K, KNN_MARGIN_MIN, KNN_SIM_MIN, type KnnVerdict } from "./
 export { classifyWithT1, T1ClassifyOutput, SchemaViolationError } from "./t1/classify-t1.js";
 export { T1_BASE_URL, T1_MODEL_ID, T1_RUN_MODEL } from "./t1/provider.js";
 export { sensitivityFor, pickSensitivity, SENSITIVITY_PRIORITY } from "./sensitivity.js";
+export { summarizeThread, type SummarizeThreadResult } from "./summarize.js";
+export { summarizeWithT1, T1SummaryOutput } from "./t1/summarize-t1.js";
