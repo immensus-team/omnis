@@ -110,6 +110,18 @@ WHERE embedding IS NULL AND invalidated_at IS NULL"`.
 > While the backfill runs, those rows do not show up in search (the partial HNSW index does not index NULL).
 > The prefix rollout of 2026-09-21 (`search_document: ` / `search_query: `) is the first case that needed this.
 
+### Embedding model id (`OMNIS_OLLAMA_EMBED_MODEL`)
+
+`embed()` asks Ollama for `OMNIS_OLLAMA_EMBED_MODEL` when set, otherwise the `EMBED_MODEL` constant
+(`packages/memory/src/embed.ts`). Ollama resolves that id against the tag it was **pulled** under, so
+the mini — which has `nomic-embed-text:latest` — must export `OMNIS_OLLAMA_EMBED_MODEL="nomic-embed-text:latest"`
+in `ops/mini/env.sh`. The un-tagged default 404s, and `embed()` swallows a failed batch by design
+(A4 §10.5) and returns NULL: every memory lands with `embedding IS NULL` and search goes quiet with
+no error in the log. Both ids are 768d, so only the name differs.
+
+Changed the id? The stored vectors are then in a different space, exactly like an `EMBED_MODEL` change —
+re-embed as above.
+
 ## Web Push VAPID keys (US-B16)
 
 ```bash
