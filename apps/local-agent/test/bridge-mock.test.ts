@@ -25,6 +25,7 @@ function capture(): { sink: EventSink; out: Captured } {
       itemStarted: (e) => out.durable.push({ ...e, _m: "started" }),
       delta: (e) => out.deltas.push(e),
       itemCompleted: (e) => out.durable.push({ ...e, _m: "completed" }),
+      turnStarted: () => {},
       turnCompleted: (e) => out.durable.push({ ...e, _m: "turn.completed" }),
       approval: async () => ({ decision: "accept" as const }),
       raw: (l) => out.raw.push(l),
