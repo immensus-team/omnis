@@ -1,4 +1,4 @@
-// A4 §1.6 실패 처리 7종 + §1.7 실행 기록. 모든 루프가 이 함수 하나를 통과한다.
+// A4 §1.6's 7 failure-handling cases + §1.7 run records. Every loop goes through this one function.
 import { createHash } from "node:crypto";
 import {
   type LanguageModel,
@@ -29,7 +29,7 @@ import {
 export const QUARANTINE_HOURS = 24;
 export const FAILURE_WINDOW_HOURS = 24;
 export const FAILURE_LIMIT = 3;
-/** A4 §1.6: 재시도 백오프는 1s → 4s. 그 이상은 하지 않는다. */
+/** A4 §1.6: retry backoff is 1s → 4s. We go no further than that. */
 const RETRY_BACKOFF_MS = [1_000, 4_000] as const;
 
 type Tier = "T0" | "T1" | "T2";
@@ -50,7 +50,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/** A4 §1.6: tool-not-found는 그 스레드를 24시간 자동루프에서 제외한다. */
+/** A4 §1.6: tool-not-found excludes that thread from auto-loops for 24h. */
 async function quarantine(threadId: string, now: Date): Promise<void> {
   const until = new Date(now.getTime() + QUARANTINE_HOURS * 3_600_000).toISOString();
   await getAgentsPool().query(
@@ -69,7 +69,7 @@ async function isQuarantined(threadId: string, now: Date): Promise<boolean> {
   return until !== undefined && until !== null && new Date(until) > now;
 }
 
-/** A4 §1.6: 같은 item에 24시간 내 3회 실패하면 agent_optout으로 마킹하고 더 안 돈다. */
+/** A4 §1.6: 3 failures on the same item within 24h → mark agent_optout and stop running it. */
 async function tooManyFailures(loop: LoopId, itemId: string): Promise<boolean> {
   const { rows } = await getAgentsPool().query<{ n: string }>(
     `SELECT count(*)::text AS n FROM agent_runs
@@ -102,7 +102,7 @@ interface Generated {
   raw: string;
 }
 
-/** ai@7의 LanguageModelUsage는 평평하다(inputTokenDetails.cacheReadTokens) — classify-t1.ts와 같은 형태. */
+/** ai@7's LanguageModelUsage is flat (inputTokenDetails.cacheReadTokens) — same shape as classify-t1.ts. */
 function usageOf(u: LanguageModelUsage): Generated["usage"] {
   return {
     ...(u.inputTokens !== undefined ? { tokens_in: u.inputTokens } : {}),
@@ -163,7 +163,7 @@ function stringField(output: unknown, key: string, fallback: string): string {
   return typeof v === "string" ? v : fallback;
 }
 
-/** A4 §12.2: 캐시 히트율을 사후에 재려면 sha256(cachedPrefix)이 agent_runs에 남아야 한다. */
+/** A4 §12.2: to measure the cache hit rate after the fact, sha256(cachedPrefix) has to land in agent_runs. */
 function hash(s: string): string {
   return createHash("sha256").update(s).digest("hex");
 }
@@ -214,14 +214,14 @@ async function skipped<T>(
   };
 }
 
-/** 레지스트리를 타지 않는 하위 진입점. digest 두 루프가 같은 LoopId를 쓰므로 필요하다. */
+/** Lower-level entry point that bypasses the registry. Needed because the two digest loops share a LoopId. */
 export async function runLoopSpec<T>(
   spec: LoopSpec<T>,
   ctx: TriggerContext,
 ): Promise<LoopResult<T>> {
   const anySpec = spec as LoopSpec<unknown>;
 
-  // ── 게이트 1·2: quarantine, 24h 3회 실패
+  // ── Gates 1 & 2: quarantine, 3 failures in 24h
   if (ctx.thread_id !== undefined && (await isQuarantined(ctx.thread_id, ctx.now))) {
     return skipped(spec, ctx, "thread is quarantined for 24h (phantom tool)");
   }
@@ -230,7 +230,7 @@ export async function runLoopSpec<T>(
     return skipped(spec, ctx, "3 failures in 24h — marked agent_optout");
   }
 
-  // ── T0 선판정: 모델을 부르지 않고 끝나는 경로(A4 §9.2 ①③④)
+  // ── T0 pre-decision: paths that finish without calling a model (A4 §9.2 ①③④)
   const decided = spec.decide === undefined ? null : await spec.decide(ctx);
   if (decided !== null) {
     const runId = await recordRun({
@@ -281,7 +281,7 @@ export async function runLoopSpec<T>(
   let lastError: unknown = null;
   let lastRaw = "";
 
-  // A4 §1.6: 같은 티어 1회 재시도 → 한 티어 상승해 1회 → failed.
+  // A4 §1.6: one retry on the same tier → escalate one tier and retry once → failed.
   for (let attempt = 0; attempt < 3; attempt += 1) {
     if (attempt === 2) {
       const raised = nextTier(tier);
@@ -321,10 +321,10 @@ export async function runLoopSpec<T>(
         ...(assembled.cachedPrefix === "" ? {} : { context_hash: hash(assembled.cachedPrefix) }),
         ...gen.usage,
       });
-      // A4 §1.6: injection_flags가 비어 있지 않으면 결과물을 만들지 않는다.
+      // A4 §1.6: if injection_flags is non-empty, we produce no output artifact.
       if (flags.length > 0) {
         await writeSystemItem({
-          body: "이 메시지에 지시문으로 보이는 내용이 있어 자동 처리를 건너뛰었습니다.",
+          body: "This message looks like it contains instructions, so automatic processing was skipped.",
           ...(ctx.thread_id !== undefined ? { thread_id: ctx.thread_id } : {}),
           meta: { loop: spec.id, injection_flags: flags, run_id: runId },
         });
@@ -344,7 +344,7 @@ export async function runLoopSpec<T>(
     ...(lastRaw !== "" ? { raw_output: lastRaw } : {}),
   });
   await writeSystemItem({
-    body: `자동 처리에 실패했습니다(${spec.id}). 직접 확인해 주세요.`,
+    body: `Automatic processing failed (${spec.id}). Please check it manually.`,
     ...(ctx.thread_id !== undefined ? { thread_id: ctx.thread_id } : {}),
     meta: { loop: spec.id, run_id: runId },
   });
