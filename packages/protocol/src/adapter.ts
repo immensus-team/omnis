@@ -51,3 +51,57 @@ export const SessionId = z
   .string()
   .min(1)
   .transform((s) => s as SessionId);
+
+export const Capabilities = z.object({
+  read: z.boolean(),
+  write: z.boolean(),
+  realtime: z.boolean(),
+  history: z.boolean(),
+  media: z.boolean(),
+  markRead: z.boolean(),
+  typing: z.boolean(),
+  archive: z.boolean(),
+  delete: z.boolean(),
+});
+export type Capabilities = z.infer<typeof Capabilities>;
+
+export const ParticipantRef = z.object({
+  externalId: z.string(),
+  displayName: z.string(),
+  personId: z.string().uuid().optional(),
+});
+export type ParticipantRef = z.infer<typeof ParticipantRef>;
+
+export const NormalizedThread = z.object({
+  externalId: z.string(),
+  kind: ThreadKind,
+  title: z.string().nullable(),
+  participants: z.array(ParticipantRef),
+  lastItemAt: z.string().datetime(),
+  archivedAt: z.string().datetime().nullable(),
+});
+export type NormalizedThread = z.infer<typeof NormalizedThread>;
+
+export const Attachment = z.object({
+  kind: z.enum(["image", "file", "audio", "video", "link"]),
+  url: z.string().optional(),
+  mimeType: z.string().optional(),
+  sizeBytes: z.number().int().optional(),
+  caption: z.string().optional(),
+});
+export type Attachment = z.infer<typeof Attachment>;
+
+export const NormalizedItem = z.object({
+  threadExternalId: z.string(),
+  externalId: z.string(),
+  kind: ItemKind,
+  author: z.object({ kind: z.enum(["person", "agent", "system"]), id: z.string() }),
+  body: z.string(),
+  bodyHtml: z.string().optional(),
+  attachments: z.array(Attachment),
+  sentAt: z.string().datetime(),
+  status: z.literal("received"),
+  sourceHash: z.string(),
+  threadMeta: NormalizedThread.optional(),
+});
+export type NormalizedItem = z.infer<typeof NormalizedItem>;
