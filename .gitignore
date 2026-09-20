@@ -14,6 +14,9 @@ coverage/
 .turbo/
 apps/desktop/src-tauri/gen/
 tools/spikes/**/out/
+tools/spikes/**/node_modules
+tools/e2e/.env
+tools/e2e/test-results
 # OMC 오케스트레이션 상태·태스크 파일 — 리포 내용이 아니다(워크트리마다 churn).
 .omc/
 .omnis-task.md

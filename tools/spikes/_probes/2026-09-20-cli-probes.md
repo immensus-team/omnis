@@ -108,3 +108,14 @@ Pass criteria (A6 §11.1): 1,000 sentences ≤ 120 s → **9.1 s PASS**; single-
 - `codex app-server generate-json-schema --out tools/spikes/_probes/codex-schema` (codex 0.155.1) produced 39 schema files. Method/notification names confirmed present in the schema: `initialize`, `thread/start`, `thread/resume`, `turn/start`, `turn/interrupt`, `item/started`, `item/completed`, `turn/completed`. The 1-turn round trip (gate ⑦ proper) is still to be run by the spike task; the vendored schema is the pin source for `packages/protocol`.
 - worktrunk `wt v0.78.0` requires Git ≥ 2.43. Apple's `/usr/bin/git` is 2.39.5 → installed Homebrew git; `/opt/homebrew/bin` must precede `/usr/bin` in PATH for `wt` (and for the ralph loop). Dry-run result recorded below.
 - Gate ⑭ dry run with Homebrew git 2.55.0: `wt switch --create spike/wt-dryrun -y --no-cd` created branch + worktree at `~/AI-Workspaces/omnis.spike-wt-dryrun` (sibling-directory layout is worktrunk's default); `wt remove spike/wt-dryrun -y` removed both worktree and branch. **PASS.** Decision: adopt the sibling layout `~/AI-Workspaces/omnis.<branch>` instead of the contract's `omnis/.worktrees/<story-id>`; the contract §9 line is updated to this.
+
+## Cleanup — dead spike databases dropped, 2026-09-20 (T3)
+
+`omnis_spike_zero` and `omnis_spike_zero13` (gate ⑥ / ⑬ scratch DBs) were left behind on local Postgres after those spikes closed. No active replication slots referenced either (`pg_replication_slots` checked first). Dropped:
+
+```
+dropdb -h 127.0.0.1 -U logankim omnis_spike_zero
+dropdb -h 127.0.0.1 -U logankim omnis_spike_zero13
+```
+
+Remaining `omnis*` databases: `omnis_dev`, `omnis_test` (plus per-chain `omnis_test_<slug>` created and dropped by the pipeline).

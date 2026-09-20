@@ -1,7 +1,7 @@
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { pickSensitivity, sensitivityFor } from "../src/sensitivity.js";
-import type { ItemRow } from "../src/types.js";
+import { pickSensitivity, sensitivityFor } from "../../src/sensitivity.js";
+import type { ItemRow } from "../../src/types.js";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL ?? "postgres://logan@127.0.0.1:5432/omnis_test",
@@ -123,7 +123,7 @@ describe("sensitivityFor", () => {
 
 describe("classify + sensitivity", () => {
   it("carries the VIP promotion through the T0 rule path", async () => {
-    const { classify, configureAgents } = await import("../src/index.js");
+    const { classify, configureAgents } = await import("../../src/index.js");
     configureAgents({ pool });
     await pool.query("UPDATE threads SET scope = 'work' WHERE id = $1", [threadId]);
     const it0 = item({ id: "00000000-0000-0000-0000-0000000000d9", author_person_id: vipId });
