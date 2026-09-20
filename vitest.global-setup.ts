@@ -10,6 +10,11 @@ export default async function setup(): Promise<void> {
   }
   process.env.DATABASE_URL = url;
 
+  // US-A21b: zero-cache가 이 DB를 논리 복제 중이면 DROP SCHEMA가 복제본을 깨뜨린다
+  // (ops/zero-cache.env.example의 1회성 기동 재현 절차가 정확히 이 상황이다).
+  // 그 패스에서는 이미 migrate된 DB를 그대로 쓴다.
+  if (process.env.OMNIS_KEEP_TEST_DB === "1") return;
+
   // ponytail: root has no `pg` devDependency (pnpm strict isolation), so a static
   // `import { Client } from "pg"` at this file's top level fails to resolve when vitest
   // loads this as globalSetup from the repo root. `@omnis/db` (packages/db) already

@@ -4,6 +4,10 @@ export interface HubConfig {
   version: string;
   /** Keychain omnis.bridge.token.<host>의 값을 A6 래퍼가 주입한다. 빈 문자열이면 WS /bridge를 닫는다. */
   bridgeToken: string;
+  /** Zero 토큰의 `sub`. permissions가 이 값과 비교한다(packages/kernel/src/zero-schema.ts). */
+  userId: string;
+  /** zero-cache의 ZERO_AUTH_SECRET과 같은 값. 비어 있으면 /api/zero-token이 503이다. */
+  zeroAuthSecret: string;
 }
 
 export const HUB_VERSION = "0.1.0";
@@ -26,5 +30,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): HubConfig {
     host: "127.0.0.1",
     version: HUB_VERSION,
     bridgeToken: env.OMNIS_BRIDGE_TOKEN ?? "",
+    userId: env.OMNIS_USER_ID ?? "logan",
+    zeroAuthSecret: env.ZERO_AUTH_SECRET ?? "",
   };
 }

@@ -3,6 +3,7 @@ import {
   ZERO_ITEM_COLUMNS,
   ZERO_LABEL_RULE_COLUMNS,
   ZERO_TABLES,
+  permissions,
   zeroSchema,
 } from "../src/zero-schema.js";
 
@@ -66,5 +67,22 @@ describe("zeroSchema", () => {
 
   it("drops the generated attendees_count from calendar_events", () => {
     expect(Object.keys(zeroSchema.tables.calendar_events.columns)).not.toContain("attendees_count");
+  });
+});
+
+// US-A21b: permissions가 없으면 zero-cache는 "no tables will be syncable"로 돌아 한 행도 안 보낸다.
+describe("zero permissions (US-A21b)", () => {
+  it("grants select on every replicated table and no writes at all", async () => {
+    const compiled = await permissions;
+    expect(compiled).toBeDefined();
+    const tables = compiled?.tables ?? {};
+    expect(Object.keys(tables).sort()).toEqual([...EXPECTED_TABLES].sort());
+    for (const [name, perms] of Object.entries(tables)) {
+      expect(perms.row?.select, `${name} select`).toBeDefined();
+      expect(perms.row?.insert, `${name} insert`).toBeUndefined();
+      expect(perms.row?.update?.preMutation, `${name} update`).toBeUndefined();
+      expect(perms.row?.update?.postMutation, `${name} update`).toBeUndefined();
+      expect(perms.row?.delete, `${name} delete`).toBeUndefined();
+    }
   });
 });

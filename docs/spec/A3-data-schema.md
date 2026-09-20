@@ -821,6 +821,25 @@ CREATE PUBLICATION zero_omnis FOR TABLE
 
 WAL 안전장치(`27`): GUC `idle_replication_slot_timeout`의 **오너는 A6**다(`postgresql.conf` 소관, 99-review §1.2). A3는 값을 정하지 않고 인용만 한다 — **A6-D4의 `'3d'`**. `slot_health` 잡이 5분마다 `pg_replication_slots.active`와 `pg_wal` 크기를 확인해 임계치 초과 시 ntfy로 알린다. 기본값 0(비활성)이면 zero-cache가 죽었을 때 WAL이 디스크를 채운다.
 
+**Zero auth (US-A21b, 2026-09-20 구현 확정)**
+
+권한 규칙은 선언만으로는 효력이 없다. `zero-deploy-permissions`로 upstream에 배포해야 하고,
+배포된 게 없으면 zero-cache는 "no tables will be syncable"로 떠서 **쿼리는 resolve되는데 행이
+0개**다(US-A22가 본 증상). 그래서 순서는 `pnpm db:migrate` → `pnpm zero:deploy-permissions` →
+zero-cache 기동이고, 스키마나 `OMNIS_USER_ID`가 바뀌면 다시 배포한다.
+
+인증은 단일 유저 허브에 맞춘 대칭키 HS256이다:
+
+- 허브 `GET /api/zero-token` → `{ sub: OMNIS_USER_ID(기본 `logan`), exp: now+7d }`를
+  `ZERO_AUTH_SECRET`으로 서명해 돌려준다. 다른 허브 라우트와 같은 경계(127.0.0.1 bind)이고
+  비밀이 비어 있으면 503이다.
+- zero-cache는 같은 `ZERO_AUTH_SECRET`으로 검증한다. **JWT `sub`와 Zero 클라이언트의 `userID`가
+  다르면 토큰 자체를 거부한다**(`JWTClaimValidationFailed: unexpected "sub" claim value`) —
+  데스크톱은 토큰의 `sub`를 그대로 `userID`로 쓴다.
+- 데스크톱은 부팅 때(`main.tsx`) 토큰을 받아 `Zero` 생성자에 넣는다. 나중-인증 경로
+  (`connection.connect({auth})`)는 이미 하이드레이션된 쿼리를 다시 태우지 않아 첫 화면이 빈 채로
+  남는다(2026-09-20 확인).
+
 **클라이언트 권한 규칙 개요** (Zero permission DSL, TS 쪽 스키마 파일에 선언):
 
 - 모든 테이블 read: 허용(단일 유저 = 단일 tenant).
@@ -830,6 +849,11 @@ WAL 안전장치(`27`): GUC `idle_replication_slot_timeout`의 **오너는 A6**�
 - `label_rules`: `prompt`, `active`, `pinned_by_user`만 쓰기 허용(`rule`/`probe_embedding` 재컴파일은 서버).
 - `accounts`, `agent_runtimes`, `agent_sessions`, `digests`, `calendar_events`: read-only.
 - 쓰기 금지 위반은 Zero가 서버에서 reject하고 클라이언트 낙관적 업데이트가 롤백된다(서버-authoritative, `13`).
+
+> **Phase A 편차(US-A21b)**: 위 쓰기 규칙 목록은 Phase B 이후의 목표다. Phase A 데스크톱은 읽기
+> 전용이고 쓰기는 전부 허브 HTTP를 거치므로(계약 §5), 실제로 선언한 것은 **모든 복제 테이블의
+> `row.select` 하나뿐**이다 — `insert`/`update`/`delete`는 아예 주지 않아 Zero가 서버에서
+> 거부한다. 셀 단위 쓰기 규칙은 커스텀 뮤테이터를 도입할 때 같이 쓴다.
 
 ---
 

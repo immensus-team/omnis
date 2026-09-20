@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { type IncomingMessage, type Server, type ServerResponse, createServer } from "node:http";
 import type { Duplex } from "node:stream";
 import { query } from "@omnis/db";
@@ -14,6 +15,16 @@ const APPROVAL_STATES = [
   "expired",
 ] as const;
 const MAX_BODY_BYTES = 64 * 1024;
+const ZERO_TOKEN_TTL_SEC = 7 * 24 * 60 * 60;
+
+// US-A21b: HS256 한 줄짜리라 jose를 새로 끌어오지 않는다. 서명 대상은 허브가 방금 만든
+// 헤더/페이로드뿐이고 검증은 zero-cache가 한다 — 여기서 남의 토큰을 파싱할 일은 없다.
+const b64url = (v: object): string => Buffer.from(JSON.stringify(v)).toString("base64url");
+
+function signZeroToken(sub: string, secret: string, nowSec: number): string {
+  const body = `${b64url({ alg: "HS256", typ: "JWT" })}.${b64url({ sub, exp: nowSec + ZERO_TOKEN_TTL_SEC })}`;
+  return `${body}.${createHmac("sha256", secret).update(body).digest("base64url")}`;
+}
 
 export interface HubServerDeps {
   kernel: Kernel;
@@ -118,6 +129,19 @@ export function createHubServer(deps: HubServerDeps): Server {
         return send(res, 400, { error: e instanceof Error ? e.message : "bad request" });
       }
       return send(res, 200, { id, state: "decided" });
+    }
+
+    // 데스크톱이 zero-cache에 붙을 때 쓰는 토큰. 다른 허브 라우트와 같은 경계(127.0.0.1 bind)다.
+    if (path === "/api/zero-token") {
+      if (method !== "GET") return send(res, 405, { error: "method not allowed" });
+      if (config.zeroAuthSecret === "") {
+        return send(res, 503, { error: "ZERO_AUTH_SECRET is not configured" });
+      }
+      const nowSec = Math.floor(Date.now() / 1000);
+      return send(res, 200, {
+        token: signZeroToken(config.userId, config.zeroAuthSecret, nowSec),
+        expiresAt: (nowSec + ZERO_TOKEN_TTL_SEC) * 1000,
+      });
     }
 
     if (path === "/kill-switch") {
