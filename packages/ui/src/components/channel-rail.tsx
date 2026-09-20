@@ -3,6 +3,7 @@ import { cn } from "../lib/cn.js";
 import { CHANNEL_LABEL } from "../lib/row-meta.js";
 import type { UiChannel } from "../types.js";
 import { ChannelGlyph } from "./channel-glyph.js";
+import { GlassSurface } from "./glass-surface.js";
 
 // U2: 브랜드 아이콘 맵(CHANNEL_ICON)과 한글 라벨(CHANNEL_LABEL)은 이제 lib/row-meta.ts 공용이다
 // (inbox-row.tsx도 U2에서 같은 아이콘이 필요해져 여기 두면 순환 import가 생긴다). U5: 실제 색은
@@ -33,7 +34,10 @@ export function ChannelRail({ channels, selected, onSelect }: ChannelRailProps) 
       >
         <InboxGlyph size={18} aria-hidden="true" />
       </button>
-      <div className="channel-rail__plate">
+      {/* US-D01: 플레이트는 불투명 흰색이었고, 그래서 "캔버스 위에 얹힌 판"으로만 읽혔다.
+          이제 진짜 유리다(blur + saturate + 틴트 + 안쪽 하이라이트 + 소프트 섀도 = .glass-surface).
+          안쪽 타일은 그대로 위에 남는다 — 유리 위에서도 브랜드 색 아이콘은 읽힌다. */}
+      <GlassSurface slot="sidebar" className="channel-rail__plate">
         {tiles.map((channel) => (
           <button
             key={channel}
@@ -54,7 +58,7 @@ export function ChannelRail({ channels, selected, onSelect }: ChannelRailProps) 
         <button type="button" className="channel-rail__more" aria-label="더 보기">
           <ChevronDown size={16} aria-hidden="true" />
         </button>
-      </div>
+      </GlassSurface>
       <div className="channel-rail__spacer" />
       {/* ponytail: 아바타는 아직 프로필 화면이 없어 장식용 자리표시자. Settings 화면이 생기면 둘 다 연결. */}
       <button type="button" className="channel-rail__tile channel-rail__avatar" aria-label="계정">

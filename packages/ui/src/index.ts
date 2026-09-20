@@ -5,6 +5,8 @@ export * from "./types.js";
 export * from "./components/status-badge.js";
 export * from "./components/draft-card.js";
 export * from "./components/command-palette.js";
+export * from "./components/ask-panel.js";
+export * from "./lib/ask-model.js";
 export * from "./components/approval-card.js";
 export * from "./components/tool-call-badge.js";
 export * from "./components/channel-rail.js";

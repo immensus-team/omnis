@@ -47,14 +47,24 @@ export function App() {
 function Shell() {
   const zero = useZeroClient();
   const [open, setOpen] = useState<OpenTarget | null>(null);
-  const [paletteOpen, setPaletteOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
   const [railChannel, setRailChannel] = useState<RailSelection>(null);
-  useCommandPaletteKey(() => setPaletteOpen((v) => !v));
+  // US-D01 결정: ⌘K는 별도 모달 팔레트가 아니라 ask 바의 플로팅 AI 패널을 연다. 같은 액션 목록을
+  // 두 표면(모달 + 패널)에 각각 띄우면 어느 쪽이 진짜인지 알 수 없다 — 하나로 모은다.
+  // CommandPalette mode="dialog" 자체는 @omnis/ui에 남아 있고 테스트도 그대로다(셸이 안 쓴다).
+  useCommandPaletteKey(() => setAskOpen((v) => !v));
 
   // 승인은 Zero로 읽고(읽기 전용 경로) 결정만 허브 HTTP로 보낸다 — 계약 §5.
   const [approvals] = useQuery(zero.query.pending_approvals.where("state", "=", "pending"));
   const [accounts] = useQuery(zero.query.accounts);
+
+  // US-D01: 선택된 스레드의 AI 요약(threads.meta.summary — T1 요약 루프가 채운다, packages/agents).
+  // 새 백엔드 호출이 필요 없다: Thread.tsx가 archived_at을 읽는 것과 같은 쿼리 모양이다.
+  // 선택이 없으면 빈 문자열로 질의한다(빈 결과) — 훅 개수를 조건부로 바꿀 수 없어서다.
+  const [selectedThreadRows] = useQuery(zero.query.threads.where("id", "=", open?.threadId ?? ""));
+  const selectedThreadSummary =
+    (selectedThreadRows as unknown as { meta?: { summary?: string } | null }[])[0]?.meta?.summary ??
+    null;
 
   // U1 채널 레일: 연결된 계정의 채널을 중복 없이, 처음 등장한 순서대로.
   const connectedChannels = useMemo(() => {
@@ -94,7 +104,14 @@ function Shell() {
     >
       <ChannelRail channels={connectedChannels} selected={railChannel} onSelect={setRailChannel} />
       <div className="app-shell__main">
-        <CommandPalette mode="inline" open={askOpen} onOpenChange={setAskOpen} actions={actions} />
+        <CommandPalette
+          mode="inline"
+          open={askOpen}
+          onOpenChange={setAskOpen}
+          actions={actions}
+          threadSelected={open !== null}
+          threadSummary={selectedThreadSummary}
+        />
         <Inbox onOpen={setOpen} channelFilter={railChannel} />
       </div>
       {detail && (
@@ -109,7 +126,6 @@ function Shell() {
           )}
         </section>
       )}
-      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} actions={actions} />
     </main>
   );
 }
