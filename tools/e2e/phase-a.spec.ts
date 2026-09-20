@@ -213,6 +213,14 @@ test("Phase A seeded smoke", async ({ page }) => {
   await shot(page, "04-agent-session.png");
 
   await check("A7 Approval card shows the pending approval", async () => {
+    // US-D03 scopes the pane's approval stack to the open thread, and A6 left an agent session
+    // open — a thread of its own, with no approval of its own, so its pane draws no card. That is
+    // the shipped behaviour, asserted in approval-stack.test.tsx ("draws nothing for an open
+    // thread that has no approval of its own"); this check was written before the scoping and had
+    // been waiting on a card the design no longer draws there. The seeded approval lives on the
+    // thread it was proposed against, so put that thread back in front of the pane first. The
+    // assertion below is unchanged.
+    await rows.filter({ hasText: "#omnis-launch" }).first().click();
     await expect(page.locator(".approval-card").first()).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("Reply to #omnis-launch?")).toBeVisible();
     const pending = await hubApprovals("pending");
@@ -302,7 +310,11 @@ test("Phase A seeded smoke", async ({ page }) => {
       await pool.end();
     }
     const ingestedAt = Date.now();
-    await expect(page.getByText(marker)).toBeVisible({ timeout: 20_000 });
+    // The marker is a message in the first Slack thread (seed.ts ingestOneMore), which is the thread
+    // A7 now leaves open, so the text is in the DOM twice — the row's summary and the pane's message
+    // body — and a page-wide getByText is ambiguous. This check is about the inbox list reaching the
+    // new item, so it reads the row.
+    await expect(rows.filter({ hasText: marker })).toBeVisible({ timeout: 20_000 });
     const ms = Date.now() - ingestedAt;
     expect(ms).toBeLessThanOrEqual(2000);
     return `${ms}ms ingest → on screen (target ≤2000ms)`;
