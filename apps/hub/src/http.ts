@@ -3,10 +3,12 @@ import { type IncomingMessage, type Server, type ServerResponse, createServer } 
 import type { Duplex } from "node:stream";
 import { query } from "@omnis/db";
 import { ApprovalStateError, type Kernel, type Logger, killSwitchStatus } from "@omnis/kernel";
+import { searchMemories } from "@omnis/memory";
 import type { Adapter } from "@omnis/protocol";
 import type { Pool } from "pg";
 import { setThreadArchived } from "./archive.js";
 import type { HubConfig } from "./config.js";
+import { createSearchDeps, runSearch } from "./search.js";
 
 const APPROVAL_STATES = [
   "pending",
@@ -63,6 +65,7 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
 
 export function createHubServer(deps: HubServerDeps): Server {
   const { kernel, pool, config, logger, startedAt } = deps;
+  const searchDeps = createSearchDeps(pool);
 
   const server = createServer((req, res) => {
     void handle(req, res).catch((e: unknown) => {
@@ -188,7 +191,28 @@ export function createHubServer(deps: HubServerDeps): Server {
       return send(res, 405, { error: "method not allowed" });
     }
 
-    // /search, /memory/search, /transcript/:id는 다른 부록이 소유한다(계약 §5) — Phase A는 열지 않는다.
+    // US-B26 / A4 §14. Synchronous, no agent_runs row. `scope`/`since` are accepted but not
+    // applied yet — A4 §14.2's query table carries no filter for them (see search.ts).
+    if (path === "/search") {
+      if (method !== "GET") return send(res, 405, { error: "method not allowed" });
+      const q = url.searchParams.get("q");
+      if (q === null || q.trim() === "") return send(res, 400, { error: "q is required" });
+      const kParam = url.searchParams.get("k");
+      const k = kParam === null ? undefined : Number(kParam);
+      if (k !== undefined && (!Number.isInteger(k) || k < 1)) {
+        return send(res, 400, { error: "bad k" });
+      }
+      return send(res, 200, await runSearch(searchDeps, { q, ...(k === undefined ? {} : { k }) }));
+    }
+
+    if (path === "/memory/search") {
+      if (method !== "GET") return send(res, 405, { error: "method not allowed" });
+      const q = url.searchParams.get("q");
+      if (q === null || q.trim() === "") return send(res, 400, { error: "q is required" });
+      return send(res, 200, { results: await searchMemories(pool, { query: q }) });
+    }
+
+    // /transcript/:id is owned by another appendix (interfaces contract §5).
     return send(res, 404, { error: "not found" });
   }
 

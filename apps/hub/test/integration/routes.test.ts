@@ -150,7 +150,7 @@ describe("kill switch routes", () => {
 
 describe("unknown routes", () => {
   it("404s the paths other appendices own and anything else", async () => {
-    for (const p of ["/search", "/memory/search", "/transcript/abc", "/nope"]) {
+    for (const p of ["/transcript/abc", "/nope"]) {
       expect((await fetch(`${base}${p}`)).status).toBe(404);
     }
   });
@@ -185,5 +185,50 @@ describe("GET /api/zero-token (US-A21b)", () => {
 
   it("405s a non-GET", async () => {
     expect((await fetch(`${base}/api/zero-token`, { method: "POST" })).status).toBe(405);
+  });
+});
+
+// US-B26 (A4 §14). The ranking math is unit-tested in src/search.test.ts; this covers the
+// HTTP contract and the real SQL fan-out against an empty database.
+describe("GET /search", () => {
+  it("returns the four groups in the fixed order", async () => {
+    const res = await fetch(`${base}/search?q=contract`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      q: string;
+      took_ms: number;
+      truncated: boolean;
+      groups: { kind: string; total: number; results: unknown[] }[];
+    };
+    expect(body.q).toBe("contract");
+    expect(body.groups.map((g) => g.kind)).toEqual(["people", "threads", "items", "memories"]);
+    expect(body.truncated).toBe(false);
+    expect(typeof body.took_ms).toBe("number");
+  });
+
+  it("400s a missing or blank q", async () => {
+    expect((await fetch(`${base}/search`)).status).toBe(400);
+    expect((await fetch(`${base}/search?q=%20`)).status).toBe(400);
+  });
+
+  it("400s a non-positive-integer k", async () => {
+    expect((await fetch(`${base}/search?q=x&k=0`)).status).toBe(400);
+    expect((await fetch(`${base}/search?q=x&k=abc`)).status).toBe(400);
+  });
+
+  it("405s a non-GET", async () => {
+    expect((await fetch(`${base}/search?q=x`, { method: "POST" })).status).toBe(405);
+  });
+});
+
+describe("GET /memory/search", () => {
+  it("returns the raw memory hits", async () => {
+    const res = await fetch(`${base}/memory/search?q=contract`);
+    expect(res.status).toBe(200);
+    expect((await res.json()) as { results: unknown[] }).toEqual({ results: [] });
+  });
+
+  it("400s a missing q", async () => {
+    expect((await fetch(`${base}/memory/search`)).status).toBe(400);
   });
 });
