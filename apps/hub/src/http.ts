@@ -2,11 +2,21 @@ import { createHmac } from "node:crypto";
 import { type IncomingMessage, type Server, type ServerResponse, createServer } from "node:http";
 import type { Duplex } from "node:stream";
 import { query } from "@omnis/db";
-import { ApprovalStateError, type Kernel, type Logger, killSwitchStatus } from "@omnis/kernel";
+import {
+  ApprovalStateError,
+  type Kernel,
+  type Logger,
+  currentPolicy,
+  getAllSettings,
+  getSetting,
+  killSwitchStatus,
+  setSetting,
+} from "@omnis/kernel";
 import type { Adapter } from "@omnis/protocol";
 import type { Pool } from "pg";
 import { setThreadArchived } from "./archive.js";
 import type { HubConfig } from "./config.js";
+import { isValidSettingKey } from "./settings.js";
 
 const APPROVAL_STATES = [
   "pending",
@@ -186,6 +196,41 @@ export function createHubServer(deps: HubServerDeps): Server {
         return send(res, 200, { on: status.on, since: status.since });
       }
       return send(res, 405, { error: "method not allowed" });
+    }
+
+    // Delta §7 (US-B33): Settings screen reads, settings write, and the cost banner.
+    if (path === "/settings") {
+      if (method !== "GET") return send(res, 405, { error: "method not allowed" });
+      return send(res, 200, { settings: await getAllSettings(pool) });
+    }
+
+    const putSetting = /^\/settings\/([a-z0-9_.]+)$/.exec(path);
+    if (putSetting !== null) {
+      if (method !== "PUT") return send(res, 405, { error: "method not allowed" });
+      const key = putSetting[1];
+      if (key === undefined) return send(res, 400, { error: "bad key" });
+      // Unknown key is checked before the body so a typo costs no read and no write.
+      if (!isValidSettingKey(key)) return send(res, 404, { error: "unknown setting" });
+      let body: unknown;
+      try {
+        body = await readJson(req);
+      } catch {
+        return send(res, 400, { error: "invalid json body" });
+      }
+      if (typeof body !== "object" || body === null || !("value" in body)) {
+        return send(res, 400, { error: "expected { value: unknown }" });
+      }
+      // Single-user repo: the actor is hardcoded until there is a real session to read it from.
+      await setSetting(pool, key, body.value, "me");
+      return send(res, 200, { key, value: body.value });
+    }
+
+    if (path === "/cost") {
+      if (method !== "GET") return send(res, 405, { error: "method not allowed" });
+      const { state, policy, mtdUsd, reserveUsd } = await currentPolicy(pool);
+      // currentPolicy reads the cap internally but does not report it; the banner needs it.
+      const capUsd = await getSetting(pool, "cost.cap_usd", 60);
+      return send(res, 200, { state, mtdUsd, capUsd, reserveUsd, policy });
     }
 
     // /search, /memory/search, /transcript/:id는 다른 부록이 소유한다(계약 §5) — Phase A는 열지 않는다.
