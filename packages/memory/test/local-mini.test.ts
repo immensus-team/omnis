@@ -116,17 +116,27 @@ describe("createLocalMiniProvider", () => {
   });
 });
 
+/** macOS의 fs.watch(recursive)는 FSEvents 스트림을 비동기로 무장하고, 스트림 시작 이전의
+ *  이벤트는 재생하지 않는다. 한 번만 쓰면 그 쓰기가 통째로 유실될 수 있으므로 워처가
+ *  보고할 때까지 다시 쓴다. */
+async function writeUntilSeen(path: string, body: string, seen: () => boolean): Promise<void> {
+  const deadline = Date.now() + 3000;
+  while (!seen() && Date.now() < deadline) {
+    await writeFile(path, body);
+    for (let i = 0; i < 10 && !seen(); i += 1) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  }
+}
+
 describe("watchLocalRoots", () => {
   it("reports a changed file and stops reporting after the returned unsubscribe", async () => {
     const seen: string[] = [];
     const stop = watchLocalRoots({ roots: [root], logger, onChange: (p) => seen.push(p) });
     try {
-      await writeFile(join(root, "watched.md"), "새 파일");
-      const deadline = Date.now() + 3000;
-      while (seen.length === 0 && Date.now() < deadline) {
-        await new Promise((r) => setTimeout(r, 50));
-      }
-      expect(seen.some((p) => p.endsWith("watched.md"))).toBe(true);
+      const sawWatched = (): boolean => seen.some((p) => p.endsWith("watched.md"));
+      await writeUntilSeen(join(root, "watched.md"), "새 파일", sawWatched);
+      expect(sawWatched()).toBe(true);
     } finally {
       stop();
     }
@@ -140,6 +150,11 @@ describe("watchLocalRoots", () => {
     const seen: string[] = [];
     const stop = watchLocalRoots({ roots: [root], logger, onChange: (p) => seen.push(p) });
     try {
+      // 워처가 실제로 무장한 뒤에 .env를 쓴다 — 그러지 않으면 이 테스트는 공허하게 통과한다.
+      const sawOk = (): boolean => seen.some((p) => p.endsWith("ok.md"));
+      await writeUntilSeen(join(root, "ok.md"), "괜찮음", sawOk);
+      expect(sawOk()).toBe(true);
+
       await writeFile(join(root, ".env"), "SECRET=1");
       await new Promise((r) => setTimeout(r, 500));
       expect(seen.filter((p) => p.endsWith(".env"))).toEqual([]);
