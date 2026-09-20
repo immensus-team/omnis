@@ -1,11 +1,21 @@
-# Gate: <gate-name>
+# Gate ⑬: Zero의 vector/tsvector/uuid[]/generated 컬럼 복제
 
-- **질문**: <이 스파이크가 답하는 한 문장 질문>
-- **소유 부록**: <A6 | A1 | A2 | A3 | A7>
-- **Owner**: <agent | Logan>
-- **Host**: <macbook | mini>
-- **실행일**: 
-- **결과(Pass/Fail)**: 
-- **측정치/근거**: 
-- **decided_by**: 
-- **비고**: 
+- **질문**: Zero가 `vector`, `tsvector`(generated), `uuid[]` 컬럼이 섞인 테이블을 publication에 넣었을 때 정상 복제하고 클라이언트에서 쿼리할 수 있는가 — 안 되면 `items.search_tsv`를 어떻게 빼야 하는가.
+- **소유 부록**: A3 (§7, §14 S-A3-2·S-A3-6)
+- **Owner**: agent(unattended)
+- **Host**: macbook (M5 Max, 로컬 Homebrew postgresql@17 + zero-cache-dev, 이 스파이크 전용 스크래치 DB/replica — `wal_level=logical`은 gate-06이 이미 영구 변경해 둔 상태를 그대로 재사용, 이번 태스크에서 추가로 바꾼 Postgres 설정 없음)
+- **실행일**: 2026-09-20
+- **결과(Pass/Fail)**: **PASS**
+- **측정치/근거**:
+  - `npx tsx measure.ts` → `thread: {"id":"...","participants":["<uuid>","<uuid>"]}`, `items: [{"id":"...","threadId":"...","body":"hello from gate 13"}]`, `gate13_pass=true`, exit 0. `uuid[]`가 JS 배열(길이 2)로 정상 복제·쿼리됨.
+  - `probe_items (id, thread_id, body)` 컬럼 리스트로 publication을 만들고 `psql`로 `SELECT attnames FROM pg_publication_tables`를 직접 확인 → `{id,thread_id,body}`(embedding 제외 확인됨).
+  - `search_tsv`(generated tsvector)는 스키마·로그·publication 어디에도 전혀 등장하지 않음 — Postgres 논리 복제가 generated 컬럼을 애초에 절대 publish하지 않기 때문(publication 컬럼 리스트 문법과 무관한 Postgres 자체 규칙). `search_tsv`를 빼기 위해 컬럼 리스트나 별도 테이블 정규화가 필요 없다는 뜻 — S-A3-2의 fail 규칙("별도 테이블로 분리")은 이 스파이크 결과로는 불필요.
+  - `embedding vector(768)`: zero-cache가 시작 시 `WARNING: zero does not yet support the "vector" data type. The "probe_items"."embedding" column will not be synced to clients.`를 찍고, 클라이언트 스키마(`schema.ts`)에 `embedding`을 아예 선언하지 않았으므로 `z.query.probe_items`에는 등장하지 않음(쿼리 결과에 `embedding` 키 없음, 위 측정치 참고) — 타입 자체가 zero-cache 1.9.0에서 미지원이라 클라이언트로는 절대 넘어가지 않는다.
+- **decided_by**: agent
+- **비고**:
+  - **계획서 원문 대비 가장 중요한 발견(publication 컬럼 리스트는 초기 스냅샷 복제를 막지 않는다)**: `CREATE PUBLICATION ... FOR TABLE probe_items (id, thread_id, body)`로 `embedding`을 publication에서 뺐음에도, zero-cache 부팅 로그에 `Starting binary copy stream of probe_items: SELECT "body","embedding"::text,"id","thread_id" FROM "public"."probe_items"`가 찍혔다 — zero-cache는 초기 풀 스냅샷을 publication 경유가 아니라 업스트림 테이블에 직접 SELECT를 날려 가져오고, 그 SELECT는 publication의 컬럼 제한을 받지 않는다(제네릭 SQL 쿼리라 테이블 전체 컬럼이 보임). 실제로 `embedding`이 클라이언트에 안 보이는 건 publication 컬럼 리스트 덕분이 아니라 **zero-cache가 `vector` 타입 자체를 지원하지 않아서**다(위 WARNING). 즉 컬럼 리스트로 타입 지원 컬럼(예: `text`, `json` 등)을 뺄 계획이라면 초기 동기화 시점에는 걸러지지 않는다는 뜻이고, 이후 논리 복제(WAL 스트림)에서는 publication 컬럼 리스트가 적용될 것으로 보이나(Postgres 표준 동작) 이 스파이크는 INSERT만 시험했고 UPDATE-후-스트리밍 경로는 확인하지 않았다 — Phase A에서 `items` 테이블에 실제로 타입 지원되는 민감 컬럼을 컬럼 리스트로 빼려는 설계가 나오면 이 갭을 재확인해야 한다(A3 §7 스코프 밖, 이 태스크는 vector/tsvector/uuid[] 3종만 시험하면 된다는 계획 범위를 지켰다).
+  - `pg_publication_tables.attnames`로 직접 확인해 `probe_items`가 정확히 `{id,thread_id,body}`만 publish함을 검증(계획서에 없던 확인 단계, 위 발견의 근거).
+  - gate-06의 3가지 API 드리프트 재확인·재사용: `enableLegacyQueries: true` 없이는 `z.query`가 `undefined`, `definePermissions` 없이는 전 쿼리가 조용히 0 rows, 쿼리 키는 `table()`에 준 실제 테이블명(`probe_items`/`probe_threads`) 문자열. 추가로 이번에 발견: Postgres 컬럼명이 camelCase가 아니면(`thread_id`) Zero 스키마 쪽에서 `.from("thread_id")`로 명시 매핑해야 클라이언트 필드(`threadId`)가 채워진다(gate-06의 `createdAt.from("created_at")`와 동일 패턴, 이번엔 FK 컬럼에도 적용됨을 확인).
+  - `zero-deploy-permissions`가 시작 로그에 `Permissions are deprecated and will be removed in an upcoming release`를 출력함(1.9.0 자체 경고, 이 스파이크가 만든 문제 아님) — `definePermissions`는 현재로선 여전히 필수(빼면 0 rows, gate-06 재확인)이므로 이 스파이크에서는 그대로 사용.
+  - `tools/spikes/gate-13-zero-column-types/`는 자체 `package.json`(`pnpm install --ignore-workspace`)과 자체 `pnpm-lock.yaml`을 가지며 루트 워크스페이스 글롭 밖(Global Constraints "빌드 그래프 밖" 충족). `zero-cache-dev` 프로세스는 측정 후 종료(포트 4848 미사용 상태로 복귀). replica 파일은 `/tmp/omnis-spike-zero13.db`(리포 밖).
+  - 재현: `omnis_spike_zero13` DB가 이미 있고 `wal_level=logical`이 이미 적용된 상태이므로, `cd tools/spikes/gate-13-zero-column-types && ZERO_UPSTREAM_DB=postgres://logankim@127.0.0.1:5432/omnis_spike_zero13 ZERO_CVR_DB=postgres://logankim@127.0.0.1:5432/omnis_spike_zero13 ZERO_REPLICA_FILE=/tmp/omnis-spike-zero13-<new>.db npx zero-cache-dev -p schema.ts &` 후 `npx tsx measure.ts`.
