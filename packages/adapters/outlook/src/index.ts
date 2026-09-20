@@ -1,6 +1,31 @@
-import { AdapterError, type Attachment, type NormalizedItem } from "@omnis/protocol";
+import {
+  type Adapter,
+  AdapterError,
+  type AdapterEvent,
+  type Attachment,
+  type AuthRef,
+  type Capabilities,
+  type Health,
+  type NormalizedItem,
+  type Outbound,
+  type SendResult,
+  type ThreadRef,
+} from "@omnis/protocol";
+import { readKeychainSecret } from "./keychain.js";
 
 export const CHANNEL = "outlook" as const;
+
+const CAPABILITIES: Capabilities = {
+  read: true,
+  write: true,
+  realtime: false, // delta 폴링이지 push가 아니다(A1 §2.4 "webhook 전 단계")
+  history: true,
+  media: true,
+  markRead: true,
+  typing: false,
+  archive: true,
+  delete: false,
+};
 
 interface GraphAddress {
   emailAddress?: { name?: string; address?: string };
@@ -101,4 +126,120 @@ export function mapApiError(cause: unknown): AdapterError {
       cause,
     );
   return new AdapterError("retryable_network", CHANNEL, "Graph API call failed", undefined, cause);
+}
+
+/** 이 어댑터가 실제로 부르는 부분집합만 duck-typing한다 — `@microsoft/microsoft-graph-client`의
+ *  `Client` 인스턴스가 구조적으로 이 인터페이스를 만족하므로 실제 SDK와 테스트 mock 둘 다 통과한다
+ *  (Gmail의 OAuth2Client 이중 타입 회피와 같은 이유, packages/adapters/gmail/src/index.ts 상단 주석 참고). */
+export interface GraphClientLike {
+  api(path: string): {
+    get(): Promise<Record<string, unknown>>;
+    patch(body: unknown): Promise<unknown>;
+    post(body: unknown): Promise<unknown>;
+  };
+}
+
+export async function refreshAccessToken(
+  clientId: string,
+  refreshToken: string,
+  fetchFn: typeof fetch,
+): Promise<{ accessToken: string; expiresIn: number }> {
+  const res = await fetchFn("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId,
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+      scope: "offline_access Mail.ReadWrite Mail.Send Calendars.ReadWrite",
+    }).toString(),
+  });
+  if (!res.ok) {
+    throw new AdapterError(
+      "auth_revoked",
+      CHANNEL,
+      `Outlook token refresh failed: ${res.status}`,
+      undefined,
+      await res.text().catch(() => undefined),
+    );
+  }
+  const body = (await res.json()) as { access_token: string; expires_in: number };
+  return { accessToken: body.access_token, expiresIn: body.expires_in };
+}
+
+export interface OutlookAdapterDeps {
+  oauthClientId: string;
+  graphClient?: GraphClientLike;
+  fetchFn?: typeof fetch;
+  pollIntervalMs?: number; // subscribe() delta 폴링 간격, 기본 5분(jobs.outlook_delta_poll 주기와 동일)
+  sink?: (thread: ThreadRef, draft: Outbound) => Promise<SendResult>;
+  now?: () => Date;
+}
+
+export function createOutlookAdapter(deps: OutlookAdapterDeps): Adapter {
+  const now = deps.now ?? ((): Date => new Date());
+  const fetchFn = deps.fetchFn ?? fetch;
+  let graphClient: GraphClientLike | undefined = deps.graphClient;
+  let status: Health["status"] = "down";
+  let lastEventAt: string | null = null;
+  let lastError: Health["lastError"];
+
+  return {
+    id: "outlook",
+    channel: CHANNEL,
+    capabilities: () => CAPABILITIES,
+
+    async connect(auth: AuthRef): Promise<void> {
+      const refreshToken = await readKeychainSecret(
+        auth.keychainService,
+        auth.keychainAccount,
+        CHANNEL,
+      );
+      try {
+        const { accessToken } = await refreshAccessToken(deps.oauthClientId, refreshToken, fetchFn);
+        if (deps.graphClient === undefined) {
+          const { Client } = await import("@microsoft/microsoft-graph-client");
+          graphClient = Client.init({
+            authProvider: (done) => done(null, accessToken),
+          }) as unknown as GraphClientLike;
+        }
+      } catch (cause) {
+        status = "down";
+        if (cause instanceof AdapterError) throw cause;
+        throw new AdapterError("auth_revoked", CHANNEL, "Outlook connect failed", undefined, cause);
+      }
+      status = "healthy";
+      lastEventAt = now().toISOString();
+    },
+
+    async disconnect(): Promise<void> {
+      status = "down";
+    },
+
+    backfill(): AsyncIterable<NormalizedItem> {
+      throw new AdapterError("fatal_unsupported", CHANNEL, "backfill not implemented until Task 4");
+    },
+
+    subscribe(): AsyncIterable<NormalizedItem | AdapterEvent> {
+      throw new AdapterError(
+        "fatal_unsupported",
+        CHANNEL,
+        "subscribe not implemented until Task 4",
+      );
+    },
+
+    async send(): Promise<never> {
+      throw new AdapterError("fatal_unsupported", CHANNEL, "send not implemented until Task 5");
+    },
+
+    async health(): Promise<Health> {
+      return {
+        channel: CHANNEL,
+        accountExternalId: "",
+        status,
+        lastEventAt,
+        ...(lastError ? { lastError } : {}),
+      };
+    },
+  };
 }
