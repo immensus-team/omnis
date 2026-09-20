@@ -45,6 +45,9 @@ importers:
       '@omnis/db':
         specifier: workspace:*
         version: link:../db
+      '@omnis/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       pg:
         specifier: 8.13.1
         version: 8.13.1
