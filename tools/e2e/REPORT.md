@@ -1,6 +1,6 @@
 # Phase A End-to-End Smoke Report
 
-Generated: 2026-09-20T18:32:40.873Z · `pnpm e2e:phase-a` (tools/e2e/run.ts)
+Generated: 2026-09-20T18:46:33.270Z · `pnpm e2e:phase-a` (tools/e2e/run.ts)
 
 Stack: PostgreSQL `omnis_e2e` (migrations 0001–0008 + Zero permissions) → zero-cache :4848
 → hub :8787 (HTTP + WS /bridge) → local agent bridge (mock runtime fixtures, host=macbook)
@@ -10,49 +10,49 @@ Every part of the seed takes a real code path: adapter `normalize()` → kernel 
 kernel `approvals.propose`, `classify()` from `@omnis/agents` (T0 rule path, no network calls),
 `ClaudeCodeAdapter` + `apps/local-agent/test` fixture replay.
 
-## Pass 1 (11.4s, items=14)
+## Pass 1 (11.3s, items=14)
 
 | Result | Check | Time | Note |
 | --- | --- | --- | --- |
-| PASS | A1 Inbox lists one row per seeded thread (U2: rows are per thread, not per item) | 26ms | 8 thread rows (item count was 14) |
-| PASS | A2 Inbox rows show a visible channel icon for all three channels | 28ms | Slack 메시지 / Gmail 메시지 / Google Calendar 메시지 |
+| PASS | A1 Inbox lists one row per seeded thread (U2: rows are per thread, not per item) | 13ms | 8 thread rows (item count was 14) |
+| PASS | A2 Inbox rows show a visible channel icon for all three channels | 26ms | Slack 메시지 / Gmail 메시지 / Google Calendar 메시지 |
 | PASS | A2b Inbox rows show the seeded thread titles | 2ms | #omnis-launch / omnis launch sync |
-| PASS | A3 Inbox rows carry label chips | 2ms |  |
+| PASS | A3 Inbox rows carry label chips | 1ms |  |
 | PASS | A2c kinso shell: channel rail tiles + ask/search bar | 10ms | rail: Inbox/Slack/Gmail/Google Calendar/Agent + ask bar |
 | PASS | A2d a conversation row has avatar + name + relative time + summary | 4ms | time="now" summary="초안: Yes, I will review it today.…" |
-| PASS | A4 work/personal filter pills change the list | 138ms | all=8 work=[#omnis-launch] personal=[Dana Lee <dana@example.com>] |
+| PASS | A4 work/personal filter pills change the list | 122ms | all=8 work=[#omnis-launch] personal=[Dana Lee <dana@example.com>] |
 | PASS | A4b channel rail tile filters the list, Inbox tile restores it | 69ms | all=8 gmail=2 |
-| PASS | A5 Thread screen renders seeded items with status badges | 48ms | 4 status badges |
+| PASS | A5 Thread screen renders seeded items with status badges | 47ms | 4 status badges |
 | PASS | A6 Agent Session screen shows turns and a ToolCallBadge | 33ms |  |
-| PASS | A7 Approval card shows the pending approval | 13ms |  |
+| PASS | A7 Approval card shows the pending approval | 10ms |  |
 | PASS | A8 Approve → hub moves the approval to decided | 42ms | pending → decided |
-| PASS | A9 ⌘K opens the command palette | 16ms |  |
-| PASS | A-archive archive a row → it leaves the list and returns when restored | 342ms | "omnis launch sync" archived → restored (8 rows), 2 audit_log actions recorded |
-| PASS | G5 a new item reaches the UI in ≤2s | 69ms | 28ms ingest → screen (target ≤2000ms) |
+| PASS | A9 ⌘K opens the command palette | 15ms |  |
+| PASS | A-archive archive a row → it leaves the list and returns when restored | 341ms | "omnis launch sync" archived → restored (8 rows), 2 audit_log actions recorded |
+| PASS | G5 a new item reaches the UI in ≤2s | 71ms | 28ms ingest → screen (target ≤2000ms) |
 | PASS | A8b hub recorded audit_log(approval.decided) | 2ms | 1 row(s) |
 | PASS | A8c pending_approvals.state moved to decided(accept) | 0ms | state=decided decision=accept |
 | PASS | A10 classify() recorded a T0 run in agent_runs (no network) | 0ms | 1 run(s), tier=T0 |
 | PASS | A11 local-agent registered over WS /bridge | 0ms | agent_runtimes state=online |
 
-## Pass 2 (8.7s, items=14)
+## Pass 2 (8.4s, items=14)
 
 | Result | Check | Time | Note |
 | --- | --- | --- | --- |
-| PASS | A1 Inbox lists one row per seeded thread (U2: rows are per thread, not per item) | 10ms | 8 thread rows (item count was 14) |
-| PASS | A2 Inbox rows show a visible channel icon for all three channels | 26ms | Slack 메시지 / Gmail 메시지 / Google Calendar 메시지 |
-| PASS | A2b Inbox rows show the seeded thread titles | 3ms | #omnis-launch / omnis launch sync |
-| PASS | A3 Inbox rows carry label chips | 2ms |  |
-| PASS | A2c kinso shell: channel rail tiles + ask/search bar | 10ms | rail: Inbox/Slack/Gmail/Google Calendar/Agent + ask bar |
+| PASS | A1 Inbox lists one row per seeded thread (U2: rows are per thread, not per item) | 114ms | 8 thread rows (item count was 14) |
+| PASS | A2 Inbox rows show a visible channel icon for all three channels | 25ms | Slack 메시지 / Gmail 메시지 / Google Calendar 메시지 |
+| PASS | A2b Inbox rows show the seeded thread titles | 2ms | #omnis-launch / omnis launch sync |
+| PASS | A3 Inbox rows carry label chips | 1ms |  |
+| PASS | A2c kinso shell: channel rail tiles + ask/search bar | 9ms | rail: Inbox/Slack/Gmail/Google Calendar/Agent + ask bar |
 | PASS | A2d a conversation row has avatar + name + relative time + summary | 4ms | time="now" summary="초안: Yes, I will review it today.…" |
-| PASS | A4 work/personal filter pills change the list | 105ms | all=8 work=[#omnis-launch] personal=[Dana Lee <dana@example.com>] |
-| PASS | A4b channel rail tile filters the list, Inbox tile restores it | 68ms | all=8 gmail=2 |
-| PASS | A5 Thread screen renders seeded items with status badges | 39ms | 4 status badges |
-| PASS | A6 Agent Session screen shows turns and a ToolCallBadge | 43ms |  |
-| PASS | A7 Approval card shows the pending approval | 11ms |  |
-| PASS | A8 Approve → hub moves the approval to decided | 39ms | pending → decided |
-| PASS | A9 ⌘K opens the command palette | 16ms |  |
-| PASS | A-archive archive a row → it leaves the list and returns when restored | 338ms | "omnis launch sync" archived → restored (8 rows), 2 audit_log actions recorded |
-| PASS | G5 a new item reaches the UI in ≤2s | 72ms | 28ms ingest → screen (target ≤2000ms) |
+| PASS | A4 work/personal filter pills change the list | 112ms | all=8 work=[#omnis-launch] personal=[Dana Lee <dana@example.com>] |
+| PASS | A4b channel rail tile filters the list, Inbox tile restores it | 69ms | all=8 gmail=2 |
+| PASS | A5 Thread screen renders seeded items with status badges | 41ms | 4 status badges |
+| PASS | A6 Agent Session screen shows turns and a ToolCallBadge | 30ms |  |
+| PASS | A7 Approval card shows the pending approval | 10ms |  |
+| PASS | A8 Approve → hub moves the approval to decided | 50ms | pending → decided |
+| PASS | A9 ⌘K opens the command palette | 13ms |  |
+| PASS | A-archive archive a row → it leaves the list and returns when restored | 342ms | "omnis launch sync" archived → restored (8 rows), 2 audit_log actions recorded |
+| PASS | G5 a new item reaches the UI in ≤2s | 74ms | 29ms ingest → screen (target ≤2000ms) |
 | PASS | A8b hub recorded audit_log(approval.decided) | 1ms | 1 row(s) |
 | PASS | A8c pending_approvals.state moved to decided(accept) | 0ms | state=decided decision=accept |
 | PASS | A10 classify() recorded a T0 run in agent_runs (no network) | 0ms | 1 run(s), tier=T0 |
