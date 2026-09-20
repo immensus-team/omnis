@@ -8,6 +8,14 @@ export interface HubConfig {
   userId: string;
   /** Same value as zero-cache's ZERO_AUTH_SECRET. Empty makes /api/zero-token return 503. */
   zeroAuthSecret: string;
+  /** App-level OAuth clients (Phase A contract §9). These are the *app's* credentials, not a
+   *  per-account secret — an empty value means that channel's adapter is not configured at all, and
+   *  its accounts are logged as skipped at boot (no credentials exist yet — US-B45). */
+  googleOAuthClientId: string;
+  googleOAuthClientSecret: string;
+  outlookClientId: string;
+  /** self-hosted ntfy (A6 §8, delta §9). Adapter health failures surface here as well as in a system Item. */
+  ntfyUrl: string;
 }
 
 export const HUB_VERSION = "0.1.0";
@@ -32,5 +40,9 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): HubConfig {
     bridgeToken: env.OMNIS_BRIDGE_TOKEN ?? "",
     userId: env.OMNIS_USER_ID ?? "logan",
     zeroAuthSecret: env.ZERO_AUTH_SECRET ?? "",
+    googleOAuthClientId: env.OMNIS_GOOGLE_OAUTH_CLIENT_ID ?? "",
+    googleOAuthClientSecret: env.OMNIS_GOOGLE_OAUTH_CLIENT_SECRET ?? "",
+    outlookClientId: env.OMNIS_OUTLOOK_CLIENT_ID ?? "",
+    ntfyUrl: env.OMNIS_NTFY_URL ?? "http://127.0.0.1:2586",
   };
 }
