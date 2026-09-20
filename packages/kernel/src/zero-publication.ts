@@ -1,5 +1,6 @@
-// 0008_publication.sql(SQL)과 zero-schema.ts(TS)는 사람이 두 곳에 같은 목록을 적는 구조라
-// 반드시 어긋난다. 어긋나면 zero-cache가 조용히 빈 테이블을 싱크하므로, 허브 부팅 때 깨뜨린다.
+// 0008_publication.sql (SQL) and zero-schema.ts (TS) both hold the same list written by hand, so
+// they are bound to drift. Drift makes zero-cache silently sync empty tables, so we fail loudly at
+// hub boot.
 import { query } from "@omnis/db";
 import type { Pool } from "pg";
 import { ZERO_ITEM_COLUMNS, ZERO_LABEL_RULE_COLUMNS, ZERO_TABLES } from "./zero-schema.js";

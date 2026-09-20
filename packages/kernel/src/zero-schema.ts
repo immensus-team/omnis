@@ -1,5 +1,5 @@
-// 복제 범위의 단일 소스. A3 §7의 publication(0008_publication.sql)과 반드시 일치한다 —
-// 일치 검사는 assertZeroPublication이 부팅 때마다 한다.
+// Single source of truth for replication scope. Must match the A3 §7 publication
+// (0008_publication.sql) — assertZeroPublication checks that match on every boot.
 import {
   type ExpressionBuilder,
   type Schema,
@@ -46,7 +46,7 @@ const threads = table("threads")
   })
   .primaryKey("id");
 
-// A3 §7: embedding(768d × 4B)과 생성 컬럼 search_tsv는 폰까지 끌고 가지 않는다.
+// A3 §7: embedding (768d × 4B) and the generated column search_tsv do not travel to the phone.
 const items = table("items")
   .columns({
     id: string(),
@@ -76,7 +76,7 @@ const items = table("items")
   })
   .primaryKey("id");
 
-// attendees_count는 GENERATED 컬럼이라 논리 복제 대상이 아니다(A3 §7).
+// attendees_count is a GENERATED column, so it is not part of logical replication (A3 §7).
 const calendar_events = table("calendar_events")
   .columns({
     id: string(),
@@ -143,7 +143,7 @@ const labels = table("labels")
   })
   .primaryKey("id");
 
-// probe_embedding은 items.embedding과 같은 이유로 제외(A3 §7).
+// probe_embedding is excluded for the same reason as items.embedding (A3 §7).
 const label_rules = table("label_rules")
   .columns({
     id: string(),
@@ -281,8 +281,8 @@ const digests = table("digests")
   })
   .primaryKey("id");
 
-// 델타 §6/§10 (US-B33): 설정 kv. 관계 없음 — 단순 키-값이라 조인이 필요 없다.
-// 쓰기는 Zero가 아니라 허브 HTTP(PUT /settings/:key)를 거친다(계약 §5).
+// Delta §6/§10 (US-B33): settings kv. No relationships — a plain key-value table needs no joins.
+// Writes go through hub HTTP (PUT /settings/:key), not Zero (contract §5).
 const settings = table("settings")
   .columns({
     key: string(),
@@ -291,7 +291,8 @@ const settings = table("settings")
   })
   .primaryKey("key");
 
-// Inbox(스레드 목록 → 마지막 item)와 Thread(스레드 → item들 → 작성자) 화면이 실제로 타는 3개만.
+// Only the three relationships the Inbox (thread list → latest item) and Thread
+// (thread → items → author) screens actually use.
 const threadRelationships = relationships(threads, ({ many }) => ({
   items: many({ sourceField: ["id"], destField: ["thread_id"], destSchema: items }),
 }));
@@ -321,16 +322,18 @@ export const zeroSchema = createSchema({
     settings,
   ],
   relationships: [threadRelationships, itemRelationships],
-  // US-A22 편차: @rocicorp/zero@1.9.0에서 `createRunnableBuilder`(= `zero.query.<table>...run()`,
-  // 인터페이스 계약 §7·A5 §5의 모든 화면 태스크가 쓰는 패턴)는 이 플래그 없이는 스키마 검증 없이
-  // 조용히 `undefined`를 반환한다(gate-06 스파이크가 예견한 API 드리프트 #2). A21은 이 API 경로를
-  // 실제로 호출한 적이 없어(원시 WAL 드레인만 테스트) 지금까지 드러나지 않았다.
+  // US-A22 deviation: without this flag, @rocicorp/zero@1.9.0's `createRunnableBuilder`
+  // (= `zero.query.<table>...run()`, the pattern every screen task in interface contract §7 and
+  // A5 §5 uses) returns a silent `undefined` with no schema validation (API drift #2 predicted by
+  // the gate-06 spike). A21 never actually called this API path (it only tested the raw WAL
+  // drain), so it stayed hidden until now.
   enableLegacyQueries: true,
-  // US-A27 편차(같은 드리프트 계열, gate-06이 예견한 #2의 짝): `zero.mutate.<table>.update(...)`
-  // 같은 CRUD 뮤테이터(A5-D9 DraftCard onDiscard가 쓰는 패턴 — 이 스토리 범위에서 Tiptap Composer/커스텀
-  // 뮤테이터는 만들지 않으므로 기본 CRUD 경로가 유일한 쓰기 경로다)도 `enableLegacyMutators` 없이는
-  // `DBMutator<S>`가 `{}` 타입이 되어 `.items` 프로퍼티가 아예 없다(zero-client/src/client/crud.d.ts).
-  // A22는 쓰기를 쓴 적이 없어 지금까지 드러나지 않았다.
+  // US-A27 deviation (same drift family, the twin of #2 predicted by gate-06): CRUD mutators such
+  // as `zero.mutate.<table>.update(...)` (the pattern A5-D9 DraftCard onDiscard uses — this story
+  // builds no Tiptap Composer/custom mutator, so the default CRUD path is the only write path)
+  // also break without `enableLegacyMutators`: `DBMutator<S>` becomes the `{}` type and has no
+  // `.items` property at all (zero-client/src/client/crud.d.ts). A22 never wrote anything, so it
+  // stayed hidden until now.
   enableLegacyMutators: true,
 }) satisfies Schema;
 
@@ -340,19 +343,20 @@ export const ZERO_LABEL_RULE_COLUMNS: readonly string[] = Object.keys(
   zeroSchema.tables.label_rules.columns,
 );
 
-// US-A21b: permissions 없이 배포하면 zero-cache는 "no tables will be syncable"로 돌아 한 행도
-// 내려보내지 않는다(deploy-permissions.js의 경고) — US-A22가 본 "쿼리는 resolve되는데 행이 없다"의
-// 정체다. 단일 유저 허브라 규칙은 하나뿐이다: 허브가 서명한 토큰의 sub가 이 유저면 전부 읽기.
+// US-A21b: deployed without permissions, zero-cache falls back to "no tables will be syncable"
+// and never sends a single row down (the warning in deploy-permissions.js) — this is what US-A22
+// saw as "the query resolves but there are no rows". Single-user hub, so there is only one rule:
+// if the sub of the hub-signed token is this user, everything is readable.
 export type AuthData = { sub: string };
 
-/** 허브가 JWT `sub`에 넣는 값과 같아야 한다(apps/hub/src/config.ts의 OMNIS_USER_ID). */
+/** Must equal the JWT `sub` value the hub signs (OMNIS_USER_ID in apps/hub/src/config.ts). */
 export const OMNIS_USER_ID: string = globalThis.process?.env?.OMNIS_USER_ID ?? "logan";
 
-// 쓰기 권한은 일부러 비운다: 데스크톱은 읽기 전용이고 쓰기는 전부 허브 HTTP를 거친다(계약 §5).
-// insert/update/delete를 안 주면 Zero가 서버에서 거부한다.
+// Write permissions are deliberately left empty: the desktop is read-only and every write goes
+// through hub HTTP (contract §5). Without insert/update/delete, Zero rejects them on the server.
 const readOnlyForOwner = {
   row: {
-    // ANYONE_CAN과 같은 모양의 테이블-무관 규칙이라 eb의 테이블 파라미터는 never다.
+    // Same shape as ANYONE_CAN: a table-agnostic rule, so eb's table parameter is never.
     select: [
       (authData: AuthData, eb: ExpressionBuilder<never, Schema>) =>
         eb.cmpLit(authData.sub, "=", OMNIS_USER_ID),
@@ -364,6 +368,6 @@ export const permissions = definePermissions<AuthData, typeof zeroSchema>(zeroSc
   Object.fromEntries(ZERO_TABLES.map((t) => [t, readOnlyForOwner])),
 );
 
-// zero-deploy-permissions CLI는 모듈에서 `schema`·`permissions` 이름을 찾는다
-// (zero-schema/src/schema-config.js의 isSchemaConfig).
+// The zero-deploy-permissions CLI looks for the names `schema` and `permissions` in the module
+// (isSchemaConfig in zero-schema/src/schema-config.js).
 export { zeroSchema as schema };
