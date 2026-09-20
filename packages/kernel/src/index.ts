@@ -1,3 +1,12 @@
+export {
+  REARCHIVE_EXCLUSION_DAYS,
+  UNDO_WINDOW_DAYS,
+  archiveItem,
+  archivedSince,
+  isRearchiveExcluded,
+  undoArchive,
+} from "./archive.js";
+export type { ArchivedByMeta, ArchivedGroup } from "./archive.js";
 export { ApprovalStateError, createApprovals } from "./approvals.js";
 export type { ApprovalConfig, Approvals, ApprovalsDeps, PendingApproval } from "./approvals.js";
 export { countUnapprovedSends, createAudit } from "./audit.js";
