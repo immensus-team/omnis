@@ -81,6 +81,46 @@
      — no per-surface declarations. */
   --glass-highlight: oklch(1 0 0 / 0.55);
   --shadow-glass: 0 8px 24px oklch(0 0 0 / 0.08), 0 1px 3px oklch(0 0 0 / 0.06);
+  /* ==== Aurora (ACCENT-DIRECTION.md §2.2) ====================================================
+     Eight colour tokens: exactly Logan's eight anchors from ACCENT-BRIEF.md, one token each. Do not
+     add a ninth — the whole point is that the app is grey and colour happens in three places, as an
+     out-of-focus film photograph rather than a gradient. */
+  /* Image 1 — soft aurora (reference/ref-aurora-accent.png) */
+  --aurora-indigo: oklch(0.35 0.15 270); /* deep blue/indigo, the ridge mass */
+  --aurora-peach: oklch(0.75 0.1 30); /* peach/coral, the transition */
+  --aurora-butter: oklch(0.9 0.08 90); /* soft yellow, the bloom core */
+  --aurora-paper: oklch(0.98 0.01 270); /* bright background */
+  /* Image 2 — high-contrast void (reference/ref-aurora-accent-2.png) */
+  --aurora-blue: oklch(0.4 0.16 260); /* vivid deep blue, above the void */
+  --aurora-void: oklch(0.15 0.02 280); /* the dark mass. Near-black, low chroma. */
+  --aurora-ember: oklch(0.6 0.22 35); /* the orange/red rim-light */
+  --aurora-lilac: oklch(0.85 0.08 320); /* lavender pink floor */
+  /* Silhouettes. Monochrome masks — the colour lives in the tokens above, never in the SVG. A
+     silhouette with a contour is the point: a stack of axis-aligned radial ellipses cannot produce a
+     ridge line or a rim-light, it produces the generic pastel blob the anti-slop guards reject. */
+  --aurora-ridge: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 200' preserveAspectRatio='none'%3E%3Cpath d='M-6 206V150C10 148 26 128 34 96C40 74 52 60 62 78C70 94 74 110 84 114C96 119 110 110 126 96V206Z' fill='%23000'/%3E%3C/svg%3E");
+  --aurora-curve: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 160' preserveAspectRatio='none'%3E%3Cpath d='M-6 40C30 26 74 4 126-14V70C86 86 40 118-6 98Z' fill='%23000'/%3E%3C/svg%3E");
+  --grain-opacity: 0.08; /* aurora grain: 8%. The ceiling is 10%. */
+  /* Scrim for any text block that sits on an aurora surface (§4.3). */
+  --aurora-scrim: color-mix(in oklch, var(--bg-base) 82%, transparent);
+  /* Per-variant knobs. These defaults are `dawn`; §3.1 re-declares all of them per variant, so the
+     only value here that is load-bearing on its own is --aurora-blur. */
+  --aurora-sky: var(--aurora-paper); /* field, top */
+  --aurora-floor: var(--aurora-paper); /* field, bottom */
+  --aurora-hot: var(--aurora-butter); /* bloom core; `transparent` disables the bloom */
+  --aurora-mass-hi: var(--aurora-indigo); /* silhouette fill, at its contour */
+  --aurora-mass-lo: var(--aurora-indigo); /* silhouette fill, at the bottom of the box */
+  --aurora-rim: var(--aurora-peach); /* rim-light colour along the contour */
+  --aurora-rim-dir: -1; /* -1 = warm ABOVE the ridge (image 1); 1 = ember BELOW the void (image 2) */
+  --aurora-silhouette: var(--aurora-ridge);
+  --aurora-vignette: var(--bg-base); /* `transparent` = full bleed, no vignette */
+  --aurora-alpha: 0.62;
+  --grain-size: 120px;
+  /* Set per surface, not per variant: ~10% of that surface's short side, which is what the
+     reference's own focus falloff measures (8-12%). A single global value is wrong by construction —
+     the rail plate is ~56px wide and the onboarding plate fills the panel. §4.1 gives the three
+     values. This default is a value nothing should actually use. */
+  --aurora-blur: 24px;
   /* Film grain (ACCENT-DIRECTION.md §2.2). One 160px tile of feTurbulence noise, shared by the
      canvas (app.css `.app-shell::before`, 3.5%) and by every aurora surface (8%). The two non-obvious
      parts are both load-bearing:
@@ -110,6 +150,204 @@
   --canvas-grid-size: auto;
   --glass-highlight: oklch(1 0 0 / 0.1);
   --shadow-glass: 0 8px 24px oklch(0 0 0 / 0.45), 0 1px 3px oklch(0 0 0 / 0.35);
+  /* US-D06: the aurora palette does not change with the theme. On near-black the same masses read as
+     glow instead of stain, so they need *less* alpha, not more — hence the two overrides below.
+     `void` keeps alpha 1 in both themes; it is already its own dark field. */
+  --aurora-scrim: color-mix(in oklch, var(--bg-base) 76%, transparent);
+}
+:root[data-theme="dark"] [data-aurora="dawn"] {
+  --aurora-alpha: 0.5;
+}
+:root[data-theme="dark"] [data-aurora="mist"] {
+  --aurora-alpha: 0.26;
+}
+
+/* ============================ The aurora texture (ACCENT-DIRECTION.md §2.3) ============================
+   One recipe, shared by every aurora surface. It is a field (the sky/floor gradient), a masked
+   silhouette carrying a coloured drop-shadow rim, grain, and a vignette. Every variant is the same
+   stack; only the custom properties in §3.1 change.
+
+   The silhouette is the point — it is what makes the output read as a photograph of a landscape
+   rather than a CSS gradient, and it is the one thing four stacked ellipses cannot fake.
+
+   Two silent failure modes are documented at §2.4 and both are structural, so neither can be
+   "simplified" away:
+     1. CSS applies `filter` BEFORE `mask`. A masked element carrying its own blur() renders a
+        razor-sharp cut-out, so the blur must live on an ANCESTOR of the masked box. Hence the
+        two-element `.aurora__mass` / `.aurora__mass::before` split below. Symptom of a regression:
+        a crisp mountain or a crisp band.
+     2. A `:root` custom property may not reference a variable that is only defined on descendants —
+        `var()` is substituted where it is *declared*, not where it is used. So `--aurora-blur` is
+        never precomputed into another :root token; every calc() stays at its use site and only
+        unitless factors come down from :root. Symptom: nothing is blurred and there is no rim. */
+.aurora {
+  position: relative;
+  /* The z-index:-1 layers must stay inside this box — without it they escape behind <body>. */
+  isolation: isolate;
+  /* Clips the oversized, blurred children. Deliberately NOT `contain: paint`: per Filter Effects L2
+     that forms a backdrop root, which would make a rail's .glass-surface sample only what is painted
+     inside .aurora — it would stop blurring the page canvas and its grid. */
+  overflow: hidden;
+  background-color: var(--bg-base);
+}
+
+/* Layer 1 — the field. No shape; this is the sky and the floor. */
+.aurora::before {
+  content: "";
+  position: absolute;
+  /* Bleed is a function of the blur, not a percentage of the box: two blur radii of bleed covers
+     ~2sigma of spread on every surface regardless of size, which is the guarantee that no blurred
+     rectangle edge lands inside the box. A percentage cannot make that guarantee — on the 56px rail
+     plate `-30%` is 16.8px of bleed against a 44px blur, so the falloff landed well inside the box
+     and the texture washed to near-uniform. */
+  inset: calc(-2 * var(--aurora-blur));
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--aurora-alpha);
+  filter: blur(var(--aurora-blur));
+  background: radial-gradient(
+      46% 30% at 50% 30%,
+      color-mix(in oklch, var(--aurora-hot) 92%, transparent) 0%,
+      color-mix(in oklch, var(--aurora-peach) 62%, transparent) 58%,
+      transparent 100%
+    ), linear-gradient(to bottom, var(--aurora-sky) 0%, var(--aurora-floor) 100%);
+}
+
+/* Layer 2 — the silhouette. This is the ridge / the void band.
+   The blur is 0.35x the field blur, not 1.0: at parity the ridge dissolves into its own sky and we
+   are back to the blob. The rim offset is 0.5x blur in the direction of --aurora-rim-dir — below
+   that the rim is buried inside the contour's own falloff, above it the rim detaches into a separate
+   band. drop-shadow() follows the already-blurred alpha contour, which is what produces the
+   rim-light. */
+.aurora__mass {
+  position: absolute;
+  inset: calc(-2 * var(--aurora-blur));
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--aurora-alpha);
+  filter: blur(calc(0.35 * var(--aurora-blur)))
+    drop-shadow(
+      0 calc(var(--aurora-rim-dir) * 0.5 * var(--aurora-blur)) calc(0.3 * var(--aurora-blur))
+        var(--aurora-rim)
+    );
+}
+.aurora__mass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, var(--aurora-mass-hi) 0%, var(--aurora-mass-lo) 100%);
+  /* The -webkit- prefixes are not optional: the desktop app is Tauri 2 -> WKWebView on macOS, where
+     unprefixed mask-image is still not reliable. */
+  -webkit-mask-image: var(--aurora-silhouette);
+  mask-image: var(--aurora-silhouette);
+  /* `100% 100%`, not `cover`. `cover` preserves the source aspect and scales the silhouette past the
+     box, which makes the contour read crisp and graphic — an illustration, not a photograph.
+     Stretching is correct here: the shape is a gesture, not a picture of one particular mountain. */
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+/* Layer 3 — grain. A real child, because it needs its own opacity. */
+.aurora__grain {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--grain);
+  background-size: var(--grain-size) var(--grain-size);
+  opacity: var(--grain-opacity);
+}
+
+/* Layer 4 — vignette. Fades the plate back to the surface colour so no edge of the texture ever
+   meets a hairline. `--aurora-vignette: transparent` turns it off (the full-bleed variants).
+   Layer order bottom to top is field, mass, grain, vignette — all z-index:-1, resolved by source
+   order — then the wrapped content at the default z-index. This source order is that list. */
+.aurora::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(120% 120% at 50% 50%, transparent 46%, var(--aurora-vignette) 100%);
+}
+
+/* ==== §3.1 Variants — three variants, three surfaces, one each. ==================================
+   `dawn` and `mist` are image 1; `void` is image 2. The `dusk` variant in the previous draft is
+   dropped: it was image 2 at alpha 0.34, and compositing --aurora-void at that alpha over --bg-base
+   lands around L0.70 — a pale lavender smudge, not a cinematic mass. Below roughly alpha 0.8 image 2
+   is not reproducible, it is merely referenced, and a faint high-contrast variant is a contradiction
+   (§2.5). Surfaces that used to be `dusk` get `dawn`. */
+
+/* dawn — image 1. Indigo ridge, warm bloom above it, paper field, rim pointing UP so the peach hugs
+   the top of the ridge the way the sunset sits behind the hill in image 1. */
+[data-aurora="dawn"] {
+  --aurora-sky: var(--aurora-paper);
+  --aurora-floor: var(--aurora-paper);
+  --aurora-hot: var(--aurora-butter);
+  --aurora-mass-hi: var(--aurora-indigo);
+  --aurora-mass-lo: var(--aurora-indigo);
+  --aurora-rim: var(--aurora-peach);
+  --aurora-rim-dir: -1;
+  --aurora-silhouette: var(--aurora-ridge);
+  --aurora-vignette: var(--bg-base);
+  --aurora-alpha: 0.62;
+  --grain-size: 120px;
+}
+
+/* mist — image 1's colour and grain, no silhouette. Finest grain.
+   The missing silhouette is a measured decision, not an omission. Its only consumer is the rail
+   plate: ~56px wide by ~400px tall. Stretching a 120:200 landscape ridge into 56:400 is a 4.7x
+   vertical stretch and renders as a vertical finger; cropping it instead (mask-size: cover) renders
+   as a vertical bar. Neither is a ridge, and at 56px behind 24px of glass blur nothing legible as a
+   contour can survive anyway. So mist carries image 1's colour, softness and grain but not its shape,
+   and costs one blurred layer instead of two on the one surface that is always mounted. */
+[data-aurora="mist"] {
+  --aurora-sky: var(--aurora-paper);
+  --aurora-floor: var(--aurora-paper);
+  --aurora-hot: var(--aurora-butter);
+  --aurora-vignette: var(--bg-base);
+  --aurora-alpha: 0.34;
+  --grain-size: 96px;
+}
+[data-aurora="mist"] .aurora__mass {
+  display: none;
+}
+
+/* void — image 2. Near-black band, vivid blue above, ember rim BELOW its lower edge, lilac floor.
+   Full bleed (no vignette), full alpha, coarse grain. */
+[data-aurora="void"] {
+  --aurora-sky: var(--aurora-blue);
+  --aurora-floor: var(--aurora-lilac);
+  --aurora-hot: transparent; /* image 2 has no bloom — the rim IS the warm light */
+  --aurora-mass-hi: var(--aurora-blue);
+  --aurora-mass-lo: var(--aurora-void);
+  --aurora-rim: var(--aurora-ember);
+  --aurora-rim-dir: 1;
+  --aurora-silhouette: var(--aurora-curve);
+  --aurora-vignette: transparent;
+  --aurora-alpha: 1;
+  --grain-size: 220px;
+}
+
+/* §3.3 Drift. 90s, <= 2.5% translation, <= 6% scale. Field and mass drift together or the ridge
+   detaches from its own sky. If it is perceptible as motion when you look at it directly, it is
+   wrong. No will-change: the transform is GPU-composited on its own. */
+@keyframes aurora-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-2.5%, 1.8%, 0) scale(1.06);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+.aurora::before,
+.aurora__mass {
+  animation: aurora-drift 90s ease-in-out infinite;
 }
 /* US-D04: reduced motion swaps travel for a cross-fade rather than switching motion off. Apple's
    rule (apple-design §14) is "a gentler, non-vestibular equivalent" — what a reduced-motion user
@@ -125,6 +363,13 @@
     --dur-move: 80ms;
     --dur-slow: 80ms;
     --dur-panel: 80ms;
+  }
+  /* US-D06 §3.4: the aurora's 90s drift. This block must stay *after* the drift declaration above —
+     same specificity, so source order decides, and a `animation: none` that lands before
+     `animation: aurora-drift 90s …` loses silently. */
+  .aurora::before,
+  .aurora__mass {
+    animation: none;
   }
 }
 /* apple-design §14's counterpart signal — having brought glass in, respect its opposite (reduced
@@ -145,6 +390,21 @@
   .glass-surface {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
+  }
+  /* US-D06 §3.4: no texture at all — a flat surface colour, with the hairline keeping the edge. This
+     is the one place that answers "what does omnis look like with effects off", so the canvas grain
+     (app.css `.app-shell::before`) is switched off here too rather than in a block of its own. */
+  .aurora::before,
+  .aurora::after,
+  .aurora__mass,
+  .aurora__grain {
+    display: none;
+  }
+  .aurora {
+    background-color: var(--bg-elevated);
+  }
+  .app-shell::before {
+    display: none;
   }
 }
 .glass-surface {

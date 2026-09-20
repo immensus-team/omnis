@@ -1,5 +1,6 @@
 export * from "./tokens.js";
 export * from "./components/glass-surface.js";
+export * from "./components/aurora-surface.js";
 export * from "./components/button.js";
 export * from "./types.js";
 export * from "./components/status-badge.js";
