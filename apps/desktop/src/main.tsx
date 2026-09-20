@@ -3,6 +3,11 @@ import { createRoot } from "react-dom/client";
 import "@omnis/ui/tokens.css";
 import { App } from "./App.js";
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode><App /></StrictMode>,
+const root = document.getElementById("root");
+if (root === null) throw new Error("#root not found in index.html");
+
+createRoot(root).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
 );

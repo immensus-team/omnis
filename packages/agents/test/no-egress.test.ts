@@ -7,8 +7,13 @@ import { describe, expect, it } from "vitest";
 const SRC = fileURLToPath(new URL("../src", import.meta.url));
 
 function sources(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap(e =>
-    e.isDirectory() ? sources(join(dir, e.name)) : e.name.endsWith(".ts") ? [join(dir, e.name)] : []);
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory()
+      ? sources(join(dir, e.name))
+      : e.name.endsWith(".ts")
+        ? [join(dir, e.name)]
+        : [],
+  );
 }
 
 describe("@omnis/agents tool isolation (A7 §7 공통 금지)", () => {

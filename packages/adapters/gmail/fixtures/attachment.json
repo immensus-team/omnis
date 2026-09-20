@@ -1,7 +1,8 @@
 {
   "scenario": "attachment",
   "raw": {
-    "id": "18c2f4a1b2d3e4f7", "threadId": "18c2f4a1b2d3e4f1",
+    "id": "18c2f4a1b2d3e4f7",
+    "threadId": "18c2f4a1b2d3e4f1",
     "payload": {
       "headers": [
         { "name": "From", "value": "Dana Lee <dana@example.com>" },
@@ -11,16 +12,28 @@
       ],
       "mimeType": "multipart/mixed",
       "body": {},
-      "parts": [{ "filename": "poc.pdf", "mimeType": "application/pdf", "body": { "attachmentId": "att-1", "size": 40960 } }]
+      "parts": [
+        {
+          "filename": "poc.pdf",
+          "mimeType": "application/pdf",
+          "body": { "attachmentId": "att-1", "size": 40960 }
+        }
+      ]
     }
   },
   "expected": {
-    "items": [{
-      "threadExternalId": "18c2f4a1b2d3e4f1", "externalId": "18c2f4a1b2d3e4f7", "kind": "email",
-      "author": { "kind": "person", "id": "Dana Lee <dana@example.com>" },
-      "body": "Subject: PoC slides\n\n",
-      "attachments": [], "sentAt": "2023-11-14T23:00:00.000Z", "status": "received",
-      "sourceHash": "<CAFakeMsgId003@mail.gmail.com>"
-    }]
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3e4f1",
+        "externalId": "18c2f4a1b2d3e4f7",
+        "kind": "email",
+        "author": { "kind": "person", "id": "Dana Lee <dana@example.com>" },
+        "body": "Subject: PoC slides\n\n",
+        "attachments": [],
+        "sentAt": "2023-11-14T23:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId003@mail.gmail.com>"
+      }
+    ]
   }
 }

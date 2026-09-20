@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { NormalizedItem } from "@omnis/protocol";
+import { describe, expect, it } from "vitest";
 import { normalize } from "../src/index.js";
 
 describe("Gmail normalize()", () => {

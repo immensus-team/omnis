@@ -8,7 +8,12 @@ export const KNN_K = 15;
 export const KNN_MARGIN_MIN = 0.35;
 export const KNN_SIM_MIN = 0.62;
 
-export interface KnnVerdict { scope: Scope; margin: number; avgSim: number; neighborIds: string[] }
+export interface KnnVerdict {
+  scope: Scope;
+  margin: number;
+  avgSim: number;
+  neighborIds: string[];
+}
 
 const SQL = `
   SELECT i.id, i.scope, 1 - (i.embedding <=> $1::vector) AS sim
@@ -23,8 +28,11 @@ const SQL = `
 export async function knnVote(item: ItemRow, ctx: ClassifyCtx): Promise<KnnVerdict | null> {
   if (item.embedding === null) return null;
 
-  const { rows } = await ctx.pool.query<{ id: string; scope: Scope; sim: string }>(
-    SQL, [item.embedding, KNN_K, item.id]);
+  const { rows } = await ctx.pool.query<{ id: string; scope: Scope; sim: string }>(SQL, [
+    item.embedding,
+    KNN_K,
+    item.id,
+  ]);
   if (rows.length === 0) return null;
 
   const votes = new Map<Scope, { weight: number; sims: number[]; ids: string[] }>();

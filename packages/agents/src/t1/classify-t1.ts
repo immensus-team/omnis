@@ -1,14 +1,18 @@
 // A4 §2.4 출력 스키마 + §1.4 프롬프트 골격 + §2.5 예산.
 import { createHash, randomBytes } from "node:crypto";
-import { generateObject, NoObjectGeneratedError } from "ai";
+import { NoObjectGeneratedError, generateObject } from "ai";
 import { z } from "zod";
-import type { ItemRow } from "../types.js";
 import type { ClassifyCtx } from "../classify/rules.js";
-import { t1Model, T1_RUN_MODEL } from "./provider.js";
+import type { ItemRow } from "../types.js";
+import { T1_RUN_MODEL, t1Model } from "./provider.js";
 
 export class SchemaViolationError extends Error {
-  constructor(message: string, readonly rawOutput: string) {
-    super(message); this.name = "SchemaViolationError";
+  constructor(
+    message: string,
+    readonly rawOutput: string,
+  ) {
+    super(message);
+    this.name = "SchemaViolationError";
   }
 }
 
@@ -70,8 +74,8 @@ ${sanitize(item.subject === null ? item.body : `${item.subject}\n${item.body}`, 
       schema: T1ClassifyOutput,
       system: SYSTEM,
       prompt,
-      maxOutputTokens: 150,          // A4 §2.5
-      abortSignal: AbortSignal.timeout(8_000),  // A4 §2.5 wallClock
+      maxOutputTokens: 150, // A4 §2.5
+      abortSignal: AbortSignal.timeout(8_000), // A4 §2.5 wallClock
     });
     return {
       output: res.object,
@@ -81,14 +85,18 @@ ${sanitize(item.subject === null ? item.body : `${item.subject}\n${item.body}`, 
         ...(res.usage.inputTokens !== undefined ? { tokens_in: res.usage.inputTokens } : {}),
         ...(res.usage.outputTokens !== undefined ? { tokens_out: res.usage.outputTokens } : {}),
         ...(res.usage.inputTokenDetails.cacheReadTokens !== undefined
-          ? { tokens_cached: res.usage.inputTokenDetails.cacheReadTokens } : {}),
+          ? { tokens_cached: res.usage.inputTokenDetails.cacheReadTokens }
+          : {}),
       },
       latencyMs: Date.now() - started,
       contextHash,
     };
   } catch (e) {
     if (NoObjectGeneratedError.isInstance(e)) {
-      throw new SchemaViolationError(`T1 output failed ${T1ClassifyOutput.description ?? "schema"} validation`, e.text ?? "");
+      throw new SchemaViolationError(
+        `T1 output failed ${T1ClassifyOutput.description ?? "schema"} validation`,
+        e.text ?? "",
+      );
     }
     throw e;
   }

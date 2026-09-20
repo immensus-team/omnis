@@ -1,21 +1,37 @@
 {
   "scenario": "attachment",
   "raw": {
-    "id": "evt2", "status": "confirmed", "summary": "PoC review",
+    "id": "evt2",
+    "status": "confirmed",
+    "summary": "PoC review",
     "start": { "dateTime": "2026-09-26T14:00:00+09:00" },
     "end": { "dateTime": "2026-09-26T15:00:00+09:00" },
-    "attachments": [{ "fileUrl": "https://drive.google.com/file/d/abc123", "title": "PoC deck.pdf" }],
+    "attachments": [
+      { "fileUrl": "https://drive.google.com/file/d/abc123", "title": "PoC deck.pdf" }
+    ],
     "attendees": []
   },
   "expected": {
-    "items": [{
-      "threadExternalId": "evt2", "externalId": "evt2", "kind": "event",
-      "author": { "kind": "system", "id": "" }, "body": "PoC review",
-      "attachments": [], "sentAt": "2026-09-26T14:00:00+09:00", "status": "received", "sourceHash": "evt2",
-      "threadMeta": {
-        "externalId": "evt2", "kind": "calendar", "title": "PoC review",
-        "participants": [], "lastItemAt": "2026-09-26T14:00:00+09:00", "archivedAt": null
+    "items": [
+      {
+        "threadExternalId": "evt2",
+        "externalId": "evt2",
+        "kind": "event",
+        "author": { "kind": "system", "id": "" },
+        "body": "PoC review",
+        "attachments": [],
+        "sentAt": "2026-09-26T14:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt2",
+        "threadMeta": {
+          "externalId": "evt2",
+          "kind": "calendar",
+          "title": "PoC review",
+          "participants": [],
+          "lastItemAt": "2026-09-26T14:00:00+09:00",
+          "archivedAt": null
+        }
       }
-    }]
+    ]
   }
 }
