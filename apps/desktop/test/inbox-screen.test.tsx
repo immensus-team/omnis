@@ -3,16 +3,25 @@ import {
   type InboxFilter,
   type InboxQueryItem,
   type SortableInboxRow,
+  approvalPillState,
   filterInboxItems,
+  groupByAgentState,
+  groupByApprovalState,
   inboxRowTitle,
   sortInboxRows,
   threadSummary,
 } from "../src/screens/Inbox";
 
 const items: InboxQueryItem[] = [
-  { id: "1", scope: "work", hasPendingApproval: false, authorKind: "person" },
-  { id: "2", scope: "personal", hasPendingApproval: true, authorKind: "person" },
-  { id: "3", scope: "work", hasPendingApproval: false, authorKind: "agent" },
+  { id: "1", scope: "work", hasPendingApproval: false, approvalState: null, authorKind: "person" },
+  {
+    id: "2",
+    scope: "personal",
+    hasPendingApproval: true,
+    approvalState: "pending",
+    authorKind: "person",
+  },
+  { id: "3", scope: "work", hasPendingApproval: false, approvalState: null, authorKind: "agent" },
 ];
 
 describe("filterInboxItems (A5 §2.1 필터 pill 5개, 서로 배타)", () => {
@@ -25,6 +34,42 @@ describe("filterInboxItems (A5 §2.1 필터 pill 5개, 서로 배타)", () => {
   ];
   it.each(cases)("filter=%s → ids %j", (filter, expectedIds) => {
     expect(filterInboxItems(items, filter).map((i) => i.id)).toEqual(expectedIds);
+  });
+
+  // US-D02 의도된 변경: needs-approval은 "지금 대기 중"이 아니라 "승인 활동이 있는" 스레드다.
+  // 대기만 있던 스레드(id 2)는 예전과 똑같이 뜨고, 결정된 건이 새로 들어온다.
+  it("needs-approval은 결정·만료된 승인도 포함한다", () => {
+    const rows: InboxQueryItem[] = [
+      {
+        id: "p",
+        scope: "work",
+        hasPendingApproval: true,
+        approvalState: "pending",
+        authorKind: "person",
+      },
+      {
+        id: "a",
+        scope: "work",
+        hasPendingApproval: false,
+        approvalState: "approved",
+        authorKind: "person",
+      },
+      {
+        id: "e",
+        scope: "work",
+        hasPendingApproval: false,
+        approvalState: "expired",
+        authorKind: "person",
+      },
+      {
+        id: "n",
+        scope: "work",
+        hasPendingApproval: false,
+        approvalState: null,
+        authorKind: "person",
+      },
+    ];
+    expect(filterInboxItems(rows, "needs-approval").map((i) => i.id)).toEqual(["p", "a", "e"]);
   });
 });
 
@@ -154,5 +199,69 @@ describe("sortInboxRows (U2: blocked agent session·승인 대기 행이 최상�
     const original = [...rows];
     sortInboxRows(rows);
     expect(rows).toEqual(original);
+  });
+});
+
+describe("approvalPillState (US-D02: DB 승인 상태 + 판정 → 표시 4상태)", () => {
+  it.each([
+    ["pending", null, "pending"],
+    ["expired", null, "expired"],
+    // failed는 표시상 "거절됨"에 모은다 — DB에 rejected state가 없다.
+    ["failed", null, "rejected"],
+    ["executed", "accept", "approved"],
+    ["executed", "edit", "approved"],
+    ["decided", "accept", "approved"],
+    ["executing", "accept", "approved"],
+    // ignore/respond는 승인도 거절도 아닌 "안 하기로 한" 결정이다 — 거절 버킷으로.
+    ["decided", "ignore", "rejected"],
+    ["decided", "respond", "rejected"],
+    ["decided", null, "rejected"],
+    ["executed", null, "rejected"],
+  ] as const)("state=%s decision=%s → %s", (state, decision, expected) => {
+    expect(approvalPillState({ state, decision })).toBe(expected);
+  });
+});
+
+describe("groupByApprovalState (US-D02: 그룹 순서 = 대기 → 승인됨 → 거절됨 → 만료)", () => {
+  const rows = [
+    { id: "e", approvalState: "expired" as const },
+    { id: "p", approvalState: "pending" as const },
+    { id: "n", approvalState: null },
+    { id: "a", approvalState: "approved" as const },
+  ];
+
+  it("데이터가 있는 그룹만, 순서대로 내고 그룹 안 순서는 건드리지 않는다", () => {
+    expect(groupByApprovalState(rows).map((g) => [g.state, g.rows.map((r) => r.id)])).toEqual([
+      ["pending", ["p"]],
+      ["approved", ["a"]],
+      ["expired", ["e"]],
+    ]);
+  });
+
+  it("승인이 없는 행은 어느 그룹에도 안 들어간다", () => {
+    expect(groupByApprovalState(rows).flatMap((g) => g.rows)).not.toContainEqual({ id: "n" });
+  });
+
+  it("빈 입력은 빈 배열 — 헤더 없는 섹션을 만들지 않는다", () => {
+    expect(groupByApprovalState([])).toEqual([]);
+  });
+});
+
+describe("groupByAgentState (US-D02: blocked 최상단, 세션 없는 행은 ungrouped)", () => {
+  const rows = [
+    { id: "i", agentState: "idle" as const },
+    { id: "b", agentState: "blocked" as const },
+    { id: "x", agentState: null },
+    { id: "w", agentState: "working" as const },
+  ];
+
+  it("blocked → working → idle 순서로 묶고, ungrouped는 원래 순서로 따로 돌려준다", () => {
+    const { groups, ungrouped } = groupByAgentState(rows);
+    expect(groups.map((g) => [g.state, g.rows.map((r) => r.id)])).toEqual([
+      ["blocked", ["b"]],
+      ["working", ["w"]],
+      ["idle", ["i"]],
+    ]);
+    expect(ungrouped.map((r) => r.id)).toEqual(["x"]);
   });
 });

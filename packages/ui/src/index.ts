@@ -11,3 +11,4 @@ export * from "./components/approval-card.js";
 export * from "./components/tool-call-badge.js";
 export * from "./components/channel-rail.js";
 export * from "./components/status-pill.js";
+export * from "./components/group-header.js";

@@ -935,3 +935,39 @@ body {
   background: oklch(from var(--success-500) 0.92 calc(c * 0.25) h);
   color: oklch(from var(--success-500) 0.44 c h);
 }
+
+/* US-D02: Needs-approval/Agents 뷰의 상태별 그룹 헤더(ref-issue-tracker-density.webp "In review 6 +").
+   세로 패딩이 비대칭(10/6)인 건 의도다 — 헤더가 위가 아니라 아래 행들에 붙어 보여야 "이 묶음의
+   라벨"로 읽힌다. 카드 크롬(테두리·배경·그림자)은 두지 않는다: 헤더는 또 하나의 서피스가 아니라
+   리스트 문법이라, 톤 컬러 좌측 스트라이프 같은 강조 리본도 쓰지 않는다(pill이 이미 상태를 말한다). */
+.group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 6px;
+}
+
+/* 호버 채움은 --state-hover로 통일 — 인박스의 다른 인터랙티브 요소 4곳과 같은 토큰이다.
+   focus는 UA 기본 링에 맡긴다(outline을 끄는 규칙이 이 코드베이스에 없다). */
+.group-header__add {
+  border: var(--hairline);
+  border-radius: 6px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--dur-base) var(--ease-spring), color var(--dur-base)
+    var(--ease-spring);
+}
+
+.group-header__add:hover {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}

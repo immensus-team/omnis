@@ -1,5 +1,13 @@
 import { OpaqueSurface, type UiChannel, type UiItemStatus } from "@omnis/ui";
+import { groupBy } from "@omnis/ui/components/command-palette";
+import { GroupHeader } from "@omnis/ui/components/group-header";
 import { InboxRow, type LabelChip, type RowAvatar } from "@omnis/ui/components/inbox-row";
+import {
+  type AgentPillState,
+  AgentStatusPill,
+  type ApprovalPillState,
+  ApprovalStatusPill,
+} from "@omnis/ui/components/status-pill";
 import { formatRelativeTime } from "@omnis/ui/lib/relative-time";
 import {
   type AgentRuntimeKind,
@@ -7,7 +15,7 @@ import {
   agentSessionKinsoState,
 } from "@omnis/ui/lib/row-meta";
 import { useQuery } from "@rocicorp/zero/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
 import { setThreadArchived } from "../api/threads.js";
 import { useKeymap } from "../hooks/use-keymap.js";
@@ -27,6 +35,8 @@ export interface InboxQueryItem {
   id: string;
   scope: "work" | "personal" | "unknown";
   hasPendingApproval: boolean;
+  /** US-D02: 그룹 헤더가 묶는 표시 상태. null = 이 스레드에는 승인이 아예 없다. */
+  approvalState: ApprovalPillState | null;
   authorKind: "person" | "agent" | "system";
 }
 
@@ -41,8 +51,12 @@ export function filterInboxItems<T extends InboxQueryItem>(items: T[], filter: I
       return items.filter((i) => i.scope === "personal");
     case "agents":
       return items.filter((i) => i.authorKind === "agent");
+    // US-D02 편차: 예전엔 i.hasPendingApproval(지금 대기 중인 건만)이었다. 이제 승인 "활동이
+    // 있는" 스레드 전체다 — 레퍼런스의 상태 라이프사이클 그룹과 맞추려면 결정·만료된 건도
+    // 같은 뷰에 남아 있어야 한다(그래야 그룹 헤더가 여러 개 뜬다). 회귀는 없다: 대기만 있던
+    // 스레드는 이전과 똑같이 뜬다.
     case "needs-approval":
-      return items.filter((i) => i.hasPendingApproval);
+      return items.filter((i) => i.approvalState !== null);
   }
 }
 
@@ -91,6 +105,22 @@ export function threadSummary(row: {
   return "";
 }
 
+/** A3 approvals_state_ck(pending/decided/executing/executed/failed/expired) + decision
+ * (accept/edit/respond/ignore) → StatusPill의 4-상태 표시 매핑. DB에 "rejected" state는 없다 —
+ * ignore/respond로 결정됐거나 실행이 failed로 끝난 건 표시상 "거절됨" 버킷에 모은다(ponytail:
+ * 별도 실패 표시가 필요해지면 여기 매핑만 넓힌다). */
+export function approvalPillState(row: {
+  state: string;
+  decision?: string | null;
+}): ApprovalPillState {
+  if (row.state === "pending") return "pending";
+  if (row.state === "expired") return "expired";
+  if (row.state === "failed") return "rejected";
+  // decided / executing / executed
+  if (row.decision === "accept" || row.decision === "edit") return "approved";
+  return "rejected"; // ignore / respond / unknown decision
+}
+
 export interface ArchivableRow {
   threadId: string;
   /** threads.archived_at (ms). null이면 인박스에 남는다(A5 §3.1의 기본 쿼리). */
@@ -126,6 +156,64 @@ export function sortInboxRows<T extends SortableInboxRow>(rows: T[]): T[] {
     r.hasPendingApproval || r.agentState === "blocked";
   return [...rows].sort((a, b) => Number(needsAttention(b)) - Number(needsAttention(a)));
 }
+
+/** 그룹 헤더 순서는 "내가 지금 해야 하는 것" 우선(pending → approved → rejected → expired).
+ *  빈 그룹은 헤더도 만들지 않는다 — 데이터 없는 섹션은 소음이다. */
+const APPROVAL_GROUP_ORDER: ApprovalPillState[] = ["pending", "approved", "rejected", "expired"];
+
+export function groupByApprovalState<T extends { approvalState: ApprovalPillState | null }>(
+  rows: T[],
+): Array<{ state: ApprovalPillState; rows: T[] }> {
+  const groups = groupBy(
+    rows.filter((r): r is T & { approvalState: ApprovalPillState } => r.approvalState !== null),
+    (r) => r.approvalState,
+  );
+  // flatMap인 이유: `groups[s]?.length` 가드는 noUncheckedIndexedAccess 아래에서 인덱싱 결과를
+  // 좁혀 주지 못한다(map + ! 필요). 빈 그룹을 여기서 흘려보내는 편이 캐스트 없이 정직하다.
+  return APPROVAL_GROUP_ORDER.flatMap((s) => {
+    const rows = groups[s];
+    return rows?.length ? [{ state: s, rows }] : [];
+  });
+}
+
+/** blocked(내 응답 필요)가 맨 위 — DESIGN-DIRECTION.md의 herdr 상태 모델 순서 그대로. */
+const AGENT_GROUP_ORDER: AgentPillState[] = ["blocked", "working", "idle", "done", "failed"];
+
+/** agent_session이 아닌 agent-authored 행(agentState===null, 예: agent가 보낸 Slack 메시지)은
+ * 그룹 헤더로 묶을 상태가 없다 — 별도 마지막 섹션으로 그대로(원래 순서) 붙인다. */
+export function groupByAgentState<T extends { agentState: AgentPillState | null }>(
+  rows: T[],
+): { groups: Array<{ state: AgentPillState; rows: T[] }>; ungrouped: T[] } {
+  const grouped = rows.filter((r) => r.agentState !== null) as Array<
+    T & { agentState: AgentPillState }
+  >;
+  const ungrouped = rows.filter((r) => r.agentState === null);
+  const groups = groupBy(grouped, (r) => r.agentState);
+  return {
+    groups: AGENT_GROUP_ORDER.flatMap((s) => {
+      const rows = groups[s];
+      return rows?.length ? [{ state: s, rows }] : [];
+    }),
+    ungrouped,
+  };
+}
+
+/** U2 행 하나. threadRows 메모가 만들고, 그룹핑 평탄화(FlatItem)가 다시 참조한다. */
+interface ThreadRow extends InboxQueryItem, ArchivableRow, SortableInboxRow {
+  threadId: string;
+  agentSession: boolean;
+  title: string;
+  summary: string;
+  isDraft: boolean;
+  channel: UiChannel;
+  timestamp: string;
+  unread: boolean;
+  labels: LabelChip[];
+  avatar: RowAvatar;
+}
+
+/** Virtuoso는 평평한 배열만 받는다 — 그룹 헤더와 행을 한 스트림으로 접은 것. */
+type FlatItem = { kind: "header"; key: string; pill: ReactNode } | { kind: "row"; row: ThreadRow };
 
 export function Inbox({
   onOpen,
@@ -164,7 +252,10 @@ export function Inbox({
       .limit(200),
   );
   const [accounts] = useQuery(zero.query.accounts);
-  const [pendingApprovals] = useQuery(zero.query.pending_approvals.where("state", "=", "pending"));
+  // US-D02: 예전엔 .where("state","=","pending")이라 지금 대기 중인 건만 알고 있었다.
+  // 그룹 헤더가 pending/approved/rejected/expired를 나눠 그리려면 라이프사이클 전체가 필요해
+  // 필터를 뗀다(승인은 스레드당 소수라 상한을 새로 걸지 않는다 — 원래도 없었다).
+  const [pendingApprovals] = useQuery(zero.query.pending_approvals);
   const [labels] = useQuery(zero.query.labels);
   const [threadLabels] = useQuery(zero.query.thread_labels);
   const [agentSessions] = useQuery(zero.query.agent_sessions);
@@ -174,11 +265,23 @@ export function Inbox({
     () => new Map(accounts.map((a) => [a.id, a.channel as UiChannel])),
     [accounts],
   );
-  const pendingThreadIds = useMemo(
-    () =>
-      new Set(pendingApprovals.map((a) => a.thread_id).filter((id): id is string => Boolean(id))),
-    [pendingApprovals],
-  );
+  // US-D02: 스레드당 "가장 볼 만한" 승인 한 건. 대기 중인 게 있으면 그게 우선(사용자가 지금
+  // 행동해야 하는 것)이고, 없으면 가장 최근에 만들어진 건이다. hasPendingApproval도 여기서
+  // 파생된다 — 대기가 최우선이라 "대기 건이 하나라도 있으면 pending"이라는 예전 Set 의미와 같다.
+  const approvalByThread = useMemo(() => {
+    const rank = (state: string) => (state === "pending" ? 1 : 0);
+    const best = new Map<string, (typeof pendingApprovals)[number]>();
+    for (const approval of pendingApprovals) {
+      if (!approval.thread_id) continue;
+      const prev = best.get(approval.thread_id);
+      const wins =
+        !prev ||
+        rank(approval.state) > rank(prev.state) ||
+        (rank(approval.state) === rank(prev.state) && approval.created_at > prev.created_at);
+      if (wins) best.set(approval.thread_id, approval);
+    }
+    return best;
+  }, [pendingApprovals]);
   const labelById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels]);
   const chipsByThread = useMemo(() => {
     const map = new Map<string, LabelChip[]>();
@@ -208,30 +311,15 @@ export function Inbox({
   // U2: item 스트림을 thread 단위로 dedup(sent_at desc라 thread_id 첫 등장 = 최신 item).
   const threadRows = useMemo(() => {
     const seen = new Set<string>();
-    const rows: Array<{
-      id: string;
-      threadId: string;
-      agentSession: boolean;
-      scope: InboxQueryItem["scope"];
-      authorKind: InboxQueryItem["authorKind"];
-      hasPendingApproval: boolean;
-      title: string;
-      summary: string;
-      isDraft: boolean;
-      channel: UiChannel;
-      timestamp: string;
-      unread: boolean;
-      labels: LabelChip[];
-      avatar: RowAvatar;
-      agentState: AgentSessionKinsoState | null;
-      archivedAt: number | null;
-    }> = [];
+    const rows: ThreadRow[] = [];
     for (const item of items) {
       if (seen.has(item.thread_id)) continue;
       seen.add(item.thread_id);
       const isAgentSession = item.thread?.kind === "agent_session";
       const session = sessionByThread.get(item.thread_id);
       const agentState = isAgentSession && session ? agentSessionKinsoState(session.state) : null;
+      const approval = approvalByThread.get(item.thread_id);
+      const approvalState = approval ? approvalPillState(approval) : null;
       const runtime = session ? runtimeById.get(session.runtime_id) : undefined;
       const authorKind: InboxQueryItem["authorKind"] = isAgentSession
         ? "agent"
@@ -251,7 +339,8 @@ export function Inbox({
         agentSession: isAgentSession,
         scope: item.scope as InboxQueryItem["scope"],
         authorKind,
-        hasPendingApproval: pendingThreadIds.has(item.thread_id),
+        hasPendingApproval: approvalState === "pending",
+        approvalState,
         title,
         summary: threadSummary({
           metaSummary: (item.thread?.meta as { summary?: string } | null)?.summary ?? null,
@@ -271,7 +360,7 @@ export function Inbox({
       });
     }
     return rows;
-  }, [items, pendingThreadIds, channelByAccount, chipsByThread, sessionByThread, runtimeById]);
+  }, [items, approvalByThread, channelByAccount, chipsByThread, sessionByThread, runtimeById]);
 
   // 서버 상태가 오버라이드를 따라잡으면 오버라이드를 버린다 — 그래야 이후의 자동 보관(A4 §9)이나
   // 다른 기기에서 한 되살리기가 이 화면에서 무시되지 않는다.
@@ -327,6 +416,37 @@ export function Inbox({
     [viewFiltered, view],
   );
 
+  // US-D02: 그룹핑은 인박스의 needs-approval/agents 두 뷰에서만. Archived는 평평하게 둔다
+  // (보관 시각 역순이라는 자체 정렬 축이 있고, 그 위에 상태 그룹을 얹으면 두 기준이 싸운다).
+  // 나머지 필터(all/work/personal)도 예전과 완전히 같은 평평한 배열을 그대로 받는다.
+  const grouped = view === "inbox" && (filter === "needs-approval" || filter === "agents");
+  const listItems = useMemo<FlatItem[]>(() => {
+    if (!grouped) return filtered.map((row) => ({ kind: "row", row }));
+    if (filter === "needs-approval") {
+      return groupByApprovalState(filtered).flatMap((g) => [
+        {
+          kind: "header" as const,
+          key: `approval-${g.state}`,
+          pill: <ApprovalStatusPill state={g.state} count={g.rows.length} />,
+        },
+        ...g.rows.map((row) => ({ kind: "row" as const, row })),
+      ]);
+    }
+    // agents: 세션 상태가 없는 행(agent가 보낸 Slack 메시지 등)은 헤더 없이 맨 뒤에 붙인다.
+    const { groups, ungrouped } = groupByAgentState(filtered);
+    return [
+      ...groups.flatMap((g) => [
+        {
+          kind: "header" as const,
+          key: `agent-${g.state}`,
+          pill: <AgentStatusPill state={g.state} count={g.rows.length} />,
+        },
+        ...g.rows.map((row) => ({ kind: "row" as const, row })),
+      ]),
+      ...ungrouped.map((row) => ({ kind: "row" as const, row })),
+    ];
+  }, [filtered, grouped, filter]);
+
   return (
     <OpaqueSurface className="inbox-card">
       <div className="inbox-card__header">
@@ -358,29 +478,33 @@ export function Inbox({
       <Virtuoso
         role="listbox"
         style={{ flex: "1 1 0", minHeight: 0 }}
-        data={filtered}
-        itemContent={(_, item) => (
-          <InboxRow
-            id={item.id}
-            name={item.title}
-            summary={item.summary}
-            isDraft={item.isDraft}
-            avatar={item.avatar}
-            channel={item.channel}
-            agentState={item.agentState}
-            timestamp={item.timestamp}
-            unread={item.unread}
-            selected={item.id === selectedId}
-            hasPendingApproval={item.hasPendingApproval}
-            labels={item.labels}
-            archived={view === "archived"}
-            onArchive={(id) => toggleArchive(id, view !== "archived")}
-            onSelect={(id) => {
-              setSelectedId(id);
-              onOpen?.({ threadId: item.threadId, agentSession: item.agentSession });
-            }}
-          />
-        )}
+        data={listItems}
+        itemContent={(_, item) =>
+          item.kind === "header" ? (
+            <GroupHeader pill={item.pill} />
+          ) : (
+            <InboxRow
+              id={item.row.id}
+              name={item.row.title}
+              summary={item.row.summary}
+              isDraft={item.row.isDraft}
+              avatar={item.row.avatar}
+              channel={item.row.channel}
+              agentState={item.row.agentState}
+              timestamp={item.row.timestamp}
+              unread={item.row.unread}
+              selected={item.row.id === selectedId}
+              hasPendingApproval={item.row.hasPendingApproval}
+              labels={item.row.labels}
+              archived={view === "archived"}
+              onArchive={(id) => toggleArchive(id, view !== "archived")}
+              onSelect={(id) => {
+                setSelectedId(id);
+                onOpen?.({ threadId: item.row.threadId, agentSession: item.row.agentSession });
+              }}
+            />
+          )
+        }
       />
     </OpaqueSurface>
   );
