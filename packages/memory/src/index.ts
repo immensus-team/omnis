@@ -60,3 +60,21 @@ export {
   writeIngestSystemItem,
   type IngestSource,
 } from "./ingest/source.js";
+export {
+  parseExtractOutput,
+  setExtractor,
+  getExtractor,
+  createT1Extractor,
+  EXTRACT_BUDGET,
+  type Extractor,
+  type ExtractResult,
+} from "./ingest/extract.js";
+export {
+  runIngest,
+  registerIngestProvider,
+  resetIngestProviders,
+  type IngestDoc,
+  type IngestProvider,
+  type RunIngestDeps,
+} from "./ingest/run.js";
+export { createCalendarProvider } from "./ingest/calendar.js";
