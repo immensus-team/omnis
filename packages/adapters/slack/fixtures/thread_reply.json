@@ -1,0 +1,27 @@
+{
+  "scenario": "thread_reply",
+  "raw": {
+    "type": "message",
+    "channel": "C0123456789",
+    "user": "U0123456789",
+    "text": "sounds good",
+    "ts": "1700000100.000200",
+    "thread_ts": "1700000000.000100",
+    "team": "T0123456789"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C0123456789",
+        "externalId": "1700000100.000200",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U0123456789" },
+        "body": "sounds good",
+        "attachments": [],
+        "sentAt": "2023-11-14T22:15:00.000Z",
+        "status": "received",
+        "sourceHash": "1700000100.000200"
+      }
+    ]
+  }
+}

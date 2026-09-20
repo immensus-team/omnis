@@ -1,0 +1,25 @@
+{
+  "scenario": "deleted_message",
+  "raw": {
+    "type": "message",
+    "subtype": "message_deleted",
+    "channel": "C0123456789",
+    "ts": "1700000400.000500",
+    "deleted_ts": "1700000200.000300"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C0123456789",
+        "externalId": "1700000400.000500",
+        "kind": "message",
+        "author": { "kind": "person", "id": "" },
+        "body": "",
+        "attachments": [],
+        "sentAt": "2023-11-14T22:20:00.000Z",
+        "status": "received",
+        "sourceHash": "1700000400.000500"
+      }
+    ]
+  }
+}

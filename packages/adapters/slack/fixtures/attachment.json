@@ -1,0 +1,36 @@
+{
+  "scenario": "attachment",
+  "raw": {
+    "type": "message",
+    "channel": "C0123456789",
+    "user": "U0123456789",
+    "text": "see attached",
+    "ts": "1700000200.000300",
+    "team": "T0123456789",
+    "files": [
+      {
+        "mimetype": "image/png",
+        "size": 2048,
+        "url_private": "https://files.slack.com/x/y.png",
+        "name": "y.png"
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C0123456789",
+        "externalId": "1700000200.000300",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U0123456789" },
+        "body": "see attached",
+        "attachments": [
+          { "kind": "image", "mimeType": "image/png", "sizeBytes": 2048, "caption": "y.png" }
+        ],
+        "sentAt": "2023-11-14T22:16:40.000Z",
+        "status": "received",
+        "sourceHash": "1700000200.000300"
+      }
+    ]
+  }
+}

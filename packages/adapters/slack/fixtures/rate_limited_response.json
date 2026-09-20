@@ -1,0 +1,9 @@
+{
+  "scenario": "rate_limited_response",
+  "raw": {
+    "httpStatus": 429,
+    "headers": { "retry-after": "30" },
+    "body": { "ok": false, "error": "ratelimited" }
+  },
+  "expected": { "errorKind": "retryable_rate_limit" }
+}

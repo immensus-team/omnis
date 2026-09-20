@@ -1,0 +1,31 @@
+{
+  "scenario": "edited_message",
+  "raw": {
+    "type": "message",
+    "subtype": "message_changed",
+    "channel": "C0123456789",
+    "ts": "1700000300.000400",
+    "message": {
+      "type": "message",
+      "user": "U0123456789",
+      "text": "edited text",
+      "ts": "1700000200.000300",
+      "edited": { "user": "U0123456789", "ts": "1700000300.000000" }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C0123456789",
+        "externalId": "1700000300.000400",
+        "kind": "message",
+        "author": { "kind": "person", "id": "" },
+        "body": "",
+        "attachments": [],
+        "sentAt": "2023-11-14T22:18:20.000Z",
+        "status": "received",
+        "sourceHash": "1700000300.000400"
+      }
+    ]
+  }
+}
