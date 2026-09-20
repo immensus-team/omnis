@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
-import { afterEach } from "vitest";
 import { cleanup } from "@testing-library/react";
+import { afterEach } from "vitest";
 
 // deviation: plan's vitest.config.ts has no `globals: true`, so RTL's automatic
 // afterEach(cleanup) detection never fires and DOM leaks across tests in the same

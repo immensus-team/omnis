@@ -1,3 +1,3 @@
-export * from "./tokens";
-export * from "./components/glass-surface";
-export * from "./components/button";
+export * from "./tokens.js";
+export * from "./components/glass-surface.js";
+export * from "./components/button.js";

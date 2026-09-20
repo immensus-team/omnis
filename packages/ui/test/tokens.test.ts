@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { TYPE_SCALE, SPACE, RADIUS, DURATION, EASE_SPRING, WEIGHT } from "../src/tokens";
+import { describe, expect, it } from "vitest";
+import { DURATION, EASE_SPRING, RADIUS, SPACE, TYPE_SCALE, WEIGHT } from "../src/tokens";
 
 describe("A5 §1 design tokens", () => {
   it("type scale has exactly the 6 A5-D2 steps", () => {

@@ -8,7 +8,7 @@
   --gray-300: oklch(0.78 0.004 260);
   --gray-100: oklch(0.94 0.002 260);
   --gray-000: oklch(0.99 0.001 260);
-  --accent-500: oklch(0.70 0.15 230);
+  --accent-500: oklch(0.7 0.15 230);
   --accent-600: oklch(0.62 0.16 230);
   --danger-500: oklch(0.62 0.19 25);
   --warn-500: oklch(0.75 0.15 80);
@@ -24,9 +24,12 @@
   --accent: var(--accent-500);
   --accent-fg: oklch(0.14 0 0);
   --shadow-row-selected: 0 4px 16px oklch(0 0 0 / 0.35), 0 1px 2px oklch(0 0 0 / 0.4);
-  --font-sans: "Pretendard Variable", "Inter Variable", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --font-sans: "Pretendard Variable", "Inter Variable", -apple-system, BlinkMacSystemFont,
+    "SF Pro Text", system-ui, sans-serif;
   --hairline: 1px solid var(--border-hairline);
-  --dur-fast: 100ms; --dur-base: 160ms; --dur-slow: 400ms;
+  --dur-fast: 100ms;
+  --dur-base: 160ms;
+  --dur-slow: 400ms;
   --ease-spring: cubic-bezier(0.2, 0, 0, 1);
 }
 :root[data-theme="light"] {
@@ -35,15 +38,19 @@
   --bg-overlay: color-mix(in oklch, var(--gray-000) 78%, transparent);
   --border-hairline: oklch(0 0 0 / 0.08);
   --border-hairline-strong: oklch(0 0 0 / 0.14);
-  --text-primary: oklch(0.20 0.006 260);
+  --text-primary: oklch(0.2 0.006 260);
   --text-secondary: oklch(0.42 0.006 260);
   --text-tertiary: oklch(0.55 0.006 260 / 0.75);
   --accent: var(--accent-600);
   --accent-fg: oklch(0.99 0 0);
-  --shadow-row-selected: 0 4px 16px oklch(0 0 0 / 0.10), 0 1px 2px oklch(0 0 0 / 0.08);
+  --shadow-row-selected: 0 4px 16px oklch(0 0 0 / 0.1), 0 1px 2px oklch(0 0 0 / 0.08);
 }
 @media (prefers-reduced-motion: reduce) {
-  :root { --dur-fast: 0ms; --dur-base: 0ms; --dur-slow: 0ms; }
+  :root {
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+    --dur-slow: 0ms;
+  }
 }
 .glass-surface {
   background: var(--bg-overlay);
@@ -51,4 +58,6 @@
   -webkit-backdrop-filter: blur(24px) saturate(1.4);
   border: var(--hairline);
 }
-.opaque-surface { background: var(--bg-base); }
+.opaque-surface {
+  background: var(--bg-base);
+}
