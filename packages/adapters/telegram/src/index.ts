@@ -196,8 +196,9 @@ interface TgMessage {
   chat?: { id?: number | string; type?: string; title?: string };
   sender?: TgSender;
   text?: string;
-  date?: number;
-  editDate?: number;
+  // raw에서는 Date가 아니라 정수/문자열로 온다(아래 parseSentAt 참고).
+  date?: number | string;
+  editDate?: number | string;
   media?: TgMedia;
   // 삭제 업데이트는 메시지가 아니라 별개 shape(mtcute DeleteMessageUpdate 계열)라 이 키로 판별한다.
   deletedMessageIds?: number[];
@@ -208,6 +209,20 @@ function tgAttachmentKind(type: string | undefined): Attachment["kind"] {
   if (type === "video") return "video";
   if (type === "voice" || type === "audio") return "audio";
   return "file";
+}
+
+/** Telegram의 date는 초 단위 unix 정수지만, raw로 오는 건 항상 그렇진 않다 — JSON을 한 번 왕복한
+ *  mtcute 메시지는 Date가 ISO 문자열로 직렬화되고, 게이트웨이를 거친 raw는 숫자 문자열로 온다.
+ *  그대로 곱하면 NaN이 되고 toISOString()이 RangeError를 던진다 — normalize()는 backfill()/subscribe()
+ *  루프 안에서 메시지마다 불리므로 그 메시지 하나가 스트림 전체를 죽인다. 숫자로 읽히는 후보
+ *  (date → editDate)를 쓰고, 다 실패하면 원래 기본값 0으로 물러난다(Gmail internalDate / Outlook
+ *  sentDateTime 폴백과 같은 원칙). now()가 아니라 0인 건 기존 기본값을 보존하고 픽스처를 결정적으로
+ *  만들기 위해서다. */
+function parseSentAt(date?: number | string, editDate?: number | string): string {
+  const secs = [date, editDate]
+    .map((v) => (typeof v === "string" && v.trim() === "" ? Number.NaN : Number(v)))
+    .find((n) => Number.isFinite(n));
+  return new Date((secs ?? 0) * 1000).toISOString();
 }
 
 export function normalize(raw: unknown): NormalizedItem[] {
@@ -221,7 +236,7 @@ export function normalize(raw: unknown): NormalizedItem[] {
     [m.sender.firstName, m.sender.lastName].filter(Boolean).join(" ") ||
     m.sender.username ||
     senderId;
-  const sentAt = new Date((m.date ?? 0) * 1000).toISOString();
+  const sentAt = parseSentAt(m.date, m.editDate);
   const attachments: Attachment[] = m.media
     ? [
         {
