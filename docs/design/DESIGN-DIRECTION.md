@@ -30,3 +30,23 @@
 | `ref-glass-mail-ai-panel.webp` | Glassy sidebar over a background (translucent + blur + subtle tint), smart folder tree with counts, top tab pill, floating **AI chat panel** (suggested actions "Draft a reply / Summarize / Extract", model selector Auto/Claude/Gemini/GPT, attachment + @ mention input). Extend omnis's ask bar into this panel. |
 | `ref-issue-tracker-density.webp` | Filter chip bar ("Priority is any of 2 priorities"), status group headers (pill + count + +), sub-item indentation, hover card, checkbox dropdown. The density and status pill grammar for omnis's Tasks and Needs-approval views. |
 | `ref-dashboard-detail-card.webp` | Left icon rail (subtle background on the selected state), top title + subline, toggles and segmented controls, right detail card (photo + badge + key-value hairline table). The typography baseline for omnis's detail panel, Network person card, and Settings. |
+
+## Radius scale (US-D02 round 4, corrected against measurement in round 5)
+
+Several radii coexisting on one screen is deliberate (a uniform radius is the SaaS-card-kit tell).
+But when choosing one, choose from below — do not invent a new value on the spot. This table matches
+a full census of the `border-radius` declarations in `apps/desktop/src/app.css`
+(`grep -o 'border-radius: [^;]*' | sort | uniq -c`); when a value is added or removed, fix this
+table with it.
+
+| Value | Used for |
+|---|---|
+| `999px` | Pills — tab pills, row label chips, status badges |
+| `22px` | The channel rail plate (`.channel-rail__plate`) |
+| `20px` | Large screen-filling surfaces — `.inbox-card`, `.ask-panel` |
+| `12px` | Floating surfaces — status pills, hover card, filter popover |
+| `10px` | A step down inside a large surface — ask panel actions, the archive banner |
+| `8px` | List surfaces — selected/hovered rows, filter chips, the add-chip button |
+| `6px` | Small things inside a pill — group header counts, chip × buttons |
+| `50%` | Circles — avatars, unread/approval dots, status pill dots |
+| `30%` | The runtime avatar squircle |

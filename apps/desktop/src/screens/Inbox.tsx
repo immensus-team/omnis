@@ -1,13 +1,25 @@
-import { OpaqueSurface, type UiChannel, type UiItemStatus } from "@omnis/ui";
+import {
+  ArchiveIcon,
+  type FilterChip,
+  FilterChipBar,
+  OpaqueSurface,
+  type UiChannel,
+  type UiItemStatus,
+} from "@omnis/ui";
+import { groupBy } from "@omnis/ui/components/command-palette";
+import { GroupHeader } from "@omnis/ui/components/group-header";
 import { InboxRow, type LabelChip, type RowAvatar } from "@omnis/ui/components/inbox-row";
+import type { RelationshipState } from "@omnis/ui/components/person-card";
+import { type AgentPillState, AgentStatusPill } from "@omnis/ui/components/status-pill";
 import { formatRelativeTime } from "@omnis/ui/lib/relative-time";
 import {
   type AgentRuntimeKind,
   type AgentSessionKinsoState,
+  CHANNEL_LABEL,
   agentSessionKinsoState,
 } from "@omnis/ui/lib/row-meta";
 import { useQuery } from "@rocicorp/zero/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
 import { setThreadArchived } from "../api/threads.js";
 import { useKeymap } from "../hooks/use-keymap.js";
@@ -16,8 +28,8 @@ import { useZeroClient } from "../zero-client.js";
 export const FILTERS = ["all", "work", "personal", "agents", "needs-approval"] as const;
 export type InboxFilter = (typeof FILTERS)[number];
 
-/** 셸(App.tsx)이 어떤 화면을 열지 고르는 데 필요한 최소 정보. Thread와 AgentSession은 같은
- *  threads row를 보지만 kind='agent_session'일 때만 세션 화면이다(A5 §3.3). */
+/** The minimum the shell (App.tsx) needs to pick a screen. Thread and AgentSession look at the
+ *  same threads row, but only kind='agent_session' opens the session screen (A5 §3.3). */
 export interface OpenTarget {
   threadId: string;
   agentSession: boolean;
@@ -30,7 +42,8 @@ export interface InboxQueryItem {
   authorKind: "person" | "agent" | "system";
 }
 
-/** A5 §2.1: 5개 필터 pill은 서로 배타(라디오)이며 items.status/labels.kind='scope' 조합의 뷰다. */
+/** A5 §2.1: the five filter pills are mutually exclusive (radio) and are views over combinations
+ *  of items.status and labels.kind='scope'. */
 export function filterInboxItems<T extends InboxQueryItem>(items: T[], filter: InboxFilter): T[] {
   switch (filter) {
     case "all":
@@ -41,22 +54,27 @@ export function filterInboxItems<T extends InboxQueryItem>(items: T[], filter: I
       return items.filter((i) => i.scope === "personal");
     case "agents":
       return items.filter((i) => i.authorKind === "agent");
+    // This tab is an action queue, not an archive — only what is waiting on a decision right now
+    // stays. Keeping decided and expired items too means the tab never empties (the lifecycle
+    // deserves a view of its own, and there is not one yet).
     case "needs-approval":
       return items.filter((i) => i.hasPendingApproval);
   }
 }
 
-/** U2 행 제목: 사람 표시명 → 스레드 제목 → 채널 핸들(thread.external_id) → 플레이스홀더
- * (DESIGN-DIRECTION.md U2 명세 순서 그대로 — 이전 버전의 item.subject 폴백은 행이 item 단위였을 때의
- * 것으로, U2부터 행이 thread 단위가 되며 spec이 이 3단 체인으로 바뀌었다).
- * ponytail: personName은 마지막 item의 발신자만 본다 — 내가 마지막으로 답장한 스레드는 스레드
- * 제목으로 폴백한다. threads.participants까지 읽어 "상대방 이름"을 고르는 건 후속 범위. */
+/** U2 row title: person display name -> thread title -> channel handle (thread.external_id) ->
+ * placeholder, in exactly the order DESIGN-DIRECTION.md U2 specifies. (The older item.subject
+ * fallback belonged to the days when a row was one item; from U2 a row is one thread and the spec
+ * became this three-step chain.)
+ * ponytail: personName only looks at the last item's sender, so a thread I replied to last falls
+ * back to the thread title. Reading threads.participants to pick "the other person" is follow-up
+ * scope. */
 export function inboxRowTitle(row: {
   personName?: string | null;
   threadTitle?: string | null;
   channelHandle?: string | null;
 }): string {
-  return row.personName || row.threadTitle || row.channelHandle || "(제목 없음)";
+  return row.personName || row.threadTitle || row.channelHandle || "(no title)";
 }
 
 function firstLine(body: string): string {
@@ -64,20 +82,22 @@ function firstLine(body: string): string {
   return (idx === -1 ? body : body.slice(0, idx)).trim();
 }
 
-/** Gmail 어댑터는 subject를 본문 맨 앞에 "Subject: …\n\n"으로 합성해 넣는다 —
- * NormalizedItem에 subject 필드가 없어서다(packages/adapters/gmail/src/index.ts). 행 요약에
- * 메일 헤더 텍스트를 그대로 내보낼 이유는 없으니 벗겨 낸다. */
+/** The Gmail adapter synthesises the subject into the head of the body as "Subject: ...\n\n",
+ * because NormalizedItem has no subject field (packages/adapters/gmail/src/index.ts). There is no
+ * reason to put mail-header text into a row summary, so it is stripped. */
 function stripSubjectHeader(body: string): string {
   if (!body.startsWith("Subject: ")) return body;
   const blank = body.indexOf("\n\n");
   return blank === -1 ? "" : body.slice(blank + 2);
 }
 
-/** U2 요약: threads.meta.summary(B3가 채울 것) → subject → 마지막 item 본문 첫 줄.
- * 단 행 제목과 같은 문자열은 건너뛴다. Gmail/gcal은 thread.title을 subject/summary에서 만들고
- * (gcal은 body까지 같은 문자열이다) Phase A는 author_person_id를 안 채워 행 제목도 thread.title로
- * 떨어진다 — 그대로 두면 한 행에 같은 말이 두 줄 찍힌다. 남은 후보가 제목뿐이면 요약 줄을
- * 비운다(그리드 2행이 0높이로 접혀 한 줄짜리 행이 된다). B3 요약이 붙으면 이 경로는 사라진다. */
+/** U2 summary: threads.meta.summary (which B3 will fill) -> subject -> the last item's first
+ * body line, skipping any candidate identical to the row title. Gmail and gcal build thread.title
+ * out of the subject/summary (for gcal even the body is that same string) and Phase A never fills
+ * author_person_id, so the row title also falls through to thread.title — left alone, one row
+ * prints the same sentence twice. When the only candidate left is the title, the summary line is
+ * empty (the grid's second row collapses to zero height and the row becomes one line). This path
+ * disappears once B3 summaries land. */
 export function threadSummary(row: {
   metaSummary?: string | null;
   subject?: string | null;
@@ -93,12 +113,13 @@ export function threadSummary(row: {
 
 export interface ArchivableRow {
   threadId: string;
-  /** threads.archived_at (ms). null이면 인박스에 남는다(A5 §3.1의 기본 쿼리). */
+  /** threads.archived_at (ms). Null means it stays in the inbox (A5 §3.1's default query). */
   archivedAt: number | null;
 }
 
-/** US-A36: Inbox는 보관된 스레드를 빼고, Archived 뷰는 보관된 것만 보관 시각 역순으로 보여준다.
- *  `pending`은 HTTP 왕복 + Zero 복제가 도착하기 전까지의 낙관적 오버라이드(id → 보관 여부)다. */
+/** US-A36: Inbox leaves archived threads out, and the Archived view shows only those, newest
+ *  archived first. `pending` is the optimistic override (id -> archived?) that holds until the
+ *  HTTP round trip and Zero replication arrive. */
 export function applyArchiveView<T extends ArchivableRow>(
   rows: T[],
   view: "inbox" | "archived",
@@ -119,42 +140,102 @@ export interface SortableInboxRow {
   agentState: AgentSessionKinsoState | null;
 }
 
-/** U2: "blocked" agent session이거나 승인 대기가 있는 행을 맨 위로. 나머지는 원래 순서(최신순) 유지
- * — Array.prototype.sort는 stable(ES2019+, V8)이라 비교 키가 같은 행끼리는 입력 순서가 보존된다. */
+/** U2: rows that are a blocked agent session, or have a pending approval, go to the top;
+ * everything else keeps its original (newest-first) order — Array.prototype.sort is stable
+ * (ES2019+, V8), so rows with equal keys keep their input order. */
 export function sortInboxRows<T extends SortableInboxRow>(rows: T[]): T[] {
   const needsAttention = (r: SortableInboxRow) =>
     r.hasPendingApproval || r.agentState === "blocked";
   return [...rows].sort((a, b) => Number(needsAttention(b)) - Number(needsAttention(a)));
 }
 
+/** blocked ("needs my reply") comes first — the herdr state model's order from
+ * DESIGN-DIRECTION.md, unchanged. */
+const AGENT_GROUP_ORDER: AgentPillState[] = ["blocked", "working", "idle", "done", "failed"];
+
+/** An agent-authored row that is not an agent_session (agentState === null, e.g. a Slack message
+ * an agent sent) has no state to group under a header — it is appended as a separate final
+ * section, in its original order. */
+export function groupByAgentState<T extends { agentState: AgentPillState | null }>(
+  rows: T[],
+): { groups: Array<{ state: AgentPillState; rows: T[] }>; ungrouped: T[] } {
+  const grouped = rows.filter((r) => r.agentState !== null) as Array<
+    T & { agentState: AgentPillState }
+  >;
+  const ungrouped = rows.filter((r) => r.agentState === null);
+  const groups = groupBy(grouped, (r) => r.agentState);
+  return {
+    groups: AGENT_GROUP_ORDER.flatMap((s) => {
+      const rows = groups[s];
+      return rows?.length ? [{ state: s, rows }] : [];
+    }),
+    ungrouped,
+  };
+}
+
+/** One U2 row. Built by the threadRows memo and referenced again by the grouping flattener
+ * (FlatItem). */
+interface ThreadRow extends InboxQueryItem, ArchivableRow, SortableInboxRow {
+  threadId: string;
+  agentSession: boolean;
+  title: string;
+  summary: string;
+  isDraft: boolean;
+  channel: UiChannel;
+  timestamp: string;
+  unread: boolean;
+  unreadCount: number;
+  labels: LabelChip[];
+  avatar: RowAvatar;
+  /** US-D03: the author's person row (items.author), for the hover card's PersonCard. */
+  person: { vip: boolean; relationshipState: RelationshipState } | null;
+}
+
+/** Virtuoso only takes a flat array — this folds group headers and rows into one stream. */
+type FlatItem =
+  | { kind: "header"; key: string; count: number; pill: ReactNode }
+  | { kind: "row"; row: ThreadRow };
+
 export function Inbox({
   onOpen,
   channelFilter = null,
+  onChannelFilterChange,
 }: {
   onOpen?: (target: OpenTarget) => void;
-  /** U1 채널 레일 선택. null = 전체(Inbox 타일). pill 필터(work/personal/…)와 AND로 합쳐진다. */
+  /** U1 channel rail selection. null = everything (the Inbox tile). ANDed with the pill filters
+   *  (work/personal/...). */
   channelFilter?: UiChannel | null;
+  /** US-D02: how the channel chip's x undoes the rail selection. Without it the channel chip is
+   *  not drawn at all — an x that does nothing is worse than no x. */
+  onChannelFilterChange?: (c: UiChannel | null) => void;
 }) {
   const zero = useZeroClient();
   const [filter, setFilter] = useState<InboxFilter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<"inbox" | "archived">("inbox");
-  // 낙관적 오버라이드: 허브 왕복 + Zero 복제가 도착하기 전까지 행이 그 자리에 남아 있지 않게 한다.
+  // Optimistic override: keeps the row from sitting there unchanged until the hub round trip and
+  // Zero replication arrive.
   const [pendingArchive, setPendingArchive] = useState<Record<string, boolean>>({});
+  // US-D02: the label chip filter. An empty Set means no label condition (it is ANDed with the
+  // others).
+  const [selectedLabelIds, setSelectedLabelIds] = useState<Set<string>>(new Set());
 
-  // 편차(계획 A26 step 7 대비, 인터페이스 계약 §7 zeroSchema 기준): zeroSchema(A21, packages/kernel/src/zero-schema.ts)는
-  // Inbox/Thread가 실제로 쓰는 관계 3개(threads.items, items.thread, items.author)만 정의한다 —
-  // items.labels 관계는 없다(라벨은 items가 아니라 thread_labels로 스레드에 붙는다, A5 §3.1 "라벨 칩 명세").
-  // 채널·승인 배지·라벨은 관계가 아니라 각자 자기 테이블을 조회해 클라이언트에서 id로 조인한다.
+  // Deviation from plan A26 step 7, measured against interface contract §7's zeroSchema: the
+  // zeroSchema (A21, packages/kernel/src/zero-schema.ts) defines only the three relations
+  // Inbox/Thread actually use (threads.items, items.thread, items.author). There is no
+  // items.labels relation — labels attach to threads through thread_labels, not to items (A5 §3.1,
+  // the label chip spec). Channels, approval badges and labels therefore query their own tables
+  // and are joined by id on the client rather than through relations.
   //
-  // U2 편차: "thread 목록"은 zero.query.threads가 아니라 이 items 쿼리를 스레드 단위로 client-side
-  // dedup해서 만든다. 이유: zeroSchema에 threads→items 관계는 있지만 그 관계에 orderBy+limit을 걸어
-  // "스레드당 최신 item 1건"을 서버에 묻는 경로는 이 Zero 버전(1.9.0)에서 검증되지 않았다(zql AST의
-  // Ordering 타입 주석이 "루트 쿼리 밖의 정렬은 아직 지원 안 함"이라고 못박아 리스크가 있다) — 반면
-  // items를 sent_at desc로 받아 thread_id 첫 등장만 남기는 건 이미 동작이 증명된 쿼리 모양이라 그대로
-  // 재사용한다. ponytail: 한 스레드에 top-N 안에서 메시지가 여러 개면 다른 스레드가 밀릴 수 있다(한도
-  // 200으로 여유를 둠) — 진짜 "스레드별 최신 1건"이 필요해지면 threads.related("items", limit 1) 경로를
-  // 검증하고 전환.
+  // U2 deviation: the thread list is built by de-duplicating this items query per thread on the
+  // client, not by zero.query.threads. The zeroSchema does have a threads->items relation, but
+  // asking the server for "the newest item per thread" by putting orderBy+limit on that relation
+  // is unverified in this Zero version (1.9.0) — the zql AST's Ordering type comment states that
+  // ordering outside the root query is not supported yet, which makes it a risk. Taking items in
+  // sent_at desc order and keeping each thread_id's first appearance is a query shape already
+  // proven to work, so it is reused as-is. ponytail: a thread with several messages inside the
+  // top-N can push another thread out (the limit is 200 to leave slack) — if a true "newest per
+  // thread" is ever needed, verify the threads.related("items", limit 1) path and switch.
   const [items] = useQuery(
     zero.query.items
       .where("status", "!=", "archived")
@@ -164,7 +245,15 @@ export function Inbox({
       .limit(200),
   );
   const [accounts] = useQuery(zero.query.accounts);
-  const [pendingApprovals] = useQuery(zero.query.pending_approvals.where("state", "=", "pending"));
+  // Exactly what the name says: pending only. Replicating the whole lifecycle grows the client's
+  // approvals table without bound, while the only question the inbox actually asks is what is
+  // waiting on a decision right now.
+  const [pendingApprovals] = useQuery(
+    zero.query.pending_approvals
+      .where("state", "=", "pending")
+      .orderBy("created_at", "desc")
+      .limit(200),
+  );
   const [labels] = useQuery(zero.query.labels);
   const [threadLabels] = useQuery(zero.query.thread_labels);
   const [agentSessions] = useQuery(zero.query.agent_sessions);
@@ -174,11 +263,16 @@ export function Inbox({
     () => new Map(accounts.map((a) => [a.id, a.channel as UiChannel])),
     [accounts],
   );
-  const pendingThreadIds = useMemo(
-    () =>
-      new Set(pendingApprovals.map((a) => a.thread_id).filter((id): id is string => Boolean(id))),
-    [pendingApprovals],
-  );
+  // One approval per thread, the most recent. The query is created_at desc, so the first
+  // appearance is the newest.
+  const approvalByThread = useMemo(() => {
+    const best = new Map<string, (typeof pendingApprovals)[number]>();
+    for (const approval of pendingApprovals) {
+      if (!approval.thread_id) continue;
+      if (!best.has(approval.thread_id)) best.set(approval.thread_id, approval);
+    }
+    return best;
+  }, [pendingApprovals]);
   const labelById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels]);
   const chipsByThread = useMemo(() => {
     const map = new Map<string, LabelChip[]>();
@@ -205,33 +299,20 @@ export function Inbox({
     [agentRuntimes],
   );
 
-  // U2: item 스트림을 thread 단위로 dedup(sent_at desc라 thread_id 첫 등장 = 최신 item).
+  // U2: de-duplicate the item stream per thread (sent_at desc, so a thread_id's first appearance
+  // is its newest item).
   const threadRows = useMemo(() => {
     const seen = new Set<string>();
-    const rows: Array<{
-      id: string;
-      threadId: string;
-      agentSession: boolean;
-      scope: InboxQueryItem["scope"];
-      authorKind: InboxQueryItem["authorKind"];
-      hasPendingApproval: boolean;
-      title: string;
-      summary: string;
-      isDraft: boolean;
-      channel: UiChannel;
-      timestamp: string;
-      unread: boolean;
-      labels: LabelChip[];
-      avatar: RowAvatar;
-      agentState: AgentSessionKinsoState | null;
-      archivedAt: number | null;
-    }> = [];
+    const rows: ThreadRow[] = [];
     for (const item of items) {
       if (seen.has(item.thread_id)) continue;
       seen.add(item.thread_id);
       const isAgentSession = item.thread?.kind === "agent_session";
       const session = sessionByThread.get(item.thread_id);
       const agentState = isAgentSession && session ? agentSessionKinsoState(session.state) : null;
+      // The query takes state='pending' only (pending_approvals above), so existence means it is
+      // waiting on a decision.
+      const hasPendingApproval = approvalByThread.has(item.thread_id);
       const runtime = session ? runtimeById.get(session.runtime_id) : undefined;
       const authorKind: InboxQueryItem["authorKind"] = isAgentSession
         ? "agent"
@@ -251,7 +332,7 @@ export function Inbox({
         agentSession: isAgentSession,
         scope: item.scope as InboxQueryItem["scope"],
         authorKind,
-        hasPendingApproval: pendingThreadIds.has(item.thread_id),
+        hasPendingApproval,
         title,
         summary: threadSummary({
           metaSummary: (item.thread?.meta as { summary?: string } | null)?.summary ?? null,
@@ -263,18 +344,27 @@ export function Inbox({
         channel: channelByAccount.get(item.account_id) ?? "system",
         timestamp: formatRelativeTime(item.sent_at),
         unread: (item.thread?.unread_count ?? 0) > 0,
+        unreadCount: item.thread?.unread_count ?? 0,
         labels: chipsByThread.get(item.thread_id) ?? [],
         avatar:
           runtime !== undefined ? { kind: "runtime", runtime } : { kind: "initials", name: title },
+        // The persons row travels with items.author, so the hover card's relationship state and
+        // VIP chip are read, not guessed. Authorless rows (agent sessions, system) have none.
+        person: item.author
+          ? {
+              vip: item.author.vip,
+              relationshipState: item.author.relationship_state as RelationshipState,
+            }
+          : null,
         agentState,
         archivedAt: item.thread?.archived_at ?? null,
       });
     }
     return rows;
-  }, [items, pendingThreadIds, channelByAccount, chipsByThread, sessionByThread, runtimeById]);
+  }, [items, approvalByThread, channelByAccount, chipsByThread, sessionByThread, runtimeById]);
 
-  // 서버 상태가 오버라이드를 따라잡으면 오버라이드를 버린다 — 그래야 이후의 자동 보관(A4 §9)이나
-  // 다른 기기에서 한 되살리기가 이 화면에서 무시되지 않는다.
+  // Once the server state catches up with the override, the override is dropped — otherwise a
+  // later auto-archive (A4 §9), or a Restore performed on another device, would be ignored here.
   useEffect(() => {
     setPendingArchive((prev) => {
       const settled = threadRows.filter((r) => prev[r.threadId] === (r.archivedAt !== null));
@@ -288,7 +378,8 @@ export function Inbox({
   const toggleArchive = useCallback((threadId: string, archived: boolean) => {
     setPendingArchive((p) => ({ ...p, [threadId]: archived }));
     setThreadArchived(threadId, archived).catch((e: unknown) => {
-      // 허브가 거절하면 낙관적 상태를 되돌린다 — 화면이 서버보다 앞서 거짓말하지 않는다.
+      // If the hub refuses, the optimistic state is rolled back — the screen does not get to lie
+      // ahead of the server.
       setPendingArchive((p) => {
         const next = { ...p };
         delete next[threadId];
@@ -317,70 +408,201 @@ export function Inbox({
     () => filterInboxItems(channelFiltered, filter),
     [channelFiltered, filter],
   );
+  // US-D02 label chips: a thread passes if any of its thread_labels is one of the chosen labels.
+  // With nothing chosen this stage disappears entirely — filtering against an empty Set would
+  // reject everything, which is the default-value trap.
+  const labelFiltered = useMemo(() => {
+    if (selectedLabelIds.size === 0) return pillFiltered;
+    const matching = new Set<string>();
+    for (const tl of threadLabels) {
+      if (selectedLabelIds.has(tl.label_id)) matching.add(tl.thread_id);
+    }
+    return pillFiltered.filter((r) => matching.has(r.threadId));
+  }, [pillFiltered, threadLabels, selectedLabelIds]);
   const viewFiltered = useMemo(
-    () => applyArchiveView(pillFiltered, view, pendingArchive),
-    [pillFiltered, view, pendingArchive],
+    () => applyArchiveView(labelFiltered, view, pendingArchive),
+    [labelFiltered, view, pendingArchive],
   );
-  // Archived는 "보관 시각 역순"이 정렬 기준이다 — needs-attention을 위로 끌어올리지 않는다.
+  // Archived sorts by archive time, newest first — it does not pull needs-attention to the top.
   const filtered = useMemo(
     () => (view === "archived" ? viewFiltered : sortInboxRows(viewFiltered)),
     [viewFiltered, view],
+  );
+
+  // US-D02 filter chips. The chip wording is finished here and handed over — FilterChipBar knows
+  // nothing about channels or labels.
+  const chips: FilterChip[] = [];
+  if (channelFilter && onChannelFilterChange) {
+    chips.push({
+      id: "channel",
+      field: "Channel",
+      value: CHANNEL_LABEL[channelFilter],
+      onRemove: () => onChannelFilterChange(null),
+    });
+  }
+  if (selectedLabelIds.size > 0) {
+    chips.push({
+      id: "labels",
+      field: "Label",
+      // The reference's filter DSL collapses the quantifier for a single value too ("Channel is
+      // Slack") — "one of 1" is not something a person writes, so like the channel chip only the
+      // name is left.
+      value:
+        selectedLabelIds.size === 1
+          ? (labels.find((l) => selectedLabelIds.has(l.id))?.name ?? "1")
+          : `one of ${selectedLabelIds.size}`,
+      onRemove: () => setSelectedLabelIds(new Set()),
+    });
+  }
+  const addOptions = {
+    fieldLabel: "Label",
+    options: labels.map((l) => ({ id: l.id, label: l.name })),
+    selectedIds: [...selectedLabelIds],
+    onToggle: (id: string) =>
+      setSelectedLabelIds((s) => {
+        const next = new Set(s);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      }),
+  };
+
+  // US-D02: grouping happens in the agents view only. needs-approval queries pending alone
+  // (pending_approvals' `.where(state, pending)` above), so there is always exactly one group and
+  // a header band would repeat the name of the tab just chosen without carrying any information —
+  // only the number folds into the tab pill (pendingCount below). Archived stays flat too: laying
+  // state groups over its own sort axis (archive time, newest first) makes the two fight.
+  const grouped = view === "inbox" && filter === "agents";
+  const listItems = useMemo<FlatItem[]>(() => {
+    if (!grouped) return filtered.map((row) => ({ kind: "row", row }));
+    // agents: rows with no session state (a Slack message an agent sent, say) are appended at the
+    // end with no header.
+    const { groups, ungrouped } = groupByAgentState(filtered);
+    return [
+      ...groups.flatMap((g) => [
+        {
+          kind: "header" as const,
+          key: `agent-${g.state}`,
+          count: g.rows.length,
+          pill: <AgentStatusPill state={g.state} />,
+        },
+        ...g.rows.map((row) => ({ kind: "row" as const, row })),
+      ]),
+      ...ungrouped.map((row) => ({ kind: "row" as const, row })),
+    ];
+  }, [filtered, grouped]);
+
+  // The needs-approval tab's count. It only means anything if it is the same number whether or
+  // not the tab is selected, so it is counted **before** the pill filter — from `channelFiltered`,
+  // the last stage upstream of it. (It read `labelFiltered`, which looks pre-pill and is not: that
+  // stage returns `pillFiltered` untouched when no label is chosen, so the count was taken after
+  // the pill after all. The badge then vanished on every tab whose own rows carry no approval —
+  // the agents view advertised no queue while both waiting threads sat one tab away.) At zero it
+  // is not drawn: an empty queue is said by an empty list, not by a badge.
+  const pendingCount = useMemo(
+    () =>
+      applyArchiveView(channelFiltered, view, pendingArchive).filter((r) => r.hasPendingApproval)
+        .length,
+    [channelFiltered, view, pendingArchive],
   );
 
   return (
     <OpaqueSurface className="inbox-card">
       <div className="inbox-card__header">
         <h2 className="inbox-card__title">{view === "archived" ? "Archived" : "Inbox"}</h2>
-        <div role="radiogroup" aria-label="Inbox 필터" className="inbox-card__pills">
+      </div>
+      {/* US-D02b: this one line under the title is the whole filter UI — the view pills, the
+          Archived toggle and the label chips used to scatter over three lines (that is the
+          screenshot where the chips folded into a pile) and are now a single horizontally
+          scrolling strip. Narrow does not wrap it, it slides; app.css's container queries are what
+          strip the two widest buttons down to icons. */}
+      <div className="inbox-card__filter-row">
+        {/* Active label chips lead the strip. They used to sit after five always-present view
+            pills, so at 390px the chip currently filtering the list — and its x — scrolled off the
+            right edge behind the fade: a list cut to one row with nothing on screen saying why.
+            What is filtering must never be the first thing to scroll away. The order is DOM order,
+            not CSS `order`, so the tab sequence matches what the eye reads.
+            The chips and the "+" trigger are two bars rather than one moved bar: the trigger owns
+            an open popover, and remounting it at a different position the moment the first chip
+            appears tears that popover down mid-selection, which kills multi-select. */}
+        {chips.length > 0 && <FilterChipBar chips={chips} />}
+        <div role="radiogroup" aria-label="Inbox filters" className="inbox-card__pills">
           {FILTERS.map((f) => (
             <button
               key={f}
               type="button"
-              // biome-ignore lint/a11y/useSemanticElements: A5 §2.1 필터 pill — <input type="radio"> can't render a pill label+count.
+              // biome-ignore lint/a11y/useSemanticElements: A5 §2.1 filter pill — <input type="radio"> can't render a pill label+count.
               role="radio"
               aria-checked={filter === f}
               onClick={() => setFilter(f)}
             >
               {f}
+              {f === "needs-approval" && pendingCount > 0 && (
+                <span className="inbox-card__pill-count">{pendingCount}</span>
+              )}
             </button>
           ))}
         </div>
-        {/* US-A36: 보관함 pill. 필터 pill(라디오)과 달리 토글이라 radiogroup 밖에 둔다. */}
+        {/* US-A36: the Archived pill. Unlike the filter pills (radio) it is a toggle, so it sits
+            outside the radiogroup. */}
         <button
           type="button"
           className="inbox-card__archived-pill"
           aria-pressed={view === "archived"}
+          aria-label="Archived"
+          title="Archived"
           onClick={() => setView((v) => (v === "archived" ? "inbox" : "archived"))}
         >
-          보관됨
+          <ArchiveIcon className="inbox-card__archived-icon" size={14} aria-hidden="true" />
+          <span className="inbox-card__archived-label">Archived</span>
         </button>
+        {/* The "+ Label" trigger keeps the end of the strip whatever is filtering. A workspace
+            with no labels at all gets no bar — an empty strip is a control with nothing to
+            press. */}
+        {labels.length > 0 && <FilterChipBar chips={[]} addOptions={addOptions} />}
       </div>
       <Virtuoso
         role="listbox"
         style={{ flex: "1 1 0", minHeight: 0 }}
-        data={filtered}
-        itemContent={(_, item) => (
-          <InboxRow
-            id={item.id}
-            name={item.title}
-            summary={item.summary}
-            isDraft={item.isDraft}
-            avatar={item.avatar}
-            channel={item.channel}
-            agentState={item.agentState}
-            timestamp={item.timestamp}
-            unread={item.unread}
-            selected={item.id === selectedId}
-            hasPendingApproval={item.hasPendingApproval}
-            labels={item.labels}
-            archived={view === "archived"}
-            onArchive={(id) => toggleArchive(id, view !== "archived")}
-            onSelect={(id) => {
-              setSelectedId(id);
-              onOpen?.({ threadId: item.threadId, agentSession: item.agentSession });
-            }}
-          />
-        )}
+        data={listItems}
+        itemContent={(_, item) =>
+          item.kind === "header" ? (
+            <GroupHeader pill={item.pill} count={item.count} />
+          ) : (
+            <InboxRow
+              id={item.row.id}
+              name={item.row.title}
+              summary={item.row.summary}
+              isDraft={item.row.isDraft}
+              avatar={item.row.avatar}
+              channel={item.row.channel}
+              // When the group header directly above states the status, the row does not say it
+              // again (ref-issue-tracker-density.webp also keeps state words in the header only).
+              // What it does not do is erase the fact that this is a session — overwriting
+              // agentState with null drops a runtime session row to a channel glyph and it starts
+              // calling itself a "Slack message" (round three's rejection).
+              agentState={item.row.agentState}
+              groupedByState={grouped}
+              timestamp={item.row.timestamp}
+              unread={item.row.unread}
+              unreadCount={item.row.unreadCount}
+              selected={item.row.id === selectedId}
+              // On the needs-approval tab every row is pending — repeating with a dot per row
+              // what the tab already said makes the dot distinguish nothing (the same rule as
+              // dropping the status badge under a group header: what is stated above is not
+              // repeated below).
+              hasPendingApproval={filter !== "needs-approval" && item.row.hasPendingApproval}
+              labels={item.row.labels}
+              person={item.row.person}
+              archived={view === "archived"}
+              onArchive={(id) => toggleArchive(id, view !== "archived")}
+              onSelect={(id) => {
+                setSelectedId(id);
+                onOpen?.({ threadId: item.row.threadId, agentSession: item.row.agentSession });
+              }}
+            />
+          )
+        }
       />
     </OpaqueSurface>
   );

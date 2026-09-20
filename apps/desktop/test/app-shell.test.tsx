@@ -1,12 +1,21 @@
 // @vitest-environment jsdom
-// 루트 `pnpm test`는 apps/desktop/vitest.config.ts를 읽지 않는다(packages/ui의 테스트들과 같은 사정) —
-// 환경과 셋업을 파일 자체가 선언한다.
+// The root `pnpm test` does not read apps/desktop/vitest.config.ts (the same situation as the
+// packages/ui tests), so this file declares its own environment and setup.
 import "./setup";
 
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-// 이 테스트는 "화면이 셸에 실제로 붙어 있는가"만 본다. Zero 왕복은 tools/e2e(Playwright)가 본다.
+/** This test file's own directory. vitest's transform can leave import.meta.url on a scheme other
+ *  than file: (fileURLToPath then throws "The URL must be of scheme file"), so only the pathname is
+ *  taken — it does not depend on cwd, so it is the same under the root `pnpm test` and under
+ *  `--filter @omnis/desktop`. */
+const TEST_DIR = dirname(new URL(import.meta.url).pathname);
+
+// This test only asks whether the screens are actually mounted in the shell. The Zero round trip
+// is tools/e2e's job (Playwright).
 const chain: unknown = new Proxy(() => chain, {
   get: () => chain,
   apply: () => chain,
@@ -22,8 +31,8 @@ vi.mock("@rocicorp/zero/react", () => ({
   ZeroProvider: ({ children }: { children: unknown }) => children,
 }));
 
-// jsdom에는 ResizeObserver도 Element.scrollIntoView도 없다 — cmdk(Command.List)가 마운트
-// 이펙트에서 둘 다 바로 쓴다. 실제 브라우저 동작은 tools/e2e의 Playwright가 본다.
+// jsdom has neither ResizeObserver nor Element.scrollIntoView, and cmdk (Command.List) reaches
+// for both in its mount effect. Real browser behaviour is covered by tools/e2e's Playwright.
 Element.prototype.scrollIntoView ??= () => {};
 globalThis.ResizeObserver ??= class {
   observe() {}
@@ -33,25 +42,50 @@ globalThis.ResizeObserver ??= class {
 
 const { App } = await import("../src/App");
 
-describe("App shell (US-A25 '빈 셸' + A26~A31 화면 라우팅)", () => {
+describe("App shell (US-A25 'empty shell' + A26-A31 screen routing)", () => {
   it("mounts the Inbox screen", () => {
     render(<App />);
-    expect(screen.getByRole("radiogroup", { name: "Inbox 필터" })).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "Inbox filters" })).toBeInTheDocument();
   });
 
-  it("opens the command palette on ⌘K (A5 §2.3)", () => {
+  it("opens the ask panel on Cmd+K (US-D01: the inline ask bar's AI panel, not a modal palette)", () => {
     render(<App />);
-    expect(screen.queryByPlaceholderText("검색 또는 명령…")).not.toBeInTheDocument();
+    // Matched by role alone — the panel's accessible name is product copy that still goes through
+    // the app's Korean-first i18n layer, and this test is about the shortcut, not that string.
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     fireEvent.keyDown(window, { key: "k", metaKey: true });
-    expect(screen.getByPlaceholderText("검색 또는 명령…")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 });
 
-describe("App shell 레이아웃 (U1 kinso: 레일 + 메인 컬럼)", () => {
+describe("App shell layout (U1 kinso: rail + main column)", () => {
   it("does not reserve a detail column while nothing is open", () => {
-    // kinso 레퍼런스는 선택 전 Inbox 카드가 창 전체를 차지한다 — 빈 상세 패널이 폭을 먹으면 안 된다.
+    // In the kinso reference the Inbox card fills the window until something is selected — an
+    // empty detail pane must not take width.
     render(<App />);
     expect(screen.queryByTestId("detail-pane")).not.toBeInTheDocument();
     expect(screen.getByTestId("app-shell")).not.toHaveClass("app-shell--with-detail");
+  });
+});
+
+describe("App shell responsive contract (US-D02b)", () => {
+  // The narrow-shell breakpoint is held in **both** the CSS container query and
+  // channel-rail.tsx's matchMedia — React cannot read a container query's result, so the two
+  // cannot be merged. Change one and the rail draws the wrong tier (a bottom bar with six tiles,
+  // or the reverse) while the screen still looks plausible. This test stops that drift: when
+  // app.css changes, channel-rail.tsx's NARROW_RAIL_QUERY changes with it.
+  it("uses the same narrow-rail breakpoint in app.css and channel-rail.tsx", () => {
+    const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
+    const tsx = readFileSync(
+      join(TEST_DIR, "../../../packages/ui/src/components/channel-rail.tsx"),
+      "utf8",
+    );
+    // Look for the cut TS asserts inside the CSS. That catches drift in both directions: change
+    // either side alone and the string is no longer in the CSS, which fails here. (Picking "the
+    // narrowest cut" instead would grab the wrong value the moment a narrower cut is added.)
+    const fromTsx = tsx.match(/NARROW_RAIL_QUERY = "\(max-width: ([\d.]+)px\)"/)?.[1];
+
+    expect(fromTsx).toBeDefined();
+    expect(css).toContain(`@container shell (max-width: ${fromTsx}px)`);
   });
 });

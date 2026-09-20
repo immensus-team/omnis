@@ -1,6 +1,8 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  // .claude/** is vendored (skills, templates, fixtures) — not our code; the skills tsconfig
+  // templates/fixtures were blocking `pnpm lint` with 136 errors (since 353f0a7).
   "files": {
     "ignore": ["**/dist/**", "**/node_modules/**", ".claude/**", ".omc/**", "tools/spikes/**"]
   },

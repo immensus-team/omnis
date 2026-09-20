@@ -1,13 +1,28 @@
 // @vitest-environment jsdom
-// 루트 `pnpm test`(vitest.workspace.ts)는 packages/ui/vitest.config.ts를 읽지 않는다.
-// 환경과 셋업(jest-dom matchers + afterEach(cleanup))을 파일 자체가 선언한다.
+// The root `pnpm test` (vitest.workspace.ts) does not read packages/ui/vitest.config.ts, so the
+// file declares its own environment and setup (jest-dom matchers + afterEach(cleanup)).
 import "./setup";
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ChannelRail } from "../src/components/channel-rail";
+import type { UiChannel } from "../src/types.js";
 
-describe("ChannelRail (U1 kinso 좌측 레일)", () => {
+// US-D02b: stand in for the narrow shell (<900px). jsdom's window.matchMedia always reports
+// matches:false, so it has to be replaced — the component calls window.matchMedia, not globalThis.
+const REAL_MATCH_MEDIA = window.matchMedia;
+function stubNarrowRail(matches: boolean) {
+  window.matchMedia = (() => ({
+    matches,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  })) as unknown as typeof window.matchMedia;
+}
+afterEach(() => {
+  window.matchMedia = REAL_MATCH_MEDIA;
+});
+
+describe("ChannelRail (U1 kinso left rail)", () => {
   it("renders one tile per connected channel, plus the fixed Inbox tile", () => {
     render(
       <ChannelRail channels={["gmail", "slack", "agent"]} selected={null} onSelect={vi.fn()} />,
@@ -16,7 +31,7 @@ describe("ChannelRail (U1 kinso 좌측 레일)", () => {
     expect(screen.getByRole("button", { name: "Gmail" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Slack" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Agent" })).toBeInTheDocument();
-    // 채널 3개 + Inbox 1개 = 채널 타일 총 4개, 임의 5번째 채널은 없어야 한다.
+    // Three channels + Inbox = four tiles; an arbitrary fifth channel must not appear.
     expect(screen.queryByRole("button", { name: "LinkedIn" })).not.toBeInTheDocument();
   });
 
@@ -27,7 +42,7 @@ describe("ChannelRail (U1 kinso 좌측 레일)", () => {
     expect(onSelect).toHaveBeenCalledWith("slack");
   });
 
-  it("clicking the Inbox tile calls onSelect with null (전체 보기)", () => {
+  it("clicking the Inbox tile calls onSelect with null (show everything)", () => {
     const onSelect = vi.fn();
     render(<ChannelRail channels={["gmail"]} selected="gmail" onSelect={onSelect} />);
     fireEvent.click(screen.getByRole("button", { name: "Inbox" }));
@@ -42,21 +57,25 @@ describe("ChannelRail (U1 kinso 좌측 레일)", () => {
   });
 });
 
-describe("ChannelRail 브랜드 컬러 (P1: kinso polish)", () => {
-  it("colors each channel tile's glyph with its brand hex", () => {
+// US-D02b: a rail tile's mark is the real brand PNG, not a react-icons glyph tinted with a brand hex.
+describe("ChannelRail brand marks (US-D02b: official brand PNGs)", () => {
+  it("renders each channel tile's real brand PNG at the 18px rail size", () => {
     render(<ChannelRail channels={["gmail", "slack"]} selected={null} onSelect={vi.fn()} />);
-    const slackSvg = screen.getByRole("button", { name: "Slack" }).querySelector("svg");
-    expect(slackSvg).toHaveStyle({ color: "#4A154B" });
+    const img = screen.getByRole("button", { name: "Slack" }).querySelector("img");
+    expect(img?.getAttribute("src")).toMatch(/slack@1x\.png$/);
+    expect(img?.getAttribute("srcSet")).toMatch(/slack@1x\.png 1x, .*slack@2x\.png 2x$/);
+    expect(img).toHaveAttribute("width", "18");
+    expect(img).toHaveAttribute("height", "18");
   });
 
-  it("colors the Agents tile's sparkle with the accent token", () => {
+  it("renders the agent silhouette on the Agents tile", () => {
     render(<ChannelRail channels={["gmail"]} selected={null} onSelect={vi.fn()} />);
-    const agentSvg = screen.getByRole("button", { name: "Agent" }).querySelector("svg");
-    expect(agentSvg).toHaveStyle({ color: "var(--accent)" });
+    const img = screen.getByRole("button", { name: "Agent" }).querySelector("img");
+    expect(img?.getAttribute("src")).toMatch(/agent@1x\.png$/);
   });
 });
 
-describe("ChannelRail 고정 타일", () => {
+describe("ChannelRail fixed tiles", () => {
   it("renders the Agents tile even when no agent account is connected", () => {
     render(<ChannelRail channels={["gmail"]} selected={null} onSelect={vi.fn()} />);
     expect(screen.getByRole("button", { name: "Agent" })).toBeInTheDocument();
@@ -65,5 +84,113 @@ describe("ChannelRail 고정 타일", () => {
   it("does not duplicate the Agents tile when an agent account is connected", () => {
     render(<ChannelRail channels={["gmail", "agent"]} selected={null} onSelect={vi.fn()} />);
     expect(screen.getAllByRole("button", { name: "Agent" })).toHaveLength(1);
+  });
+});
+
+// US-D02b: in the narrow shell the rail is a bottom bar — at most four tiles stand in it and the
+// rest, along with the avatar and settings, move into the More popover (pushing tiles into a 320px
+// bar indefinitely produces horizontal scroll).
+describe("ChannelRail narrow shell (US-D02b: bottom bar + More popover)", () => {
+  const MANY: UiChannel[] = ["gmail", "slack", "outlook", "telegram", "whatsapp", "kakaotalk"];
+
+  it("keeps only the first 4 tiles in the bar and moves the rest into More", () => {
+    stubNarrowRail(true);
+    render(<ChannelRail channels={MANY} selected={null} onSelect={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Inbox" })).toBeInTheDocument();
+    for (const name of ["Gmail", "Slack", "Outlook", "Telegram"]) {
+      expect(screen.getByRole("button", { name })).toBeInTheDocument();
+    }
+    // From the fifth on they are not in the bar — they are inside More.
+    expect(screen.queryByRole("button", { name: "WhatsApp" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Agent" })).not.toBeInTheDocument();
+    // The two that stand at the foot of the wide rail are not in the bar either.
+    expect(screen.queryByRole("button", { name: "Account" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Settings" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "More" })).toBeInTheDocument();
+  });
+
+  it("More opens a popover with the overflow tiles plus the Account/Settings rows", () => {
+    stubNarrowRail(true);
+    render(<ChannelRail channels={MANY} selected={null} onSelect={vi.fn()} />);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+
+    const popover = screen.getByRole("dialog");
+    expect(within(popover).getByRole("button", { name: "WhatsApp" })).toBeInTheDocument();
+    expect(within(popover).getByRole("button", { name: "KakaoTalk" })).toBeInTheDocument();
+    expect(within(popover).getByRole("button", { name: "Agent" })).toBeInTheDocument();
+    // Unlike the 44px bar tiles there is room for words here — an icon alone does not say which
+    // tile it is.
+    expect(within(popover).getByText("Account")).toBeInTheDocument();
+    expect(within(popover).getByText("Settings")).toBeInTheDocument();
+    // The four already standing in the bar are not repeated in the popover.
+    expect(within(popover).queryByRole("button", { name: "Gmail" })).not.toBeInTheDocument();
+  });
+
+  it("picking an overflow channel selects it and closes the popover", () => {
+    stubNarrowRail(true);
+    const onSelect = vi.fn();
+    render(<ChannelRail channels={MANY} selected={null} onSelect={onSelect} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(screen.getByRole("button", { name: "WhatsApp" }));
+
+    expect(onSelect).toHaveBeenCalledWith("whatsapp");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("keeps every tile in the wide shell's bar", () => {
+    stubNarrowRail(false);
+    render(<ChannelRail channels={MANY} selected={null} onSelect={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "WhatsApp" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Account" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
+  });
+
+  it("does not offer a More button in the wide shell, where nothing overflows", () => {
+    stubNarrowRail(false);
+    const { container } = render(
+      <ChannelRail channels={MANY} selected={null} onSelect={vi.fn()} />,
+    );
+
+    // The chevron is a mark, not a control: it stays out of the accessibility tree and out of the
+    // tab order rather than announcing as a button that does nothing when pressed.
+    expect(screen.queryByRole("button", { name: "More" })).not.toBeInTheDocument();
+    expect(container.querySelector(".channel-rail__more")).toHaveAttribute("aria-hidden", "true");
+  });
+});
+
+// US-D02b: Account and Settings have no screen behind them yet. A labelled, focusable button that
+// does nothing is worse than a visibly gated one, so they are disabled and say why.
+describe("ChannelRail Phase B controls", () => {
+  it("disables Account and Settings and explains the gate in the wide shell", () => {
+    stubNarrowRail(false);
+    render(<ChannelRail channels={["gmail"]} selected={null} onSelect={vi.fn()} />);
+
+    for (const name of ["Account", "Settings"]) {
+      const button = screen.getByRole("button", { name });
+      expect(button).toBeDisabled();
+      expect(button.getAttribute("title")).toMatch(/Phase B/);
+    }
+  });
+
+  it("disables the Account and Settings rows inside the narrow shell's More popover", () => {
+    stubNarrowRail(true);
+    render(
+      <ChannelRail
+        channels={["gmail", "slack", "outlook", "telegram", "whatsapp"]}
+        selected={null}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    const popover = screen.getByRole("dialog");
+    for (const name of ["Account", "Settings"]) {
+      expect(within(popover).getByRole("button", { name })).toBeDisabled();
+    }
   });
 });

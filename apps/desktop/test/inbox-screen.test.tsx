@@ -4,6 +4,7 @@ import {
   type InboxQueryItem,
   type SortableInboxRow,
   filterInboxItems,
+  groupByAgentState,
   inboxRowTitle,
   sortInboxRows,
   threadSummary,
@@ -11,11 +12,16 @@ import {
 
 const items: InboxQueryItem[] = [
   { id: "1", scope: "work", hasPendingApproval: false, authorKind: "person" },
-  { id: "2", scope: "personal", hasPendingApproval: true, authorKind: "person" },
+  {
+    id: "2",
+    scope: "personal",
+    hasPendingApproval: true,
+    authorKind: "person",
+  },
   { id: "3", scope: "work", hasPendingApproval: false, authorKind: "agent" },
 ];
 
-describe("filterInboxItems (A5 §2.1 필터 pill 5개, 서로 배타)", () => {
+describe("filterInboxItems (A5 §2.1: five mutually exclusive filter pills)", () => {
   const cases: [InboxFilter, string[]][] = [
     ["all", ["1", "2", "3"]],
     ["work", ["1", "3"]],
@@ -28,7 +34,7 @@ describe("filterInboxItems (A5 §2.1 필터 pill 5개, 서로 배타)", () => {
   });
 });
 
-describe("inboxRowTitle (U2: 스레드 단위 행 제목, 사람 → 스레드 제목 → 채널 핸들)", () => {
+describe("inboxRowTitle (U2 per-thread row title: person -> thread title -> channel handle)", () => {
   it("prefers the person display name", () => {
     expect(
       inboxRowTitle({
@@ -50,39 +56,41 @@ describe("inboxRowTitle (U2: 스레드 단위 행 제목, 사람 → 스레드 �
   });
   it("uses the placeholder only when nothing identifies the row", () => {
     expect(inboxRowTitle({ personName: null, threadTitle: null, channelHandle: null })).toBe(
-      "(제목 없음)",
+      "(no title)",
     );
   });
 });
 
-describe("threadSummary (U2: threads.meta.summary → subject → 마지막 item 본문 첫 줄)", () => {
+describe("threadSummary (U2: threads.meta.summary -> subject -> last item's first body line)", () => {
   it("prefers threads.meta.summary when B3 has filled it", () => {
     expect(
       threadSummary({
-        metaSummary: "Brightstone Realty 계약서 공유를 원해요",
-        subject: "계약서 요청",
-        body: "안녕하세요\n계약서 부탁드립니다",
+        metaSummary: "Wants the Brightstone Realty contract shared",
+        subject: "Contract request",
+        body: "Hello\nCould you send the contract?",
       }),
-    ).toBe("Brightstone Realty 계약서 공유를 원해요");
+    ).toBe("Wants the Brightstone Realty contract shared");
   });
   it("falls back to the item subject when there is no summary yet", () => {
     expect(
-      threadSummary({ metaSummary: null, subject: "계약서 요청", body: "안녕하세요\n본문" }),
-    ).toBe("계약서 요청");
+      threadSummary({ metaSummary: null, subject: "Contract request", body: "Hello\nbody" }),
+    ).toBe("Contract request");
   });
   it("skips a subject that is already the row title and uses the body instead", () => {
-    // Gmail/gcal은 thread.title이 subject라 행 제목과 요약이 같은 문자열이 된다.
+    // For Gmail and gcal, thread.title is the subject, so the row title and the summary end up
+    // as the same string.
     expect(
       threadSummary({
         metaSummary: null,
         subject: "omnis launch sync",
         title: "omnis launch sync",
-        body: "내일 10시에 봐요\n장소는 추후 공지",
+        body: "See you at 10 tomorrow\nvenue to follow",
       }),
-    ).toBe("내일 10시에 봐요");
+    ).toBe("See you at 10 tomorrow");
   });
   it("leaves the summary empty when every candidate just repeats the title", () => {
-    // gcal은 body까지 e.summary와 같은 문자열이다 — 같은 말을 두 줄 쓰느니 둘째 줄을 접는다.
+    // For gcal even the body is that same e.summary string — rather than print one sentence
+    // twice, the second line is collapsed.
     expect(
       threadSummary({
         metaSummary: null,
@@ -98,27 +106,27 @@ describe("threadSummary (U2: threads.meta.summary → subject → 마지막 item
         metaSummary: null,
         subject: null,
         title: "PoC slides",
-        body: "Subject: PoC slides\n\n슬라이드 초안 보냅니다\n확인 부탁드려요",
+        body: "Subject: PoC slides\n\nSending the draft slides\nplease take a look",
       }),
-    ).toBe("슬라이드 초안 보냅니다");
+    ).toBe("Sending the draft slides");
   });
   it("falls back to the first line of the body when there is no summary and no subject", () => {
     expect(
       threadSummary({
         metaSummary: null,
         subject: null,
-        body: "회의 자료 확인 부탁드립니다\n감사합니다",
+        body: "Please take a look at the meeting notes\nthanks",
       }),
-    ).toBe("회의 자료 확인 부탁드립니다");
+    ).toBe("Please take a look at the meeting notes");
   });
   it("trims the first line", () => {
     expect(
-      threadSummary({ metaSummary: null, subject: null, body: "  공백 있음  \n둘째 줄" }),
-    ).toBe("공백 있음");
+      threadSummary({ metaSummary: null, subject: null, body: "  padded  \nsecond line" }),
+    ).toBe("padded");
   });
 });
 
-describe("sortInboxRows (U2: blocked agent session·승인 대기 행이 최상단, 나머지는 원래 순서 유지)", () => {
+describe("sortInboxRows (U2: blocked agent sessions and pending-approval rows first, the rest in their original order)", () => {
   it("moves a pending-approval row to the top without reordering the rest", () => {
     const rows: (SortableInboxRow & { id: string })[] = [
       { id: "a", hasPendingApproval: false, agentState: null },
@@ -154,5 +162,24 @@ describe("sortInboxRows (U2: blocked agent session·승인 대기 행이 최상�
     const original = [...rows];
     sortInboxRows(rows);
     expect(rows).toEqual(original);
+  });
+});
+
+describe("groupByAgentState (US-D02: blocked first, rows with no session left ungrouped)", () => {
+  const rows = [
+    { id: "i", agentState: "idle" as const },
+    { id: "b", agentState: "blocked" as const },
+    { id: "x", agentState: null },
+    { id: "w", agentState: "working" as const },
+  ];
+
+  it("groups blocked -> working -> idle and returns the ungrouped rows separately in order", () => {
+    const { groups, ungrouped } = groupByAgentState(rows);
+    expect(groups.map((g) => [g.state, g.rows.map((r) => r.id)])).toEqual([
+      ["blocked", ["b"]],
+      ["working", ["w"]],
+      ["idle", ["i"]],
+    ]);
+    expect(ungrouped.map((r) => r.id)).toEqual(["x"]);
   });
 });

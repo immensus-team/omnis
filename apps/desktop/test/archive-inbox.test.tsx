@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-// US-A36: 행 보관 → Inbox에서 사라지고 "보관됨" 뷰에 뜬다 → 되살리면 돌아온다.
-// app-shell.test.tsx의 프록시 목은 모든 쿼리에 같은 값을 주므로 여기서는 테이블 이름을 붙여
-// 테이블별로 다른 행을 주는 목을 쓴다(Inbox는 7개 쿼리를 건다).
+// US-A36: archive a row -> it leaves the Inbox and appears in the "Archived" view -> Restore
+// brings it back. app-shell.test.tsx's proxy mock answers every query with the same value, so this
+// file tags queries by table name and returns different rows per table (Inbox runs seven).
 import "./setup";
 
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -19,7 +19,7 @@ function item(threadId: string, title: string, archivedAt: number | null) {
     status: "received",
     scope: "work",
     subject: null,
-    body: `${title} 본문`,
+    body: `${title} body`,
     sent_at: Date.now(),
     author_person_id: null,
     author_agent_id: null,
@@ -37,7 +37,7 @@ function item(threadId: string, title: string, archivedAt: number | null) {
 }
 
 const store: Record<string, unknown[]> = {
-  items: [item(THREAD_A, "새 메일", null), item(THREAD_B, "묵은 메일", Date.now() - 86_400_000)],
+  items: [item(THREAD_A, "New mail", null), item(THREAD_B, "Older mail", Date.now() - 86_400_000)],
   accounts: [{ id: "acct-1", channel: "gmail" }],
   pending_approvals: [],
   labels: [],
@@ -46,7 +46,7 @@ const store: Record<string, unknown[]> = {
   agent_runtimes: [],
 };
 
-/** zero.query.<table>....(체인) → { __table }. 체인 메서드는 전부 자기 자신을 돌려준다. */
+/** zero.query.<table>....(chain) -> { __table }. Every chain method returns the proxy itself. */
 function taggedQuery(table: string): unknown {
   const proxy: unknown = new Proxy(
     {},
@@ -93,22 +93,22 @@ const rowNames = (): string[] =>
     .queryAllByRole("option")
     .map((r) => r.querySelector(".inbox-row__name")?.textContent ?? "");
 
-const archivedPill = () => screen.getByRole("button", { name: "보관됨" });
+const archivedPill = () => screen.getByRole("button", { name: "Archived" });
 const url = (call: number): string => String(fetchMock.mock.calls[call]?.[0]);
 
-describe("Inbox 보관/되살리기 (US-A36)", () => {
-  it("hides threads that are already archived and lists them under the 보관됨 pill", () => {
+describe("Inbox archive/restore (US-A36)", () => {
+  it("hides threads that are already archived and lists them under the Archived pill", () => {
     renderInbox();
-    expect(rowNames()).toEqual(["새 메일"]);
+    expect(rowNames()).toEqual(["New mail"]);
 
     fireEvent.click(archivedPill());
-    expect(rowNames()).toEqual(["묵은 메일"]);
-    expect(screen.getByRole("button", { name: "되살리기" })).toBeInTheDocument();
+    expect(rowNames()).toEqual(["Older mail"]);
+    expect(screen.getByRole("button", { name: "Restore" })).toBeInTheDocument();
   });
 
-  it("archives the selected row with `e` — it leaves the list at once and shows up in 보관됨", async () => {
+  it("archives the selected row with `e` — it leaves the list at once and shows up in Archived", async () => {
     renderInbox();
-    fireEvent.click(screen.getByRole("option", { name: /새 메일/ }));
+    fireEvent.click(screen.getByRole("option", { name: /New mail/ }));
     fireEvent.keyDown(window, { key: "e" });
 
     expect(rowNames()).toEqual([]);
@@ -116,21 +116,21 @@ describe("Inbox 보관/되살리기 (US-A36)", () => {
     expect(url(0)).toContain(`/api/threads/${THREAD_A}/archive`);
 
     fireEvent.click(archivedPill());
-    expect(rowNames()).toEqual(["새 메일", "묵은 메일"]);
+    expect(rowNames()).toEqual(["New mail", "Older mail"]);
   });
 
   it("restores it with `u` — back in the Inbox, and the hub gets the unarchive", () => {
     renderInbox();
-    fireEvent.click(screen.getByRole("option", { name: /새 메일/ }));
+    fireEvent.click(screen.getByRole("option", { name: /New mail/ }));
     fireEvent.keyDown(window, { key: "e" });
     fireEvent.click(archivedPill());
-    fireEvent.click(screen.getByRole("option", { name: /새 메일/ }));
+    fireEvent.click(screen.getByRole("option", { name: /New mail/ }));
     fireEvent.keyDown(window, { key: "u" });
 
-    expect(rowNames()).toEqual(["묵은 메일"]);
+    expect(rowNames()).toEqual(["Older mail"]);
     expect(url(1)).toContain(`/api/threads/${THREAD_A}/unarchive`);
     fireEvent.click(archivedPill());
-    expect(rowNames()).toEqual(["새 메일"]);
+    expect(rowNames()).toEqual(["New mail"]);
   });
 
   it("the hover action archives the row it belongs to without opening it", () => {
@@ -140,7 +140,7 @@ describe("Inbox 보관/되살리기 (US-A36)", () => {
         <Inbox onOpen={onOpen} />
       </VirtuosoMockContext.Provider>,
     );
-    fireEvent.click(screen.getByRole("button", { name: "보관" }));
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
     expect(onOpen).not.toHaveBeenCalled();
     expect(url(0)).toContain(`/api/threads/${THREAD_A}/archive`);
     expect(rowNames()).toEqual([]);

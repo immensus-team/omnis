@@ -1,3 +1,4 @@
+import * as HoverCard from "@radix-ui/react-hover-card";
 import { cn } from "../lib/cn.js";
 import {
   type AgentRuntimeKind,
@@ -11,6 +12,8 @@ import {
 } from "../lib/row-meta.js";
 import type { UiChannel } from "../types.js";
 import { ChannelGlyph } from "./channel-glyph.js";
+import { KeyValueTable } from "./key-value-table.js";
+import { PersonCard, type RelationshipState } from "./person-card.js";
 import { AgentStatusBadge } from "./status-badge.js";
 
 export interface LabelChip {
@@ -19,56 +22,76 @@ export interface LabelChip {
   color: string | null;
 }
 
-/** U2 아바타: 사람 사진(있으면) → 이니셜+파스텔 폴백, agent_session 행은 런타임 로고
- * (DESIGN-DIRECTION.md U2 — identities에 사진 필드가 아직 없어 "photo"는 데이터가 들어올 때를 위한 자리). */
+/** U2 avatar: a person's photo when there is one, otherwise the initials+pastel fallback; an
+ * agent_session row shows its runtime logo (DESIGN-DIRECTION.md U2 — identities has no photo field
+ * yet, so "photo" is the slot held open for when that data arrives). */
 export type RowAvatar =
   | { kind: "photo"; url: string; name: string }
   | { kind: "initials"; name: string }
   | { kind: "runtime"; runtime: AgentRuntimeKind };
 
 export interface InboxRowProps {
-  /** thread id — U2부터 행은 item이 아니라 thread 하나당 하나다. */
+  /** thread id — since U2 a row is one per thread, not one per item. */
   id: string;
-  /** 이름/제목(사람 표시명 → 스레드 제목 → 채널 핸들, Inbox.tsx의 inboxRowTitle). */
+  /** Name or title (person display name -> thread title -> channel handle; Inbox.tsx's
+   *  inboxRowTitle). */
   name: string;
-  /** 이미 포맷된 상대시간 문자열("3m"/"2w"/"4 Aug" — @omnis/ui/lib/relative-time). */
+  /** An already-formatted relative time string ("3m"/"2w"/"4 Aug" — @omnis/ui/lib/relative-time). */
   timestamp: string;
-  /** threads.meta.summary 우선, 없으면 subject/본문 첫 줄(Inbox.tsx의 threadSummary). */
+  /** threads.meta.summary first, else the subject or the body's first line (Inbox.tsx's
+   *  threadSummary). */
   summary: string;
-  /** 마지막 item이 draft 상태면 요약 앞에 "초안: "을 붙인다(A5 §3.1). */
+  /** When the last item is a draft, the summary is prefixed with "Draft: " (A5 §3.1). */
   isDraft: boolean;
   avatar: RowAvatar;
   channel: UiChannel;
-  /** null이 아니면 agent_session 행 — 우측 슬롯이 채널 아이콘 대신 상태 배지를 보여준다. */
+  /** Non-null means this is an agent_session row — the right slot shows a status badge instead of
+   *  a channel mark. Whether a row is a session lives here and nowhere else: overwriting it with
+   *  null for a grouped view drops the row back to a channel glyph, so a runtime session claims to
+   *  be a "Slack message" and the hover card grows a channel line it does not have. */
   agentState: AgentSessionKinsoState | null;
+  /** The group header directly above already states this row's status (the Agents view). The row
+   *  does not repeat it, and does not fill the gap with an unrelated channel glyph either — a
+   *  session row's right slot is simply empty. */
+  groupedByState?: boolean;
   unread: boolean;
+  /** The unread count (threads.unread_count). The row reduces it to a single dot, so the hover
+   *  card is where the number is said. */
+  unreadCount?: number;
   selected: boolean;
   hasPendingApproval: boolean;
   labels: LabelChip[];
   onSelect: (id: string) => void;
-  /** US-A36 행 hover 액션. 없으면 버튼을 그리지 않는다(A5 §3.1 "hover 시 우측에 아이콘 버튼"). */
+  /** US-A36 row hover action. Without it no button is drawn (A5 §3.1, "an icon button on the
+   *  right on hover"). */
   onArchive?: (id: string) => void;
-  /** 보관된 행이면 액션이 "되살리기"가 된다(A5 §3.8). */
+  /** On an archived row the action becomes "Restore" (A5 §3.8). */
   archived?: boolean;
+  /** US-D03: the person behind this row (items.author), for the hover card's PersonCard. Absent on
+   *  an agent session, which has no person — the card then omits those rows rather than inventing
+   *  them. */
+  person?: { vip?: boolean; relationshipState?: RelationshipState | null } | null;
 }
 
 function pickChips(labels: LabelChip[]): { shown: LabelChip[]; more: number } {
   const scope = labels.find((l) => l.kind === "scope");
   const rest = labels.filter((l) => l !== scope);
-  // A5 §3.1: 칩은 최대 2개. scope가 없으면 그 자리를 비우지 않고 나머지 라벨로 채운다.
+  // A5 §3.1: at most two chips. With no scope label, that slot is filled from the remaining
+  // labels rather than left empty.
   const shown = (scope ? [scope, ...rest] : rest).slice(0, 2);
   return { shown, more: labels.length - shown.length };
 }
 
 function RowAvatarView({ avatar }: { avatar: RowAvatar }) {
   if (avatar.kind === "runtime") {
-    // U5: 실제 브랜드 마크가 있는 런타임(Claude/DeepSeek/…)은 그 로고, 없는 런타임(Hermes)은
-    // 사람 아바타의 이니셜 폴백과 같은 발상으로 글자 한 글자(RUNTIME_LETTER)를 보여준다.
+    // U5: a runtime with a real brand mark (Claude, DeepSeek, ...) shows that logo; one without
+    // (Hermes) shows a single letter (RUNTIME_LETTER), the same idea as a person's initials
+    // fallback.
     const Icon = RUNTIME_ICON[avatar.runtime];
     return (
       <span
         className="inbox-row__avatar inbox-row__avatar--runtime"
-        aria-label={`${RUNTIME_LABEL[avatar.runtime]} 세션`}
+        aria-label={`${RUNTIME_LABEL[avatar.runtime]} session`}
       >
         {Icon ? <Icon size={16} aria-hidden="true" /> : RUNTIME_LETTER[avatar.runtime]}
       </span>
@@ -94,80 +117,143 @@ function RowAvatarView({ avatar }: { avatar: RowAvatar }) {
 
 export function InboxRow(props: InboxRowProps) {
   const { shown, more } = pickChips(props.labels);
-  const summaryText = props.isDraft ? `초안: ${props.summary}` : props.summary;
+  const summaryText = props.isDraft ? `Draft: ${props.summary}` : props.summary;
+  // US-D03: a runtime avatar is the one row shape with nobody behind it.
+  const isPerson = props.avatar.kind !== "runtime";
+  const unreadRows =
+    props.unreadCount !== undefined && props.unreadCount > 0
+      ? [{ label: "Unread", value: props.unreadCount, numeric: true }]
+      : [];
   return (
-    // biome-ignore lint/a11y/useSemanticElements: A5 §3.1 listbox/option pattern — <option> is only valid inside <select> and can't hold this row's markup.
-    <div
-      role="option"
-      tabIndex={0}
-      aria-selected={props.selected}
-      className={cn("inbox-row", props.selected && "inbox-row--selected")}
-      onClick={() => props.onSelect(props.id)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          props.onSelect(props.id);
-        }
-      }}
-    >
-      <RowAvatarView avatar={props.avatar} />
-      <div className="inbox-row__meta">
-        <span className="inbox-row__name" data-unread={props.unread}>
-          {props.name}
-        </span>
-        {props.unread && <span className="inbox-row__unread-dot" aria-label="안읽음" />}
-        <span className="inbox-row__timestamp">{props.timestamp}</span>
-      </div>
-      <div className="inbox-row__side">
-        {props.agentState ? (
-          <AgentStatusBadge state={props.agentState} />
-        ) : (
-          <span
-            className="inbox-row__channel-icon"
-            aria-label={`${CHANNEL_LABEL[props.channel]} 메시지`}
-          >
-            <ChannelGlyph channel={props.channel} size={16} />
-          </span>
-        )}
-        {props.hasPendingApproval && (
-          <span className="inbox-row__approval-dot" aria-label="승인 대기" />
-        )}
-        {props.onArchive && (
-          <button
-            type="button"
-            className="inbox-row__action"
-            // 행 전체가 클릭 타깃이라 버블링을 막지 않으면 보관과 동시에 스레드가 열린다.
-            onClick={(e) => {
-              e.stopPropagation();
-              props.onArchive?.(props.id);
-            }}
-            onKeyDown={(e) => e.stopPropagation()}
-          >
-            {props.archived ? "되살리기" : "보관"}
-          </button>
-        )}
-      </div>
-      <div className="inbox-row__summary-line">
-        <span className="inbox-row__summary" data-draft={props.isDraft}>
-          {summaryText}
-        </span>
-        <div className="inbox-row__chips">
-          {shown.map((chip) => (
-            <span
-              key={`${chip.kind}:${chip.name}`}
-              className="inbox-row__chip"
-              aria-label={`${chip.kind} 라벨: ${chip.name}`}
-            >
-              {chip.name}
+    // US-D02: HoverCard.Trigger is asChild, so it only adds hover handlers to this row div — no
+    // wrapper element appears and the row's role="option", click and keyboard behaviour are
+    // untouched (Radix Slot merges into the existing props).
+    // The 400ms openDelay is deliberate: rows here are short, so a pointer sweeps across many of
+    // them, and with no delay the cards flash one after another (hover intent). closeDelay stays
+    // short (100ms) so the card follows while moving between rows.
+    <HoverCard.Root openDelay={400} closeDelay={100}>
+      <HoverCard.Trigger asChild>
+        {/* biome-ignore lint/a11y/useSemanticElements: A5 §3.1 listbox/option pattern — <option> is only valid inside <select> and can't hold this row's markup. */}
+        <div
+          role="option"
+          tabIndex={0}
+          aria-selected={props.selected}
+          className={cn("inbox-row", props.selected && "inbox-row--selected")}
+          onClick={() => props.onSelect(props.id)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              props.onSelect(props.id);
+            }
+          }}
+        >
+          <RowAvatarView avatar={props.avatar} />
+          <div className="inbox-row__meta">
+            <span className="inbox-row__name" data-unread={props.unread}>
+              {props.name}
             </span>
-          ))}
-          {more > 0 && (
-            <span className="inbox-row__chip-more" aria-label={`라벨 ${more}개 더 보기`}>
-              +{more}
+            {props.unread && <span className="inbox-row__unread-dot" aria-label="Unread" />}
+            <span className="inbox-row__timestamp">{props.timestamp}</span>
+          </div>
+          <div className="inbox-row__side">
+            {props.agentState ? (
+              !props.groupedByState && <AgentStatusBadge state={props.agentState} />
+            ) : (
+              <span
+                className="inbox-row__channel-icon"
+                aria-label={`${CHANNEL_LABEL[props.channel]} message`}
+              >
+                <ChannelGlyph channel={props.channel} size={16} />
+              </span>
+            )}
+            {props.hasPendingApproval && (
+              <span className="inbox-row__approval-dot" aria-label="Pending approval" />
+            )}
+            {props.onArchive && (
+              <button
+                type="button"
+                className="inbox-row__action"
+                // The whole row is a click target, so without stopping propagation archiving
+                // also opens the thread.
+                onClick={(e) => {
+                  e.stopPropagation();
+                  props.onArchive?.(props.id);
+                }}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                {props.archived ? "Restore" : "Archive"}
+              </button>
+            )}
+          </div>
+          <div className="inbox-row__summary-line">
+            <span className="inbox-row__summary" data-draft={props.isDraft}>
+              {summaryText}
             </span>
-          )}
+            <div className="inbox-row__chips">
+              {shown.map((chip) => (
+                <span
+                  key={`${chip.kind}:${chip.name}`}
+                  className="inbox-row__chip"
+                  aria-label={`${chip.kind} label: ${chip.name}`}
+                >
+                  {chip.name}
+                </span>
+              ))}
+              {more > 0 && (
+                <span className="inbox-row__chip-more" aria-label={`${more} more labels`}>
+                  +{more}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      </HoverCard.Trigger>
+      <HoverCard.Portal>
+        {/* A floating panel, so it is glass (DESIGN-DIRECTION.md: Liquid Glass on floating panels
+            only). Its density follows the reference (the lower-left card in
+            ref-issue-tracker-density.webp) — a compact card of a title plus a few key-value lines,
+            not a detail pane.
+            US-D03: the body is the shared PersonCard (initials/photo + badge row + KeyValueTable)
+            rather than a private <dl>, so the inbox and the future Network screen draw an identity
+            the same way. The card still says only what the row had to cut — the summary the row
+            clamped, and the labels it clipped to two chips plus "+N".
+            An agent_session row has no person behind it (its avatar slot holds the runtime logo),
+            so it keeps the plain title + table form instead of claiming to be somebody. */}
+        <HoverCard.Content
+          className="glass-surface row-hover-card"
+          data-glass-slot="sheet"
+          side="right"
+          align="start"
+          sideOffset={8}
+        >
+          {isPerson ? (
+            <PersonCard
+              person={{
+                name: props.name,
+                vip: props.person?.vip ?? false,
+                relationshipState: props.person?.relationshipState ?? null,
+                channels: [props.channel],
+                labels: more > 0 ? props.labels.map((l) => l.name) : [],
+                lastContact: props.timestamp,
+              }}
+              extraRows={unreadRows}
+            >
+              {summaryText && <p className="row-hover-card__summary">{summaryText}</p>}
+            </PersonCard>
+          ) : (
+            <>
+              <p className="row-hover-card__title">{props.name}</p>
+              {summaryText && <p className="row-hover-card__summary">{summaryText}</p>}
+              <KeyValueTable
+                rows={[
+                  { label: "Last activity", value: props.timestamp, numeric: true },
+                  ...unreadRows,
+                ]}
+              />
+            </>
+          )}
+        </HoverCard.Content>
+      </HoverCard.Portal>
+    </HoverCard.Root>
   );
 }

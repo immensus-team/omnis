@@ -13,6 +13,8 @@
   },
   "scripts": { "test": "vitest run", "typecheck": "tsc --build" },
   "dependencies": {
+    "@radix-ui/react-hover-card": "^1.1.23",
+    "@radix-ui/react-popover": "^1.1.23",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "tailwind-merge": "^2.5.0",

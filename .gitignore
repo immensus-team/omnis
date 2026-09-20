@@ -26,5 +26,7 @@ tools/e2e/.tmp/
 tools/e2e/.playwright/
 ops/mini/env.sh
 tools/auth-kit/accounts.local.json
+# One-off Playwright helper for screenshots (not committed — only docs/design/screens/ output is committed).
+tools/e2e/.shoot.*
 # Visual regression test scratch output (screenshots/report) — not committed; baseline/ is committed separately.
 tools/visual/.current/

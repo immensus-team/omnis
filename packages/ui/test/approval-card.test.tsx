@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// 루트 `pnpm test`(vitest.workspace.ts)는 packages/ui/vitest.config.ts를 읽지 않는다.
-// 환경과 셋업(jest-dom matchers + afterEach(cleanup))을 파일 자체가 선언한다.
+// The root `pnpm test` (vitest.workspace.ts) does not read packages/ui/vitest.config.ts, so the
+// environment and the setup (jest-dom matchers + afterEach(cleanup)) are declared by the file itself.
 import "./setup";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -8,23 +8,23 @@ import { type ApprovalCardInterrupt, ApprovalCardView } from "../src/components/
 
 const interrupt: ApprovalCardInterrupt = {
   action: "send",
-  description: "Gmail 답장: David Park에게",
+  description: "Gmail reply: to David Park",
   config: { allow_accept: true, allow_edit: true, allow_respond: false, allow_ignore: true },
 };
 
-describe("ApprovalCardView (A5-D10, HumanInterrupt 4-way)", () => {
+describe("ApprovalCardView (A5-D10, the 4-way HumanInterrupt)", () => {
   it("renders only the buttons the config allows", () => {
     render(<ApprovalCardView interrupt={interrupt} onDecide={vi.fn()} />);
-    expect(screen.getByText("승인")).toBeInTheDocument();
-    expect(screen.getByText("수정 후 승인")).toBeInTheDocument();
-    expect(screen.queryByText("응답")).not.toBeInTheDocument();
-    expect(screen.getByText("무시")).toBeInTheDocument();
+    expect(screen.getByText("Approve")).toBeInTheDocument();
+    expect(screen.getByText("Edit & approve")).toBeInTheDocument();
+    expect(screen.queryByText("Respond")).not.toBeInTheDocument();
+    expect(screen.getByText("Ignore")).toBeInTheDocument();
   });
 
   it("accept calls onDecide('accept')", () => {
     const onDecide = vi.fn();
     render(<ApprovalCardView interrupt={interrupt} onDecide={onDecide} />);
-    fireEvent.click(screen.getByText("승인"));
+    fireEvent.click(screen.getByText("Approve"));
     expect(onDecide).toHaveBeenCalledWith("accept", undefined);
   });
 });

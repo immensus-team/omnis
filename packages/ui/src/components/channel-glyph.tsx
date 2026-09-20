@@ -1,18 +1,26 @@
-import { CHANNEL_COLOR, CHANNEL_ICON, CHANNEL_TILE_BG } from "../lib/row-meta.js";
+import { CHANNEL_BRAND_ASSET } from "../lib/row-meta.js";
 import type { UiChannel } from "../types.js";
 
-/** U5 kinso polish: channel-rail.tsx(레일 타일)와 inbox-row.tsx(행 우측 아이콘)가 똑같이 필요한
- * "브랜드 컬러 아이콘" 렌더링을 한 곳에 둔다 — 두 파일에 색 로직을 복붙하면 다음에 채널 하나
- * 늘 때마다 두 군데를 같이 고쳐야 한다. KakaoTalk만 배경 타일(CHANNEL_TILE_BG)이 붙는다. */
+/** U5 kinso polish: one place to render a brand mark, which channel-rail.tsx (rail tiles) and
+ * inbox-row.tsx (the row's right-hand mark) both need — copied into two files, every new channel
+ * would mean editing both.
+ * US-D02b: the monochrome react-icons glyph, the brand-hex tint and the KakaoTalk tile background
+ * are all gone; the real brand PNG is shown as-is. The PNGs already carry their own tiles and
+ * rounded corners, so wrapping one in a background tile double-frames it, and a CSS colour on a
+ * raster PNG does nothing at all. */
 export function ChannelGlyph({ channel, size = 16 }: { channel: UiChannel; size?: number }) {
-  const Icon = CHANNEL_ICON[channel];
-  const tileBg = CHANNEL_TILE_BG[channel];
-  if (tileBg) {
-    return (
-      <span className="channel-glyph channel-glyph--tiled" style={{ background: tileBg }}>
-        <Icon size={size * 0.7} aria-hidden="true" style={{ color: CHANNEL_COLOR[channel] }} />
-      </span>
-    );
-  }
-  return <Icon size={size} aria-hidden="true" style={{ color: CHANNEL_COLOR[channel] }} />;
+  const { at1x, at2x } = CHANNEL_BRAND_ASSET[channel];
+  return (
+    <img
+      src={at1x}
+      srcSet={`${at1x} 1x, ${at2x} 2x`}
+      width={size}
+      height={size}
+      alt=""
+      aria-hidden="true"
+      // Gmail (64x51) and Outlook (64x59) are not square — dropped straight into a square slot,
+      // Gmail stretches by 25%. The slot stays size x size and the mark fits inside it.
+      style={{ objectFit: "contain" }}
+    />
+  );
 }
