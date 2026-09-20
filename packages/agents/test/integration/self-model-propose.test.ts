@@ -27,7 +27,7 @@ const diff = (lines: number) =>
     "--- a/VOICE.md",
     "+++ b/VOICE.md",
     "@@ -1,1 +1,1 @@",
-    ...Array.from({ length: lines }, (_, i) => `+새 줄 ${i}`),
+    ...Array.from({ length: lines }, (_, i) => `+new line ${i}`),
   ].join("\n");
 
 describe("self-model patch constraints (A4 §13.2)", () => {
@@ -45,7 +45,7 @@ describe("self-model patch constraints (A4 §13.2)", () => {
     expect(
       validatePatch({ file: "VOICE.md", diff: diff(2), rationale: "r", evidence: ["a", "b"] }).ok,
     ).toBe(true);
-    const deletion = ["--- a/USER.md", "+++ b/USER.md", "@@ -1,2 +1,1 @@", "-지운다"].join("\n");
+    const deletion = ["--- a/USER.md", "+++ b/USER.md", "@@ -1,2 +1,1 @@", "-deleted"].join("\n");
     expect(
       validatePatch({ file: "USER.md", diff: deletion, rationale: "r", evidence: ["a", "b"] }).ok,
     ).toBe(false);

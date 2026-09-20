@@ -6,9 +6,10 @@ import { configureAgents, resetAgentsPoolForTest } from "../../src/pool.js";
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL ?? "postgres://logan@127.0.0.1:5432/omnis_test",
 });
-// hostHealth는 host별 max(last_seen_at)을 본다 — apps/hub의 bridge 테스트가 같은 DB에
-// claude_code/macbook을 now()로 등록하므로 고정 과거 시각을 기준으로 잡으면 그 쪽이 max가 된다.
-// 우리 하트비트를 now()로 찍고 기준 시각을 그 5분 뒤로 두면 경합해도 나이는 (0, 300s]에 머문다.
+// hostHealth looks at max(last_seen_at) per host — apps/hub's bridge test registers
+// claude_code/macbook in the same DB at now(), so anchoring on a fixed past instant would let
+// that row win the max. Stamping our heartbeat at now() and putting the reference instant five
+// minutes after it keeps the age inside (0, 300s] even under contention.
 const now = new Date(Date.now() + 300_000);
 
 beforeAll(async () => {
@@ -30,7 +31,7 @@ describe("hostHealth (A4 §5.2)", () => {
     const h = await hostHealth(now);
     expect(h.macbook.lastHeartbeatMs).toBeLessThanOrEqual(300_000);
     expect(h.macbook.lastHeartbeatMs).toBeGreaterThan(MACBOOK_OFFLINE_MS);
-    // 0002 시드의 omnis/mini row는 last_seen_at이 NULL이다.
+    // The omnis/mini row from the 0002 seed has last_seen_at NULL.
     expect(h.mini.lastHeartbeatMs).toBe(Number.POSITIVE_INFINITY);
   });
 });

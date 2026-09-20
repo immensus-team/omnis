@@ -2,7 +2,7 @@ import { createInterface } from "node:readline";
 
 type Handler = (params: unknown) => void;
 
-/** A2-D6: 상주 app-server 자식 1개를 stdio로 붙든다. 줄바꿈 구분 JSON-RPC 2.0. */
+/** A2-D6: holds a single resident app-server child over stdio. Newline-delimited JSON-RPC 2.0. */
 export class AppServerClient {
   #nextId = 1;
   readonly #pending = new Map<
@@ -43,7 +43,7 @@ export class AppServerClient {
     try {
       msg = JSON.parse(line) as typeof msg;
     } catch {
-      return; // 미지 형식도 파서를 죽이지 않는다
+      return; // an unknown shape must not kill the parser
     }
     if (typeof msg.id === "number" && msg.method === undefined) {
       const p = this.#pending.get(msg.id);

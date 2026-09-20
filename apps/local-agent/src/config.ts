@@ -16,7 +16,7 @@ export interface ProcessRuntimeConfig {
   allowed_roots: string[];
   pinned_version?: string;
   default_model?: string;
-  /** 게이트 ⑪ 스위치(Task 12). 미지정이면 origin 기본값(A2-D11). 계약 §8의 필드 목록에는 게이트가 닫힐 때 합친다. */
+  /** The Gate ⑪ switch (Task 12). When unset, the origin default applies (A2-D11). It joins the contract §8 field list once the gate closes. */
   bare?: boolean;
 }
 export interface HttpRuntimeConfig {
@@ -38,11 +38,11 @@ export interface LoadConfigResult {
   provenance: Record<"host" | "hub_url" | "token_keychain_item", ConfigSource>;
 }
 
-/** 계약 §8. host-config.ts(US-A19b)가 이 표를 재사용한다. */
+/** Contract §8. host-config.ts (US-A19b) reuses this table. */
 export const HOST_DEFAULTS: Record<HostId, { hub_url: string; token_keychain_item: string }> = {
   mini: { hub_url: "ws://127.0.0.1:8787/bridge", token_keychain_item: "omnis.bridge.token.mini" },
   macbook: {
-    // 미니의 Tailscale Serve는 /에 허브를 그대로 붙인다(prefix strip 없음) — 경로는 허브 라우트와 1:1이다.
+    // The mini's Tailscale Serve mounts the hub at / verbatim (no prefix strip) — paths map 1:1 onto hub routes.
     hub_url: "wss://your-hub.your-tailnet.ts.net/bridge",
     token_keychain_item: "omnis.bridge.token.macbook",
   },
@@ -52,7 +52,7 @@ const PROCESS_KINDS = new Set(["claude_code", "codex", "claude_ds"]);
 const PROCESS_ONLY_FIELDS = ["binary", "allowed_roots", "pinned_version", "default_model", "bare"];
 const HTTP_ONLY_FIELDS = ["base_url", "session_header_mode"];
 
-/** A6 §10의 plist는 `--hub http://127.0.0.1:8787`을 넘긴다. 브리지가 쓰는 것은 ws(s) + /bridge다. */
+/** The A6 §10 plist passes `--hub http://127.0.0.1:8787`. What the bridge uses is ws(s) + /bridge. */
 export function normalizeHubUrl(input: string): string {
   const u = new URL(input);
   if (u.protocol === "http:") u.protocol = "ws:";
@@ -110,7 +110,7 @@ function parseRuntime(raw: Record<string, unknown>, homeDir: string): RuntimeCon
     };
     if (typeof raw.pinned_version === "string") out.pinned_version = raw.pinned_version;
     if (typeof raw.default_model === "string") out.default_model = raw.default_model;
-    if (typeof raw.bare === "boolean") out.bare = raw.bare; // 게이트 ⑪ 스위치. 없으면 Task 12가 origin 기본값을 쓴다
+    if (typeof raw.bare === "boolean") out.bare = raw.bare; // the Gate ⑪ switch. Without it, Task 12 uses the origin default
     return out;
   }
   if (kind === "hermes") {

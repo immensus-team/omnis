@@ -1,11 +1,11 @@
-// A3 §10 (A3-D13): handle_norm만으로 매칭한다. 표시 이름은 절대 키가 아니다.
+// A3 §10 (A3-D13): match on handle_norm alone. The display name is never a key.
 import { createHash } from "node:crypto";
 import { one, query, tx } from "@omnis/db";
 import type { PoolClient } from "@omnis/db";
 import type { Channel } from "@omnis/protocol";
 import type { Pool } from "pg";
 
-const UNIT_SEPARATOR = ""; // A3 §10이 고정한 구분자(0x1f)
+const UNIT_SEPARATOR = ""; // Separator fixed by A3 §10 (0x1f)
 
 function normalizeEmail(raw: string, collapseDots: boolean): string {
   const trimmed = raw.trim().replace(/^</, "").replace(/>$/, "").toLowerCase();
@@ -19,8 +19,9 @@ function normalizeEmail(raw: string, collapseDots: boolean): string {
   return `${local}@${domain}`;
 }
 
-/** ponytail: libphonenumber를 붙이지 않는다. 입력은 채널이 준 E.164이거나 한국 번호 둘 중
- *  하나다. 다른 나라 로컬 번호가 실제로 들어오면 그때 라이브러리를 넣는다. */
+/** ponytail: no libphonenumber. Input is either the E.164 the channel handed us or a Korean
+ *  number — those are the only two cases. If local numbers from other countries really start
+ *  showing up, add the library then. */
 function toE164(raw: string): string {
   const cleaned = raw.replace(/[^\d+]/g, "");
   if (cleaned.startsWith("+")) return `+${cleaned.slice(1).replace(/\D/g, "")}`;
@@ -51,8 +52,8 @@ export function handleNorm(channel: Channel, raw: string, roomExternalId?: strin
       return (m?.[1] ?? raw.trim()).toLowerCase();
     }
     case "kakaotalk": {
-      // A3 §10: 카톡은 안정적인 사용자 id가 없다. "이 방의 이 이름"으로 스코프를 좁히고
-      // verified=false로만 만든다. room은 threads.external_id다.
+      // A3 §10: KakaoTalk has no stable user id. Narrow the scope to "this name in this room"
+      // and only ever create it with verified=false. The room is threads.external_id.
       if (roomExternalId === undefined || roomExternalId === "") {
         throw new Error("kakaotalk handle_norm requires room_external_id (A3 §10)");
       }
@@ -64,7 +65,7 @@ export function handleNorm(channel: Channel, raw: string, roomExternalId?: strin
   }
 }
 
-/** B-D3: 아바타는 이니셜만. persons.avatar_url 컬럼을 만들지 않는다. */
+/** B-D3: avatars are initials only. Do not add a persons.avatar_url column. */
 export function initialsFor(displayName: string): string {
   const tokens = displayName
     .trim()
@@ -73,7 +74,8 @@ export function initialsFor(displayName: string): string {
   const first = tokens[0];
   if (first === undefined) return "?";
   if (/[가-힣]/.test(first)) {
-    // 한국 이름은 성이 한 글자다 — 이름 두 글자가 사람을 더 잘 가른다.
+    // Hangul (Korean): the family name is a single character, so the two characters of the
+    // given name identify a person better.
     return first.length >= 3 ? first.slice(1, 3) : first;
   }
   const last = tokens[tokens.length - 1];
@@ -83,8 +85,8 @@ export function initialsFor(displayName: string): string {
   return first.slice(0, 2).toUpperCase();
 }
 
-/** A3 §10 1단계의 tombstone 추적. 병합 시 평탄화하므로 정상 깊이는 1이지만, 데이터가
- *  깨졌을 때 무한 루프에 빠지지 않도록 상한을 둔다. */
+/** Tombstone chasing for step 1 of A3 §10. Merges flatten the chain, so the usual depth is 1,
+ *  but cap it so corrupt data cannot spin forever. */
 async function followMerges(c: PoolClient, personId: string): Promise<string> {
   let id = personId;
   for (let i = 0; i < 4; i += 1) {
@@ -101,11 +103,12 @@ async function followMerges(c: PoolClient, personId: string): Promise<string> {
 }
 
 /**
- * A3 §10 해석 알고리즘.
- * 1. identities(channel, handle_norm) → 있으면 그 person(merged_into 추적)
- * 2. 없고 이메일이면 교차 채널 결정론적 매칭(같은 handle_norm의 이메일 identity)
- * 3. 그래도 없으면 새 persons + identities(verified=false)
- * 4. 추측 매칭은 하지 않는다 — 표시 이름이 같다는 이유로 붙이지 않는다.
+ * A3 §10 resolution algorithm.
+ * 1. identities(channel, handle_norm) → if present, that person (following merged_into)
+ * 2. otherwise, for email, deterministic cross-channel matching (an email identity with the
+ *    same handle_norm)
+ * 3. still nothing → new persons + identities(verified=false)
+ * 4. no guesswork matching — never join identities just because display names match.
  */
 export async function resolvePerson(
   c: PoolClient,
@@ -126,7 +129,8 @@ export async function resolvePerson(
     return { person_id: await followMerges(c, hit.person_id), created: false };
   }
 
-  // 2단계는 이메일 키에만 적용된다. 전화번호·슬랙 id는 채널 간에 같은 값을 가질 일이 없다.
+  // Step 2 applies only to email keys. Phone numbers and Slack ids never share a value
+  // across channels.
   if (norm.includes("@")) {
     const cross = await query<{ person_id: string }>(
       c,
@@ -164,7 +168,8 @@ export async function resolvePerson(
   );
   const created = inserted[0];
   if (created === undefined) {
-    // 다른 워커가 먼저 만든 경우. 방금 만든 빈 person은 Network 화면에서 지울 수 있다.
+    // Another worker got there first. The empty person we just created can be deleted from
+    // the Network screen.
     const winner = await one<{ person_id: string }>(
       c,
       "SELECT person_id FROM identities WHERE channel = $1 AND handle_norm = $2",
@@ -187,7 +192,8 @@ async function recordIdentityAudit(
   );
 }
 
-/** A3 §10 병합 (a)~(e). $from은 지우지 않는다 — tombstone으로 남겨 되돌릴 수 있게 한다. */
+/** A3 §10 merge (a)–(e). $from is not deleted — it stays as a tombstone so the merge can be
+ *  undone. */
 export async function mergePersons(
   pool: Pool,
   from: string,
@@ -206,7 +212,7 @@ export async function mergePersons(
       from,
       survivor,
     ]);
-    // 체인을 평탄화한다 — 해석 1단계의 깊이 상한이 실제로 충분해지는 이유다.
+    // Flatten the chain — that is why the depth cap in step 1 of resolution is actually enough.
     await query(c, "UPDATE persons SET merged_into = $2 WHERE id = $1 OR merged_into = $1", [
       from,
       survivor,
@@ -228,11 +234,11 @@ export async function mergePersons(
 }
 
 /**
- * A3 §10 분리. items 재배정은 "그 채널의 thread" 기준이다.
- * ponytail: items에는 handle이 없어서 "이 item이 어느 identity에서 왔는지"를 사후에 복원할 수
- * 없다. 그래서 원 person이 그 채널에 identity를 하나도 안 남기면 전부 옮기고, 하나라도 남으면
- * A3가 지시한 대로 NULL + threads.meta.reassign_needed로 사람에게 넘긴다. items에 identity_id
- * 컬럼이 생기면 이 분기는 사라진다.
+ * A3 §10 split. Item reassignment is scoped to "threads on that channel".
+ * ponytail: items carry no handle, so "which identity did this item come from" cannot be
+ * reconstructed after the fact. So if the original person has no identity left on that channel we
+ * move everything; if even one remains we follow A3 and hand it to a human via NULL +
+ * threads.meta.reassign_needed. This branch disappears once items gets an identity_id column.
  */
 export async function splitIdentity(
   pool: Pool,

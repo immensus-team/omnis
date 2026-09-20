@@ -4,9 +4,9 @@ import { AdapterError, type Channel } from "@omnis/protocol";
 
 const execFileAsync = promisify(execFile);
 
-/** `security find-generic-password -s <service> -a <account> -w` 로 시크릿 값을 읽는다.
- *  값은 절대 로그로 찍지 않는다(A7 §9 로그 규약). Gmail/Slack Task와 동일 패턴 —
- *  어댑터 패키지 간 import 금지라 복제한다(A7 §9 "의도된 중복"). */
+/** Reads the secret value with `security find-generic-password -s <service> -a <account> -w`.
+ *  The value is never logged (A7 §9 logging rules). Same pattern as the Gmail/Slack tasks —
+ *  duplicated because adapter packages must not import each other (A7 §9 "intended duplication"). */
 export async function readKeychainSecret(
   service: string,
   account: string,

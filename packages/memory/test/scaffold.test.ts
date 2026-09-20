@@ -18,7 +18,7 @@ describe("@omnis/memory scaffold", () => {
     ]);
   });
 
-  // B-D1: mem0ai는 어떤 패키지에도 들어가지 않는다. 실측 근거는 스파이크 결과 파일에 있다.
+  // B-D1: mem0ai goes into no package. The measured evidence lives in the spike result file.
   it("never depends on mem0ai anywhere in the workspace", () => {
     const manifests = [
       "package.json",

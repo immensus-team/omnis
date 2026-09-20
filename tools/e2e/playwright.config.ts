@@ -1,6 +1,6 @@
 import { defineConfig } from "@playwright/test";
 
-// The stack (DB, zero-cache, hub, Vite) is brought up by tools/e2e/run.ts — no webServer here.
+// tools/e2e/run.ts brings up the stack (DB, zero-cache, hub, Vite) — no webServer here.
 export default defineConfig({
   testDir: ".",
   testMatch: /phase-a\.spec\.ts/,

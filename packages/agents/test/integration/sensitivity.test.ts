@@ -53,8 +53,8 @@ const item = (over: Partial<ItemRow> = {}): ItemRow => ({
   ...over,
 });
 
-// agent_runs.item_id는 items(id) FK다. classify()가 recordRun하기 전에 대응하는
-// items 행이 있어야 한다 — classify.test.ts와 같은 패턴(deviation).
+// agent_runs.item_id is an FK to items(id). The matching items row must exist
+// before classify() calls recordRun — same pattern as classify.test.ts (deviation).
 async function insertItem(it: ItemRow): Promise<void> {
   await pool.query(
     `INSERT INTO items (id, thread_id, account_id, external_id, kind, scope, sensitivity, subject, body, sent_at)

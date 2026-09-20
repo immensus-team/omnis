@@ -63,7 +63,7 @@ describe("mapAppServerEvent (A2 §4.2)", () => {
   });
 });
 
-describe("codexDecisionToResponse (A2 §4.2 승인표)", () => {
+describe("codexDecisionToResponse (A2 §4.2 approval table)", () => {
   it("maps accept / decline straight through", () => {
     expect(codexDecisionToResponse("accept")).toEqual({ decision: "accept" });
     expect(codexDecisionToResponse("decline")).toEqual({ decision: "ignore" });
@@ -83,12 +83,12 @@ describe("codexDecisionToResponse (A2 §4.2 승인표)", () => {
   });
 });
 
-// --- 상주 자식 1개가 여러 턴을 처리한다 (A2-D6) ---
+// --- one resident child handles several turns (A2-D6) ---
 
 function fakeAppServer(): { spawnFn: typeof spawn; notify: (m: string, p: unknown) => void } {
   const stdin = new PassThrough();
   const stdout = new PassThrough();
-  // app-server 흉내: 모든 요청에 빈 result로 답해 startTurn의 await을 풀어 준다.
+  // app-server stand-in: answers every request with an empty result to release startTurn's await.
   createInterface({ input: stdin }).on("line", (line) => {
     const msg = JSON.parse(line) as { id: number };
     stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: {} })}\n`);
@@ -187,10 +187,10 @@ describe("CodexAdapter on a resident app-server child", () => {
     await tick();
 
     expect(h2.turn_id).not.toBe(h1.turn_id);
-    // 1번 턴의 sink는 2번 턴 이벤트를 보면 안 된다(중복 emit의 증상)
+    // turn 1's sink must not see turn 2's events (the symptom of duplicate emits)
     expect(first.calls.filter((c) => c.e.item_id === "i2")).toHaveLength(0);
     expect(first.calls.filter((c) => c.kind === "turnCompleted")).toHaveLength(1);
-    // 2번 턴은 자기 이벤트를 정확히 한 번씩 본다
+    // turn 2 sees its own events exactly once each
     expect(
       second.calls.filter((c) => c.kind === "itemStarted" && c.e.item_id === "i2"),
     ).toHaveLength(1);

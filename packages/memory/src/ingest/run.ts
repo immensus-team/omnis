@@ -1,4 +1,4 @@
-// A4 §10: L9 ingestion 코어. 소스는 provider로 꽂히고, 추출 모델은 주입된다.
+// A4 §10: L9 ingestion core. Sources are plugged in as providers and the extraction model is injected.
 import type { MemorySourceKind } from "@omnis/protocol";
 import type { Pool } from "pg";
 import { assertRelation, upsertEntity } from "../entities.js";
@@ -16,7 +16,7 @@ import {
   writeIngestSystemItem,
 } from "./source.js";
 
-/** @omnis/kernel의 Logger를 **타입만** 구조적으로 받는다(계약 §12 의도된 중복). */
+/** Structurally accepts @omnis/kernel's Logger, **type only** (contract §12 intentional duplication). */
 export interface Logger {
   debug(msg: string, extra?: Record<string, unknown>): void;
   info(msg: string, extra?: Record<string, unknown>): void;
@@ -26,13 +26,13 @@ export interface Logger {
 
 export interface IngestDoc {
   source_ref: string;
-  /** null이면 본문 없음. deleted=true와 함께 오면 무효화 신호다. */
+  /** null means no body. Arriving together with deleted=true is an invalidation signal. */
   text: string | null;
-  /** A4 §10.4 표: 문서가 말하는 시점, 없으면 mtime / 커밋 시각. */
+  /** A4 §10.4 table: the point in time the document speaks about, else mtime / commit time. */
   validFrom: string;
   deleted?: boolean;
   meta?: Record<string, unknown>;
-  /** 이 문서까지 처리했음을 나타내는 커서. 마지막으로 본 값이 저장된다. */
+  /** Cursor indicating this document has been processed. The last value seen is persisted. */
   nextCursor?: Record<string, unknown>;
 }
 
@@ -44,7 +44,7 @@ export interface IngestProviderContext {
 
 export interface IngestProvider {
   kind: MemorySourceKind;
-  /** `ingest_sources.source_ref` — 이 provider의 커서를 담는 키다(루트 경로, 'changes', 'repos' 등). */
+  /** `ingest_sources.source_ref` — the key holding this provider's cursor (root path, 'changes', 'repos', etc.). */
   ref: string;
   list(ctx: IngestProviderContext): AsyncIterable<IngestDoc>;
 }
@@ -55,7 +55,7 @@ export function registerIngestProvider(p: IngestProvider): void {
   providers.push(p);
 }
 
-/** 테스트 전용. 프로덕션 코드에서 호출하지 않는다. */
+/** Test-only. Never called from production code. */
 export function resetIngestProviders(): void {
   providers.length = 0;
 }
@@ -74,7 +74,7 @@ export interface RunIngestDeps {
   pool: Pool;
   logger: Logger;
   kind: MemorySourceKind;
-  /** 테스트에서 백오프를 건너뛴다. */
+  /** Skips backoff in tests. */
   sleep?: (ms: number) => Promise<void>;
 }
 
@@ -95,24 +95,24 @@ export async function runIngest(
           for await (const doc of p.list({ pool, logger, cursor })) {
             if (doc.nextCursor !== undefined) cursor = doc.nextCursor;
 
-            // 커서만 옮기는 신호 문서(Drive 베이스라인 등)는 저장하지 않는다.
+            // Signal-only documents that just move the cursor (Drive baselines, etc.) are not stored.
             if (doc.source_ref.startsWith("__") && doc.text === null && doc.deleted !== true)
               continue;
 
-            // A4 §10.2: 경로가 걸리면 파일을 열지 않고 건너뛴다.
+            // A4 §10.2: when the path is denied, skip it without opening the file.
             if (isDenied(doc.source_ref)) {
               logger.debug("ingest denied by path", { kind, source_ref: doc.source_ref });
               continue;
             }
 
-            // A4 §10.4: 삭제·tombstone은 지우지 않고 무효화한다.
+            // A4 §10.4: deletions and tombstones are invalidated rather than erased.
             if (doc.deleted === true || doc.text === null) {
               await invalidateBySource(pool, kind, doc.source_ref);
               continue;
             }
 
-            // 재스캔 멱등성: upsertMemory가 동일 (kind, ref, content)를 재사용하므로 내용이 안 바뀐
-            // 청크는 새 row가 생기지 않는다 — 여기서 먼저 무효화하면 그 재사용이 깨지므로 하지 않는다.
+            // Rescan idempotency: upsertMemory reuses the same (kind, ref, content), so chunks whose
+            // content is unchanged produce no new row — invalidating first would break that reuse.
             for (const chunk of chunksFor(doc)) {
               chunkCount += 1;
               await upsertMemory(pool, {
@@ -140,8 +140,8 @@ export async function runIngest(
       logger.warn("ingest source failed", { kind, source_ref: p.ref, fails, err: message });
       if (fails >= DEAD_LETTER_THRESHOLD) {
         await writeIngestSystemItem(pool, {
-          subject: `ingestion 실패: ${kind} ${p.ref}`,
-          body: `source_kind=${kind}\nsource_ref=${p.ref}\n연속 실패 ${fails}회\n마지막 에러: ${message}`,
+          subject: `ingestion failed: ${kind} ${p.ref}`,
+          body: `source_kind=${kind}\nsource_ref=${p.ref}\n${fails} consecutive failures\nlast error: ${message}`,
         });
         deadLettered += 1;
       }
@@ -151,8 +151,8 @@ export async function runIngest(
   return { chunks: chunkCount, memories: memoryCount, deadLettered };
 }
 
-/** 추출 실패는 **그 청크만** 버리고 계속한다(A4 §10.5 파싱 실패 행). 청크 임베딩은 이미
- *  저장돼 있으므로 T1이 죽어도 검색은 산다. */
+/** An extraction failure drops **only that chunk** and continues (A4 §10.5 parsing-failure row).
+ *  The chunk embedding is already stored, so search survives even if T1 dies. */
 async function extractInto(
   pool: Pool,
   logger: Logger,
@@ -192,8 +192,8 @@ async function extractInto(
     for (const r of out.relations) {
       const from = idByName.get(r.from);
       const to = idByName.get(r.to);
-      // 이번 청크에서 정의되지 않은 엔티티를 가리키는 관계는 버린다 — 이름만으로 기존
-      // 엔티티를 찾으면 동명이인이 한 노드로 붙는다(A3 §10의 추측 금지와 같은 원칙).
+      // Relations pointing at entities not defined in this chunk are dropped — resolving an
+      // existing entity by name alone merges namesakes into one node (A3 §10's no-guessing rule).
       if (from === undefined || to === undefined) continue;
       await assertRelation(pool, {
         from_entity_id: from,

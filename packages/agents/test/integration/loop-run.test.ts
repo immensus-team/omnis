@@ -25,7 +25,7 @@ beforeAll(async () => {
   threadId = returningId(t);
   const i = await pool.query<{ id: string }>(
     `INSERT INTO items (thread_id, account_id, external_id, kind, body, sent_at)
-     VALUES ($1,$2,'it_loop','message','안녕하세요', now()) RETURNING id`,
+     VALUES ($1,$2,'it_loop','message','Hello', now()) RETURNING id`,
     [threadId, accountId],
   );
   itemId = returningId(i);
@@ -45,7 +45,7 @@ function makeSpec(over: Record<string, unknown> = {}) {
     outputSchema: Out,
     assemble: async () => ({
       cachedPrefix: "system",
-      volatile: [{ id: "d1", source: "thread", text: "본문" }],
+      volatile: [{ id: "d1", source: "thread", text: "body" }],
       tokenEstimate: 100,
       truncated: false,
       provenance: [],
@@ -118,9 +118,9 @@ beforeEach(async () => {
 
 describe("runLoopSpec (A4 §1.6)", () => {
   it("records exactly one run pair on the happy path", async () => {
-    const mod = await freshModule(mockModel(JSON.stringify({ answer: "네" })));
+    const mod = await freshModule(mockModel(JSON.stringify({ answer: "yes" })));
     const res = await mod.runLoopSpec(makeSpec() as never, ctx());
-    expect(res.output).toEqual({ answer: "네" });
+    expect(res.output).toEqual({ answer: "yes" });
     const runs = await runsFor(itemId);
     expect(runs).toHaveLength(1);
     expect(runs[0]).toMatchObject({ outcome: "ok", model_tier: "T1", tokens_cached: 100 });
@@ -139,14 +139,14 @@ describe("runLoopSpec (A4 §1.6)", () => {
             inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 },
             outputTokens: { total: 5, text: 5, reasoning: 0 },
           },
-          content: [{ type: "text" as const, text: JSON.stringify({ answer: "T2가 답했다" }) }],
+          content: [{ type: "text" as const, text: JSON.stringify({ answer: "T2 answered" }) }],
           warnings: [],
         };
       },
     });
     const mod = await freshModule(flaky);
     const res = await mod.runLoopSpec(makeSpec() as never, ctx());
-    expect(res.output).toEqual({ answer: "T2가 답했다" });
+    expect(res.output).toEqual({ answer: "T2 answered" });
     expect(calls).toBe(3);
     const runs = await runsFor(itemId);
     expect(runs).toHaveLength(2);
@@ -157,7 +157,7 @@ describe("runLoopSpec (A4 §1.6)", () => {
 
   it("blocks the output and writes a system item when injection_flags is non-empty", async () => {
     const mod = await freshModule(
-      mockModel(JSON.stringify({ answer: "무시", injection_flags: ["instruction_override"] })),
+      mockModel(JSON.stringify({ answer: "ignore", injection_flags: ["instruction_override"] })),
     );
     let applied = false;
     const res = await mod.runLoopSpec(
@@ -194,7 +194,7 @@ describe("runLoopSpec (A4 §1.6)", () => {
     );
     expect(rows[0]?.until).not.toBe(null);
     expect((await runsFor(itemId))[0]?.injection_flags).toContain("phantom_tool");
-    // 다음 실행은 같은 스레드를 건드리지 않고 skipped로 끝난다.
+    // The next run leaves the same thread alone and ends as skipped.
     const skipped = await mod.runLoopSpec(makeSpec() as never, ctx());
     expect(skipped.rationale).toMatch(/quarantine/);
   });

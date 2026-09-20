@@ -1,7 +1,7 @@
 import { query } from "@omnis/db";
 import type { Pool } from "pg";
 
-/** 계약 §5. append-only, 모든 egress가 반드시 경유한다. */
+/** Contract §5. Append-only; every egress must pass through it. */
 export interface AuditEntry {
   actor: string; // 'me' | `agent:${RuntimeKind}` | 'system'
   action: string; // 'item.sent' | 'approval.decided' | 'kill_switch.set' ...
@@ -37,8 +37,9 @@ export function createAudit(pool: Pool): Audit {
   };
 }
 
-/** A3 §9 규칙 5 / 마스터 §2: 승인 없는 외부 전송은 0건이어야 한다.
- *  밤 다이제스트 잡(Phase B)이 이 값을 세고, 0이 아니면 그날 다이제스트에 뜬다. */
+/** A3 §9 rule 5 / master §2: sends without approval must be zero.
+ *  The nightly digest job (Phase B) counts this and surfaces it in that day's digest
+ *  when it is non-zero. */
 export async function countUnapprovedSends(pool: Pool, since: Date): Promise<number> {
   const rows = await query<{ n: string }>(
     pool,

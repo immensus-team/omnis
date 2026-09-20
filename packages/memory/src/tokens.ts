@@ -1,6 +1,7 @@
-// ponytail: 토크나이저를 붙이지 않는다. 소비처는 (a) A4 §12.3 self-model 상한 경고와
-// (b) A4 §1.3 절삭 트리거뿐이고, 둘 다 10% 오차로 결론이 바뀌지 않는다. 실제 청구 토큰은
-// agent_runs.tokens_in이 사후에 알려준다. 정확도가 문제가 되면 tiktoken으로 바꾼다.
+// ponytail: no tokenizer is wired in. The only consumers are (a) the A4 §12.3 self-model cap
+// warning and (b) the A4 §1.3 truncation trigger, and a 10% error changes neither conclusion.
+// The actual billed tokens are reported after the fact by agent_runs.tokens_in. Switch to
+// tiktoken if accuracy ever matters.
 const ASCII_CHARS_PER_TOKEN = 4;
 const WIDE_CHARS_PER_TOKEN = 1.5;
 

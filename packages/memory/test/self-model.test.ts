@@ -30,7 +30,7 @@ describe("selfModelDir", () => {
     expect(selfModelDir()).toBe(dir);
   });
 
-  // 델타 §0-2: A3 §5의 ~/.omnis/memory/*.md도 A4 §13.2의 ~/omnis/self-model/도 아니다.
+  // delta §0-2: neither A3 §5's ~/.omnis/memory/*.md nor A4 §13.2's ~/omnis/self-model/.
   it("defaults to ~/.omnis/self-model", () => {
     Reflect.deleteProperty(process.env, "OMNIS_SELF_MODEL_DIR");
     expect(selfModelDir()).toMatch(/\.omnis[/\\]self-model$/);
@@ -39,19 +39,19 @@ describe("selfModelDir", () => {
 
 describe("loadSelfModel", () => {
   it("returns the requested files in canonical order with a stable sha256", async () => {
-    await writeFile(join(dir, "USER.md"), "# Logan\n서울에서 일한다.\n");
-    await writeFile(join(dir, "VOICE.md"), "# 말투\n짧게 쓴다.\n");
+    await writeFile(join(dir, "USER.md"), "# Logan\nWorks in Seoul.\n");
+    await writeFile(join(dir, "VOICE.md"), "# Voice\nKeeps it short.\n");
 
     const first = await loadSelfModel(["VOICE.md", "USER.md"]);
-    expect(Object.keys(first.files)).toEqual(["USER.md", "VOICE.md"]); // 요청 순서가 아니라 정본 순서
-    expect(first.files["USER.md"]).toContain("서울");
+    expect(Object.keys(first.files)).toEqual(["USER.md", "VOICE.md"]); // canonical order, not request order
+    expect(first.files["USER.md"]).toContain("Seoul");
     expect(first.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(first.tokenEstimate).toBeGreaterThan(0);
     expect(first.overCap).toEqual([]);
 
     invalidateSnapshotCache();
     const second = await loadSelfModel(["USER.md", "VOICE.md"]);
-    expect(second.sha256).toBe(first.sha256); // 같은 내용이면 같은 해시 = 캐시 프리픽스 재사용
+    expect(second.sha256).toBe(first.sha256); // same content = same hash = cache prefix reuse
   });
 
   it("omits files that do not exist instead of throwing", async () => {
@@ -61,8 +61,9 @@ describe("loadSelfModel", () => {
   });
 
   it("reports files over the A4 §12.3 cap in overCap", async () => {
+    // Frozen hangul fixture: "가" counts at 1.5 chars/token, so this is what actually busts the cap.
     await writeFile(join(dir, "USER.md"), "가".repeat(SELF_MODEL_TOKEN_CAPS["USER.md"] * 2));
-    await writeFile(join(dir, "VOICE.md"), "짧다");
+    await writeFile(join(dir, "VOICE.md"), "short");
     const snap = await loadSelfModel(["USER.md", "VOICE.md"]);
     expect(snap.overCap).toEqual(["USER.md"]);
   });
@@ -70,7 +71,7 @@ describe("loadSelfModel", () => {
   it("caches until invalidateSnapshotCache is called", async () => {
     await writeFile(join(dir, "USER.md"), "v1");
     const a = await loadSelfModel(["USER.md"]);
-    await writeFile(join(dir, "USER.md"), "v2 완전히 다른 내용");
+    await writeFile(join(dir, "USER.md"), "v2 completely different content");
     const cached = await loadSelfModel(["USER.md"]);
     expect(cached.sha256).toBe(a.sha256);
 
@@ -90,11 +91,12 @@ describe("loadSelfModel", () => {
 
 describe("overCapWarning", () => {
   it("is null when nothing is over the cap", async () => {
-    await writeFile(join(dir, "USER.md"), "짧다");
+    await writeFile(join(dir, "USER.md"), "short");
     expect(overCapWarning(await loadSelfModel(["USER.md"]))).toBeNull();
   });
 
   it("names each over-cap file and its cap", async () => {
+    // Frozen hangul fixture: only non-ASCII text reaches 1,500 tokens in 4,000 characters.
     await writeFile(join(dir, "PROJECTS.md"), "가".repeat(4000));
     const body = overCapWarning(await loadSelfModel(["PROJECTS.md"]));
     expect(body).toContain("PROJECTS.md");

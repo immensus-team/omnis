@@ -9,7 +9,7 @@ export class AgentsNotConfiguredError extends Error {
 
 let poolRef: Pool | null = null;
 
-/** 허브가 부팅 때 한 번 호출한다. @omnis/agents는 @omnis/db를 import할 수 없다(계약 §1). */
+/** The hub calls this once at boot. @omnis/agents cannot import @omnis/db (contract §1). */
 export function configureAgents(deps: { pool: Pool }): void {
   poolRef = deps.pool;
 }
@@ -19,7 +19,7 @@ export function getAgentsPool(): Pool {
   return poolRef;
 }
 
-/** 테스트 전용. 프로덕션 코드에서 호출하지 않는다. */
+/** Test-only. Never call this from production code. */
 export function resetAgentsPoolForTest(): void {
   poolRef = null;
 }

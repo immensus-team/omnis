@@ -99,7 +99,7 @@ describe("withRetry (A4 §10.5 1s → 4s → 16s)", () => {
         { sleep: async (ms) => void sleeps.push(ms) },
       ),
     ).rejects.toThrow("5xx");
-    expect(calls).toBe(4); // 첫 시도 + 재시도 3회
+    expect(calls).toBe(4); // first attempt + 3 retries
     expect(sleeps).toEqual([1000, 4000, 16000]);
   });
 
@@ -118,7 +118,7 @@ describe("withRetry (A4 §10.5 1s → 4s → 16s)", () => {
     expect(sleeps).toEqual([500]);
   });
 
-  // 한 시간짜리 x-ratelimit-reset을 그대로 자면 스케줄러의 다른 잡까지 그동안 멈춘다.
+  // Sleeping through an hour-long x-ratelimit-reset would stall the scheduler's other jobs too.
   it("caps an absurd retry-after so one rate-limited source cannot stall the scheduler", async () => {
     const sleeps: number[] = [];
     let calls = 0;
@@ -138,8 +138,8 @@ describe("withRetry (A4 §10.5 1s → 4s → 16s)", () => {
 describe("writeIngestSystemItem (A4 §10.5 dead-letter)", () => {
   it("lands one system item in the inbox with the source and the last error", async () => {
     const id = await writeIngestSystemItem(pool, {
-      subject: "ingestion 실패: github logankim/omnis",
-      body: "source_kind=github source_ref=logankim/omnis\n마지막 에러: 403 rate limited",
+      subject: "ingestion failed: github logankim/omnis",
+      body: "source_kind=github source_ref=logankim/omnis\nlast error: 403 rate limited",
     });
     const row = await one<{ kind: string; status: string; subject: string; body: string }>(
       pool,

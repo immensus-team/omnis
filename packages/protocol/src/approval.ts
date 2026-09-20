@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** 계약 §3.4 (A3 §4 / A4 / research 22). 비가역 액션의 승인 객체. */
+/** Contract §3.4 (A3 §4 / A4 / research 22). The approval object for an irreversible action. */
 export const ApprovalAction = z.enum([
   "send",
   "delete",

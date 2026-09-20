@@ -8,14 +8,14 @@ import {
 } from "../src/ingest/chunk.js";
 import { estimateTokens } from "../src/tokens.js";
 
-const para = (n: number): string => `${"가".repeat(n)}`;
+const para = (n: number): string => `${"a".repeat(n)}`;
 
-describe("chunkDocument (A4 §10.3 문서)", () => {
+describe("chunkDocument (A4 §10.3 document)", () => {
   it("returns one chunk for a short document", () => {
-    const chunks = chunkDocument("짧은 메모 한 줄.");
+    const chunks = chunkDocument("A short note, one line.");
     expect(chunks).toHaveLength(1);
     expect(chunks[0]?.ord).toBe(0);
-    expect(chunks[0]?.text).toContain("짧은 메모");
+    expect(chunks[0]?.text).toContain("short note");
     expect(chunks[0]?.meta.strategy).toBe("document");
   });
 
@@ -31,14 +31,14 @@ describe("chunkDocument (A4 §10.3 문서)", () => {
   });
 
   it("splits on paragraph boundaries and numbers chunks in order", () => {
-    const doc = Array.from({ length: 12 }, (_, i) => `문단${i}\n${para(300)}`).join("\n\n");
+    const doc = Array.from({ length: 12 }, (_, i) => `paragraph${i}\n${para(300)}`).join("\n\n");
     const chunks = chunkDocument(doc);
     expect(chunks.length).toBeGreaterThan(1);
     expect(chunks.map((c) => c.ord)).toEqual(chunks.map((_, i) => i));
   });
 
   it("overlaps consecutive chunks so a sentence on the seam survives", () => {
-    const doc = Array.from({ length: 12 }, (_, i) => `문단${i}\n${para(300)}`).join("\n\n");
+    const doc = Array.from({ length: 12 }, (_, i) => `paragraph${i}\n${para(300)}`).join("\n\n");
     const chunks = chunkDocument(doc);
     const first = chunks[0];
     const second = chunks[1];
@@ -49,25 +49,26 @@ describe("chunkDocument (A4 §10.3 문서)", () => {
   });
 
   it("hard-splits a single paragraph that is bigger than the ceiling", () => {
-    const chunks = chunkDocument(para(4000)); // 한 문단, 오버플로
+    const chunks = chunkDocument(para(4000)); // one paragraph, overflow
     expect(chunks.length).toBeGreaterThan(1);
     for (const c of chunks) expect(estimateTokens(c.text)).toBeLessThanOrEqual(CHUNK_MAX_TOKENS);
   });
 
   it("stays under the ceiling when the document is thousands of tiny paragraphs", () => {
-    // 조각마다 "\n\n"(0.5토큰)이 붙는다. 세지 않으면 조각이 많을 때 상한을 넘었다(850토큰).
+    // Every piece adds "\n\n" (0.5 token). Not counting it pushed the total over the ceiling
+    // when there are many pieces (850 tokens).
     const doc = Array.from({ length: 1000 }, () => "abcd").join("\n\n");
     for (const c of chunkDocument(doc)) {
       expect(estimateTokens(c.text)).toBeLessThanOrEqual(CHUNK_MAX_TOKENS);
     }
   });
 
-  it("leaves source_ref empty — the caller stamps it (델타 §3 시그니처)", () => {
-    expect(chunkDocument("메모")[0]?.source_ref).toBe("");
+  it("leaves source_ref empty — the caller stamps it (delta §3 signature)", () => {
+    expect(chunkDocument("note")[0]?.source_ref).toBe("");
   });
 });
 
-describe("chunkCode (A4 §10.3 코드)", () => {
+describe("chunkCode (A4 §10.3 code)", () => {
   const ts = `import { a } from "./a.js";
 
 export function first(): number {
@@ -131,9 +132,9 @@ export class Third {
     for (const c of chunks) expect(estimateTokens(c.text)).toBeLessThanOrEqual(CHUNK_MAX_TOKENS);
   });
 
-  it("keeps merged one-liner chunks under the ceiling once they fill it (배럴 파일)", () => {
-    // 40개는 한 청크(320토큰)로 접혀 상한을 못 건드린다. 200개는 상한까지 채우므로
-    // "\n\n" 구분자를 안 세면 넘친다(825토큰이었다).
+  it("keeps merged one-liner chunks under the ceiling once they fill it (barrel file)", () => {
+    // 40 units fold into a single chunk (320 tokens) and never reach the ceiling. 200 units fill
+    // all the way up to it, so not counting the "\n\n" separators overflows (it was 825 tokens).
     const many = Array.from({ length: 200 }, (_, i) => `export function f${i}(): void {}`).join(
       "\n\n",
     );
@@ -143,30 +144,30 @@ export class Third {
   });
 });
 
-describe("chunkCalendarEvent (A4 §10.3 캘린더)", () => {
+describe("chunkCalendarEvent (A4 §10.3 calendar)", () => {
   it("makes exactly one chunk carrying the times, title and attendees", () => {
     const c = chunkCalendarEvent({
       external_id: "evt-1",
-      title: "다비치 PoC 킥오프",
+      title: "Davichi PoC kickoff",
       start_at: "2026-09-23T01:00:00.000Z",
       end_at: "2026-09-23T02:00:00.000Z",
-      location: "강남 본사",
+      location: "Gangnam HQ",
       attendees: ["a@corp.com", "b@corp.com"],
-      description: "기획서 리뷰",
+      description: "Planning doc review",
     });
     expect(c.ord).toBe(0);
     expect(c.source_ref).toBe("evt-1");
     expect(c.meta.strategy).toBe("calendar");
-    expect(c.text).toContain("다비치 PoC 킥오프");
+    expect(c.text).toContain("Davichi PoC kickoff");
     expect(c.text).toContain("2026-09-23T01:00:00.000Z");
     expect(c.text).toContain("a@corp.com");
-    expect(c.text).toContain("강남 본사");
+    expect(c.text).toContain("Gangnam HQ");
   });
 
   it("is well under the minimum chunk size — calendar events are already short", () => {
     const c = chunkCalendarEvent({
       external_id: "evt-2",
-      title: "점심",
+      title: "Lunch",
       start_at: "2026-09-23T03:00:00.000Z",
       end_at: "2026-09-23T04:00:00.000Z",
       location: null,

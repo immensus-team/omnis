@@ -23,7 +23,7 @@ describe("upsertEntity", () => {
   it("creates one live row with the four timestamps", async () => {
     const id = await upsertEntity(pool, {
       type: "org",
-      name: "다비치안경",
+      name: "Davich Optical",
       attributes: { industry: "retail" },
       valid_from: T1,
     });
@@ -50,19 +50,19 @@ describe("upsertEntity", () => {
     expect(await query(pool, "SELECT id FROM entities")).toHaveLength(1);
   });
 
-  // entities_live_uq는 (type, lower(name))에 걸려 있다. 새 사실은 새 row여야 하고,
-  // 그러려면 옛 row를 같은 트랜잭션에서 먼저 무효화해야 한다.
+  // entities_live_uq is on (type, lower(name)). A new fact has to be a new row, and for that
+  // the old row must be invalidated first in the same transaction.
   it("invalidates the previous live row and inserts a new one when attributes change", async () => {
     const first = await upsertEntity(pool, {
       type: "person",
-      name: "김진호",
-      attributes: { title: "팀장" },
+      name: "Jinho Kim",
+      attributes: { title: "team lead" },
       valid_from: T1,
     });
     const second = await upsertEntity(pool, {
       type: "person",
-      name: "김진호",
-      attributes: { title: "이사" },
+      name: "Jinho Kim",
+      attributes: { title: "director" },
       valid_from: T2,
     });
     expect(second).not.toBe(first);
@@ -71,7 +71,7 @@ describe("upsertEntity", () => {
       pool,
       "SELECT id, invalidated_at FROM entities ORDER BY recorded_at",
     );
-    expect(rows).toHaveLength(2); // 옛 사실은 지워지지 않는다
+    expect(rows).toHaveLength(2); // old facts are not deleted
     expect(rows[0]?.invalidated_at).toBeInstanceOf(Date);
     expect(rows[1]?.invalidated_at).toBeNull();
   });
@@ -84,35 +84,35 @@ describe("upsertEntity", () => {
 
   it("refuses a write with no valid_from (4-timestamp guard)", async () => {
     await expect(
-      upsertEntity(pool, { type: "org", name: "무근거", valid_from: "" }),
+      upsertEntity(pool, { type: "org", name: "unsupported", valid_from: "" }),
     ).rejects.toThrow(/valid_from/);
   });
 });
 
 describe("assertRelation", () => {
   it("creates the relation once and reuses it", async () => {
-    const from = await upsertEntity(pool, { type: "person", name: "김진호", valid_from: T1 });
-    const to = await upsertEntity(pool, { type: "org", name: "온워드랩", valid_from: T1 });
+    const from = await upsertEntity(pool, { type: "person", name: "Jinho Kim", valid_from: T1 });
+    const to = await upsertEntity(pool, { type: "org", name: "onwardlab", valid_from: T1 });
     const r = { from_entity_id: from, to_entity_id: to, type: "works_at", valid_from: T1 } as const;
     expect(await assertRelation(pool, r)).toBe(await assertRelation(pool, r));
     expect(await query(pool, "SELECT id FROM relations")).toHaveLength(1);
   });
 
   it("supersedes the live relation when attributes change", async () => {
-    const from = await upsertEntity(pool, { type: "person", name: "김진호", valid_from: T1 });
-    const to = await upsertEntity(pool, { type: "org", name: "온워드랩", valid_from: T1 });
+    const from = await upsertEntity(pool, { type: "person", name: "Jinho Kim", valid_from: T1 });
+    const to = await upsertEntity(pool, { type: "org", name: "onwardlab", valid_from: T1 });
     await assertRelation(pool, {
       from_entity_id: from,
       to_entity_id: to,
       type: "works_at",
-      attributes: { role: "팀장" },
+      attributes: { role: "team lead" },
       valid_from: T1,
     });
     await assertRelation(pool, {
       from_entity_id: from,
       to_entity_id: to,
       type: "works_at",
-      attributes: { role: "이사" },
+      attributes: { role: "director" },
       valid_from: T2,
     });
     const rows = await query<{ invalidated_at: Date | null }>(
@@ -165,29 +165,29 @@ describe("invalidateEntity", () => {
   });
 });
 
-describe("asOf (A3 §5 3조건)", () => {
+describe("asOf (A3 §5 three conditions)", () => {
   it("reproduces the past: the old title at T1, the new one at now", async () => {
     await upsertEntity(pool, {
       type: "person",
-      name: "김진호",
-      attributes: { title: "팀장" },
+      name: "Jinho Kim",
+      attributes: { title: "team lead" },
       valid_from: T1,
       valid_until: T2,
     });
     await upsertEntity(pool, {
       type: "person",
-      name: "김진호",
-      attributes: { title: "이사" },
+      name: "Jinho Kim",
+      attributes: { title: "director" },
       valid_from: T2,
     });
 
     const past = await asOf(pool, { at: "2026-03-01T00:00:00.000Z" });
     expect(past).toHaveLength(1);
-    expect(past[0]?.attributes?.title).toBe("팀장");
+    expect(past[0]?.attributes?.title).toBe("team lead");
 
     const now = await asOf(pool, { at: "now" });
     expect(now).toHaveLength(1);
-    expect(now[0]?.attributes?.title).toBe("이사");
+    expect(now[0]?.attributes?.title).toBe("director");
   });
 
   it("filters by entityId", async () => {
@@ -198,7 +198,7 @@ describe("asOf (A3 §5 3조건)", () => {
   });
 
   it("returns nothing before valid_from", async () => {
-    await upsertEntity(pool, { type: "org", name: "미래", valid_from: T2 });
+    await upsertEntity(pool, { type: "org", name: "future", valid_from: T2 });
     expect(await asOf(pool, { at: T1 })).toEqual([]);
   });
 });

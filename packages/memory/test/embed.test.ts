@@ -16,14 +16,14 @@ describe("embed", () => {
   it("returns one 768-dim vector per input, in order", async () => {
     ollama = await startFakeOllama();
     process.env.OLLAMA_HOST = ollama.host;
-    const out = await embed(["회의 내용 정리", "점심 메뉴"]);
+    const out = await embed(["meeting notes summary", "lunch menu"]);
     expect(out).toHaveLength(2);
     expect(out[0]).toHaveLength(EMBED_DIMS);
     expect(out[1]).toHaveLength(EMBED_DIMS);
     expect(out[0]).not.toEqual(out[1]);
   });
 
-  // A4 §10.5: Ollama가 죽으면 예외가 아니라 null이다. 호출자는 embedding=NULL로 저장한다.
+  // A4 §10.5: if Ollama is down it is null, not an exception. The caller stores embedding=NULL.
   it("returns null for every text when ollama is down", async () => {
     ollama = await startFakeOllama("all");
     process.env.OLLAMA_HOST = ollama.host;
@@ -31,14 +31,14 @@ describe("embed", () => {
   });
 
   it("returns null without any request when the host refuses the connection", async () => {
-    process.env.OLLAMA_HOST = "127.0.0.1:1"; // 아무도 안 듣는 포트
+    process.env.OLLAMA_HOST = "127.0.0.1:1"; // a port nobody is listening on
     expect(await embed(["a"])).toEqual([null]);
   });
 
   it("batches long input lists instead of sending one request per text", async () => {
     ollama = await startFakeOllama();
     process.env.OLLAMA_HOST = ollama.host;
-    const out = await embed(Array.from({ length: 70 }, (_, i) => `문장 ${i}`));
+    const out = await embed(Array.from({ length: 70 }, (_, i) => `sentence ${i}`));
     expect(out.filter((v) => v !== null)).toHaveLength(70);
     expect(ollama.calls).toBe(3); // 32 + 32 + 6
   });
@@ -65,7 +65,7 @@ describe("toVectorLiteral", () => {
     expect(toVectorLiteral(v)).toBe(`[0.5,-0.25,${new Array(EMBED_DIMS - 2).fill(0).join(",")}]`);
   });
 
-  // 차원이 틀린 벡터를 조용히 쓰면 HNSW INSERT가 런타임에 깨진다. 여기서 깨뜨린다.
+  // Silently using a wrong-dimension vector breaks the HNSW INSERT at runtime. Break it here instead.
   it("refuses a vector whose dimension is not 768", () => {
     expect(() => toVectorLiteral([1, 2, 3])).toThrow(MemoryEmbedError);
     expect(() => toVectorLiteral([1, 2, 3])).toThrow(/768/);

@@ -6,8 +6,8 @@ export interface DurableEvent {
 }
 
 /**
- * A2-D4: turn.item.started에서 row를 만들고, UPDATE는 500ms 디바운스 또는 turn.item.completed에만.
- * 같은 item_id의 started 중복은 버리고, completed 연타는 마지막 것만 남긴다.
+ * A2-D4: a row is created on turn.item.started; UPDATEs happen only on the 500ms debounce or on turn.item.completed.
+ * Duplicate started events for the same item_id are dropped, and a burst of completed events keeps only the last.
  */
 export function createDurableDebouncer(
   emit: (e: DurableEvent) => void,

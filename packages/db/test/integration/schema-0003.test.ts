@@ -32,7 +32,7 @@ describe("0003_labels", () => {
     const rule = await one<{ tier: string; active: boolean; positives: string[] }>(
       pool,
       `INSERT INTO label_rules (label_id, prompt, probe_embedding)
-       VALUES ($1, '청구서가 첨부된 메일', $2::vector)
+       VALUES ($1, 'email with an attached invoice', $2::vector)
        RETURNING tier, active, positives`,
       [label.id, `[${new Array(768).fill(0).join(",")}]`],
     );

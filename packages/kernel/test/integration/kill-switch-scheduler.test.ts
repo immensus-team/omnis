@@ -19,9 +19,11 @@ let scheduler: Scheduler;
 let runs = 0;
 const logger = createLogger("@omnis/kernel");
 
-/** 틱(50ms)이 게이트를 이미 지나 in-flight인 창을 닫는다. 이 시간이 지나면 남은 틱이 없다. */
+/** Closes the window in which a tick (50ms) already passed the gate and is in flight. Once it
+ * elapses, no tick is left. */
 const SETTLE_MS = 150;
-/** 테스트 창(400ms) 안에서 cron이 스스로 다시 due가 되면 안 된다 — due는 아래 UPDATE로만 만든다. */
+/** The cron must not become due again on its own inside the test window (400ms) — only the
+ * UPDATE below makes it due. */
 const NEVER_IN_A_TEST_WINDOW = "0 4 * * *";
 
 async function makeDue(): Promise<void> {
@@ -51,7 +53,8 @@ beforeAll(async () => {
 afterAll(async () => {
   await scheduler.stop();
   await killSwitch.set(false, "test end");
-  // 공유 omnis_test DB: 등록한 test_* 잡을 지우지 않으면 0006의 seed 개수 단언이 깨진다.
+  // Shared omnis_test DB: leaving the registered test_* job behind breaks the 0006
+  // seed-count assertion.
   await query(pool, `DELETE FROM jobs WHERE name = 'test_killable'`);
   await events.close();
   await pool.end();
@@ -66,8 +69,9 @@ describe("kill switch stops the scheduler", () => {
   });
 
   it("stops running due jobs while the switch is on, and leaves the claim untouched", async () => {
-    // set()은 audit insert가 끝난 뒤에야 cached=on을 넣는다. 그 사이에 게이트를 통과한 틱이
-    // 아직 날고 있으므로, 먼저 가라앉히고 그 다음에 카운터를 0으로 만든다(순서가 핵심).
+    // set() only flips cached=on after the audit insert finishes. A tick that passed the gate in
+    // the meantime is still in flight, so let it settle first, then zero the counter (order
+    // matters).
     await killSwitch.set(true, "stop everything");
     await new Promise((r) => setTimeout(r, SETTLE_MS));
     runs = 0;

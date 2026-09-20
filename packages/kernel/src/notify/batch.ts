@@ -1,4 +1,4 @@
-// A4 §3.6: 묶음 등급은 3시간 간격으로 "초안 N건 준비됨" 1건으로 접힌다.
+// A4 §3.6: the batched tier collapses into a single "N drafts ready" every 3 hours.
 import { query } from "@omnis/db";
 import type { NotifyTier, PushPayload } from "@omnis/protocol";
 import type { Pool } from "pg";
@@ -12,7 +12,7 @@ export interface Notifier {
   send(p: PushPayload, tier: NotifyTier): Promise<void>;
 }
 
-/** A4 §3.6 프라이버시 원칙: 잠금화면에 본문 전문을 띄우지 않는다. */
+/** A4 §3.6 privacy rule: never put the full body on the lock screen. */
 export function first80(s: string): string {
   return s.length <= 80 ? s : s.slice(0, 80);
 }
@@ -28,7 +28,7 @@ export async function runPushBatch(deps: PushBatchDeps): Promise<number> {
   const { pool, notifier, logger } = deps;
   const rows = await query<{ n: string; thread_id: string | null }>(
     pool,
-    // min(uuid)는 Postgres에 없다(집계 미정의) — text로 캐스트해서 집계한다.
+    // Postgres has no min(uuid) (aggregate undefined) — cast to text and aggregate that.
     `SELECT count(*)::text AS n, min(thread_id::text) AS thread_id
        FROM items WHERE status = 'draft' AND (meta->>'pending') IS DISTINCT FROM 'true'`,
   );
@@ -39,7 +39,7 @@ export async function runPushBatch(deps: PushBatchDeps): Promise<number> {
     {
       kind: "draft",
       title: "omnis",
-      body: first80(`초안 ${n}건 준비됨`),
+      body: first80(`${n} drafts ready`),
       deep_link: threadId === "" ? "omnis://inbox" : `omnis://thread/${threadId}`,
     },
     "batched",
@@ -54,7 +54,8 @@ export function registerPushBatchJob(scheduler: Scheduler, deps: PushBatchDeps):
   });
 }
 
-/** 실제 발송기는 Task 12의 Web Push + Tauri 로컬 알림이다. 여기서는 주입 지점만 만든다. */
+/** The real sender is the Web Push + Tauri local notification from Task 12. This only creates the
+ *  injection point. */
 export function createNotifier(deps: {
   pool: Pool;
   logger: Logger;
@@ -66,7 +67,7 @@ export function createNotifier(deps: {
       try {
         await deps.send(p, tier);
       } catch (e) {
-        // A4: 발송 실패를 조용히 삼키지 않는다. agent_runs가 아니라 시스템 Item이다(백로그 US-B17).
+        // A4: a send failure is never swallowed. A system Item, not an agent_run (backlog US-B17).
         deps.logger.error("notify send failed", {
           kind: p.kind,
           err: e instanceof Error ? e.message : String(e),
@@ -82,7 +83,7 @@ export function createNotifier(deps: {
              ON CONFLICT (account_id, external_id) DO UPDATE SET kind = 'system' RETURNING id, account_id)
            INSERT INTO items (thread_id, account_id, kind, status, body, sent_at)
            SELECT thr.id, thr.account_id, 'system', 'received', $1, now() FROM thr`,
-          [`알림 발송에 실패했습니다(${p.kind}). 설정에서 푸시 구독을 확인해 주세요.`],
+          [`Notification send failed (${p.kind}). Check your push subscription in Settings.`],
         );
       }
     },

@@ -84,8 +84,8 @@ beforeEach(() => {
 describe("summarizeThread — fallback path", () => {
   it("skips a thread whose last item is outbound (author_is_me)", async () => {
     const threadId = await newThread("thr_out");
-    await addItem(threadId, { body: "요청드립니다", authorIsMe: false });
-    await addItem(threadId, { body: "네 확인했습니다", authorIsMe: true });
+    await addItem(threadId, { body: "Could you send it over?", authorIsMe: false });
+    await addItem(threadId, { body: "Yes, confirmed", authorIsMe: true });
 
     const out = await summarizeThread(threadId);
     expect(out).toBeNull();
@@ -101,14 +101,14 @@ describe("summarizeThread — fallback path", () => {
   it("keeps the existing summary when the last item has no text (agent tool_call with body='')", async () => {
     process.env.OMNIS_OPENROUTER_API_KEY = "";
     const threadId = await newThread("thr_blank");
-    await addItem(threadId, { body: "계약서 공유 부탁드립니다" });
-    expect((await summarizeThread(threadId))?.summary).toBe("계약서 공유 부탁드립니다");
+    await addItem(threadId, { body: "Please share the contract" });
+    expect((await summarizeThread(threadId))?.summary).toBe("Please share the contract");
 
-    // writeAgentItem(apps/hub/src/sessions.ts)의 started 단계: kind='tool_call', body=''.
+    // The started stage of writeAgentItem(apps/hub/src/sessions.ts): kind='tool_call', body=''.
     const blankId = await addItem(threadId, { kind: "tool_call", body: "" });
     expect(await summarizeThread(threadId)).toBeNull();
     expect(await threadMeta(threadId)).toMatchObject({
-      summary: "계약서 공유 부탁드립니다",
+      summary: "Please share the contract",
       summary_source: "fallback",
     });
     expect(await runsFor(blankId)).toHaveLength(0);
@@ -118,14 +118,14 @@ describe("summarizeThread — fallback path", () => {
     process.env.OMNIS_OPENROUTER_API_KEY = "";
     const threadId = await newThread("thr_nokey");
     const itemId = await addItem(threadId, {
-      subject: "견적 요청",
-      body: "내일까지 견적서 부탁드립니다",
+      subject: "Quote request",
+      body: "Please send the quote by tomorrow",
     });
 
     const out = await summarizeThread(threadId);
-    expect(out).toEqual({ summary: "견적 요청", source: "fallback" });
+    expect(out).toEqual({ summary: "Quote request", source: "fallback" });
     expect(await threadMeta(threadId)).toMatchObject({
-      summary: "견적 요청",
+      summary: "Quote request",
       summary_source: "fallback",
     });
     expect((await threadMeta(threadId)).summary_at).not.toBeNull();
@@ -137,17 +137,17 @@ describe("summarizeThread — fallback path", () => {
   it("falls back to the first line of the body when subject is null", async () => {
     process.env.OMNIS_OPENROUTER_API_KEY = "";
     const threadId = await newThread("thr_nosubject");
-    await addItem(threadId, { subject: null, body: "첫 줄입니다\n둘째 줄" });
+    await addItem(threadId, { subject: null, body: "This is the first line\nSecond line" });
 
     const out = await summarizeThread(threadId);
-    expect(out?.summary).toBe("첫 줄입니다");
+    expect(out?.summary).toBe("This is the first line");
     expect(out?.source).toBe("fallback");
   });
 
   it("truncates a long fallback line to 90 chars", async () => {
     process.env.OMNIS_OPENROUTER_API_KEY = "";
     const threadId = await newThread("thr_long");
-    const long = "가".repeat(120);
+    const long = "a".repeat(120);
     await addItem(threadId, { subject: long, body: "x" });
 
     const out = await summarizeThread(threadId);
@@ -172,7 +172,7 @@ describe("summarizeThread — T1 path", () => {
               {
                 type: "text" as const,
                 text: JSON.stringify({
-                  summary: "브라이트스톤 계약서 공유를 요청합니다",
+                  summary: "Wants you to share the Brightstone Realty contract.",
                   confidence: 0.87,
                 }),
               },
@@ -182,18 +182,23 @@ describe("summarizeThread — T1 path", () => {
         }),
     }));
     vi.resetModules();
-    // resetModules는 pool.ts의 모듈 싱글톤도 초기화한다(classify.test.ts와 같은 편차).
+    // resetModules also clears the module singleton in pool.ts (same deviation as classify.test.ts).
     const { summarizeThread: summarizeMocked } = await import("../../src/summarize.js");
     const { configureAgents: configureAgentsFresh } = await import("../../src/index.js");
     configureAgentsFresh({ pool });
 
     const threadId = await newThread("thr_t1");
-    const itemId = await addItem(threadId, { body: "브라이트스톤 계약서 공유 부탁드립니다" });
+    const itemId = await addItem(threadId, {
+      body: "Please share the Brightstone Realty contract",
+    });
 
     const out = await summarizeMocked(threadId);
-    expect(out).toEqual({ summary: "브라이트스톤 계약서 공유를 요청합니다", source: "t1" });
+    expect(out).toEqual({
+      summary: "Wants you to share the Brightstone Realty contract.",
+      source: "t1",
+    });
     expect(await threadMeta(threadId)).toMatchObject({
-      summary: "브라이트스톤 계약서 공유를 요청합니다",
+      summary: "Wants you to share the Brightstone Realty contract.",
       summary_source: "t1",
     });
     const runs = await runsFor(itemId);

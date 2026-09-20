@@ -3,7 +3,8 @@ import type { Audit } from "./audit.js";
 import type { KillSwitch } from "./kill-switch.js";
 
 declare const egressBrand: unique symbol;
-/** runEgress 안에서만 만들어진다. 채널로 나가는 함수는 이 토큰을 인자로 요구해 우회를 컴파일 에러로 만든다. */
+/** Created only inside runEgress. Functions that reach the channel take this token as an
+ *  argument, so bypassing the flow is a compile error. */
 export type EgressToken = {
   readonly [egressBrand]: "EgressToken";
   readonly approvalId: string;
@@ -23,14 +24,14 @@ export interface EgressDeps {
   audit: Audit;
 }
 
-/** 비가역 행동의 유일한 실행 경로(마스터 §7, A7 §1). 순서를 바꾸지 않는다. */
+/** The only execution path for irreversible actions (master §7, A7 §1). Do not reorder. */
 export async function runEgress<T>(
   deps: EgressDeps,
   spec: EgressSpec,
   fn: (token: EgressToken) => Promise<T>,
 ): Promise<T> {
   await deps.killSwitch.assertOff();
-  await deps.approvals.beginExecution(spec.approvalId); // decided + accept|edit이 아니면 throw
+  await deps.approvals.beginExecution(spec.approvalId); // throws unless state=decided + accept|edit
   const token = { approvalId: spec.approvalId } as unknown as EgressToken;
   const targetIdField = spec.targetId !== undefined ? { target_id: spec.targetId } : {};
   try {

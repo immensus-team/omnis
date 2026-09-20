@@ -93,7 +93,7 @@ describe("registerSummaryJob", () => {
 
     fire({ id: "i1", thread_id: "t1", op: "insert" });
     vi.advanceTimersByTime(30_000);
-    // 타이머 콜백이 던진 rejection은 마이크로태스크에서 처리된다 — 실제 타이머로 한 틱 흘려보낸다.
+    // The rejection thrown by the timer callback is handled in a microtask — let one real timer tick pass.
     vi.useRealTimers();
     await new Promise((r) => setTimeout(r, 0));
     expect(error).toHaveBeenCalledWith(

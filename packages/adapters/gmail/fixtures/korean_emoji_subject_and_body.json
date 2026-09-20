@@ -1,5 +1,6 @@
 {
   "scenario": "korean_emoji_subject_and_body",
+  "note": "Korean subject and body with emoji — the non-ASCII input under test, kept verbatim so the round trip stays pinned.",
   "raw": {
     "id": "18c2f4a1b2d3f509",
     "threadId": "18c2f4a1b2d3f509",

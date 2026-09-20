@@ -23,11 +23,11 @@ beforeAll(async () => {
        VALUES ($1,'cal-main','calendar', ARRAY[$2]::uuid[]) RETURNING id`,
       [acc.id, person.id],
     );
-    // A3 §2.1 조인 규칙: items.sent_at = start_at
+    // A3 §2.1 join rule: items.sent_at = start_at
     const item = await one<{ id: string }>(
       c,
       `INSERT INTO items (thread_id, account_id, kind, subject, body, sent_at)
-       VALUES ($1,$2,'event','PoC 킥오프','', now() - interval '3 days') RETURNING id`,
+       VALUES ($1,$2,'event','PoC kickoff','', now() - interval '3 days') RETURNING id`,
       [thread.id, acc.id],
     );
     await query(
@@ -96,7 +96,7 @@ describe("US-A04 acceptance: calendar queries (A4 §7.1, A3 §12 5b)", () => {
     await query(
       pool,
       `INSERT INTO items (thread_id, account_id, kind, body, status, author_is_me, sent_at)
-       VALUES ($1,$2,'message','감사합니다','sent', true, now() - interval '2 days')`,
+       VALUES ($1,$2,'message','Thanks','sent', true, now() - interval '2 days')`,
       [thread.id, accountId],
     );
     const rows = await query<{ missed_followups: string }>(

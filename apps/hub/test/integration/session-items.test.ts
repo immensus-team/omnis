@@ -1,6 +1,6 @@
-// US-A34: 브리지 이벤트 → 인박스 item. mock 런타임 픽스처를 실제 어댑터가 파싱하고,
-// 실제 HubClient가 실제 WS /bridge로 쏘고, 허브가 items/agent_sessions에 쓴다.
-// 시드의 bridgeSink 같은 우회로가 없다는 것이 이 파일이 지키는 것이다.
+// US-A34: bridge events → inbox items. A real adapter parses the mock runtime fixtures, a real
+// HubClient sends them over the real WS /bridge, and the hub writes items/agent_sessions.
+// What this file guards is the absence of a bypass like the seed's bridgeSink.
 import type { AddressInfo } from "node:net";
 import { createPool, query } from "@omnis/db";
 import { type Kernel, createKernel, createLogger } from "@omnis/kernel";
@@ -68,7 +68,7 @@ beforeAll(async () => {
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   const port = (server.address() as AddressInfo).port;
 
-  // 이 세션 키로 남은 앞선 실행의 흔적을 지운다(items는 thread CASCADE로 같이 지워진다).
+  // Clear traces left by an earlier run under this session key (items go with it via thread CASCADE).
   await query(pool, "DELETE FROM threads WHERE external_id = $1", [SESSION_KEY]);
 
   client = new HubClient({
@@ -105,7 +105,7 @@ beforeAll(async () => {
   });
   await adapter.startTurn(
     session,
-    { text: "inbox 초안 한 건" },
+    { text: "One inbox draft" },
     createHubSink({ client, session, turnId: "t-int-1", logger }),
   );
 
@@ -168,11 +168,11 @@ describe("bridge session → inbox (US-A34)", () => {
     expect(turn?.body).toBe("Listing src/.");
 
     const tool = rows.find((r) => r.kind === "tool_call");
-    // ToolCallBadge가 읽는 shape: master §11 팔레트 이름 + 배지 상태.
+    // The shape ToolCallBadge reads: master §11 palette name + badge state.
     expect(tool?.tool).toMatchObject({ name: "read", label: "Bash", state: "done" });
     expect(tool?.body).toContain("index.ts");
 
-    expect(rows.find((r) => r.kind === "system")?.body).toBe("✓ Turn complete");
+    expect(rows.find((r) => r.kind === "system")?.body).toBe("✓ Turn completed");
   });
 
   it("stores no delta: one row per item plus the turn line (A2-D4)", async () => {
@@ -194,16 +194,17 @@ describe("bridge session → inbox (US-A34)", () => {
     expect(rows[0]?.last_turn_at).not.toBeNull();
   });
 
-  // 이 턴은 beforeAll에서 이미 turn.completed까지 끝났다 — 승인이 턴보다 늦게 끝나는
-  // A2 §1.3의 순서(승인 요청 → 턴 종료 → 결정)다. 결정 뒤 종착지는 done이지 working이 아니다.
+  // This turn already reached turn.completed in beforeAll — the A2 §1.3 ordering where an
+  // approval finishes after its turn (approval requested → turn ended → decision). The state it
+  // settles on after the decision is done, not working.
   it("blocks on approval.requested and settles to done — not working — on the decision", async () => {
     const asked = client.request("approval.requested", {
       session_key: SESSION_KEY,
       turn_id: "t-int-1",
       interrupt: {
         action: "send",
-        args: { text: "보냅니다" },
-        description: "US-A34 승인 왕복",
+        args: { text: "Sending it" },
+        description: "US-A34 approval round-trip",
         config: { allow_accept: true, allow_edit: true, allow_respond: false, allow_ignore: true },
       },
     });
@@ -219,9 +220,9 @@ describe("bridge session → inbox (US-A34)", () => {
 
     const approval = await until(async () => {
       const list = await kernel.approvals.list({ state: "pending", limit: 50 });
-      return list.find((a) => a.description === "US-A34 승인 왕복") ?? null;
+      return list.find((a) => a.description === "US-A34 approval round-trip") ?? null;
     });
-    // 승인은 세션 스레드에 걸린다 — ApprovalCard가 그 스레드에서 보인다(A5 §4).
+    // The approval hangs off the session thread — the ApprovalCard shows up in that thread (A5 §4).
     expect(approval.thread_id).toBe(threadId);
 
     await kernel.approvals.decide(approval.id, { decision: "accept" });

@@ -4,12 +4,14 @@ import { createPool, one } from "@omnis/db";
 import { afterAll, describe, expect, it } from "vitest";
 
 const MAIN = fileURLToPath(new URL("../../src/main.ts", import.meta.url));
-// deviation: 계획 원문은 `spawn("pnpm", ["exec", "tsx", MAIN])`다. 이 환경의 pnpm 9.12.3은
-// SIGTERM을 자식(tsx)에 전달한 뒤 자기 자신도 default disposition으로 죽어(재신호) 부모
-// 프로세스의 exit는 항상 {code:null, signal:'SIGTERM'}로 관측된다 — 그 아래 실제 node
-// 프로세스가 0으로 정상 종료해도 pnpm 래퍼의 exit event에는 반영되지 않는다(격리 재현 완료).
-// tsx 바이너리를 pnpm 없이 직접 spawn하면 그 프로세스 자체가 우리 SIGTERM 핸들러를 갖고
-// exit(0)/exit(1)을 직접 반환하므로 acceptance criteria(정상 종료 코드로 관측)를 그대로 지킨다.
+// deviation: the plan text says `spawn("pnpm", ["exec", "tsx", MAIN])`. pnpm 9.12.3 in this
+// environment forwards SIGTERM to the child (tsx) and then dies on the default disposition itself
+// (re-raising), so the parent process's exit is always observed as
+// {code:null, signal:'SIGTERM'} — even when the actual node process underneath exits cleanly with
+// 0, that never reaches the pnpm wrapper's exit event (reproduced in isolation).
+// Spawning the tsx binary directly, without pnpm, means that process holds our SIGTERM handler and
+// returns exit(0)/exit(1) itself, which keeps the acceptance criteria (observed as a normal exit
+// code) intact.
 const TSX_BIN = fileURLToPath(new URL("../../../../node_modules/.bin/tsx", import.meta.url));
 const PORT = "8799";
 

@@ -1,5 +1,6 @@
 {
   "scenario": "korean_zwj_family_emoji_and_skin_tone",
+  "note": "Korean text with a ZWJ family emoji and a skin-tone modifier — the Unicode input under test, kept verbatim.",
   "raw": {
     "id": 8802,
     "chat": {

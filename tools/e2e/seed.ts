@@ -1,6 +1,7 @@
-// The seed takes only "real code paths": adapter normalize → kernel IngestSink,
-// kernel approvals.propose, @omnis/agents classify (T0 rules), the local agent bridge over WS /bridge.
-// Agent sessions are the same: thread/agent_sessions/items are all created by the hub (US-A34).
+// Every part of the seed goes through a "real code path": adapter normalize → kernel IngestSink,
+// kernel approvals.propose, @omnis/agents classify (T0 rules), and the local agent bridge over the
+// WS /bridge. Agent sessions are no exception: the hub creates the thread/agent_sessions/items
+// (US-A34).
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import WebSocket from "ws";
@@ -21,7 +22,7 @@ import { BRIDGE_HOST, type E2EEnv, HUB_PORT, REPO_ROOT } from "./stack.js";
 const logger = createLogger("@omnis/e2e");
 
 export interface SeedResult {
-  /** Closes the bridge. It has to stay open until the smoke ends so agent_runtimes stays online. */
+  /** Closes the bridge. It must stay open until the smoke finishes so agent_runtimes stays online. */
   closeBridge?: () => void;
   slackThreadId: string;
   gmailThreadId: string;
@@ -33,9 +34,10 @@ export interface SeedResult {
 }
 
 // The smoke seed replays only this fixed slice, not every adapter fixture. The fixture directories
-// are the adapter contract corpus and keep growing (38/42/44 files), and sweeping a whole directory
-// grows the seed with them — the Inbox list then enters the virtualized range and the row-counting
-// A1/A2/A4/A4b/A5 break. Every fixture's normalize() is covered by the adapter contract tests.
+// are the adapter contract corpus and keep growing (38/42/44 rows), so sweeping a directory whole
+// would grow the seed with them, push the Inbox list into its virtualization range, and break the
+// A1/A2/A4/A4b/A5 checks that count rows. Every fixture's normalize() is covered separately by the
+// adapter contract tests.
 const CHANNELS: {
   channel: Channel;
   fixturesDir: string;
@@ -101,8 +103,8 @@ export async function seed(pool: Pool, env: E2EEnv): Promise<SeedResult> {
          RETURNING id`,
       [spec.channel, `e2e-${spec.channel}`, `e2e ${spec.channel}`],
     );
-    // slack/gmail/gcal normalize() all carry threadMeta now — feed the raw fixture straight in
-    // (synthetic workaround removed, root fix for main's real defect #1).
+    // slack/gmail/gcal normalize() all carry threadMeta now — feed the raw fixture straight
+    // through (synthetic workaround removed; root fix for real defect #1 on main).
     for (const item of fixtureItems(spec.fixturesDir, spec.fixtures, spec.normalize)) {
       await sink(account.id, item);
     }
@@ -118,7 +120,7 @@ export async function seed(pool: Pool, env: E2EEnv): Promise<SeedResult> {
   const gmailThreadId = threadIds.gmail ?? "";
   const calendarThreadId = threadIds.gcal ?? "";
 
-  // Label chips (A5 §3.1) are attached through thread_labels.
+  // Label chips (A5 §3.1) attach through thread_labels.
   await labelThread(pool, slackThreadId, "scope", "work", "#2f6feb");
   await labelThread(pool, slackThreadId, "topic", "launch", "#8b5cf6");
   await labelThread(pool, gmailThreadId, "scope", "personal", "#16a34a");
@@ -128,7 +130,7 @@ export async function seed(pool: Pool, env: E2EEnv): Promise<SeedResult> {
   await query(pool, "UPDATE threads SET scope = 'personal' WHERE id = $1", [gmailThreadId]);
   await query(pool, "UPDATE items SET scope = t.scope FROM threads t WHERE items.thread_id = t.id");
 
-  // Leave one item as a draft so the Thread screen's StatusBadge has to render a value other than 'received'.
+  // Leave one item as a draft so we can see the Thread screen's StatusBadge render a value other than 'received'.
   const slackAccount = await one<{ account_id: string }>(
     pool,
     "SELECT account_id FROM threads WHERE id = $1",
@@ -137,17 +139,17 @@ export async function seed(pool: Pool, env: E2EEnv): Promise<SeedResult> {
   await query(
     pool,
     `INSERT INTO items (thread_id, account_id, kind, status, scope, body, sent_at)
-       VALUES ($1, $2, 'message', 'draft', 'work', 'Sure, I will review it today.', now())`,
+       VALUES ($1, $2, 'message', 'draft', 'work', 'Yes, I will review it today.', now())`,
     [slackThreadId, slackAccount.account_id],
   );
 
-  // ── One approval: the kernel's approvals.propose (contract §5)
+  // ── one approval: the kernel's approvals.propose (contract §5)
   const kernel = createKernel({ pool, logger });
   let approvalId: string;
   try {
     approvalId = await kernel.approvals.propose({
       action: "send",
-      args: { channel: "slack", body: "Sure, I will review it today." },
+      args: { channel: "slack", body: "Yes, I will review it today." },
       description: "Reply to #omnis-launch?",
       config: {
         allow_accept: true,
@@ -162,10 +164,10 @@ export async function seed(pool: Pool, env: E2EEnv): Promise<SeedResult> {
     await kernel.close();
   }
 
-  // ── One classify() call: takes only the T0 rule path (r_channel_work). DeepSeek/OpenRouter is never called.
+  // ── one classify() call: it takes the T0 rule path only (r_channel_work). DeepSeek/OpenRouter are never called.
   const classifyTier = await runClassify(pool, slackThreadId);
 
-  // ── Agent session: real WS /bridge + mock runtime fixture
+  // ── agent session: the real WS /bridge plus mock runtime fixtures
   const agent = await seedAgentSession(pool, env);
 
   const { count } = await one<{ count: string }>(pool, "SELECT count(*) AS count FROM items");
@@ -203,10 +205,10 @@ async function labelThread(
 }
 
 async function runClassify(pool: Pool, threadId: string): Promise<string> {
-  // Network guarantee: for tier 3 (T1 = DeepSeek/OpenRouter) t1Model() requires
-  // OMNIS_OPENROUTER_API_KEY and throws before any fetch when it is missing. Clearing the key makes
-  // the call impossible even when the rules miss and it falls through — it is enforced, not "the
-  // rules happened to match". A10 verifies tier=T0 separately.
+  // Network guarantee: tier 3 (T1 = DeepSeek/OpenRouter) requires OMNIS_OPENROUTER_API_KEY in
+  // t1Model() and throws before fetching when it is absent. Clearing the key makes the call
+  // outright impossible even if a rule misses and falls through — so this is enforced, not "the
+  // rule happened to match". A10 verifies tier=T0 separately.
   process.env.OMNIS_OPENROUTER_API_KEY = "";
   configureAgents({ pool });
   const item = await one<{
@@ -228,7 +230,7 @@ async function runClassify(pool: Pool, threadId: string): Promise<string> {
        FROM items WHERE thread_id = $1 AND status = 'received' ORDER BY sent_at LIMIT 1`,
     [threadId],
   );
-  // Reset the thread scope to unknown at classification time so rule 1 (r_thread_sticky) does not hit immediately.
+  // Reset the thread scope to unknown at classify time so the tier-1 rule (r_thread_sticky) does not fire immediately.
   await query(pool, "UPDATE threads SET scope = 'unknown' WHERE id = $1", [threadId]);
   const result = await classify(
     {
@@ -246,8 +248,9 @@ async function runClassify(pool: Pool, threadId: string): Promise<string> {
   return result.tier_used;
 }
 
-/** The real notifications the hub receives over WS /bridge + one turn of the mock runtime fixture.
- *  Session thread/row and items are all created by the hub (US-A34) — the seed does no direct INSERT. */
+/** The real notifications the hub receives on the WS /bridge, plus one turn of mock runtime
+ *  fixtures. The session thread/row and the items are all created by the hub (US-A34) — the seed
+ *  does no direct INSERT. */
 async function seedAgentSession(
   pool: Pool,
   env: E2EEnv,
@@ -264,7 +267,7 @@ async function seedAgentSession(
   await client.start();
   await waitFor(() => client.connected, "bridge connect");
 
-  // 1) Runtime registration — the hub upserts into agent_runtimes (bridge.ts onRegister).
+  // 1) runtime registration — the hub upserts into agent_runtimes (bridge.ts onRegister).
   client.notify("runtime.registered", {
     runtime: "claude_code",
     version: "claude 2.1.274",
@@ -277,9 +280,10 @@ async function seedAgentSession(
     [BRIDGE_HOST],
   );
 
-  // 2) One mock runtime turn — the real ClaudeCodeAdapter parses stdio (replaying A2 §8.2's fixture)
-  //    and createHubSink ships it to the hub unchanged. session.registered on the fixture's first
-  //    line (system/init) creates the session thread, and the turn.item.* that follow become items.
+  // 2) one turn of the mock runtime — the real ClaudeCodeAdapter parses stdio (replaying the A2
+  //    §8.2 fixture) and createHubSink sends it straight to the hub. session.registered in the
+  //    fixture's first line (system/init) creates the session thread, and the turn.item.* that
+  //    follow become items.
   const session: SessionRecord = {
     session_key: "agent:claude_code:macbook:inbox-draft",
     session_id: null,
@@ -301,7 +305,7 @@ async function seedAgentSession(
   });
   await adapter.startTurn(
     session,
-    { text: "one inbox draft" },
+    { text: "One inbox draft" },
     createHubSink({ client, session, turnId: "e2e-turn-1", logger }),
   );
 
@@ -331,7 +335,7 @@ async function seedAgentSession(
   return { threadId: row.thread_id, close: () => client.stop() };
 }
 
-/** G5: push one more item through the hub's IngestSink and time how long it takes to show up in the UI. */
+/** G5: push one more item through the hub's IngestSink and measure how long it takes to show up in the UI. */
 export async function ingestOneMore(pool: Pool, body: string): Promise<void> {
   const sink = createIngestSink({ pool, logger });
   const row = await one<{ account_id: string; external_id: string }>(

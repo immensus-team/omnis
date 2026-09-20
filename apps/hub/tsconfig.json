@@ -3,6 +3,11 @@
   "compilerOptions": { "rootDir": "src", "outDir": "dist" },
   "include": ["src"],
   "references": [
+    { "path": "../../packages/adapters/gmail" },
+    { "path": "../../packages/adapters/google-calendar" },
+    { "path": "../../packages/adapters/outlook" },
+    { "path": "../../packages/adapters/slack" },
+    { "path": "../../packages/adapters/telegram" },
     { "path": "../../packages/agents" },
     { "path": "../../packages/db" },
     { "path": "../../packages/kernel" },

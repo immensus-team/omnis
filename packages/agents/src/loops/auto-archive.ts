@@ -1,5 +1,5 @@
-// A4 §9. 이 루프는 egress가 아니다 — pending_approvals를 만들지 않고, 7일 undo·전량 노출·
-// 하드 삭제 금지 셋으로 보장한다.
+// A4 §9. This loop is not egress — it creates no pending_approvals; the guarantee comes from
+// three things: 7-day undo, full exposure, and no hard deletes.
 import type { Pool } from "pg";
 import { z } from "zod";
 import { buildContext } from "../context/assemble.js";
@@ -24,8 +24,8 @@ export const AutoArchiveOutput = z.object({
   tier: z.enum(["T0", "T1"]),
   confidence: z.number().min(0).max(1),
   rationale: z.string().max(200),
-  // ponytail: .default([])를 쓰면 z.input과 z.output이 갈려 LoopSpec의 ZodType<TOut>에 대입되지 않는다.
-  // T1 프롬프트가 항상 채우게 하는 쪽이 싸다.
+  // ponytail: with .default([]) z.input and z.output diverge, so it no longer assigns to
+  // LoopSpec's ZodType<TOut>. Cheaper to have the T1 prompt always fill it.
   injection_flags: z.array(z.string()),
 });
 export type AutoArchiveOutputT = z.infer<typeof AutoArchiveOutput>;
@@ -42,7 +42,7 @@ export function nonHumanSender(i: { handle: string; meta: Record<string, unknown
   >;
   if (typeof headers["List-Unsubscribe"] === "string") return true;
   if (String(headers.Precedence ?? "").toLowerCase() === "bulk") return true;
-  if (i.meta.bot === true) return true; // Slack bot 발신
+  if (i.meta.bot === true) return true; // sent by a Slack bot
   return false;
 }
 
@@ -51,7 +51,7 @@ export interface HardGateResult {
   reason: string | null;
 }
 
-/** A4 §9.2: 규칙보다 먼저 평가하는 하드 게이트 5종. 하나라도 걸리면 절대 보관하지 않는다. */
+/** A4 §9.2: the five hard gates evaluated before the rules. If even one trips, never archive. */
 export async function hardGate(pool: Pool, itemId: string): Promise<HardGateResult> {
   const { rows } = await pool.query<{
     sensitivity: string;
@@ -106,36 +106,36 @@ async function t0Verdict(itemId: string): Promise<AutoArchiveOutputT | null> {
   if (r === undefined) return null;
 
   const rules: string[] = [];
-  // ① 발신자가 사람이 아님 (T0, $0)
+  // ① the sender is not a human (T0, $0)
   if (!nonHumanSender({ handle: r.handle, meta: r.meta })) return null;
   rules.push(AUTO_ARCHIVE_RULES.senderNonHuman);
-  // ③ VIP 아님 + sensitivity normal — hardGate가 이미 보장했다
+  // ③ not VIP + sensitivity normal — hardGate already guaranteed this
   rules.push(AUTO_ARCHIVE_RULES.notVipNormal);
-  // ④ 내가 답한 적 없음. 답한 적이 있으면 ④-b(T1)로 넘어간다.
+  // ④ I have never replied. If I have, this falls through to ④-b (T1).
   if (r.i_replied) return null;
   rules.push(AUTO_ARCHIVE_RULES.neverReplied);
-  // ② T0 경로: 물음표 부재. 물음표가 있으면 T1을 태운다.
+  // ② T0 path: no question mark. If there is one, run T1 instead.
   if (r.body.includes("?") || r.body.includes("？")) return null;
   rules.push(AUTO_ARCHIVE_RULES.noCta);
 
   const headers = (r.meta as { headers?: Record<string, unknown> }).headers;
   return {
     archive: true,
-    reason: typeof headers?.["List-Unsubscribe"] === "string" ? "뉴스레터" : "알림 메일",
+    reason: typeof headers?.["List-Unsubscribe"] === "string" ? "newsletter" : "notification email",
     rule_ids: rules,
     tier: "T0",
     confidence: 0.95,
-    rationale: "발신자가 사람이 아니고 나에게 향한 질문이 없어 보관했습니다.",
+    rationale: "Archived because the sender is not a human and no question is addressed to me.",
     injection_flags: [],
   };
 }
 
 async function applyArchive(itemId: string, out: AutoArchiveOutputT, runId: string): Promise<void> {
   if (!out.archive) return;
-  // "애매하면 보관하지 않는다"(A4 §9.2)가 이 임계의 의미다.
+  // "When in doubt, do not archive" (A4 §9.2) is what this threshold means.
   if (out.tier === "T1" && out.confidence < T1_ARCHIVE_CONFIDENCE_MIN) return;
-  // ponytail: @omnis/agents는 @omnis/kernel을 의존할 수 없어 archiveItem을 직접 못 부른다.
-  // 같은 UPDATE 한 문장을 여기 둔다(계약 §12의 의도된 중복).
+  // ponytail: @omnis/agents cannot depend on @omnis/kernel, so it cannot call archiveItem directly.
+  // The same single UPDATE statement lives here (intentional duplication per contract §12).
   await getAgentsPool().query(
     `UPDATE items SET status = 'archived',
         meta = meta || jsonb_build_object('archived_by', jsonb_build_object(
@@ -174,7 +174,7 @@ export const autoArchiveLoop: LoopSpec<AutoArchiveOutputT> = {
           rule_ids: [],
           tier: "T0" as const,
           confidence: 1,
-          rationale: `하드 게이트(${reason})에 걸려 보관하지 않았습니다.`,
+          rationale: `Hard gate (${reason}) blocked archiving.`,
           injection_flags: [],
         },
         confidence: 1,
@@ -185,7 +185,7 @@ export const autoArchiveLoop: LoopSpec<AutoArchiveOutputT> = {
       };
     }
     const t0 = await t0Verdict(itemId);
-    if (t0 === null) return null; // ② 또는 ④-b가 애매하다 → T1 경로
+    if (t0 === null) return null; // ambiguous ② or ④-b → T1 path
     return {
       loop: "auto_archive" as const,
       output: t0,
@@ -210,7 +210,7 @@ export const autoArchiveLoop: LoopSpec<AutoArchiveOutputT> = {
 
 registerLoop(autoArchiveLoop);
 
-/** A4 §9.1 두 번째 경로: 22:00 스윕. 23:00 다이제스트보다 먼저 끝난다. */
+/** A4 §9.1 second path: the 22:00 sweep. Finishes before the 23:00 digest. */
 export async function sweepAutoArchive(
   runOne: (itemId: string, threadId: string) => Promise<void>,
 ): Promise<number> {

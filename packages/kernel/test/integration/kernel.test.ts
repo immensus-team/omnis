@@ -59,7 +59,7 @@ describe("ingest.sink", () => {
   });
 
   it("upserts the thread and the item, leaving author resolution to Phase B", async () => {
-    await kernel.ingest.sink(accountId, item("m-1", "첫 메시지"));
+    await kernel.ingest.sink(accountId, item("m-1", "first message"));
     const row = await one<{
       body: string;
       status: string;
@@ -73,7 +73,7 @@ describe("ingest.sink", () => {
         WHERE i.account_id = $1 AND i.external_id = 'm-1'`,
       [accountId],
     );
-    expect(row.body).toBe("첫 메시지");
+    expect(row.body).toBe("first message");
     expect(row.status).toBe("received");
     expect(row.author_person_id).toBeNull();
     expect(row.author_is_me).toBe(false);
@@ -81,7 +81,7 @@ describe("ingest.sink", () => {
   });
 
   it("is idempotent on source_hash and bumps threads.last_item_at", async () => {
-    await kernel.ingest.sink(accountId, item("m-1", "첫 메시지"));
+    await kernel.ingest.sink(accountId, item("m-1", "first message"));
     const count = await one<{ n: string }>(
       pool,
       `SELECT count(*)::text AS n FROM items WHERE account_id=$1 AND source_hash='hash-m-1'`,
@@ -89,7 +89,7 @@ describe("ingest.sink", () => {
     );
     expect(count.n).toBe("1");
 
-    await kernel.ingest.sink(accountId, item("m-2", "두 번째"));
+    await kernel.ingest.sink(accountId, item("m-2", "second one"));
     const thread = await one<{ last_item_at: Date }>(
       pool,
       `SELECT last_item_at FROM threads WHERE account_id=$1 AND external_id='C-ing'`,
@@ -131,7 +131,8 @@ describe("ingest.sink", () => {
       [accountId],
     );
     expect(thread.kind).toBe("group");
-    // NormalizedItem에 subject도 채널명도 없다 — 제목은 참가자(작성자)에서 합성된다.
+    // NormalizedItem carries neither a subject nor a channel name — the title is synthesized
+    // from the participants (the author).
     expect(thread.title).toBe("U-lazy");
 
     // idempotent on a second item to the same lazily created thread: reuses it,
@@ -162,9 +163,9 @@ describe("ingest.sink", () => {
     expect(updated.last_item_at.getTime()).toBe(new Date(laterSentAt).getTime());
   });
 
-  // 어댑터가 이제 *모든* 아이템에 threadMeta를 싣는다 — upsert가 무조건 대입이면
-  // 제목 없는 메시지 한 통이 이름을 지우고, 답장 제목이 스레드를 개명하고,
-  // 새 메시지가 사용자가 보관한 스레드를 되살린다.
+  // The adapter now puts threadMeta on *every* item — if the upsert assigned unconditionally,
+  // one message with no title would blank the name, a reply title would rename the thread,
+  // and a new message would resurrect a thread the user archived.
   it("never lets a later item rename, blank, or un-archive an existing thread", async () => {
     const meta = (
       title: string | null,
@@ -203,16 +204,16 @@ describe("ingest.sink", () => {
       );
 
     await send("m-keep-1", "#omnis-launch", null);
-    await send("m-keep-2", null, null); // 제목을 모르는 메시지
+    await send("m-keep-2", null, null); // a message with no title
     expect((await read()).title).toBe("#omnis-launch");
 
-    await send("m-keep-3", "Re: #omnis-launch", null); // 답장 제목
+    await send("m-keep-3", "Re: #omnis-launch", null); // a reply title
     expect((await read()).title).toBe("#omnis-launch");
 
     const archivedAt = new Date().toISOString();
     await send("m-keep-4", null, archivedAt);
     expect((await read()).archived_at).not.toBeNull();
-    await send("m-keep-5", null, null); // 보관 뒤 새 메시지 — 되살리면 안 된다
+    await send("m-keep-5", null, null); // new message after archiving — must not resurrect it
     expect((await read()).archived_at).not.toBeNull();
   });
 });

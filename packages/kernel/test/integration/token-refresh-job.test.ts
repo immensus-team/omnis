@@ -17,11 +17,11 @@ let accountId: string;
 beforeAll(async () => {
   pool = createPool();
   events = createEvents({ pool, logger: createLogger("@omnis/kernel") });
-  // 0006 seed가 'token_refresh'를 next_run_at=now()(마이그레이션 적용 시각)로 미리 심어둔다(델타 §8).
-  // scheduler.start()의 upsert는 기존 행의 next_run_at을 건드리지 않으므로(FIXED, scheduler.ts) 이 seed
-  // 행을 지우지 않으면 start()의 최초 내부 tick이 "밀린 실행 따라잡기"로 즉시 한 번 돈다 — 뒤이어 테스트가
-  // 의도적으로 next_run_at을 과거로 돌리는 것과 합쳐져 2회 호출된다. 매 실행마다 깨끗한 상태에서
-  // 시작하도록 seed 행을 지운다(afterAll의 정리와 대칭).
+  // The 0006 seed pre-plants 'token_refresh' with next_run_at=now() (migration apply time, delta §8).
+  // scheduler.start()'s upsert leaves an existing row's next_run_at alone (FIXED, scheduler.ts), so if
+  // this seed row is left in place start()'s first internal tick immediately fires once to "catch up on
+  // a missed run" — and with the test then moving next_run_at into the past, the refresher is called
+  // twice. Delete the seed row so every run starts from a clean state (symmetric with afterAll).
   await query(pool, "DELETE FROM jobs WHERE name = 'token_refresh'");
   const account = await one<{ id: string }>(
     pool,

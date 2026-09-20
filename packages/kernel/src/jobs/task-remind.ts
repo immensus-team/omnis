@@ -1,4 +1,4 @@
-// A4 §4.3: 이건 LLM 없이 순수 SQL이다. 알림은 §3.6의 '묶음' 등급을 쓴다.
+// A4 §4.3: this is pure SQL, no LLM. Notifications use the §3.6 "batched" tier.
 import { query } from "@omnis/db";
 import type { Pool } from "pg";
 import type { Logger } from "../logger.js";
@@ -18,13 +18,13 @@ export interface RemindGroup {
 }
 
 const LINE: Record<RemindKind, (n: number) => string> = {
-  due_soon: (n) => `오늘 마감 ${n}건`,
-  stale: (n) => `3일째 손 안 댄 항목 ${n}건`,
-  undelegated: (n) => `에이전트에게 넘기기로 한 ${n}건이 아직 안 나갔습니다`,
+  due_soon: (n) => `${n} due today`,
+  stale: (n) => `${n} untouched for 3 days`,
+  undelegated: (n) => `${n} delegated to an agent have not gone out yet`,
 };
 
 export async function remindGroups(pool: Pool): Promise<RemindGroup[]> {
-  // A4 §4.3의 WHERE 3항을 CASE로 편다 — 한 task는 한 그룹에만 들어간다(마감이 먼저).
+  // A4 §4.3's three WHERE clauses unfolded into a CASE — each task lands in one group (due first).
   const rows = await query<{ kind: RemindKind; count: string; task_ids: string[] }>(
     pool,
     `WITH classified AS (

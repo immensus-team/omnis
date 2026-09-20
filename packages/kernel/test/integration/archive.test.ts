@@ -32,7 +32,7 @@ beforeEach(async () => {
   threadId = t.rows[0]?.id ?? "";
   const i = await pool.query<{ id: string }>(
     `INSERT INTO items (thread_id, account_id, external_id, kind, status, body, sent_at, meta)
-     VALUES ($1,$2,'it_arch','email','received','뉴스레터', now(), '{}'::jsonb)
+     VALUES ($1,$2,'it_arch','email','received','newsletter', now(), '{}'::jsonb)
      ON CONFLICT (account_id, external_id) WHERE external_id IS NOT NULL
        DO UPDATE SET status='received', meta='{}'::jsonb RETURNING id`,
     [threadId, accountId],
@@ -42,7 +42,7 @@ beforeEach(async () => {
 
 const meta = {
   rule_ids: ["ar_sender_nonhuman", "ar_no_cta"],
-  reason: "뉴스레터",
+  reason: "newsletter",
   tier: "T0" as const,
   confidence: 0.93,
   run_id: "00000000-0000-0000-0000-0000000000aa",
@@ -57,7 +57,7 @@ describe("archiveItem / undoArchive (A4 §9.3·§9.4)", () => {
       [itemId],
     );
     expect(rows[0]?.status).toBe("archived");
-    expect(rows[0]?.ab.reason).toBe("뉴스레터");
+    expect(rows[0]?.ab.reason).toBe("newsletter");
     expect(UNDO_WINDOW_DAYS).toBe(7);
     expect(REARCHIVE_EXCLUSION_DAYS).toBe(30);
   });
@@ -89,6 +89,6 @@ describe("archiveItem / undoArchive (A4 §9.3·§9.4)", () => {
   it("archivedSince lists the day's archived items by reason", async () => {
     await archiveItem(pool, itemId, meta);
     const groups = await archivedSince(pool, new Date(Date.now() - 3_600_000));
-    expect(groups.find((g) => g.reason === "뉴스레터")?.count).toBeGreaterThanOrEqual(1);
+    expect(groups.find((g) => g.reason === "newsletter")?.count).toBeGreaterThanOrEqual(1);
   });
 });

@@ -1,6 +1,6 @@
-// A4 §1.2. 레지스트리의 루프를 커널 이벤트·스케줄러에 붙인다.
-// @omnis/agents는 @omnis/kernel을 의존하지 않는다(계약 §1). Kernel/Logger가 구조적으로
-// 대입되는 최소 인터페이스만 여기 둔다 — 허브가 createKernel()의 결과를 그대로 넘긴다.
+// A4 §1.2. Attaches the registry's loops to kernel events and the scheduler.
+// @omnis/agents does not depend on @omnis/kernel (contract §1). Only the minimal interfaces
+// that Kernel/Logger structurally satisfy live here — the hub passes createKernel()'s result straight in.
 import { listLoops } from "./registry.js";
 import { runLoopSpec } from "./run.js";
 import type { LoopId, TriggerContext } from "./spec.js";
@@ -21,7 +21,7 @@ export interface LoopLogger {
   error(msg: string, extra?: Record<string, unknown>): void;
 }
 
-/** schedule 트리거를 쓰는 루프의 jobs.name. 이름은 0006_kernel.sql의 seed와 1:1이다. */
+/** jobs.name for loops that use a schedule trigger. The names are 1:1 with the seed in 0006_kernel.sql. */
 export const LOOP_JOB_NAME: Partial<Record<LoopId, string>> = {
   auto_archive: "auto_archive_sweep",
   followup: "network_inactive_sweep",
@@ -75,8 +75,9 @@ export function startLoops(deps: { kernel: LoopKernel; logger: LoopLogger }): ()
     }
     if (trigger.kind !== "event" || trigger.on === undefined) continue;
 
-    // ponytail: 고정 지연 디바운스 — 첫 이벤트가 타이머를 걸고, 창이 열린 동안 온 같은 키는
-    // 버린다(apps/hub/src/summarize-job.ts와 같은 형태). 슬라이딩이 필요해지면 그때 바꾼다.
+    // ponytail: fixed-delay debounce — the first event arms the timer, and same-key events arriving
+    // while the window is open are dropped (same shape as apps/hub/src/summarize-job.ts). Switch to
+    // sliding when that need actually shows up.
     const pending = new Set<string>();
     const debounceMs = trigger.debounceMs ?? 0;
     stops.push(

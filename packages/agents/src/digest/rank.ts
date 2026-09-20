@@ -1,4 +1,4 @@
-// A4 §6.3: 랭킹은 LLM이 하지 않는다. 산술 점수로 정렬하고 LLM은 한 줄 요약만 쓴다.
+// A4 §6.3: the LLM does not do the ranking. Sort by arithmetic score; the LLM only writes the one-liner.
 export type BriefSectionId = "needs_you" | "drafts" | "calendar" | "commitments" | "agents";
 
 export interface BriefItem {
@@ -14,7 +14,7 @@ export interface BriefCandidate extends BriefItem {
   priority: "now" | "today" | "week" | "fyi";
   vip: boolean;
   pendingApproval: boolean;
-  /** 내가 마지막으로 답한 뒤 상대가 보낸 미응답 턴 수. 3으로 클램프된다. */
+  /** Unanswered turns the other party sent since my last reply. Clamped to 3. */
   unansweredTurns: number;
   meetingToday: boolean;
   dueToday: boolean;
@@ -50,8 +50,9 @@ const PRIORITY_WEIGHT: Record<BriefCandidate["priority"], number> = {
   fyi: 0,
 };
 
-/** A4 §6.3의 8항 가중합 중 7항. 8번째 항(-1.0 * 같은 스레드 중복)은 감점이 아니라
- *  rankBriefItems의 하드 dedupe로 실현된다 — 스레드당 1회가 §6.3 마지막 항의 요구다. */
+/** 7 of the 8 weighted terms in A4 §6.3. The 8th term (-1.0 * duplicate same thread) is not a
+ *  penalty but is realized by the hard dedupe in rankBriefItems — once per thread is what the
+ *  last term of §6.3 requires. */
 function score(c: BriefCandidate): number {
   return (
     3.0 * PRIORITY_WEIGHT[c.priority] +
@@ -65,9 +66,9 @@ function score(c: BriefCandidate): number {
   );
 }
 
-/** 한 스레드는 브리핑 전체에서 최대 1회 등장한다(A4 §6.3 마지막 항). */
+/** A thread appears at most once in the whole briefing (last term of A4 §6.3). */
 export function rankBriefItems(rows: BriefCandidate[], now: Date): BriefItem[] {
-  void now; // ageHours가 이미 수집 시점에 계산돼 온다(A4 §6.3). 시그니처는 델타 §4 고정.
+  void now; // ageHours arrives already computed at collection time (A4 §6.3). Signature fixed by delta §4.
   const sorted = [...rows].sort((a, b) => score(b) - score(a));
   const seen = new Set<string>();
   const out: BriefItem[] = [];

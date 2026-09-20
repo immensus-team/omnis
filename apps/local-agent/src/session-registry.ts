@@ -23,7 +23,7 @@ export interface SessionRecord {
 
 export type SessionCreateInput = Omit<SessionRecord, "session_id" | "state" | "last_turn_at">;
 
-/** 브리지는 자기가 만든 세션만 관리한다(A2 §2.3). 디스크에 영속화하지 않는다. */
+/** The bridge manages only the sessions it created (A2 §2.3). Nothing is persisted to disk. */
 export class SessionRegistry {
   readonly #byKey = new Map<string, SessionRecord>();
 
@@ -48,7 +48,7 @@ export class SessionRegistry {
     return rec;
   }
 
-  /** 런타임이 세션을 새로 만들면 이 값만 바뀐다. session_key와 thread는 유지된다. */
+  /** When the runtime starts a new session only this value changes. session_key and thread are kept. */
   bindSessionId(key: string, sessionId: string): SessionRecord {
     const rec = this.require(key);
     rec.session_id = sessionId;

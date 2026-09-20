@@ -1,6 +1,6 @@
-// B3: kinso 인박스 행의 "AI 한 줄 요약" 루프. DESIGN-DIRECTION.md: "요약은 T1(DeepSeek Flash) 한 줄,
-// 실패·미생성 시 subject 또는 본문 첫 줄 폴백. threads.meta.summary에 저장하고 매 실행을
-// agent_runs에 기록."
+// B3: the "one-line AI summary" loop for a kinso inbox row. DESIGN-DIRECTION.md: "Summaries are one
+// line from T1 (DeepSeek Flash); on failure or when not generated, fall back to the subject or the
+// first line of the body. Store in threads.meta.summary and record every run in agent_runs."
 import { getAgentsPool } from "./pool.js";
 import { finishRun, recordRun } from "./record-run.js";
 import { SchemaViolationError } from "./t1/classify-t1.js";
@@ -13,15 +13,16 @@ export interface SummarizeThreadResult {
   source: "t1" | "fallback";
 }
 
-/** 폴백: subject, 없으면 본문 첫 줄. 90자를 넘으면 자른다(design direction §요약). */
+/** Fallback: the subject, or the first line of the body when there is none. Truncates past 90 chars (design direction §summary). */
 function fallbackSummary(subject: string | null, body: string): string {
   const line = (subject ?? body.split("\n")[0] ?? "").trim();
   return line.length > SUMMARY_MAX_CHARS ? `${line.slice(0, SUMMARY_MAX_CHARS - 1)}…` : line;
 }
 
-/** 스레드의 마지막 item을 요약해 threads.meta에 쓴다. 마지막 item이 outbound(author_is_me)면
- *  건너뛴다 — 내가 보낸 메시지로 인박스 행을 요약할 이유가 없다. 스레드에 item이 아직 없어도,
- *  마지막 item에 요약할 텍스트가 없어도(subject/body 둘 다 빈 문자열) 건너뛴다. */
+/** Summarizes the thread's last item and writes it to threads.meta. Skips when the last item is
+ *  outbound (author_is_me) — there is no reason to summarize an inbox row with a message I sent.
+ *  Also skips when the thread has no item yet, or the last item has no text to summarize
+ *  (both subject and body empty). */
 export async function summarizeThread(threadId: string): Promise<SummarizeThreadResult | null> {
   const pool = getAgentsPool();
   const { rows } = await pool.query<{
@@ -35,9 +36,9 @@ export async function summarizeThread(threadId: string): Promise<SummarizeThread
     [threadId],
   );
   const last = rows[0];
-  // 빈 item(sessions.ts writeAgentItem의 started 단계 tool_call은 body='')을 요약하면 T1 호출을
-  // 낭비하고 폴백이 빈 문자열을 뱉어 이미 있던 멀쩡한 요약을 지운다. 요약할 텍스트가 없으면
-  // 마지막 요약을 그대로 둔다.
+  // Summarizing an empty item (sessions.ts writeAgentItem's started-stage tool_call has body='')
+  // wastes a T1 call and lets the fallback return an empty string, wiping a good existing summary.
+  // With no text to summarize, leave the previous summary alone.
   if (last === undefined || last.author_is_me) return null;
   if (`${last.subject ?? ""}${last.body}`.trim() === "") return null;
 
@@ -63,7 +64,7 @@ export async function summarizeThread(threadId: string): Promise<SummarizeThread
       ...t1.usage,
     });
   } catch (e) {
-    // 키가 없거나(t1Model()이 던짐) 스키마 위반이거나 타임아웃이거나 — 전부 같은 폴백.
+    // Missing key (t1Model() throws), schema violation, or timeout — all take the same fallback.
     result = { summary: fallbackSummary(last.subject, last.body), source: "fallback" };
     const raw = e instanceof SchemaViolationError ? e.rawOutput : undefined;
     await finishRun(runId, {

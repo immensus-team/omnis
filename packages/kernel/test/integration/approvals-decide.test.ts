@@ -24,7 +24,7 @@ const base = {
 describe("approvals.decide", () => {
   it("moves pending → decided and stores decision + decided_args + decided_at", async () => {
     const id = await approvals.propose({ ...base, action: "send" });
-    await approvals.decide(id, { decision: "edit", decided_args: { text: "고친 초안" } });
+    await approvals.decide(id, { decision: "edit", decided_args: { text: "edited draft" } });
 
     const row = await one<{
       state: string;
@@ -38,7 +38,7 @@ describe("approvals.decide", () => {
     );
     expect(row.state).toBe("decided");
     expect(row.decision).toBe("edit");
-    expect(row.decided_args.text).toBe("고친 초안");
+    expect(row.decided_args.text).toBe("edited draft");
     expect(row.decided_at).toBeInstanceOf(Date);
   });
 

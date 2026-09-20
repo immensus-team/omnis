@@ -23,7 +23,7 @@ const COMMIT = {
   sha: "abc1234",
   html_url: "https://github.com/logankim/omnis/commit/abc1234",
   commit: {
-    message: "US-B11: Drive 폴링 ingestion",
+    message: "US-B11: Drive polling ingestion",
     author: { name: "Logan", date: "2026-09-20T00:00:00.000Z" },
   },
 };
@@ -77,8 +77,9 @@ describe("createGithubProvider", () => {
     });
   });
 
-  // ETag가 한 번 바뀌면 200이 per_page=50 한 페이지를 통째로 돌려준다. since를 올려두지 않으면
-  // 이미 넣은 커밋까지 매번 T1 추출을 다시 돈다(upsertMemory는 행만 dedupe한다).
+  // Once an ETag changes, a 200 hands back a whole per_page=50 page. Without advancing since,
+  // every poll re-runs T1 extraction over commits that were already ingested (upsertMemory only
+  // dedupes rows).
   it("advances since per repo to the newest commit it saw", async () => {
     const older = {
       ...COMMIT,
@@ -118,11 +119,11 @@ describe("createGithubProvider", () => {
       }),
     );
     expect(urls[0]).toContain("since=2026-09-20T00%3A00%3A00.000Z");
-    // sinces에 없는 레포는 예전 평평한 since로 떨어진다 — 전체 히스토리를 걷지 않는다.
+    // A repo missing from sinces falls back to the old flat since — the whole history is not walked.
     expect(urls[1]).toContain("since=2026-09-01T00%3A00%3A00.000Z");
   });
 
-  // A4 §10.1: 목록에 없는 레포는 API를 호출조차 하지 않는다.
+  // A4 §10.1: repos that are not on the list are never called against the API at all.
   it("never calls the api when the repo allowlist is empty", async () => {
     let called = false;
     const p = provider(async () => {

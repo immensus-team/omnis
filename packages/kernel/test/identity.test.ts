@@ -49,17 +49,17 @@ describe("handleNorm — slack/linkedin", () => {
   });
 });
 
-describe("handleNorm — kakaotalk (A3 §10, 불안정 키)", () => {
+describe("handleNorm — kakaotalk (A3 §10, unstable key)", () => {
   it("is kt: + 32 hex chars, scoped to the room", () => {
-    const a = handleNorm("kakaotalk", " 김진호 ", "room-1");
+    const a = handleNorm("kakaotalk", " jinho.kim ", "room-1");
     expect(a).toMatch(/^kt:[0-9a-f]{32}$/);
-    expect(handleNorm("kakaotalk", "김진호", "room-1")).toBe(a); // 결정론적
-    expect(handleNorm("kakaotalk", "김진호", "room-2")).not.toBe(a); // 방이 다르면 다르다
-    expect(handleNorm("kakaotalk", "김철수", "room-1")).not.toBe(a);
+    expect(handleNorm("kakaotalk", "jinho.kim", "room-1")).toBe(a); // deterministic
+    expect(handleNorm("kakaotalk", "jinho.kim", "room-2")).not.toBe(a); // other room, other key
+    expect(handleNorm("kakaotalk", "chulsoo.kim", "room-1")).not.toBe(a);
   });
 
   it("requires a room — a kakaotalk handle without one is not a key", () => {
-    expect(() => handleNorm("kakaotalk", "김진호")).toThrow(/room_external_id/);
+    expect(() => handleNorm("kakaotalk", "jinho.kim")).toThrow(/room_external_id/);
   });
 });
 
@@ -71,6 +71,7 @@ describe("handleNorm — fallback", () => {
 
 describe("initialsFor (B-D3)", () => {
   it("takes the given name for korean and the initials for latin", () => {
+    // Hangul name: initialsFor detects the Hangul range and takes the given name (characters 1-3).
     expect(initialsFor("김진호")).toBe("진호");
     expect(initialsFor("Logan Kim")).toBe("LK");
     expect(initialsFor("Logan")).toBe("LO");

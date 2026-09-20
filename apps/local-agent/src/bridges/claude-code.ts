@@ -16,11 +16,11 @@ import { createDurableDebouncer } from "./durable-debounce.js";
 import { mapStreamJsonEvent, newStreamJsonState } from "./stream-json.js";
 
 /**
- * profile → --permission-mode 매핑(A2 §7.1, 계약 §8).
- * claude 2.1.274 실측 리터럴은 acceptEdits|auto|bypassPermissions|manual|dontAsk|plan 6종뿐이고
- * 'default'라는 값은 존재하지 않는다(tools/spikes/_probes/2026-09-20-cli-probes.md §3).
- * 게이트 ⑫(S-A2-2) PASS로 이 표는 확정이고, 불변식도 그대로다:
- * bypassPermissions는 trusted + origin='human'에서만 나온다.
+ * profile → --permission-mode mapping (A2 §7.1, contract §8).
+ * the literals measured on claude 2.1.274 are only these six — acceptEdits|auto|bypassPermissions|manual|dontAsk|plan — and
+ * the value 'default' does not exist (tools/spikes/_probes/2026-09-20-cli-probes.md §3).
+ * Gate ⑫ (S-A2-2) passed, so this table is settled and its invariants still hold:
+ * bypassPermissions is only produced for trusted + origin='human'.
  */
 export const PERMISSION_MODE: Record<PermissionProfile, string> = {
   observe: "plan",
@@ -46,11 +46,11 @@ export interface ClaudeArgsOpts {
   sessionId: string | null;
   strictMcpConfig?: boolean;
   /**
-   * `--bare`를 켤지. 미지정이면 A2-D11의 보수값(비human origin = bare).
-   * `--bare`는 인증 경로를 ANTHROPIC_API_KEY / apiKeyHelper로 한정하고 OAuth·Keychain을 읽지 않으며,
-   * 게이트 ⑪ 실측으로는 `--settings`의 hook 선언과 `--permission-mode`까지 무시한다.
-   * 런타임별 실행 모드는 ClaudeAdapterConfig가 정한다(마스터 §19 Q13) — 이 fallback은
-   * buildClaudeArgs를 직접 부르는 쪽의 보수 기본값일 뿐이다.
+   * Whether to switch on `--bare`. When unset, the conservative A2-D11 default (non-human origin = bare).
+   * `--bare` narrows the auth path to ANTHROPIC_API_KEY / apiKeyHelper, reads neither OAuth nor the Keychain, and
+   * as measured under Gate ⑪, ignores even the `--settings` hook declaration and `--permission-mode`.
+   * The per-runtime execution mode is decided by ClaudeAdapterConfig (master §19 Q13) — this fallback is
+   * only the conservative default for callers that invoke buildClaudeArgs directly.
    */
   bare?: boolean;
 }
@@ -68,7 +68,7 @@ export function buildClaudeArgs(o: ClaudeArgsOpts): string[] {
     permissionModeFor(o.profile, o.origin),
   ];
   if (o.sessionId !== null) args.push("--resume", o.sessionId);
-  if (o.bare ?? o.origin !== "human") args.push("--bare"); // A2-D11 기본값, 어댑터가 뒤집는다
+  if (o.bare ?? o.origin !== "human") args.push("--bare"); // the A2-D11 default; the adapter can flip it
   if (o.strictMcpConfig === true) args.push("--strict-mcp-config"); // A2 §4.3
   args.push(o.prompt);
   return args;
@@ -106,22 +106,22 @@ export interface ClaudeAdapterConfig {
   defaultModel: string;
   strictMcpConfig?: boolean;
   /**
-   * TOML `[[runtime]]`의 `bare`가 여기로 온다. 미지정이면 계약 §8 / 마스터 §19 Q13의 런타임별 기본값:
-   * claude_code=false(구독 인증 + `--settings` omnis hook이 발동하는 유일한 모드),
-   * claude_ds=true(API 키 전용이라 --bare가 자연스러운 모드).
+   * The TOML `[[runtime]]` key `bare` lands here. When unset, the per-runtime default from contract §8 / master §19 Q13:
+   * claude_code=false (subscription auth — the only mode where the omnis `--settings` hook fires),
+   * claude_ds=true (API-key only, where --bare is the natural mode).
    */
   bare?: boolean;
   env?: NodeJS.ProcessEnv;
   spawnFn?: typeof spawn;
 }
 
-/** A2-D5: 턴당 서브프로세스. 상주시키지 않는다. A2-D8: claude-ds는 이 클래스의 설정 변형이다. */
+/** A2-D5: one subprocess per turn, never resident. A2-D8: claude-ds is a configuration variant of this class. */
 export class ClaudeCodeAdapter implements RuntimeAdapter {
   readonly kind: RuntimeKind;
   /**
-   * 이 어댑터가 실제로 `--bare`로 도는지. probe()와 startTurn()이 갈라지면 안 되므로
-   * 한 곳에서만 계산한다(계약 §8 / 마스터 §19 Q13):
-   * claude_code=false(구독 인증 + `--settings` omnis hook), claude_ds=true(API 키 전용).
+   * Whether this adapter actually runs with `--bare`. probe() and startTurn() must not diverge, so it is
+   * computed in exactly one place (contract §8 / master §19 Q13):
+   * claude_code=false (subscription auth + the omnis `--settings` hook), claude_ds=true (API-key only).
    */
   readonly #bare: boolean;
   constructor(private readonly cfg: ClaudeAdapterConfig) {
@@ -132,9 +132,9 @@ export class ClaudeCodeAdapter implements RuntimeAdapter {
   async probe(): Promise<{ version: string; capabilities: RuntimeCapabilities }> {
     const line = await this.#capture(["--version"]);
     const parsed = parseClaudeCapabilities(line);
-    // 게이트 ⑪ FAIL(mode a): `--bare` 아래에서는 `--settings`의 hook 선언도 `--permission-mode`도
-    // 통째로 무시된다 — 승인 표면이 아예 없다. 허브에 "hook 승인이 있다"고 말하면
-    // 영영 오지 않을 승인을 기다리게 되므로 실행 모드에 맞춰 내려 적는다.
+    // Gate ⑪ FAIL (mode a): under `--bare`, both the `--settings` hook declaration and `--permission-mode`
+    // are ignored outright — there is no approval surface at all. Telling the hub "hook approvals exist"
+    // would make it wait for an approval that never comes, so this is recorded to match the execution mode.
     return {
       ...parsed,
       capabilities: { ...parsed.capabilities, approvals: this.#bare ? "none" : "hook" },
@@ -163,9 +163,9 @@ export class ClaudeCodeAdapter implements RuntimeAdapter {
         `${this.cfg.binary} produced no stdout`,
       );
 
-    // stdio에서 stderr를 pipe로 열어 두고 아무도 읽지 않으면, 실제 바이너리가 OS 파이프 버퍼(~64KB)
-    // 넘게 경고를 뱉는 순간 child가 write에서 막혀 턴이 이벤트도 타임아웃도 없이 영원히 멈춘다.
-    // cold 티어로 흘려보내 파이프를 비운다(진단도 같이 남는다).
+    // If stderr is opened as a pipe and nobody reads it, then the moment the real binary emits more warnings
+    // than the OS pipe buffer (~64KB) the child blocks on write and the turn hangs forever with no events and no timeout.
+    // Drain it into the cold tier so the pipe empties (the diagnostics are kept too).
     if (child.stderr !== null && child.stderr !== undefined) {
       createInterface({ input: child.stderr }).on("line", (l) => {
         sink.raw(`[stderr] ${l}`);
@@ -180,12 +180,12 @@ export class ClaudeCodeAdapter implements RuntimeAdapter {
     });
 
     createInterface({ input: child.stdout }).on("line", (line) => {
-      sink.raw(line); // cold 티어
+      sink.raw(line); // cold tier
       let ev: unknown;
       try {
         ev = JSON.parse(line);
       } catch {
-        return; // 미지 형식도 파서를 죽이지 않는다
+        return; // an unknown shape must not kill the parser
       }
       for (const emit of mapStreamJsonEvent(ev, {
         session_key: s.session_key,
@@ -193,7 +193,7 @@ export class ClaudeCodeAdapter implements RuntimeAdapter {
         state,
       })) {
         if (emit.method === "turn.item.delta")
-          sink.delta(emit.params); // ephemeral, 저장 안 함
+          sink.delta(emit.params); // ephemeral, never stored
         else if (emit.method === "session.registered" || emit.method === "health")
           sink.itemStarted(emit.params);
         else debounced.push({ method: emit.method, params: emit.params });
@@ -214,7 +214,7 @@ export class ClaudeCodeAdapter implements RuntimeAdapter {
   }
 
   async close(): Promise<void> {
-    /* 턴당 프로세스라 닫을 상주 자원이 없다 */
+    /* one process per turn, so there is no resident resource to close */
   }
 
   async #capture(args: string[]): Promise<string> {
@@ -232,7 +232,7 @@ export class ClaudeCodeAdapter implements RuntimeAdapter {
   }
 }
 
-/** A2 §4.3: 바이너리·모델 alias·키 출처만 다르다. 비용은 result.cost_usd를 믿지 않는다. */
+/** A2 §4.3: only the binary, model alias and key source differ. Cost does not trust result.cost_usd. */
 export function createClaudeDsAdapter(cfg: {
   binary: string;
   apiKey: string;
@@ -244,7 +244,7 @@ export function createClaudeDsAdapter(cfg: {
     binary: cfg.binary,
     defaultModel: cfg.model ?? "deepseek-flash",
     strictMcpConfig: true,
-    bare: true, // API 키로만 돌므로 --bare가 자연스러운 모드(프로브 §2, 마스터 §19 Q13 ②).
+    bare: true, // API-key only, so --bare is the natural mode (probe §2, master §19 Q13 ②).
     env: { DEEPSEEK_API_KEY: cfg.apiKey },
     ...(cfg.spawnFn === undefined ? {} : { spawnFn: cfg.spawnFn }),
   });

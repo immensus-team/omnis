@@ -1,4 +1,4 @@
-// A4 §3 L2 답장 초안 루프(Deliberate).
+// A4 §3 L2 reply-draft loop (Deliberate).
 import type { Channel, Sensitivity } from "@omnis/protocol";
 import { z } from "zod";
 import { buildContext } from "../context/assemble.js";
@@ -9,12 +9,12 @@ import type { LoopSpec, TriggerContext } from "../loop/spec.js";
 import { getAgentsPool } from "../pool.js";
 import { PROPOSE_TOOLS } from "../tools/propose.js";
 
-/** A4 §3.1 SLA: 60초 안에 status='draft' row가 있어야 한다. 55초에 placeholder를 먼저 쓴다. */
+/** A4 §3.1 SLA: a status='draft' row must exist within 60 seconds. We write a placeholder at 55s first. */
 export const DRAFT_SLA_MS = 60_000;
 export const DRAFT_PLACEHOLDER_MS = 55_000;
 
-/** LoopSpec.outputSchema는 `z.ZodType<TOut>`(입력=출력)이라 .default()를 쓸 수 없다 —
- *  배열·불리언 필드는 모델이 항상 채운다(빠지면 runLoopSpec의 재시도/에스컬레이션 경로로 간다). */
+/** LoopSpec.outputSchema is `z.ZodType<TOut>` (input = output), so .default() is not allowed —
+ *  the model always fills array and boolean fields (omitting one routes into runLoopSpec's retry/escalation path). */
 export const DraftOutput = z.object({
   body: z.string().max(4000),
   subject: z.string().max(200).optional(),
@@ -34,7 +34,7 @@ export const DraftOutput = z.object({
 });
 export type DraftOutputT = z.infer<typeof DraftOutput>;
 
-/** A4 §3.5의 6조건. 하나라도 참이면 T2(Claude Sonnet 5). */
+/** The six conditions of A4 §3.5. If any one is true, go to T2 (Claude Sonnet 5). */
 export function shouldEscalate(i: {
   vip: boolean;
   sensitivity: Sensitivity;
@@ -49,7 +49,7 @@ export function shouldEscalate(i: {
   if (i.t1Confidence < 0.65) return true;
   if (i.t1Escalate) return true;
   if (i.unresolvedCount >= 2) return true;
-  // 초면 + 이메일/LinkedIn만. 메신저 초면은 T1으로 충분하다(A4 §3.5).
+  // First contact + email/LinkedIn only. A first contact over a messenger is fine at T1 (A4 §3.5).
   if (
     i.firstContact &&
     (i.channel === "gmail" || i.channel === "outlook" || i.channel === "linkedin")
@@ -59,13 +59,13 @@ export function shouldEscalate(i: {
   return false;
 }
 
-/** A4 §3.1: 화면이 "초안 없음"으로 비는 것보다 "준비 중"이 낫다. */
+/** A4 §3.1: "preparing" beats the screen sitting empty with "no draft". */
 export async function writePlaceholderDraft(threadId: string): Promise<string> {
   const { rows } = await getAgentsPool().query<{ id: string }>(
     `INSERT INTO items (thread_id, account_id, kind, status, body, sent_at, author_is_me, meta)
      SELECT t.id, t.account_id,
             CASE WHEN t.kind = 'email' THEN 'email' ELSE 'message' END,
-            'draft', '초안 준비 중…', now(), true, '{"pending": true}'::jsonb
+            'draft', 'Preparing draft…', now(), true, '{"pending": true}'::jsonb
        FROM threads t WHERE t.id = $1
      RETURNING id`,
     [threadId],
@@ -75,7 +75,7 @@ export async function writePlaceholderDraft(threadId: string): Promise<string> {
   return id;
 }
 
-/** placeholder를 같은 row에서 교체하고 meta.pending을 지운다(A4 §3.1). */
+/** Replaces the placeholder in the same row and clears meta.pending (A4 §3.1). */
 async function replacePlaceholder(
   itemId: string,
   out: DraftOutputT,
@@ -132,7 +132,7 @@ export const draftLoop: LoopSpec<DraftOutputT> = {
   tier: "T1",
   outputSchema: DraftOutput,
 
-  // A4 §3.2의 7슬롯. 슬롯 이름과 수치는 그 표 그대로다.
+  // The 7 slots of A4 §3.2. Slot names and numbers are exactly as in that table.
   assemble: (ctx: TriggerContext) =>
     buildContext({
       selfModel: ["USER.md", "VOICE.md"],
@@ -183,8 +183,8 @@ export const draftLoop: LoopSpec<DraftOutputT> = {
       entityNames: [],
       channel,
     });
-    // A4 §3.3 step 4: 실패 항목이 있으면 초안을 저장하되 UI가 볼 수 있게 표시한다 —
-    // 재생성은 runLoopSpec의 재시도가 아니라 사람의 판단이다(6번은 안전 실패라 특히 그렇다).
+    // A4 §3.3 step 4: if any check failed, still store the draft but mark it so the UI can see it —
+    // regeneration is a human decision, not a runLoopSpec retry (especially for #6, a safety failure).
     await getAgentsPool().query(
       "UPDATE items SET meta = meta || jsonb_build_object('draft_self_check', $2::jsonb) WHERE id = $1",
       [itemId, JSON.stringify({ ...check, shape: CHANNEL_DRAFT_SHAPE[channel].notes })],

@@ -1,5 +1,6 @@
-// Entry point for `pnpm e2e:phase-a`. Bring the stack up → seed → run Playwright → leave evidence
-// and REPORT.md behind → tear it all down. It does the same thing twice in a row to check idempotence.
+// The `pnpm e2e:phase-a` entry point. Bring the stack up → seed → run Playwright → leave evidence
+// and REPORT.md behind → tear it all down. It does the same thing twice in a row to check
+// idempotence.
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -64,7 +65,7 @@ function runPlaywright(env: Record<string, string>): void {
   if (r.status !== 0) console.error(`playwright exited with ${String(r.status)}`);
 }
 
-/** Look at what the hub actually recorded, not the UI — an approval decision is proven by audit_log and the state transition. */
+/** Look at the traces the hub actually left, not the UI — an approval decision is proven by audit_log and the state transition. */
 async function auditAssertions(pool: Pool, seeded: SeedResult): Promise<Assertion[]> {
   const out: Assertion[] = [];
   const started = Date.now();
@@ -123,7 +124,7 @@ async function onePass(pass: number, env: Record<string, string>): Promise<PassR
     writeFileSync(join(TMP, "seed.json"), JSON.stringify(seeded, null, 2));
     writeFileSync(join(TMP, "assertions.json"), "[]");
     if (process.env.E2E_HOLD === "1") {
-      console.log("E2E_HOLD=1 — holding with the stack up. Finish with ctrl-c.");
+      console.log("E2E_HOLD=1 — holding with the stack up. Press ctrl-c to finish.");
       await new Promise(() => {});
     }
     runPlaywright(env);
@@ -158,16 +159,16 @@ function report(passes: PassResult[]): string {
     first.seed.itemCount === second.seed.itemCount &&
     first.assertions.length === second.assertions.length &&
     first.assertions.every((a, i) => a.ok === (second.assertions[i]?.ok ?? false));
-  return `# Phase A end-to-end smoke report
+  return `# Phase A End-to-End Smoke Report
 
 Generated: ${now} · \`pnpm e2e:phase-a\` (tools/e2e/run.ts)
 
 Stack: PostgreSQL \`${DB_NAME}\` (migrations 0001–0008 + Zero permissions) → zero-cache :${ZERO_PORT}
-→ hub :${HUB_PORT} (HTTP + WS /bridge) → local agent bridge (mock runtime fixture, host=macbook)
+→ hub :${HUB_PORT} (HTTP + WS /bridge) → local agent bridge (mock runtime fixtures, host=macbook)
 → desktop Vite dev :${VITE_PORT} → Playwright (chromium, headless).
 
-The seed only ever takes real code paths: adapter \`normalize()\` → kernel \`IngestSink\`,
-kernel \`approvals.propose\`, \`classify()\` from \`@omnis/agents\` (T0 rule path, no network call),
+Every part of the seed takes a real code path: adapter \`normalize()\` → kernel \`IngestSink\`,
+kernel \`approvals.propose\`, \`classify()\` from \`@omnis/agents\` (T0 rule path, no network calls),
 \`ClaudeCodeAdapter\` + \`apps/local-agent/test\` fixture replay.
 
 ${passes
@@ -186,49 +187,49 @@ Two consecutive runs produced ${same ? "the same result (PASS)" : "different res
 
 ## How to read this (what the report does not claim)
 
-- **Since U2 (kinso conversation rows) the Inbox is a thread list.** Several messages in one thread
-  collapse into a single row (the most recent item), and a row title resolves in the order person
-  display name → thread title → channel handle — Phase A's kernel IngestSink deliberately leaves
-  author_person_id empty (person identity resolution is Phase B), so every seeded row falls back to
-  the thread title. A1 checks the thread count, A2b checks that those titles are really on screen.
-- **A2 looks at a visible icon, not an accessible name.** The channel icon is a react-icons/si
-  SVG (it was monogram text before U2) — A2 confirms "something is really drawn here" through an
-  svg child node and a non-zero bounding box.
-- **A2c/A2d look at the kinso shell and the row anatomy.** A2c checks that the left channel rail
-  tiles (Inbox/Slack/Gmail/Google Calendar/Agent) and the top "Start typing to ask or search" pill
-  bar are up; A2d checks that a single row has an avatar · name · **relative-time grammar**
-  (now/3m/2w/4 Aug — not an ISO timestamp) · a non-empty summary line. Without those two, A1/A2/A2b
-  still pass even with the summary line missing entirely.
-- **A4 looks at identity, not counts.** Since U2 made rows thread-level, the seed's work thread and
-  personal thread are one each — "the counts differ" no longer holds (it actually broke in the U2
-  merge), so the check became whether the two filters' row sets are disjoint and both are proper
-  subsets of all. A4b separately checks that a rail tile click narrows the list and the Inbox tile
+- **The Inbox has been a thread list since U2 (kinso conversation rows).** Multiple messages in
+  one thread collapse into a single row (the most recent item), and the row title is resolved as
+  person display name → thread title → channel handle — the Phase A kernel IngestSink deliberately
+  leaves author_person_id empty (resolving person identity is Phase B), so every seeded row falls
+  through to the thread title. A1 checks the thread count; A2b checks that those titles are really
+  on screen.
+- **A2 looks at the visible icon, not the accessible name.** Channel icons are react-icons/si SVGs
+  (they were monogram text before U2) — A2 confirms "something is actually drawn" via an svg child
+  node and a non-zero bounding box.
+- **A2c/A2d cover the kinso shell and the row anatomy.** A2c checks that the left channel rail
+  tiles (Inbox/Slack/Gmail/Google Calendar/Agent) and the top "Start typing to ask or search" bar
+  are up; A2d checks that a single row holds avatar, name, **relative-time grammar** (now/3m/2w/
+  4 Aug — never an ISO timestamp) and a non-empty summary line. Without those two, A1/A2/A2b would
+  still pass with the summary line missing entirely.
+- **A4 checks identity, not counts.** Since U2 made rows per thread, the seed's work thread and
+  personal thread are one each — "the counts differ" no longer holds (it actually broke at the U2
+  merge), so the check became: the two filters' row sets do not overlap and both are proper subsets
+  of all. A4b separately checks that clicking a rail tile narrows the list and the Inbox tile
   restores it.
-- **T1 (DeepSeek/OpenRouter) calls are blocked by force.** The seed clears
-  OMNIS_OPENROUTER_API_KEY before calling classify() — if rule stage 1 misses and it falls through
-  to stage 3, t1Model() throws before the fetch. Separately from that, A10 checks that the recorded
-  run has tier=T0.
-- **Re-running this smoke overwrites REPORT.md and the evidence/ PNGs.** If you ran it before
-  merging, either revert with \`git checkout -- tools/e2e\` or commit the new results as they are.
+- **T1 (DeepSeek/OpenRouter) calls are force-blocked.** The seed clears OMNIS_OPENROUTER_API_KEY
+  before calling classify() — so even if tier 1 misses a rule and falls through to tier 3,
+  t1Model() throws before the fetch. A10 separately checks that the recorded run has tier=T0.
+- **Re-running this smoke overwrites REPORT.md and the evidence/ PNGs.** If you ran it before a
+  merge, either revert with \`git checkout -- tools/e2e\` or commit the new results as they are.
 
 ## Evidence
 
 The 8 PNGs in \`tools/e2e/evidence/\` (01-inbox / 02-inbox-filter-work / 03-thread /
 04-agent-session / 05-approval-card / 06-command-palette / 07-g5-live-item /
-08-archived — the Archived view with the "Archived" pill on, US-A36).
-05 crops to just the approval card — shot full-screen it would be exactly the same picture as 04
-(the shell pins the approval card above the detail pane, so it is already up in 04).
+08-archived — the Archived view with the archived pill on, US-A36).
+05 crops to just the approval card element — shooting the full screen would produce exactly the
+same image as 04 (the shell pins the approval card above the detail pane, so it is already in 04).
 
 ## Logs
 
-hub.log · zero-cache.log · desktop.log in \`tools/e2e/.logs/\` (not committed).
+hub.log · zero-cache.log · desktop.log under \`tools/e2e/.logs/\` (not committed).
 `;
 }
 
 const env = loadOrCreateEnv();
 const passes: PassResult[] = [];
 try {
-  // Two passes by default (idempotence check). While debugging, E2E_PASSES=1 runs it once.
+  // Two passes by default (idempotence check). While debugging, E2E_PASSES=1 runs just one.
   const total = Number(process.env.E2E_PASSES ?? "2");
   for (let pass = 1; pass <= total; pass++) {
     passes.push(await onePass(pass, env));

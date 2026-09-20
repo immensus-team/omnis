@@ -1,4 +1,4 @@
-// A4 §5. 승인 없이 실행되는 경로는 없다 — 이 루프의 유일한 산출물은 pending_approvals 한 행이다.
+// A4 §5. No path runs without approval — this loop's only output is a single pending_approvals row.
 import { z } from "zod";
 import { buildContext } from "../context/assemble.js";
 import { renderBrief } from "../delegate/brief.js";
@@ -6,7 +6,7 @@ import { registerLoop } from "../loop/registry.js";
 import type { LoopSpec, TriggerContext } from "../loop/spec.js";
 import { PROPOSE_TOOLS } from "../tools/propose.js";
 
-/** A4 §4.4: 자율 규칙이 열려 있어도 30분을 넘으면 승인을 탄다. */
+/** A4 §4.4: even with autonomy rules open, anything over 30 minutes goes through approval. */
 export const AUTONOMY_MAX_MINUTES = 30;
 
 export interface AutonomyRule {
@@ -28,11 +28,11 @@ export function autonomyAllows(i: {
 }
 
 export const DelegateOutput = z.object({
-  runtime: z.enum(["claude_code", "codex", "claude_ds", "omnis"]), // B-D7: hermes 없음
+  runtime: z.enum(["claude_code", "codex", "claude_ds", "omnis"]), // B-D7: no hermes
   host: z.enum(["mini", "macbook"]),
   goal: z.string().max(200),
-  // taskLoop과 같은 이유로 .default()를 걸지 않는다: z.input과 z.output이 갈라지면
-  // LoopSpec<DelegateOutputT>.outputSchema에 붙지 않는다(A4 §1.6 flagsOf가 읽는 필드).
+  // No .default() here, for the same reason as taskLoop: once z.input and z.output diverge it
+  // will not attach to LoopSpec<DelegateOutputT>.outputSchema (the field A4 §1.6 flagsOf reads).
   background: z.array(z.string().max(200)).max(6),
   steps: z.array(z.string().max(200)).min(1).max(8),
   acceptance: z.array(z.string().max(200)).min(1),

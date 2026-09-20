@@ -24,14 +24,15 @@ afterEach(() => {
   invalidateSnapshotCache();
 });
 
-describe("buildContext — 캐시 경계 (A4 §1.3)", () => {
+describe("buildContext — cache boundary (A4 §1.3)", () => {
   it("puts the self-model snapshot in cachedPrefix and nothing time-varying", async () => {
-    await writeFile(join(dir, "USER.md"), "# Logan\n서울에서 일한다.\n");
+    await writeFile(join(dir, "USER.md"), "# Logan\nWorks in Seoul.\n");
     const ctx = await buildContext({ selfModel: ["USER.md"] });
 
-    expect(ctx.cachedPrefix).toContain("나(사용자)에 대하여");
-    expect(ctx.cachedPrefix).toContain("서울에서 일한다");
-    // 타임스탬프·nonce·run_id는 경계 뒤에만 있다 — 여기 들어가면 캐시 단가가 50배가 된다.
+    expect(ctx.cachedPrefix).toContain("About me (the user)");
+    expect(ctx.cachedPrefix).toContain("Works in Seoul");
+    // Timestamps, nonces and run_ids live only past the boundary — inside it they would make the
+    // cached rate 50x worse.
     expect(ctx.cachedPrefix).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
     expect(ctx.cachedPrefix).not.toMatch(/d_[0-9a-f]{16}/);
   });
@@ -51,32 +52,36 @@ describe("buildContext — 캐시 경계 (A4 §1.3)", () => {
   });
 });
 
-describe("buildContext — 절삭 순서 (A4 §1.3, A4-D15)", () => {
+describe("buildContext — truncation order (A4 §1.3, A4-D15)", () => {
   it("drops PROJECTS.md before touching USER.md", async () => {
+    // Frozen: a Hangul filler character, used as a wide (non-ASCII) blob. estimateTokens() charges
+    // wide chars 1.5 per token against 4 for ASCII, so an ASCII filler would change the math.
     await writeFile(join(dir, "USER.md"), `# Logan\n${"가".repeat(1000)}`);
     await writeFile(join(dir, "PROJECTS.md"), "프".repeat(9000));
     setContextBudget(1200);
 
     const ctx = await buildContext({ selfModel: ["USER.md", "PROJECTS.md"] });
     expect(ctx.truncated).toBe(true);
-    expect(ctx.cachedPrefix).toContain("# Logan"); // USER.md는 어떤 경우에도 안 깎는다
+    expect(ctx.cachedPrefix).toContain("# Logan"); // USER.md is never trimmed, whatever happens
     expect(ctx.cachedPrefix).not.toContain("프".repeat(100));
   });
 
   it("drops the per-recipient VOICE.md samples before dropping PROJECTS.md", async () => {
     await writeFile(join(dir, "USER.md"), "# Logan\n");
+    // `## 상대별 샘플` is frozen: it is the Korean heading ("per-recipient samples") that the
+    // voice-strip regex in src/context/assemble.ts matches. `샘` is the wide filler as above.
     await writeFile(
       join(dir, "VOICE.md"),
-      `# 말투\n기본 규칙\n## 상대별 샘플\n${"샘".repeat(5000)}\n`,
+      `# Voice\nBasic rules\n## 상대별 샘플\n${"샘".repeat(5000)}\n`,
     );
-    await writeFile(join(dir, "PROJECTS.md"), "프로젝트 하나\n");
+    await writeFile(join(dir, "PROJECTS.md"), "one project\n");
     setContextBudget(600);
 
     const ctx = await buildContext({ selfModel: ["USER.md", "VOICE.md", "PROJECTS.md"] });
     expect(ctx.truncated).toBe(true);
-    expect(ctx.cachedPrefix).toContain("기본 규칙");
+    expect(ctx.cachedPrefix).toContain("Basic rules");
     expect(ctx.cachedPrefix).not.toContain("샘".repeat(50));
-    expect(ctx.cachedPrefix).toContain("프로젝트 하나"); // 4단계가 먼저, 5단계는 아직
+    expect(ctx.cachedPrefix).toContain("one project"); // step 4 ran first, step 5 has not yet
   });
 
   it("never sets truncated when everything fits", async () => {

@@ -1,4 +1,5 @@
-// A4 §6.1~§6.3. 브리핑은 06:30에 완성돼야 하므로 배치 큐를 쓰지 않고 동기 호출한다.
+// A4 §6.1~§6.3. The briefing must be complete by 06:30, so we call it synchronously rather than
+// through a batch queue.
 import { z } from "zod";
 import { buildContext } from "../context/assemble.js";
 import {
@@ -13,24 +14,24 @@ import { getAgentsPool } from "../pool.js";
 
 export const MORNING_DIGEST_CRON = "30 6 * * *";
 
-/** 모델이 쓰는 건 이 두 문장뿐이다(A4 §6.3). */
+/** These two sentences are all the model writes (A4 §6.3). */
 export const MorningDigestOutput = z.object({
   greeting: z.string().max(120),
   one_liner: z.string().max(160),
   confidence: z.number().min(0).max(1),
   rationale: z.string().max(200),
-  // ponytail: auto-archive.ts와 같은 이유로 .default()를 쓰지 않는다 — z.input과 z.output이
-  // 갈리면 LoopSpec의 ZodType<TOut>에 대입되지 않는다.
+  // ponytail: no .default() here, for the same reason as auto-archive.ts — once z.input and
+  // z.output diverge it will not assign to LoopSpec's ZodType<TOut>.
   injection_flags: z.array(z.string()),
 });
 export type MorningDigestOutputT = z.infer<typeof MorningDigestOutput>;
 
 const SECTION_TITLE: Record<string, string> = {
-  needs_you: "지금 결정이 필요한 것",
-  drafts: "초안이 준비된 답장",
-  calendar: "오늘 일정",
-  commitments: "내가 한 약속",
-  agents: "에이전트 진행/결과",
+  needs_you: "Needs your decision now",
+  drafts: "Drafts ready to send",
+  calendar: "Today's schedule",
+  commitments: "Your commitments",
+  agents: "Agent progress / results",
 };
 
 export async function morningCandidates(now: Date): Promise<BriefCandidate[]> {
@@ -53,7 +54,7 @@ export async function morningCandidates(now: Date): Promise<BriefCandidate[]> {
     `WITH approvals AS (
        SELECT 'approval'::text AS kind, a.id::text AS id,
               COALESCE(a.thread_id::text, a.id::text) AS thread_id,
-              'needs_you'::text AS section, a.description AS line, '승인 대기'::text AS why,
+              'needs_you'::text AS section, a.description AS line, 'Pending approval'::text AS why,
               'now'::text AS priority, false AS vip, true AS pending_approval,
               0 AS unanswered_turns, false AS meeting_today, false AS due_today,
               (EXTRACT(EPOCH FROM (now() - a.created_at))/3600)::text AS age_hours,
@@ -61,7 +62,7 @@ export async function morningCandidates(now: Date): Promise<BriefCandidate[]> {
          FROM pending_approvals a WHERE a.state = 'pending'),
      drafts AS (
        SELECT 'item', i.id::text, i.thread_id::text, 'drafts',
-              left(i.body, 90), COALESCE(i.meta->'draft'->>'rationale', '초안 준비됨'), 'today',
+              left(i.body, 90), COALESCE(i.meta->'draft'->>'rationale', 'Draft ready'), 'today',
               COALESCE(p.vip, false), false, 0, false, false,
               (EXTRACT(EPOCH FROM (now() - i.sent_at))/3600)::text, false
          FROM items i
@@ -69,7 +70,7 @@ export async function morningCandidates(now: Date): Promise<BriefCandidate[]> {
         WHERE i.status = 'draft' AND (i.meta->>'pending') IS DISTINCT FROM 'true'),
      events AS (
        SELECT 'event', c.id::text, i.thread_id::text, 'calendar',
-              COALESCE(i.subject, '(제목 없음)'),
+              COALESCE(i.subject, '(no subject)'),
               to_char(c.start_at AT TIME ZONE 'Asia/Seoul', 'HH24:MI'),
               'today', false, false, 0, true, false, '0', false
          FROM calendar_events c JOIN items i ON i.id = c.item_id
@@ -78,7 +79,7 @@ export async function morningCandidates(now: Date): Promise<BriefCandidate[]> {
           AND c.start_at <  date_trunc('day', $1::timestamptz) + interval '1 day'),
      commitments AS (
        SELECT 'task', t.id::text, COALESCE(i.thread_id::text, t.id::text), 'commitments',
-              t.title, '내가 한 약속', 'today', false, false, 0, false,
+              t.title, 'Your commitment', 'today', false, false, 0, false,
               (t.due_at IS NOT NULL AND t.due_at < $1::timestamptz + interval '1 day'),
               (EXTRACT(EPOCH FROM (now() - t.created_at))/3600)::text, false
          FROM tasks t LEFT JOIN items i ON i.id = t.source_item_id
@@ -146,7 +147,7 @@ export const morningDigestLoop: LoopSpec<MorningDigestOutputT> = {
       quiet += all.length - kept.length;
       sections.push({ id: id as BriefSection["id"], title: SECTION_TITLE[id] ?? id, items: kept });
     }
-    sections.push({ id: "quiet", title: "그 외", count: quiet });
+    sections.push({ id: "quiet", title: "Other", count: quiet });
 
     const briefing = {
       greeting: result.output.greeting,
@@ -167,5 +168,5 @@ export const morningDigestLoop: LoopSpec<MorningDigestOutputT> = {
     );
   },
 };
-// 레지스트리에 넣지 않는다 — LoopId 'digest'를 nightlyDigestLoop과 공유하므로
-// 두 루프 모두 runLoopSpec으로 직접 돈다(허브가 cron 핸들러를 등록한다).
+// Not registered in the registry — it shares LoopId 'digest' with nightlyDigestLoop, so both
+// loops run directly through runLoopSpec (the hub registers the cron handler).

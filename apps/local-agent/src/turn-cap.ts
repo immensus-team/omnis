@@ -1,6 +1,6 @@
 import { BRIDGE_ERRORS, BridgeError } from "@omnis/protocol";
 
-/** A2 §7.2: 호스트당 활성 "턴" 4개. 프로세스 수가 아니다. 초과는 큐잉(최대 8), 넘치면 -32004. */
+/** A2 §7.2: 4 active "turns" per host. Not a process count. Excess is queued (up to 8); beyond that, -32004. */
 export class TurnCap {
   readonly #max: number;
   readonly #queueMax: number;
@@ -27,7 +27,7 @@ export class TurnCap {
     return "queued";
   }
 
-  /** 성공·실패·취소 모두에서 호출된다. 다음 대기 턴 id를 돌려준다. */
+  /** Called on success, failure and cancellation alike. Returns the id of the next queued turn. */
   release(turnId: string): string | undefined {
     if (!this.#active.delete(turnId)) {
       this.#queue = this.#queue.filter((t) => t !== turnId);

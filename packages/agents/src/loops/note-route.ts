@@ -1,4 +1,4 @@
-// A4 §8. LLM은 후보를 만들어내지 못한다 — 검색이 준 목록 안에서만 고른다.
+// A4 §8. The LLM cannot invent candidates — it only picks from the list search hands it.
 import { z } from "zod";
 import { buildContext } from "../context/assemble.js";
 import { registerLoop } from "../loop/registry.js";
@@ -6,9 +6,10 @@ import type { LoopSpec, TriggerContext } from "../loop/spec.js";
 import { getAgentsPool } from "../pool.js";
 import { PROPOSE_TOOLS } from "../tools/propose.js";
 
-/** A4 §8.3 1행: 1-tap 확인 카드를 띄우는 선. 자동 첨부는 이 위에서도 하지 않는다. */
+/** A4 §8.3 row 1: the line at which a 1-tap confirmation card appears. Auto-attach never happens,
+ *  even above it. */
 export const ROUTE_CONFIDENCE_HIGH = 0.8;
-/** A4 §8.3 3행: 이 밑이면 제안 자체를 만들지 않는다. */
+/** A4 §8.3 row 3: below this, no proposal is created at all. */
 export const ROUTE_CONFIDENCE_MIN = 0.5;
 const MAX_CANDIDATES = 3;
 
@@ -46,7 +47,7 @@ export const noteRouteLoop: LoopSpec<RouteOutputT> = {
   async apply(result, ctx) {
     const noteId = ctx.note_id;
     if (noteId === undefined) return;
-    // A4 §8.3: 0.50 미만이면 라우팅 없이 보관한다. 신뢰도가 아무리 높아도 자동 첨부는 없다.
+    // A4 §8.3: below 0.50, file it with no routing. However high the confidence, there is no auto-attach.
     const kept = result.output.candidates
       .filter((c) => c.confidence >= ROUTE_CONFIDENCE_MIN)
       .slice(0, MAX_CANDIDATES);

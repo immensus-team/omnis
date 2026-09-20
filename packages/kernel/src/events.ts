@@ -5,9 +5,9 @@ import type { Logger } from "./logger.js";
 export type EventTier = "ephemeral" | "durable" | "cold";
 
 export interface Events {
-  /** ephemeral: 프로세스 안 팬아웃만(저장·NOTIFY 없음, A3-D14).
-   *  durable: 호출자가 이미 쓴 row의 id를 NOTIFY로 알린다.
-   *  cold: events 테이블 INSERT(트리거가 없어 NOTIFY 없음). */
+  /** ephemeral: in-process fanout only (no persistence, no NOTIFY, A3-D14).
+   *  durable: NOTIFY the id of the row the caller has already written.
+   *  cold: INSERT into the events table (no trigger, so no NOTIFY). */
   emit(
     tier: EventTier,
     kind: string,
@@ -16,7 +16,8 @@ export interface Events {
   subscribe(channel: string, fn: (p: Record<string, unknown>) => void): () => void;
 }
 
-/** durable 이벤트 kind → NOTIFY 채널(계약 §4). 여기 없는 kind는 durable로 쏠 수 없다. */
+/** durable event kind → NOTIFY channel (contract §4). A kind missing here cannot be
+ *  emitted as durable. */
 export const DURABLE_CHANNEL: Readonly<Record<string, string>> = {
   "item.created": "omnis_item",
   "item.updated": "omnis_item",
@@ -31,7 +32,7 @@ export const DURABLE_CHANNEL: Readonly<Record<string, string>> = {
   "control.kill_switch": "omnis_control",
 };
 
-/** A3 §6.2: NOTIFY 페이로드 한도. */
+/** A3 §6.2: NOTIFY payload limit. */
 export const NOTIFY_MAX_BYTES = 8000;
 
 export interface EventsDeps {
@@ -76,7 +77,8 @@ export function createEvents(deps: EventsDeps): Events & { close(): Promise<void
         }
         fanout(msg.channel, payload);
       });
-      // 채널 이름은 식별자라 파라미터화할 수 없다. NOTIFY_CHANNELS는 고정 상수이므로 주입 경로가 없다.
+      // Channel names are identifiers, so they cannot be parameterized. NOTIFY_CHANNELS is a
+      // fixed constant, so there is no injection path.
       for (const ch of NOTIFY_CHANNELS) {
         await c.query(`LISTEN ${ch}`);
       }
@@ -101,7 +103,8 @@ export function createEvents(deps: EventsDeps): Events & { close(): Promise<void
         if (bytes >= NOTIFY_MAX_BYTES) {
           throw new Error(`NOTIFY payload for "${kind}" is ${bytes}B, limit ${NOTIFY_MAX_BYTES}`);
         }
-        // LISTEN이 아직 걸리는 중이면 기다린다 — pg_notify는 그 순간 듣고 있는 세션에만 닿는다.
+        // If LISTEN is still being set up, wait for it — pg_notify only reaches sessions
+        // listening at that instant.
         if (listening !== null) await listening;
         await query(pool, "SELECT pg_notify($1, $2)", [channel, text]);
         return;
@@ -151,7 +154,7 @@ export function createEvents(deps: EventsDeps): Events & { close(): Promise<void
       listener = null;
       if (c !== null) {
         c.removeAllListeners("notification");
-        c.release(true); // 이 커넥션은 LISTEN 상태이므로 풀에 돌려주지 않고 버린다
+        c.release(true); // in LISTEN state — discard, do not return to the pool
       }
     },
   };

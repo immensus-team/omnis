@@ -25,7 +25,8 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   await scheduler.stop();
-  // 공유 omnis_test DB: 스케줄러가 upsert한 잡 행을 남기면 0006의 seed 개수 단언이 깨진다.
+  // Shared omnis_test DB: leaving the scheduler's upserted job row behind breaks the 0006
+  // seed-count assertion.
   await query(pool, "DELETE FROM jobs WHERE name = $1", [HEALTHCHECK_JOB_NAME]);
   await events.close();
   await pool.end();

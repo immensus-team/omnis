@@ -1,4 +1,4 @@
-// A4 §7 L6 Network 팔로업 루프.
+// A4 §7 L6 network follow-up loop.
 import type { Channel } from "@omnis/protocol";
 import type { Pool } from "pg";
 import { z } from "zod";
@@ -7,9 +7,9 @@ import { registerLoop } from "../loop/registry.js";
 import type { LoopSpec, TriggerContext } from "../loop/spec.js";
 import { getAgentsPool } from "../pool.js";
 
-/** A4 §7.3: 하루 최대 10명 — 이 이상은 팔로업이 아니라 스팸이다. */
+/** A4 §7.3: at most 10 people per day — beyond that it is spam, not follow-up. */
 export const INACTIVE_SWEEP_LIMIT = 10;
-/** 마스터 §13: 이 두 채널로는 선제 발신하지 않는다. */
+/** Master §13: we never initiate outreach on these two channels. */
 export const NO_COLD_OUTREACH_CHANNELS: readonly Channel[] = ["linkedin", "kakaotalk"];
 
 export function isFirstContact(
@@ -21,7 +21,8 @@ export function isFirstContact(
   return days <= 90 && p.item_count < 3;
 }
 
-/** A4 §7.4 채널 선택: 최근 90일 최다 채널, 동률이면 이메일. 선제 발신 금지 2채널은 예외. */
+/** A4 §7.4 channel choice: the most-used channel in the last 90 days, ties go to email. The two
+ *  no-cold-outreach channels are the exception. */
 export function pickFollowupChannel(i: {
   counts: Partial<Record<Channel, number>>;
   theySentLast: boolean;
@@ -32,12 +33,12 @@ export function pickFollowupChannel(i: {
   );
   const top = ranked[0];
   if (top === undefined) return i.hasEmail ? "gmail" : null;
-  // A4 §7.4/§7.5 하드 게이트: 선제 발신 금지 채널은 동률이든 단독이든 후보에서 빠진다.
-  // (계획 원문은 동률 분기를 먼저 반환해서 이 게이트를 건너뛴다 — 게이트가 이긴다.)
+  // A4 §7.4/§7.5 hard gate: a no-cold-outreach channel drops out of the running whether tied or alone.
+  // (The plan text returned the tie branch first and skipped this gate — the gate wins.)
   const forbidden = !i.theySentLast && NO_COLD_OUTREACH_CHANNELS.includes(top[0]);
   const tie = ranked.filter(([, n]) => n === top[1]).length > 1;
   if (i.hasEmail && (tie || forbidden)) return "gmail";
-  // 이메일도 없으면 발신 자체를 포기한다 — 호출부는 task만 만든다.
+  // With no email either, we give up on sending entirely — the caller creates only the task.
   return forbidden ? null : top[0];
 }
 
@@ -49,7 +50,7 @@ export interface InactiveCandidate {
   effective_cadence_days: number;
 }
 
-/** A4 §7.3 SQL 원문. LLM은 이 후보에 대해서만 돈다. */
+/** A4 §7.3 SQL verbatim. The LLM only runs over these candidates. */
 export async function inactiveCandidates(pool: Pool): Promise<InactiveCandidate[]> {
   const { rows } = await pool.query<InactiveCandidate>(
     `WITH cadence AS (
@@ -112,7 +113,8 @@ export type FollowupOutputT = z.infer<typeof FollowupOutput>;
 export const followupLoop: LoopSpec<FollowupOutputT> = {
   id: "followup",
   kind: "deliberate",
-  // 스윕 잡이 후보를 뽑아 사람마다 이 이벤트를 쏜다 — 루프 자체는 "사람 한 명"에 대해 돈다.
+  // The sweep job picks candidates and fires this event once per person — the loop itself runs for
+  // a single person.
   trigger: { kind: "event", on: "person.inactive", debounceMs: 0 },
   palette: [
     "read_thread",
@@ -128,8 +130,8 @@ export const followupLoop: LoopSpec<FollowupOutputT> = {
   outputSchema: FollowupOutput,
 
   assemble: (ctx: TriggerContext) => {
-    // ponytail: thread 슬롯은 thread_id가 있을 때만 건다 — 계획의 `ctx.thread_id ?? ""`는
-    // 미팅 트리거가 아닌 비활성 스윕에서 빈 문자열 uuid로 쿼리가 터진다.
+    // ponytail: only attach the thread slot when thread_id exists — the plan's `ctx.thread_id ?? ""`
+    // blows up the query with an empty-string uuid on the inactive sweep, which is not a meeting trigger.
     const req: ContextRequest = {
       selfModel: ["USER.md", "VOICE.md"],
       entities: { personIds: ctx.person_id === undefined ? [] : [ctx.person_id], asOf: "now" },
@@ -145,8 +147,8 @@ export const followupLoop: LoopSpec<FollowupOutputT> = {
     const update = o.relationship_update;
     if (update === undefined) return;
 
-    // A4 §7.4: relationship_update는 자동 적용된다. 단 'closed'로의 전이만 승인이 필요하다 —
-    // 관계를 끊는 판단은 에이전트가 할 일이 아니다.
+    // A4 §7.4: relationship_update is applied automatically. Only the transition to 'closed' needs
+    // approval — deciding to cut off a relationship is not the agent's job.
     if (update.state === "closed") {
       await pool.query(
         `INSERT INTO pending_approvals (action, args, description, risk, requested_by)
@@ -154,7 +156,7 @@ export const followupLoop: LoopSpec<FollowupOutputT> = {
                  (SELECT id FROM agent_runtimes WHERE runtime = 'omnis' LIMIT 1))`,
         [
           JSON.stringify({ person_id: o.person_id, state: "closed", note: update.note ?? null }),
-          `${o.person_id} 관계를 'closed'로 바꿀까요? — ${o.rationale}`,
+          `Mark ${o.person_id}'s relationship as 'closed'? — ${o.rationale}`,
         ],
       );
       return;
@@ -172,7 +174,7 @@ export const followupLoop: LoopSpec<FollowupOutputT> = {
 
 registerLoop(followupLoop);
 
-/** A4 §7.3 평일 10:00 스윕(jobs.name = 'network_inactive_sweep'). 후보마다 루프를 한 번씩 돌린다. */
+/** A4 §7.3 weekday 10:00 sweep (jobs.name = 'network_inactive_sweep'). Runs the loop once per candidate. */
 export async function sweepFollowups(
   runOne: (c: InactiveCandidate) => Promise<void>,
 ): Promise<number> {

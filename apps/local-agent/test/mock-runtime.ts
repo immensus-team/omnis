@@ -9,7 +9,7 @@ export const FIXTURES = {
   codexToolCall: join(here, "fixtures", "codex", "tool_call_turn.ndjson"),
 } as const;
 
-/** RuntimeAdapter가 stdio를 읽는 코드 경로를 그대로 타게 한다(A2 §8.2). */
+/** Makes it take the very code path RuntimeAdapter uses to read stdio (A2 §8.2). */
 export function mockSpawn(fixture: string): typeof spawn {
   return ((_cmd: string, _args: readonly string[], opts?: SpawnOptions) =>
     spawn(process.execPath, [join(here, "mock-runtime.mjs")], {

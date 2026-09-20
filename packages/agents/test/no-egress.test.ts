@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { PHANTOM_TOOLS } from "../src/tools/names.js";
 
-// cwd에 기대지 않는다: 루트 `pnpm test`(unit 프로젝트)에서도 같은 파일 집합을 훑어야 한다.
+// Does not lean on cwd: the root `pnpm test` (unit project) must scan the same file set too.
 const SRC = fileURLToPath(new URL("../src", import.meta.url));
 
 function sources(dir: string): string[] {
@@ -17,9 +17,9 @@ function sources(dir: string): string[] {
   );
 }
 
-describe("@omnis/agents tool isolation (A7 §7 공통 금지)", () => {
+describe("@omnis/agents tool isolation (A7 §7 common bans)", () => {
   it("never mentions an irreversible tool name in a tool definition", () => {
-    // 이름 목록은 names.ts가 소유하고, 여기서는 "정의로 등장하지 않는가"만 본다.
+    // names.ts owns the name list; this only checks that they never appear as a definition.
     for (const f of sources(SRC)) {
       const text = readFileSync(f, "utf8");
       for (const name of PHANTOM_TOOLS) {

@@ -1,6 +1,6 @@
 import type { Channel, Scope } from "@omnis/protocol";
-// A4 §2.2 1단 — 결정론적 규칙 ($0, ~1ms). 순서가 우선순위다.
-// A6 §6: 1~3B 로컬 분류기는 스파이크 전까지 미탑재이므로 T0는 규칙 + kNN 둘뿐이다.
+// A4 §2.2 stage 1 — deterministic rules ($0, ~1ms). Order is priority.
+// A6 §6: the 1–3B local classifier is not shipped until the spike, so T0 is only rules + kNN.
 import type { Pool } from "pg";
 import type { ItemRow } from "../types.js";
 
@@ -17,7 +17,7 @@ export interface RuleHit {
   confidence: number;
 }
 
-/** Logan의 업무 도메인. Settings에서 편집 가능해지는 건 Phase B — 지금은 상수다. */
+/** Logan's work domains. Making these editable in Settings is Phase B — for now they are constants. */
 export const WORK_DOMAINS: readonly string[] = ["onwardlab.com", "theunderpin.ai", "davich.com"];
 
 export const DETERMINISTIC_RULES = [
@@ -57,7 +57,7 @@ async function senderOnWorkDomain(ctx: ClassifyCtx): Promise<boolean> {
   return rows.some((r) => WORK_DOMAINS.some((d) => r.handle_norm.endsWith(`@${d}`)));
 }
 
-/** A4 §2.2 r_calendar_peer: 최근 7일 안에 같은 캘린더 이벤트에 함께 있었으면 업무로 본다. */
+/** A4 §2.2 r_calendar_peer: if they were on the same calendar event within the last 7 days, treat it as work. */
 async function sharedEventWithin(ctx: ClassifyCtx, days: number): Promise<boolean> {
   if (ctx.authorPersonId === undefined) return false;
   const { rows } = await ctx.pool.query<{ n: string }>(
@@ -71,7 +71,7 @@ async function sharedEventWithin(ctx: ClassifyCtx, days: number): Promise<boolea
   return Number(rows[0]?.n ?? "0") > 0;
 }
 
-/** 1단 판정. 아무 규칙도 안 맞으면 null을 돌려 2단(kNN)으로 넘긴다. */
+/** Stage-1 decision. If no rule matches, return null and hand off to stage 2 (kNN). */
 export async function applyRules(item: ItemRow, ctx: ClassifyCtx): Promise<RuleHit | null> {
   const sticky = await threadScope(ctx);
   if (sticky !== null) return { rule_id: "r_thread_sticky", scope: sticky, confidence: 0.98 };
@@ -88,6 +88,6 @@ export async function applyRules(item: ItemRow, ctx: ClassifyCtx): Promise<RuleH
   if (await sharedEventWithin(ctx, 7))
     return { rule_id: "r_calendar_peer", scope: "work", confidence: 0.85 };
 
-  void item; // 1단은 본문을 보지 않는다 — 본문 판정은 2단(kNN)과 3단(T1)의 몫이다.
+  void item; // Stage 1 does not look at the body — body decisions belong to stage 2 (kNN) and stage 3 (T1).
   return null;
 }

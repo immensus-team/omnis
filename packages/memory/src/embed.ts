@@ -1,15 +1,16 @@
-// A4 §10.4-1: 임베딩은 T0($0). Ollama nomic-embed-text-v1.5, 768d — A3 §5의 vector(768) 컬럼과
-// HNSW 한계(2,000d) 양쪽에 맞는다.
+// A4 §10.4-1: embeddings are T0 ($0). Ollama nomic-embed-text-v1.5, 768d — fits both A3 §5's
+// vector(768) column and the HNSW limit (2,000d).
 export const EMBED_MODEL = "nomic-embed-text-v1.5";
 export const EMBED_DIMS = 768;
 
-/** nomic-embed-text는 query/document를 비대칭 태스크 프리픽스로 구분해서 학습됐다 —
- *  프리픽스 없이 넣으면 코사인 거리가 사실상 랜덤에 가까워진다. 저장할 때는 document,
- *  검색할 때는 query를 쓴다 (Nomic 모델 카드). */
+/** nomic-embed-text was trained to separate query/document with asymmetric task prefixes —
+ *  embed without the prefix and cosine distance becomes close to random. Use document when
+ *  storing, query when searching (Nomic model card). */
 export const EMBED_QUERY_PREFIX = "search_query: ";
 export const EMBED_DOCUMENT_PREFIX = "search_document: ";
 
-/** 차원이 틀린 벡터가 SQL까지 내려가는 것을 막는 유일한 문. 임베딩 값 자체는 메시지에 넣지 않는다. */
+/** The only gate that stops a wrong-dimension vector from reaching SQL. The embedding values
+ *  themselves never go into the message. */
 export class MemoryEmbedError extends Error {
   constructor(message: string) {
     super(message);
@@ -17,8 +18,8 @@ export class MemoryEmbedError extends Error {
   }
 }
 
-/** ponytail: 32는 Ollama 기본 num_parallel(4)보다 넉넉하고 요청 바디가 수 MB를 넘지 않는 선.
- *  미니 처리량 실측(S-A4-3)이 나오면 그때 조정한다. */
+/** ponytail: 32 is roomier than Ollama's default num_parallel(4) while keeping the request body
+ *  under a few MB. Tune it once the mini's measured throughput (S-A4-3) is in. */
 const BATCH = 32;
 const TIMEOUT_MS = 30_000;
 
@@ -34,9 +35,9 @@ export function toVectorLiteral(v: number[]): string {
   return `[${v.join(",")}]`;
 }
 
-/** A4 §10.5: Ollama가 죽어도 throw하지 않는다. 실패분은 null이고 호출자는 embedding=NULL로
- *  저장한다 — A3의 부분 HNSW가 NULL을 애초에 인덱싱하지 않으므로 스키마가 이미 이 상태를
- *  허용한다. 다음 주기에 reembedNulls()가 줍는다. */
+/** A4 §10.5: never throws even when Ollama is down. Failures come back as null and the caller
+ *  stores embedding=NULL — A3's partial HNSW never indexes NULL in the first place, so the
+ *  schema already allows this state. reembedNulls() picks them up on the next cycle. */
 export async function embed(texts: readonly string[]): Promise<(number[] | null)[]> {
   const out: (number[] | null)[] = new Array(texts.length).fill(null);
   if (texts.length === 0) return out;
@@ -56,7 +57,7 @@ export async function embed(texts: readonly string[]): Promise<(number[] | null)
       if (!res.ok) continue;
       embeddings = ((await res.json()) as { embeddings?: unknown }).embeddings;
     } catch {
-      continue; // 네트워크·타임아웃 — 이 배치는 통째로 null로 남는다
+      continue; // network or timeout — this whole batch stays null
     }
     if (!Array.isArray(embeddings)) continue;
     for (let j = 0; j < slice.length; j += 1) {

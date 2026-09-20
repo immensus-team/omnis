@@ -1,4 +1,4 @@
-// A4 §3.6. 맥과 폰에 똑같이 적용된다 — 폰 전용 규칙은 없다.
+// A4 §3.6. Applies to Mac and phone alike — there are no phone-only rules.
 import type { NotifyTier } from "@omnis/protocol";
 
 export const QUIET_START_HOUR_KST = 23;
@@ -22,13 +22,14 @@ export function notifyTierFor(i: {
   mentionsMe: boolean;
   meetingWithin2h: boolean;
   now: Date;
-  /** Settings `notify.vip_override`. 기본 true — 끄면 조용시간 예외가 사라진다. */
+  /** Settings `notify.vip_override`. Defaults to true — turning it off removes the quiet-hours
+   *  exception. */
   vipOverride?: boolean;
 }): NotifyTier {
   const immediate = i.priority === "now" && (i.vip || i.mentionsMe || i.meetingWithin2h);
   if (immediate) {
     if (!inQuietHours(i.now)) return "immediate";
-    // 조용시간 예외는 vip AND priority='now' 하나뿐이고, 그것조차 Settings에서 끌 수 있다.
+    // Quiet hours have exactly one exception: vip AND priority='now', and Settings can disable it.
     return i.vip && (i.vipOverride ?? true) ? "immediate" : "batched";
   }
   if (i.priority === "today") return "batched";

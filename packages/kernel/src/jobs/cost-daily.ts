@@ -1,4 +1,5 @@
-// A4 §12.4: 매일 00:05 KST 집계 + 상태 전이 감지. 뷰는 SQL이 갱신하므로 잡은 전이만 본다.
+// A4 §12.4: aggregate daily at 00:05 KST and detect state transitions. The view is refreshed by
+// SQL, so the job only looks at transitions.
 import { query } from "@omnis/db";
 import type { Pool } from "pg";
 import type { Audit } from "../audit.js";
@@ -16,14 +17,14 @@ export interface CostDailyDeps {
   now?: Date;
 }
 
-/** The thresholds of the A4 §12.4 state table as-is. `Policy.note` only says "what stopped", so a
- *  sentence saying "why it changed now" is put in front of it. */
+/** Exactly the thresholds from the A4 §12.4 state table. `Policy.note` only says "what stopped",
+ *  so prefix it with one sentence saying "why it changed now". */
 const HEADLINE: Record<CostState, string> = {
-  normal: "LLM spend is back in the normal range",
-  warn: "This month's LLM spend has passed 60% of the monthly cap",
-  degraded: "This month's LLM spend has passed 80% of the monthly cap",
-  reserve_only: "The general budget is spent; only the VIP/sensitive reserve is left",
-  frozen: "The monthly cap is fully spent",
+  normal: "LLM cost is back within the normal range",
+  warn: "This month's LLM cost has passed 60% of the monthly cap",
+  degraded: "This month's LLM cost has passed 80% of the monthly cap",
+  reserve_only: "The general budget is exhausted; only the VIP/sensitive reserve is left",
+  frozen: "The monthly cap is fully exhausted",
 };
 
 async function lastState(pool: Pool): Promise<CostState | null> {
@@ -54,11 +55,11 @@ export async function runCostDaily(deps: CostDailyDeps): Promise<CostState> {
     before: { from: previous },
     after: { to: state, mtdUsd, reserveUsd },
   });
-  const body = `${HEADLINE[state]} (month to date $${mtdUsd.toFixed(2)}, reserve $${reserveUsd.toFixed(2)}).${
+  const body = `${HEADLINE[state]} (month $${mtdUsd.toFixed(2)}, reserve $${reserveUsd.toFixed(2)}).${
     policy.note === null ? "" : ` ${policy.note}`
   }`;
-  // ponytail: @omnis/kernel cannot depend on @omnis/agents, so writeSystemItem is out of reach.
-  // The same INSERT in the same shape — a deliberate duplication (contract §12).
+  // ponytail: @omnis/kernel cannot depend on @omnis/agents, so it cannot use writeSystemItem.
+  // Same shape of INSERT — deliberate duplication (contract §12).
   await query(
     pool,
     `WITH acc AS (

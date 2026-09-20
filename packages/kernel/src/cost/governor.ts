@@ -1,4 +1,5 @@
-// A4 §12.4. 예산은 두 개다 — 일반 $54와 VIP·민감 전용 예비비 $6(마스터 §14, §19 Q11).
+// A4 §12.4. There are two budgets — $54 general and a $6 reserve for VIP·sensitive drafts
+// (master §14, §19 Q11).
 import { query } from "@omnis/db";
 import type { Pool } from "pg";
 
@@ -52,7 +53,7 @@ export const POLICY: Record<CostState, Policy> = {
     draftsNonVip: true,
     draftsVipSensitive: true,
     digestCron: "alternate",
-    note: "T2 escalation is stopped for non-sensitive work (generated with T1). VIP and sensitive drafts continue on the reserve.",
+    note: "Paused T2 escalation for non-sensitive work (generating with T1). VIP·sensitive drafts continue from the reserve.",
   },
   reserve_only: {
     allowT2NonSensitive: false,
@@ -60,7 +61,7 @@ export const POLICY: Record<CostState, Policy> = {
     draftsNonVip: false,
     draftsVipSensitive: true,
     digestCron: "alternate",
-    note: "The general budget is spent, so non-VIP draft generation is stopped. Classification, labels, todo extraction and auto-archive continue, and VIP and sensitive drafts continue on the reserve.",
+    note: "The general budget is exhausted, so non-VIP draft generation has stopped. Classification, labeling, todo extraction, and auto-archiving continue; VIP·sensitive drafts continue from the reserve.",
   },
   frozen: {
     allowT2NonSensitive: false,
@@ -68,11 +69,11 @@ export const POLICY: Record<CostState, Policy> = {
     draftsNonVip: false,
     draftsVipSensitive: false,
     digestCron: "off",
-    note: "The reserve is spent too, so all draft generation is stopped. Classification, labels, todo extraction and auto-archive continue.",
+    note: "The reserve is exhausted too, so all draft generation has stopped. Classification, labeling, todo extraction, and auto-archiving continue.",
   },
 };
 
-/** 이번 달 총 지출. agent_runs.cost_usd가 유일한 입력이다(A4 §12.4). */
+/** This month's total spend. agent_runs.cost_usd is the only input (A4 §12.4). */
 export async function mtdSpendUsd(pool: Pool, now: Date): Promise<number> {
   const rows = await query<{ sum: string | null }>(
     pool,
@@ -83,7 +84,7 @@ export async function mtdSpendUsd(pool: Pool, now: Date): Promise<number> {
   return Number(rows[0]?.sum ?? "0");
 }
 
-/** 예비비 소진분: model_tier='T2' AND (VIP person이거나 sensitivity<>'normal'인 item). */
+/** Reserve spend: model_tier='T2' AND (VIP person, or an item with sensitivity<>'normal'). */
 export async function reserveSpendUsd(pool: Pool, now: Date): Promise<number> {
   const rows = await query<{ sum: string | null }>(
     pool,

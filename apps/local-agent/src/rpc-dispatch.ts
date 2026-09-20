@@ -163,14 +163,14 @@ export function createDispatcher(
       }
 
       case "session.read_summary":
-        // 요약은 허브가 만든다(A2 §6). 브리지는 생성 경로를 갖지 않는다.
+        // The summary is produced by the hub (A2 §6). The bridge has no generation path.
         throw new BridgeError(
           BRIDGE_ERRORS.CAPABILITY_UNSUPPORTED,
           "session.read_summary is served by the hub, not the bridge",
         );
 
-      // US-B10: A2 §3.2. 모든 런타임의 allowed_roots 합집합 안에서만 읽는다 — 런타임별로
-      // 권한을 나눌 이유가 없다(읽기 전용이고, 파일에는 런타임 개념이 없다).
+      // US-B10: A2 §3.2. Reads happen only inside the union of every runtime's allowed_roots — there is
+      // no reason to split permissions per runtime (reads are read-only, and a file has no notion of a runtime).
       case "ingest.scan": {
         const p = IngestScanParams.parse(params);
         return handleIngestScan(p, {
@@ -189,7 +189,7 @@ export function createDispatcher(
       }
 
       case "delegate.run": {
-        // A2 §5.1: 허브가 서명한 approval_id 없이는 와이어에서 거절한다. Phase A에는 실행 분기가 없다.
+        // A2 §5.1: without a hub-signed approval_id it is rejected on the wire. Phase A has no execution branch.
         const approvalId = (params as { approval_id?: unknown }).approval_id;
         if (typeof approvalId !== "string" || approvalId.length === 0) {
           deps.logger.error("delegate.run without approval_id", { host: deps.host });

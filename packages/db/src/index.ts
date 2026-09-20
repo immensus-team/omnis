@@ -2,19 +2,19 @@ import { fileURLToPath } from "node:url";
 import pg from "pg";
 import type { Pool as PgPool, PoolClient } from "pg";
 
-// pg는 CJS이고 lib/index.js가 `module.exports = new PG(Client)`라 Node ESM의 정적 named export
-// 분석이 실패한다. `import { Pool } from "pg"`는 타입체크는 통과하지만 런타임에
-// "does not provide an export named 'Pool'"로 죽으므로(vitest는 Vite interop으로 가려준다),
-// default import로 받아 값과 타입을 각각 내보낸다.
+// pg is CJS and lib/index.js does `module.exports = new PG(Client)`, so Node ESM's static named
+// export analysis fails. `import { Pool } from "pg"` passes typecheck but dies at runtime with
+// "does not provide an export named 'Pool'" (vitest hides this via Vite interop), so we take a
+// default import and re-export the value and the type separately.
 export const Pool: typeof pg.Pool = pg.Pool;
 export type Pool = PgPool;
 export type { PoolClient };
 export { MigrationError, migrate } from "./migrate.js";
 
-/** packages/db/migrations 절대경로. src 실행(vitest)과 dist 실행(hub) 양쪽에서 같은 곳을 가리킨다. */
+/** Absolute path to packages/db/migrations, the same for src (vitest) and dist (hub) runs. */
 export const MIGRATIONS_DIR: string = fileURLToPath(new URL("../migrations", import.meta.url));
 
-/** A3 §6.2. 페이로드는 id만, 8,000B 한도. */
+/** A3 §6.2. Payload is the id only, 8,000B limit. */
 export const NOTIFY_CHANNELS: readonly string[] = [
   "omnis_item",
   "omnis_thread",
@@ -28,7 +28,7 @@ export const NOTIFY_CHANNELS: readonly string[] = [
 export function createPool(env: NodeJS.ProcessEnv = process.env): Pool {
   const connectionString = env.DATABASE_URL;
   if (connectionString === undefined || connectionString === "") {
-    throw new Error("DATABASE_URL is required (계약 §9)");
+    throw new Error("DATABASE_URL is required (contract §9)");
   }
   return new Pool({ connectionString, max: 10, application_name: "omnis-hub" });
 }

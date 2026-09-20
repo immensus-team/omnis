@@ -96,14 +96,14 @@ describe("bridge contract invariants (A2 §8.2)", () => {
   });
 
   it("5. the hub's sink answers an approval before the runtime hears the decision", async () => {
-    // 실제 승인 왕복(런타임 → sink.approval → 허브 approval.requested → HumanResponse)은
-    // 아직 프로덕션 경로가 없다: ClaudeCodeAdapter의 승인 표면은 hook(US-A07 게이트)이고,
-    // CodexAdapter의 app-server 승인 요청 핸들러는 S-A2-3 스파이크 대기라 어느 어댑터도
-    // sink.approval을 부르지 않는다. 그래서 여기서 고정하는 것은 "그 왕복이 탈 배선"이다 —
-    // 디스패처가 허브의 sink를 런타임에 그대로 넘기고(다른 sink를 새로 만들지 않고),
-    // 런타임이 결정을 보는 시점이 sink가 답한 뒤라는 것. 어댑터가 승인 표면을 갖는 날
-    // 아래 asking 스텁을 실 어댑터로 바꾸면 그대로 왕복 테스트가 된다.
-    // open question(계획 소유자): 승인 왕복의 어댑터 쪽 구현 오너는 US-A07인가 US-A19인가.
+    // The real approval round trip (runtime → sink.approval → hub approval.requested → HumanResponse)
+    // has no production path yet: ClaudeCodeAdapter's approval surface is a hook (the US-A07 gate),
+    // and CodexAdapter's app-server approval-request handler is waiting on the S-A2-3 spike, so neither
+    // adapter calls sink.approval. What is pinned here is therefore "the wiring that round trip will use" —
+    // that the dispatcher hands the hub's sink straight to the runtime (without building a new sink),
+    // and that the runtime sees the decision only after the sink has answered. On the day an adapter
+    // gains an approval surface, swapping the asking stub below for the real adapter makes this a round-trip test.
+    // open question (plan owner): is the adapter-side owner of the approval round trip US-A07 or US-A19?
     const { sink } = capture();
     const order: string[] = [];
     const hubSink: EventSink = {
@@ -170,7 +170,7 @@ describe("bridge contract invariants (A2 §8.2)", () => {
     );
 
     expect(order).toEqual(["asked:send", "answered", "runtime:accept"]);
-    expect(handed).toBe(hubSink); // 디스패처가 허브 sink를 그대로 넘겼다
+    expect(handed).toBe(hubSink); // the dispatcher handed the hub sink straight through
     expect(spawnFn).not.toHaveBeenCalled();
   });
 

@@ -1,5 +1,6 @@
 {
   "scenario": "korean_text_with_emoji",
+  "note": "Korean message text with emoji — the non-ASCII input under test, kept verbatim.",
   "raw": {
     "type": "message",
     "channel": "C07OMNISLA",

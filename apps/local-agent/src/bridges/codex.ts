@@ -12,7 +12,7 @@ import type { SessionRecord } from "../session-registry.js";
 import { AppServerClient } from "./app-server-client.js";
 import type { BridgeEmit } from "./stream-json.js";
 
-/** A2 §4.2: 이 목록에 없는 item/started는 kind='tool_call', label=item.type으로 일반화한다. */
+/** A2 §4.2: an item/started absent from this list is generalized to kind='tool_call', label=item.type. */
 export const KNOWN_CODEX_ITEM_TYPES = [
   "agentMessage",
   "commandExecution",
@@ -44,7 +44,7 @@ export function codexDecisionToResponse(d: CodexDecision): HumanResponse {
       return { decision: "accept" };
     case "acceptForSession":
       return { decision: "accept", decided_args: { session_rules: true } };
-    // S-A2-3 전까지 amendment payload 스키마를 모르므로 edit 경로를 UI에 노출하지 않는다.
+    // Until S-A2-3 the amendment payload schema is unknown, so the edit path is not exposed to the UI.
     default:
       return { decision: "ignore" };
   }
@@ -152,7 +152,7 @@ export function mapAppServerEvent(method: string, params: unknown, ctx: Ctx): Br
     ];
   }
 
-  return []; // 미지 이벤트는 cold 전용
+  return []; // unknown events are cold-tier only
 }
 
 export interface CodexAdapterConfig {
@@ -162,14 +162,14 @@ export interface CodexAdapterConfig {
   version: string;
 }
 
-/** 자식 1개가 여러 턴을 나르므로, 알림을 어느 턴에 귀속시킬지 들고 있어야 한다. */
+/** One child carries several turns, so it has to hold which turn a notification belongs to. */
 interface ActiveTurn {
   ctx: Ctx;
   sink: EventSink;
   thread_id: string | null;
 }
 
-/** 어댑터가 구독하는 app-server 알림. 여기 없는 것은 cold 전용이다. */
+/** The app-server notifications the adapter subscribes to. Anything absent here is cold-tier only. */
 const CODEX_EVENT_METHODS = [
   "thread.started",
   "turn.started",
@@ -182,7 +182,7 @@ const CODEX_EVENT_METHODS = [
   ...REASONING_DELTA_METHODS,
 ];
 
-/** A2-D6: 상주 app-server 자식 1개가 여러 thread/턴을 처리한다. */
+/** A2-D6: one resident app-server child handles several threads/turns. */
 export class CodexAdapter implements RuntimeAdapter {
   readonly kind: RuntimeKind = "codex";
   #client: AppServerClient | null = null;
@@ -204,8 +204,8 @@ export class CodexAdapter implements RuntimeAdapter {
       throw new Error("codex app-server has no stdio");
     this.#child = child;
     const client = new AppServerClient({ stdin: child.stdin, stdout: child.stdout });
-    // 핸들러는 자식당 한 번만 건다. 턴마다 걸면 AppServerClient에 off()가 없어
-    // 두 번째 턴부터 지난 턴의 클로저가 같이 울리고(= 이벤트 중복) 목록이 무한히 자란다.
+    // The handler is attached once per child. Attaching it per turn would, since AppServerClient has no off(),
+    // make the previous turn's closure fire too from the second turn on (duplicate events) and grow the list without bound.
     for (const m of CODEX_EVENT_METHODS) {
       client.on(m, (params) => {
         this.#route(m, params);
@@ -220,8 +220,8 @@ export class CodexAdapter implements RuntimeAdapter {
     if (threadId !== null) {
       for (const t of this.#turns) if (t.thread_id === threadId) return t;
     }
-    // ponytail: threadId 없는 알림은 활성 턴이 하나일 때만 귀속시킨다.
-    // 동시 턴이 둘 이상이면서 threadId도 없으면 귀속이 모호하므로 버린다(오배송보다 낫다).
+    // ponytail: a notification without a threadId is attributed only when exactly one turn is active.
+    // With two or more concurrent turns and no threadId, attribution is ambiguous, so it is dropped (better than misdelivery).
     return this.#turns.size === 1 ? this.#turns.values().next().value : undefined;
   }
 

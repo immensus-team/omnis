@@ -1,6 +1,6 @@
-// A4 §1.6·§12.4·§9: 실패와 정책 전이는 조용히 삼키지 않고 인박스에 남긴다.
-// ponytail: 커널(@omnis/kernel)도 같은 INSERT를 필요로 하지만 agents를 의존할 수 없어 4줄짜리
-// SQL을 각자 갖는다(apps/hub/src/archive.ts가 이미 같은 형태다). 의도된 중복 — 공용 패키지로 뽑지 않는다.
+// A4 §1.6·§12.4·§9: failures and policy transitions are not swallowed silently — they are left in the inbox.
+// ponytail: the kernel (@omnis/kernel) needs the same INSERT but cannot depend on agents, so each keeps
+// its own 4-line SQL (apps/hub/src/archive.ts already looks the same). Intentional duplication — do not extract it into a shared package.
 import { getAgentsPool } from "./pool.js";
 
 export const SYSTEM_ACCOUNT_EXTERNAL_ID = "omnis";
@@ -8,13 +8,13 @@ export const SYSTEM_THREAD_EXTERNAL_ID = "system:agents";
 
 export interface SystemItemInput {
   body: string;
-  /** 없으면 system 채널의 단일 'system:agents' 스레드에 붙인다. */
+  /** When omitted, the item is attached to the single 'system:agents' thread in the system channel. */
   thread_id?: string;
   subject?: string;
   meta?: Record<string, unknown>;
 }
 
-/** system 채널 계정과 단일 스레드를 멱등하게 확보한다. */
+/** Idempotently ensures the system channel account and its single thread exist. */
 async function systemThreadId(): Promise<string> {
   const pool = getAgentsPool();
   const acc = await pool.query<{ id: string }>(

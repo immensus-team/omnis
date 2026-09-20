@@ -9,12 +9,12 @@ import type { EventSink } from "../src/rpc-dispatch.js";
 import type { SessionRecord } from "../src/session-registry.js";
 
 describe("parseHermesCapabilities()", () => {
-  it("maps the Hermes self-description to RuntimeCapabilities (Phase B: 승인 표면 none)", () => {
+  it("maps the Hermes self-description to RuntimeCapabilities (Phase B: approval surface none)", () => {
     const caps = parseHermesCapabilities({
       session_key_header: "X-Hermes-Session-Key",
       models: ["gpt-hermes-1"],
     });
-    expect(caps.approvals).toBe("none"); // A2-D9: Phase B는 읽기 전용, 승인 요청이 발생할 여지가 없다
+    expect(caps.approvals).toBe("none"); // A2-D9: Phase B is read-only, so no approval request can arise
     expect(caps.models).toEqual(["gpt-hermes-1"]);
     expect(caps.stream_deltas).toBe(true);
   });
@@ -213,7 +213,7 @@ describe("HermesAdapter SSE pump", () => {
     });
     const { sink, calls } = fakeSink();
     await adapter.startTurn(baseSession("human"), { text: "hi" }, sink);
-    await new Promise((r) => setTimeout(r, 20)); // #pump는 fire-and-forget(void) — 배출 완료를 잠깐 기다린다
+    await new Promise((r) => setTimeout(r, 20)); // #pump is fire-and-forget (void) — wait briefly for it to drain
     expect(calls.delta?.map((d) => (d as { text: string }).text)).toEqual(["hel", "lo"]);
     expect(calls.itemCompleted).toHaveLength(1);
     expect((calls.itemCompleted?.[0] as { body: string }).body).toBe("hello");
@@ -221,7 +221,7 @@ describe("HermesAdapter SSE pump", () => {
     expect((calls.turnCompleted?.[0] as { status: string }).status).toBe("ok");
   });
 
-  // gate-hermes-sse: /v1/responses는 OpenAI Responses 호환일 수 있다 — 두 필드명 모양이 같은 결과를 내야 한다
+  // gate-hermes-sse: /v1/responses may be OpenAI Responses-compatible — both field-name shapes must produce the same result
   it("accepts the OpenAI Responses shape (response.output_text.delta / response.completed) identically", async () => {
     const fetchFn = vi.fn(
       async () =>
@@ -246,7 +246,7 @@ describe("HermesAdapter SSE pump", () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(calls.delta?.map((d) => (d as { text: string }).text)).toEqual(["hel", "lo"]);
     expect((calls.itemCompleted?.[0] as { body: string }).body).toBe("hello");
-    expect(calls.turnCompleted).toHaveLength(1); // 종료 이벤트가 둘이어도 턴 종료는 한 번
+    expect(calls.turnCompleted).toHaveLength(1); // one turn completion even with two terminal events
   });
 
   it("drops unknown event types and malformed JSON without throwing", async () => {

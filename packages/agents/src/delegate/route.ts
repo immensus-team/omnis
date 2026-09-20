@@ -1,4 +1,4 @@
-// A4 §5.2: 결정 규칙이 먼저, LLM은 나중. 여기에 모델 호출은 없다(~1ms).
+// A4 §5.2: deterministic rules first, LLM later. There are no model calls here (~1ms).
 import type { HostId, RuntimeKind } from "@omnis/protocol";
 import { getAgentsPool } from "../pool.js";
 
@@ -14,7 +14,7 @@ export interface DelegationHints {
   repo: string | null;
 }
 
-/** Phase B에서 hermes는 위임 대상이 아니다(B-D7, 마스터 §19 Q7). */
+/** In Phase B, hermes is not a delegation target (B-D7, master §19 Q7). */
 export type DelegationRuntime = Exclude<RuntimeKind, "hermes">;
 
 export interface Routing {
@@ -29,6 +29,8 @@ export interface HostHealth {
 }
 
 const ABS_PATH = /(\/Users\/[\w./-]+|\/Volumes\/[\w./-]+|\/opt\/[\w./-]+)/g;
+// FROZEN matchers — the Korean alternatives match Korean-language input (a GUI-channel messenger
+// name, an always-on cadence, and Korean duration units: minute / hour). Keep them verbatim.
 const GUI_CHANNEL = /카카오톡|kakao|linkedin|링크드인/i;
 const ALWAYS_ON = /매일|매주|주기적|정기적으로|cron|스케줄/i;
 const MINUTES = /(\d{1,3})\s*분/;
@@ -58,10 +60,10 @@ export function routeByRule(h: DelegationHints, hosts: HostHealth): Routing | nu
   if (hosts.macbook.lastHeartbeatMs > MACBOOK_OFFLINE_MS) {
     return { host: "mini", rule_id: "dr_macbook_offline" };
   }
-  return null; // 규칙이 못 가름 → L4(LLM, T2)
+  return null; // no rule could decide → L4 (LLM, T2)
 }
 
-/** A4 §5.2 런타임 표. hermes는 Phase C로 미룬다(B-D7). */
+/** A4 §5.2 runtime table. hermes is deferred to Phase C (B-D7). */
 export function pickRuntime(i: {
   filesTouched: number;
   specClear: boolean;
