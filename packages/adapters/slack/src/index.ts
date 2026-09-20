@@ -56,7 +56,7 @@ export interface SlackAdapterDeps {
 export function createSlackAdapter(deps: SlackAdapterDeps = {}): Adapter {
   const now = deps.now ?? (() => new Date());
   let socket: SocketModeClient | undefined;
-  let web: WebClient | undefined;
+  let web: WebClient | undefined = deps.webClient;
   const queue = new AsyncQueue<NormalizedItem | AdapterEvent>();
   let lastEventAt: string | null = null;
   let status: Health["status"] = "down";
@@ -117,8 +117,52 @@ export function createSlackAdapter(deps: SlackAdapterDeps = {}): Adapter {
       status = "down";
     },
 
-    async *backfill(): AsyncIterable<NormalizedItem> {
-      throw new AdapterError("fatal_unsupported", CHANNEL, "backfill not implemented until Task 5");
+    async *backfill(since?: Date): AsyncIterable<NormalizedItem> {
+      if (!web)
+        throw new AdapterError("fatal_protocol", CHANNEL, "backfill() called before connect()");
+      const oldest = since ? String(Math.floor(since.getTime() / 1000)) : undefined;
+      let cursor: string | undefined;
+      let done = 0;
+      do {
+        let page: {
+          ok: boolean;
+          has_more?: boolean;
+          response_metadata?: { next_cursor?: string };
+          messages?: unknown[];
+        };
+        try {
+          page = await web.conversations.history({
+            channel: "",
+            cursor,
+            oldest,
+            limit: 200,
+          } as never);
+        } catch (cause) {
+          const err = cause as { data?: { error?: string; retry_after?: number } };
+          if (err.data?.error === "ratelimited") {
+            throw new AdapterError(
+              "retryable_rate_limit",
+              CHANNEL,
+              "Slack conversations.history rate limited",
+              (err.data.retry_after ?? 60) * 1000,
+              cause,
+            );
+          }
+          throw new AdapterError(
+            "retryable_network",
+            CHANNEL,
+            "conversations.history failed",
+            undefined,
+            cause,
+          );
+        }
+        for (const raw of page.messages ?? []) {
+          for (const item of normalize(raw)) yield item;
+          done += 1;
+        }
+        cursor = page.response_metadata?.next_cursor || undefined;
+        queue.push({ kind: "backfill_progress", done, total: null, at: now().toISOString() });
+      } while (cursor);
     },
 
     subscribe(): AsyncIterable<NormalizedItem | AdapterEvent> {
@@ -139,4 +183,22 @@ export function createSlackAdapter(deps: SlackAdapterDeps = {}): Adapter {
       };
     },
   };
+}
+
+export function normalize(raw: unknown): NormalizedItem[] {
+  const m = raw as { type?: string; ts?: string; user?: string; text?: string };
+  if (m.type !== "message" || !m.ts) return [];
+  return [
+    {
+      threadExternalId: "",
+      externalId: m.ts,
+      kind: "message",
+      author: { kind: "person", id: m.user ?? "" },
+      body: m.text ?? "",
+      attachments: [],
+      sentAt: new Date(Number(m.ts) * 1000).toISOString(),
+      status: "received",
+      sourceHash: m.ts,
+    },
+  ];
 }
