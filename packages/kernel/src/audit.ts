@@ -36,3 +36,15 @@ export function createAudit(pool: Pool): Audit {
     },
   };
 }
+
+/** A3 §9 규칙 5 / 마스터 §2: 승인 없는 외부 전송은 0건이어야 한다.
+ *  밤 다이제스트 잡(Phase B)이 이 값을 세고, 0이 아니면 그날 다이제스트에 뜬다. */
+export async function countUnapprovedSends(pool: Pool, since: Date): Promise<number> {
+  const rows = await query<{ n: string }>(
+    pool,
+    `SELECT count(*)::text AS n FROM audit_log
+      WHERE action = 'item.sent' AND approval_id IS NULL AND at >= $1`,
+    [since],
+  );
+  return Number(rows[0]?.n ?? "0");
+}

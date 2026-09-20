@@ -1,6 +1,6 @@
 export { ApprovalStateError, createApprovals } from "./approvals.js";
 export type { ApprovalConfig, Approvals, ApprovalsDeps, PendingApproval } from "./approvals.js";
-export { createAudit } from "./audit.js";
+export { countUnapprovedSends, createAudit } from "./audit.js";
 export type { Audit, AuditEntry } from "./audit.js";
 export { nextRunAt } from "./cron.js";
 export { DURABLE_CHANNEL, NOTIFY_MAX_BYTES, createEvents } from "./events.js";
