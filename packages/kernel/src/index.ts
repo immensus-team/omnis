@@ -27,6 +27,15 @@ export { SETTING_DEFAULTS, getAllSettings, getSetting, setSetting } from "./sett
 export type { SettingKey } from "./settings.js";
 
 export {
+  POLICY,
+  costState,
+  currentPolicy,
+  mtdSpendUsd,
+  reserveSpendUsd,
+} from "./cost/governor.js";
+export type { CostInput, CostState, Policy } from "./cost/governor.js";
+
+export {
   ZERO_ITEM_COLUMNS,
   ZERO_LABEL_RULE_COLUMNS,
   ZERO_TABLES,
