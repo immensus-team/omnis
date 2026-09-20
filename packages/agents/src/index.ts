@@ -73,3 +73,32 @@ export {
   type Register,
 } from "./draft/register.js";
 export { SELF_CHECK_ITEMS, selfCheck, type SelfCheckCtx } from "./draft/selfcheck.js";
+export {
+  DELEGATION_DAILY_CAP,
+  DELEGATION_THREAD_CAP_24H,
+  MACBOOK_OFFLINE_MS,
+  extractHints,
+  hostHealth,
+  pickRuntime,
+  routeByRule,
+  type DelegationHints,
+  type DelegationRuntime,
+  type HostHealth,
+  type Routing,
+} from "./delegate/route.js";
+export {
+  TASK_CONFIDENCE_MIN,
+  TASK_MAX_PER_ITEM,
+  TaskOutput,
+  taskLoop,
+  type TaskOutputT,
+} from "./loops/task.js";
+export { renderBrief, type BriefInput } from "./delegate/brief.js";
+export {
+  AUTONOMY_MAX_MINUTES,
+  DelegateOutput,
+  autonomyAllows,
+  delegateLoop,
+  type AutonomyRule,
+  type DelegateOutputT,
+} from "./loops/delegate.js";

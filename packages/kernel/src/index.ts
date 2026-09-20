@@ -34,6 +34,14 @@ export {
 } from "./jobs/cost-daily.js";
 export type { CostDailyDeps } from "./jobs/cost-daily.js";
 export {
+  TASK_REMIND_CRON,
+  TASK_REMIND_JOB_NAME,
+  registerTaskRemindJob,
+  remindGroups,
+  runTaskRemind,
+} from "./jobs/task-remind.js";
+export type { RemindGroup, RemindKind, TaskRemindDeps } from "./jobs/task-remind.js";
+export {
   TOKEN_REFRESH_CRON,
   TOKEN_REFRESH_JOB_NAME,
   TOKEN_REFRESH_WINDOW_MINUTES,
