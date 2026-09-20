@@ -25,3 +25,16 @@ export {
   type DataBlock,
   type AssembledContext,
 } from "./context/assemble.js";
+export {
+  LoopBudgetError,
+  PhantomToolError,
+  type LoopBudget,
+  type LoopId,
+  type LoopKind,
+  type LoopResult,
+  type LoopSpec,
+  type LoopTrigger,
+  type TriggerContext,
+} from "./loop/spec.js";
+export { getLoop, listLoops, registerLoop, resetLoopRegistryForTest } from "./loop/registry.js";
+export { PHANTOM_TOOLS, TOOL_NAMES, type ToolName } from "./tools/names.js";
