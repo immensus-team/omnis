@@ -5,10 +5,11 @@ import WebSocket from "ws";
 import { loadConfig } from "./config.js";
 import { hostProfile } from "./host-config.js";
 import { HubClient, type SocketLike } from "./hub-client.js";
+import { createHubSink } from "./hub-sink.js";
 import { readKeychainSecret } from "./keychain.js";
 import { createLogger } from "./logger.js";
 import { Outbox } from "./outbox.js";
-import { createDispatcher } from "./rpc-dispatch.js";
+import { type EventSink, createDispatcher } from "./rpc-dispatch.js";
 import { SessionRegistry } from "./session-registry.js";
 import { TurnCap } from "./turn-cap.js";
 
@@ -39,7 +40,7 @@ export async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<void
   const outbox = new Outbox({ path: join(homedir(), ".omnis", "outbox.ndjson") });
   const token = await readKeychainSecret(config.token_keychain_item);
 
-  const client = new HubClient({
+  const client: HubClient = new HubClient({
     url: config.hub_url,
     token,
     host: config.host,
@@ -53,6 +54,9 @@ export async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<void
       logger,
       host: config.host,
       turnCap: new TurnCap({ max: hostProfile(config.host).maxActiveTurns }),
+      // 런타임 이벤트 → 허브 알림 → items(A2 §4.1). client는 이 클로저가 불릴 때 이미 있다.
+      sinkFor: (session, turnId): EventSink =>
+        createHubSink({ client, session, turnId, logger, outbox, registry }),
     }),
     onOpen: async () => {
       await outbox.drain(async (e) => {

@@ -15,17 +15,29 @@ import {
   JSONRPC_ERRORS,
   PROTOCOL_VERSION,
   RuntimeKind,
+  SessionCreateParams,
   assertProtocolVersion,
   toJsonRpcError,
   withMeta,
 } from "@omnis/protocol";
 import type { Pool } from "pg";
 import { type WebSocket, WebSocketServer } from "ws";
+import {
+  HERDR_STATE,
+  type SessionRow,
+  type SessionStateValue,
+  ensureSession,
+  hasPendingApproval,
+  paletteTool,
+  runtimeOf,
+  setSessionState,
+  writeAgentItem,
+} from "./sessions.js";
 
 const BRIDGE_PATH = "/bridge";
 
 /** 계약 §3.5 SessionState → A3 §4 agent_sessions.state. 두 enum의 이름이 다르다. */
-const SESSION_STATE: Readonly<Record<string, string>> = {
+const SESSION_STATE: Readonly<Record<string, SessionStateValue>> = {
   idle: "idle",
   running: "running",
   awaiting_approval: "waiting_approval",
@@ -62,6 +74,10 @@ interface Conn {
   ws: WebSocket;
   host: HostId;
   alive: boolean;
+  /** 알림은 도착 순서대로 처리한다 — session.registered가 turn.item.*보다 늦게 커밋되면
+   *  같은 세션을 두 번 만들거나 item이 없는 스레드에 붙는다. 요청(approval.requested)은
+   *  사람의 결정까지 막혀 있으므로 이 큐에 넣지 않는다. */
+  queue: Promise<void>;
 }
 
 interface Waiting {
@@ -136,27 +152,140 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     );
   }
 
+  /** 세션 1개당 thread/account/runtime id는 안 바뀐다 — 매 item마다 4번 조회하지 않는다.
+   *  state를 같이 들고 있는 것은 item 하나마다 같은 값으로 UPDATE를 쏴서 sessions_notify가
+   *  Zero에 의미 없는 변경을 흘리지 않게 하기 위해서다. */
+  interface CachedSession extends SessionRow {
+    state: SessionStateValue | null;
+    /** turn.started ~ turn.completed 사이. 승인 결정 뒤에 working으로 돌아갈지 가르는 값이다. */
+    turnOpen: boolean;
+    /** 마지막 turn.completed가 정한 종착 상태(done/failed). 턴이 없었으면 idle. */
+    settled: SessionStateValue;
+  }
+  const sessions = new Map<string, CachedSession>();
+
+  async function applyState(
+    session: CachedSession,
+    sessionKey: string,
+    value: SessionStateValue,
+  ): Promise<void> {
+    if (session.state === value) return;
+    await setSessionState(pool, session.runtimeId, sessionKey, value);
+    session.state = value;
+  }
+
+  /** 승인 왕복과 턴이 겹칠 때 상태를 정하는 유일한 자리(A2 §1.3): blocked > working > 마지막 턴의 결과.
+   *  turn.completed도, 승인 결정도 여기를 거친다 — 한쪽만 고치면 "승인 요청 → 턴 종료 → 결정"
+   *  순서에서 세션이 영원히 running으로 남는다. */
+  async function settleState(session: CachedSession, sessionKey: string): Promise<void> {
+    if (await hasPendingApproval(pool, session.threadId)) {
+      await applyState(session, sessionKey, HERDR_STATE.blocked);
+      return;
+    }
+    await applyState(session, sessionKey, session.turnOpen ? HERDR_STATE.working : session.settled);
+  }
+
+  async function sessionFor(
+    host: HostId,
+    sessionKey: string,
+    hint: { runtime?: string; cwd?: string | null; sessionId?: string | null } = {},
+  ): Promise<CachedSession> {
+    const cacheKey = `${host}|${sessionKey}`;
+    const cached = sessions.get(cacheKey);
+    if (cached !== undefined && hint.sessionId === undefined && hint.cwd === undefined) {
+      return cached;
+    }
+    const runtime = RuntimeKind.parse(hint.runtime ?? runtimeOf(sessionKey));
+    const row = await ensureSession(pool, {
+      runtime,
+      host,
+      sessionKey,
+      ...(hint.cwd === undefined ? {} : { cwd: hint.cwd }),
+      ...(hint.sessionId === undefined ? {} : { sessionId: hint.sessionId }),
+    });
+    const cachedRow: CachedSession = {
+      ...row,
+      state: cached?.state ?? null,
+      turnOpen: cached?.turnOpen ?? false,
+      settled: cached?.settled ?? HERDR_STATE.idle,
+    };
+    sessions.set(cacheKey, cachedRow);
+    return cachedRow;
+  }
+
   async function onSessionRegistered(host: HostId, params: Record<string, unknown>): Promise<void> {
-    const runtime = RuntimeKind.parse(params.runtime);
     const sessionKey = String(params.session_key);
     const sessionId = typeof params.session_id === "string" ? params.session_id : null;
     const mapped = typeof params.state === "string" ? SESSION_STATE[params.state] : undefined;
-    const rows = await query<{ id: string }>(
-      pool,
-      `UPDATE agent_sessions s
-          SET session_id = $1,
-              state = COALESCE($2, s.state),
-              last_turn_at = now()
-         FROM agent_runtimes r
-        WHERE s.runtime_id = r.id AND r.runtime = $3 AND r.host = $4 AND s.session_key = $5
-      RETURNING s.id`,
-      [sessionId, mapped ?? null, runtime, host, sessionKey],
-    );
-    if (rows.length === 0) {
-      // 허브가 session.create로 먼저 row를 만든다(Phase B). 지금은 모르는 세션을 조용히 흘린다.
-      logger.warn("session.registered for an unknown session_key", { runtime, host, sessionKey });
+    // 브리지가 자기 쪽에서 연 세션도 인박스에 나타나야 한다 — 없으면 여기서 만든다(0007의
+    // sessions_notify 트리거가 NOTIFY를 쏘므로 여기서 emit하면 두 번 나간다).
+    const session = await sessionFor(host, sessionKey, {
+      ...(typeof params.runtime === "string" ? { runtime: params.runtime } : {}),
+      sessionId,
+    });
+    if (mapped !== undefined) {
+      await applyState(session, sessionKey, mapped);
     }
-    // NOTIFY는 0007의 sessions_notify 트리거가 쏜다 — 여기서 emit하면 두 번 나간다.
+  }
+
+  // ---- turn.* → items (A2 §4.1, A2-D4) ----
+
+  async function onTurnNotification(
+    host: HostId,
+    method: string,
+    params: Record<string, unknown>,
+  ): Promise<void> {
+    await kernel.events.emit("ephemeral", method, { ...params, host });
+    if (method === "turn.item.delta") return; // A2-D4: 델타는 절대 저장하지 않는다
+    const sessionKey = typeof params.session_key === "string" ? params.session_key : "";
+    if (sessionKey === "") return;
+    const session = await sessionFor(host, sessionKey);
+    const turnId = String(params.turn_id ?? "");
+
+    if (method === "turn.started") {
+      session.turnOpen = true;
+      await applyState(session, sessionKey, HERDR_STATE.working);
+      return;
+    }
+    if (method === "turn.completed") {
+      const ok = params.status === "ok";
+      // master §11: 실행은 kind='system' 한 줄로만 보인다.
+      await writeAgentItem(pool, {
+        session,
+        externalId: `${sessionKey}|${turnId}|turn`,
+        kind: "system",
+        body: ok ? "✓ 턴 완료" : "⚠ 턴 실패",
+        tool: null,
+      });
+      session.turnOpen = false;
+      session.settled = ok ? HERDR_STATE.done : "failed";
+      await settleState(session, sessionKey);
+      return;
+    }
+
+    const started = method === "turn.item.started";
+    const kind = params.kind === "tool_call" ? "tool_call" : "agent_turn";
+    const meta = (params.meta ?? {}) as Record<string, unknown>;
+    const rawTool = String(meta.label ?? meta.tool ?? params.label ?? "");
+    await writeAgentItem(pool, {
+      session,
+      externalId: `${sessionKey}|${turnId}|${String(params.item_id ?? "")}`,
+      kind,
+      body: started ? "" : String(params.body ?? ""),
+      tool:
+        kind === "tool_call"
+          ? {
+              name: paletteTool(rawTool),
+              label: rawTool,
+              state: started ? "loading" : params.status === "failed" ? "error" : "done",
+              args: meta.input ?? {},
+            }
+          : null,
+    });
+    if (started) {
+      session.turnOpen = true;
+      await applyState(session, sessionKey, HERDR_STATE.working);
+    }
   }
 
   // ---- approval.requested ----
@@ -201,11 +330,42 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     });
   }
 
-  async function onApprovalRequested(params: Record<string, unknown>): Promise<HumanResponse> {
+  async function onApprovalRequested(
+    host: HostId,
+    params: Record<string, unknown>,
+  ): Promise<HumanResponse> {
     const interrupt = HumanInterrupt.parse(params.interrupt);
-    const id = await kernel.approvals.propose(interrupt);
+    const sessionKey = typeof params.session_key === "string" ? params.session_key : "";
+    // 승인을 세션 스레드에 건다: ApprovalCard가 그 스레드에서 보이고, turn.completed가
+    // blocked인지 done인지 판정하는 근거도 이 thread_id 하나다(A2 §1.3).
+    // 세션을 못 찾아도 승인 자체는 반드시 올라간다 — 사람에게 물어야 할 것을 런타임 등록
+    // 순서 때문에 삼키면 안 된다. 링크와 blocked 표시만 포기한다.
+    const session =
+      sessionKey === ""
+        ? null
+        : await sessionFor(host, sessionKey).catch((e) => {
+            logger.warn("approval has no resolvable session", {
+              sessionKey,
+              err: e instanceof Error ? e.message : String(e),
+            });
+            return null;
+          });
+    const linked =
+      session === null || interrupt.thread_id !== undefined
+        ? interrupt
+        : { ...interrupt, thread_id: session.threadId };
+    const id = await kernel.approvals.propose(linked);
     logger.info("approval requested by bridge", { id, action: interrupt.action });
-    return await waitForDecision(id);
+    if (session !== null) {
+      await applyState(session, sessionKey, HERDR_STATE.blocked);
+    }
+    try {
+      return await waitForDecision(id);
+    } finally {
+      // 결정이 났으니 다시 계산한다. 무조건 working으로 되돌리면 승인이 턴보다 늦게 끝난
+      // 경우(A2 §1.3 "승인 요청 → 턴 종료 → 결정")에 done으로 내려갈 기회가 영영 없다.
+      if (session !== null) await settleState(session, sessionKey);
+    }
   }
 
   // ---- 디스패치 ----
@@ -228,12 +388,11 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
       return null;
     }
     if (TURN_NOTIFICATIONS.has(method)) {
-      // ephemeral 팬아웃만(A3-D14). items row 쓰기는 US-A18/A19가 브리지 클라이언트 쪽에서 한다.
-      await kernel.events.emit("ephemeral", method, { ...params, host: conn.host });
+      await onTurnNotification(conn.host, method, params);
       return null;
     }
     if (method === "approval.requested") {
-      return await onApprovalRequested(params);
+      return await onApprovalRequested(conn.host, params);
     }
     throw new BridgeError(JSONRPC_ERRORS.METHOD_NOT_FOUND, `unknown bridge method: ${method}`);
   }
@@ -277,7 +436,7 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     const isRequest = id !== undefined && id !== null;
     const params = (msg.params ?? {}) as Record<string, unknown>;
 
-    void (async () => {
+    const run = async (): Promise<void> => {
       try {
         assertProtocolVersion(params);
         const result = await dispatch(conn, method, params);
@@ -290,7 +449,9 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
         });
         if (isRequest) send(conn.ws, { jsonrpc: "2.0", id, error: toJsonRpcError(e) });
       }
-    })();
+    };
+    if (isRequest) void run();
+    else conn.queue = conn.queue.then(run);
   }
 
   // ---- 업그레이드 ----
@@ -326,7 +487,7 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     wss.handleUpgrade(req, socket, head, (ws) => {
       const previous = conns.get(host);
       if (previous !== undefined) previous.ws.close(1012, "replaced by a newer bridge");
-      const conn: Conn = { ws, host, alive: true };
+      const conn: Conn = { ws, host, alive: true, queue: Promise.resolve() };
       conns.set(host, conn);
       ws.on("pong", () => {
         conn.alive = true;
@@ -360,6 +521,39 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     if (method === "ingest.scan" || method === "ingest.read") {
       throw new BridgeError(BRIDGE_ERRORS.CAPABILITY_UNSUPPORTED, `${method} is Phase B (계약 §8)`);
     }
+    // 연결부터 본다 — 붙어 있지도 않은 호스트 때문에 세션 row를 만들거나 파라미터로 먼저 던지지 않는다.
+    if (!conns.has(host)) {
+      throw new BridgeError(
+        BRIDGE_ERRORS.RUNTIME_UNAVAILABLE,
+        `no bridge connected for host ${host}`,
+      );
+    }
+    if (method === "session.create") {
+      const p = SessionCreateParams.parse(params);
+      // 브리지가 먼저 cwd를 재검증한다(A2-D12) — 거절당한 세션의 row를 남기지 않는다.
+      await rpc<unknown>(host, method, params);
+      const session = await sessionFor(host, p.session_key, { runtime: p.runtime, cwd: p.cwd });
+      await applyState(session, p.session_key, HERDR_STATE.idle);
+      // 브리지가 돌려준 thread_id는 버린다: 스레드는 허브의 것이다(A3 §4).
+      return { session_id: null, thread_id: session.threadId } as T;
+    }
+    if (method === "session.resume") {
+      const sessionKey = String((params as { session_key?: unknown }).session_key ?? "");
+      const result = await rpc<{ session_id: string; restored: boolean }>(host, method, params);
+      const session = await sessionFor(host, sessionKey, {
+        sessionId: result.session_id === "" ? null : result.session_id,
+      });
+      await applyState(session, sessionKey, HERDR_STATE.idle);
+      return result as T;
+    }
+    return await rpc<T>(host, method, params);
+  }
+
+  async function rpc<T>(
+    host: HostId,
+    method: HubMethod,
+    params: Record<string, unknown>,
+  ): Promise<T> {
     const conn = conns.get(host);
     if (conn === undefined) {
       throw new BridgeError(

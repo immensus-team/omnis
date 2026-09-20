@@ -105,6 +105,29 @@ export interface RuntimeCapabilities {
 
 `features`는 런타임이 준 배열을 손대지 않고 그대로 싣는다(Claude Code의 `interrupt_receipt_v1` 등). 어댑터는 자기가 이해하는 것만 위쪽 boolean으로 승격하고 나머지는 통과시킨다 — 새 기능이 나와도 브리지 배포 없이 허브가 로그로 발견할 수 있다.
 
+### 1.3 세션 상태 기계 (herdr 모델 → `agent_sessions.state`)
+
+세션 상태는 herdr의 pane 모델(`idle / working / blocked / done`, `research/30-herdr-and-oss-ui-borrow.md` §1 — "에이전트가 멈춰서 답을 기다리면 herdr가 그렇게 말한다")을 그대로 쓴다. 저장 값은 A3 §4 `agent_sessions_state_ck`의 6종이고, 매핑은 이것뿐이다:
+
+| herdr | `agent_sessions.state` | 전이 시점 |
+|---|---|---|
+| — | `starting` | row가 처음 만들어진 직후(허브의 `session.create`, 또는 브리지의 `session.registered`가 모르는 키를 들고 왔을 때) |
+| idle | `idle` | `session.create`/`session.resume` 응답 뒤 |
+| working | `running` | `turn.started`, 그리고 `turn.item.started` 하나라도 도착하면 |
+| blocked | `waiting_approval` | `approval.requested` 접수 ~ 사람의 결정까지 |
+| (재계산) | — | 결정 직후. 상태를 고정하지 않고 다시 고른다: 남은 `pending` 승인이 있으면 `waiting_approval`, 턴이 아직 열려 있으면 `running`, 아니면 마지막 `turn.completed`의 종착점(`idle`/`failed`) |
+| done | `idle` | `turn.completed`(status=ok)이고 그 세션 스레드에 `pending` 승인이 없을 때 |
+| — | `failed` | `turn.completed`(status≠ok) |
+| — | `ended` | `session.close` |
+
+**`done`이 `idle`로 접히는 것은 의도다.** CHECK의 `ended`는 세션 종료 자리라 재사용하면 "턴이 끝난 열린 세션"과 "닫힌 세션"이 구분되지 않는다. UI가 "이 턴은 끝났다"를 아는 근거는 세션 상태가 아니라 스레드의 마지막 item(`kind='system'`의 턴 완료 한 줄)이다.
+
+**blocked는 done보다 세다.** `turn.completed`가 와도 그 세션 스레드에 `pending` 승인이 남아 있으면 `waiting_approval`에 머문다 — 승인 왕복 중에 런타임이 턴을 닫는 순서(승인 요청 → 턴 종료 → 결정)에서 세션이 잠깐 "할 일 없음"으로 보이면 안 된다. 판정 근거는 `pending_approvals.thread_id` 하나이고, 그래서 브리지가 올린 승인은 접수 시점에 세션 스레드에 걸린다.
+
+**결정이 나면 `running`으로 되돌리지 않는다.** 승인을 기다리던 호출이 풀리는 시점에 상태를 `running`으로 고정하면 위 순서(승인 요청 → 턴 종료 → 결정)에서 턴은 이미 끝났는데 세션 배지만 영원히 "작업 중"으로 남는다. 결정 직후에는 위 표의 (재계산) 행대로 blocked → working → 마지막 턴의 종착점 순으로 다시 고른다.
+
+이 값들은 Zero publication(0008)에 이미 들어 있는 `agent_sessions.state`로 그대로 복제된다 — 데스크톱은 별도 조회 없이 세션 배지를 그린다.
+
 ---
 
 ## 2. 브리지 데몬 `local-agent`
