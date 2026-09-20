@@ -15,6 +15,10 @@ export interface IngestSource {
 
 export const DEAD_LETTER_THRESHOLD = 3;
 export const RETRY_BACKOFF_MS: readonly number[] = [1000, 4000, 16000];
+/** retryAfterMs 힌트의 상한. GitHub의 x-ratelimit-reset은 최대 한 시간 뒤를 가리키는데,
+ *  스케줄러 tick()은 잡 핸들러를 순차로 돌리므로 여기서 그만큼 자면 healthcheck까지
+ *  전부 같이 멈춘다. 상한을 넘는 힌트는 잘라내고 다음 틱에 맡긴다. */
+export const MAX_RETRY_AFTER_MS = 60_000;
 
 interface RawSource extends Omit<IngestSource, "last_ok_at"> {
   last_ok_at: Date | null;
@@ -90,7 +94,11 @@ export async function withRetry<T>(fn: () => Promise<T>, deps: RetryDeps = {}): 
       lastError = e;
       if (attempt === RETRY_BACKOFF_MS.length) break;
       const hinted = (e as { retryAfterMs?: unknown }).retryAfterMs;
-      await sleep(typeof hinted === "number" ? hinted : (RETRY_BACKOFF_MS[attempt] ?? 1000));
+      await sleep(
+        typeof hinted === "number"
+          ? Math.min(hinted, MAX_RETRY_AFTER_MS)
+          : (RETRY_BACKOFF_MS[attempt] ?? 1000),
+      );
     }
   }
   throw lastError;

@@ -71,7 +71,55 @@ describe("createGithubProvider", () => {
         }),
     );
     const docs = await collect(p.list({ pool: {} as never, logger, cursor: {} }));
-    expect(docs[0]?.nextCursor).toEqual({ etags: { "logankim/omnis": 'W/"v2"' } });
+    expect(docs[0]?.nextCursor).toEqual({
+      etags: { "logankim/omnis": 'W/"v2"' },
+      sinces: { "logankim/omnis": "2026-09-20T00:00:00.000Z" },
+    });
+  });
+
+  // ETag가 한 번 바뀌면 200이 per_page=50 한 페이지를 통째로 돌려준다. since를 올려두지 않으면
+  // 이미 넣은 커밋까지 매번 T1 추출을 다시 돈다(upsertMemory는 행만 dedupe한다).
+  it("advances since per repo to the newest commit it saw", async () => {
+    const older = {
+      ...COMMIT,
+      sha: "old",
+      commit: { ...COMMIT.commit, author: { name: "Logan", date: "2026-09-19T00:00:00.000Z" } },
+    };
+    const p = provider(
+      async () =>
+        new Response(JSON.stringify([COMMIT, older]), {
+          status: 200,
+          headers: { "content-type": "application/json", etag: 'W/"v3"' },
+        }),
+    );
+    const docs = await collect(p.list({ pool: {} as never, logger, cursor: {} }));
+    expect(docs.at(-1)?.nextCursor).toMatchObject({
+      sinces: { "logankim/omnis": "2026-09-20T00:00:00.000Z" },
+    });
+  });
+
+  it("prefers the per-repo since over the legacy flat one", async () => {
+    const urls: string[] = [];
+    const p = provider(
+      async (url) => {
+        urls.push(url);
+        return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+      },
+      ["logankim/omnis", "onwardlab/iro"],
+    );
+    await collect(
+      p.list({
+        pool: {} as never,
+        logger,
+        cursor: {
+          since: "2026-09-01T00:00:00.000Z",
+          sinces: { "logankim/omnis": "2026-09-20T00:00:00.000Z" },
+        },
+      }),
+    );
+    expect(urls[0]).toContain("since=2026-09-20T00%3A00%3A00.000Z");
+    // sinces에 없는 레포는 예전 평평한 since로 떨어진다 — 전체 히스토리를 걷지 않는다.
+    expect(urls[1]).toContain("since=2026-09-01T00%3A00%3A00.000Z");
   });
 
   // A4 §10.1: 목록에 없는 레포는 API를 호출조차 하지 않는다.

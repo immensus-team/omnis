@@ -3,6 +3,7 @@ import type { Pool } from "pg";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   DEAD_LETTER_THRESHOLD,
+  MAX_RETRY_AFTER_MS,
   RETRY_BACKOFF_MS,
   getSource,
   recordFailure,
@@ -115,6 +116,22 @@ describe("withRetry (A4 §10.5 1s → 4s → 16s)", () => {
     );
     expect(out).toBe("ok");
     expect(sleeps).toEqual([500]);
+  });
+
+  // 한 시간짜리 x-ratelimit-reset을 그대로 자면 스케줄러의 다른 잡까지 그동안 멈춘다.
+  it("caps an absurd retry-after so one rate-limited source cannot stall the scheduler", async () => {
+    const sleeps: number[] = [];
+    let calls = 0;
+    const out = await withRetry(
+      async () => {
+        calls += 1;
+        if (calls === 1) throw Object.assign(new Error("403"), { retryAfterMs: 3_600_000 });
+        return "ok";
+      },
+      { sleep: async (ms) => void sleeps.push(ms) },
+    );
+    expect(out).toBe("ok");
+    expect(sleeps).toEqual([MAX_RETRY_AFTER_MS]);
   });
 });
 

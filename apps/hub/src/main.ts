@@ -30,19 +30,6 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
 
   registerHealthcheckJob(kernel.scheduler, { pool, events: kernel.events });
   registerCostDailyJob(kernel.scheduler, { pool, audit: kernel.audit, logger });
-
-  const bridge = createBridgeHub({ kernel, pool, logger, token: config.bridgeToken });
-  if (config.bridgeToken === "") {
-    logger.warn("OMNIS_BRIDGE_TOKEN is empty — WS /bridge refuses every upgrade with 503");
-  }
-  // ingest 잡(drive_poll/github_poll)도 scheduler.register()를 쓴다 — start() 전에 등록해야
-  // jobs 테이블 행이 생긴다(register-after-start는 조용히 영원히 안 돈다, Task 14의 jobs upsert).
-  const stopIngestWatch = await registerIngestJobs({
-    pool,
-    logger,
-    scheduler: kernel.scheduler,
-    bridge,
-  });
   await kernel.scheduler.start();
 
   // B3: kinso 인박스 행의 AI 한 줄 요약 — @omnis/agents는 모듈 싱글톤 pool을 쓴다(pool.ts).
@@ -54,6 +41,22 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
   });
   // 등록된 루프를 커널 이벤트/스케줄러에 건다(A4 §1.2).
   const stopLoops = startLoops({ kernel, logger });
+
+  const bridge = createBridgeHub({ kernel, pool, logger, token: config.bridgeToken });
+  if (config.bridgeToken === "") {
+    logger.warn("OMNIS_BRIDGE_TOKEN is empty — WS /bridge refuses every upgrade with 503");
+  }
+  // ingest 잡은 start() **뒤에** 등록한다(startLoops와 같은 자리). drive_poll/github_poll 행은
+  // 0006_kernel.sql이 이미 seed했고 tick()은 매 틱 handlers Map을 다시 훑으므로 다음 틱(10초)에
+  // 바로 돈다. 반대로 start() 앞에 두면 start() 끝의 await tick()이 seed된 due 행을 즉시 집어
+  // 전체 ingestion 한 바퀴(로컬 스캔·임베딩·T1)를 listen() 전에 동기로 돌려버린다 — 그 사이
+  // /health와 시그널 핸들러가 둘 다 없다.
+  const stopIngestWatch = await registerIngestJobs({
+    pool,
+    logger,
+    scheduler: kernel.scheduler,
+    bridge,
+  });
 
   const startedAt = Date.now();
   const server = createHubServer({

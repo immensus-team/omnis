@@ -46,10 +46,22 @@ export function createGithubProvider(opts: {
         ctx.cursor.etags !== null && typeof ctx.cursor.etags === "object"
           ? ({ ...(ctx.cursor.etags as Record<string, string>) } as Record<string, string>)
           : {};
-      const since = typeof ctx.cursor.since === "string" ? ctx.cursor.since : undefined;
+      // since는 레포마다 따로 올린다 — 하나로 묶으면 활발한 레포가 조용한 레포의 커밋을
+      // 건너뛴다. 예전 커서의 평평한 since는 아직 sinces에 없는 레포의 기본값으로만 쓴다.
+      const sinces =
+        ctx.cursor.sinces !== null && typeof ctx.cursor.sinces === "object"
+          ? ({ ...(ctx.cursor.sinces as Record<string, string>) } as Record<string, string>)
+          : {};
+      const legacySince = typeof ctx.cursor.since === "string" ? ctx.cursor.since : undefined;
       const token = await opts.token();
+      const cursorNow = (): Record<string, unknown> => ({
+        etags: { ...cursorEtags },
+        sinces: { ...sinces },
+        ...(legacySince === undefined ? {} : { since: legacySince }),
+      });
 
       for (const repo of opts.repos) {
+        const since = sinces[repo] ?? legacySince;
         const url = `${API}/repos/${repo}/commits?per_page=50${since === undefined ? "" : `&since=${encodeURIComponent(since)}`}`;
         const etag = cursorEtags[repo];
         const res = await opts.fetch(url, {
@@ -73,6 +85,15 @@ export function createGithubProvider(opts: {
         if (newEtag !== null) cursorEtags[repo] = newEtag;
         const commits = (await res.json()) as CommitRow[];
 
+        // 다음 폴링이 이미 넣은 커밋을 다시 추출하지 않도록 가장 최신 커밋 시각까지 올린다.
+        // ETag가 바뀌는 순간 200이 per_page=50을 통째로 주므로, 이게 없으면 활발한 레포에서
+        // 폴링마다 50청크씩 T1 추출이 다시 돈다(upsertMemory는 행만 dedupe한다).
+        const newest = commits.reduce<string | undefined>((max, c) => {
+          const d = c.commit.author?.date;
+          return d !== undefined && (max === undefined || d > max) ? d : max;
+        }, undefined);
+        if (newest !== undefined) sinces[repo] = newest;
+
         for (const c of commits) {
           const date = c.commit.author?.date ?? new Date().toISOString();
           yield {
@@ -88,7 +109,7 @@ export function createGithubProvider(opts: {
             // A4 §10.4 표: 커밋 시각이 valid_from이다.
             validFrom: date,
             meta: { repo, sha: c.sha },
-            nextCursor: { etags: { ...cursorEtags }, ...(since === undefined ? {} : { since }) },
+            nextCursor: cursorNow(),
           };
         }
 
@@ -98,7 +119,7 @@ export function createGithubProvider(opts: {
             source_ref: "__github_etag__",
             text: null,
             validFrom: new Date().toISOString(),
-            nextCursor: { etags: { ...cursorEtags }, ...(since === undefined ? {} : { since }) },
+            nextCursor: cursorNow(),
           };
         }
       }
