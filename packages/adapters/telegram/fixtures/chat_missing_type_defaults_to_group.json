@@ -11,7 +11,7 @@
       "lastName": "Lee",
       "username": "danalee"
     },
-    "text": "partial update라 chat.type이 없음",
+    "text": "partial update, so chat.type is missing",
     "date": 1700008300
   },
   "expected": {
@@ -24,7 +24,7 @@
           "kind": "person",
           "id": "42"
         },
-        "body": "partial update라 chat.type이 없음",
+        "body": "partial update, so chat.type is missing",
         "attachments": [],
         "sentAt": "2023-11-15T00:31:40.000Z",
         "status": "received",

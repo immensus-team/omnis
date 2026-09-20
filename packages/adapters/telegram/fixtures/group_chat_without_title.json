@@ -11,7 +11,7 @@
       "firstName": "Logan",
       "username": "logankim"
     },
-    "text": "제목 없는 그룹 메시지",
+    "text": "Group message with no title",
     "date": 1700008200
   },
   "expected": {
@@ -24,7 +24,7 @@
           "kind": "person",
           "id": "43"
         },
-        "body": "제목 없는 그룹 메시지",
+        "body": "Group message with no title",
         "attachments": [],
         "sentAt": "2023-11-15T00:30:00.000Z",
         "status": "received",

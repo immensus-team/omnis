@@ -31,11 +31,11 @@ describe("Telegram contract: fixture replay", () => {
   }
 });
 
-// 위 replay 루프는 "이 raw가 정확히 이 아이템이 된다"를 픽스처마다 고정한다. 아래는 반대로,
-// 픽스처가 늘어나도 계속 성립해야 하는 아이템 자체의 불변식이다 — 이 shape을 커널이 소비하므로
-// 어느 픽스처에서 나온 아이템이든 지켜야 한다. replay 루프가 expected === normalize(raw)를 이미
-// 못 박았으므로 여기서 expected.items를 검사하는 건 실제 normalize() 출력을 검사하는 것과 같다
-// (동시에 픽스처 자체에 잘못된 아이템을 손으로 적어 넣는 것도 막는다).
+// The replay loop above pins down "this raw becomes exactly this item" for each fixture. This block is
+// the inverse: invariants on the item itself that must keep holding as fixtures are added — the kernel
+// consumes this shape, so an item from any fixture has to satisfy them. Since the replay loop already
+// nailed down expected === normalize(raw), checking expected.items here is equivalent to checking the
+// real normalize() output (and it also blocks a bogus item being hand-written into a fixture).
 describe("Telegram contract: NormalizedItem invariants", () => {
   const itemFixtures = fixtures.filter(([, f]) => f.expected.items !== undefined);
   const produced = itemFixtures.flatMap(([file, f]) =>
@@ -46,19 +46,21 @@ describe("Telegram contract: NormalizedItem invariants", () => {
     })),
   );
 
-  // 필터가 잘못돼 검사 대상이 0개가 되면 아래 루프가 조용히 통과해 버린다 — 그 구멍을 막는다.
+  // If the filter were wrong and left zero items to check, the loop below would pass silently — this
+  // closes that hole.
   it("has items to check", () => {
     expect(produced.length).toBeGreaterThan(0);
   });
 
   for (const { file, index, item } of produced) {
-    it(`${file}#${index} → ${item.externalId ?? "(externalId 없음)"}`, () => {
+    it(`${file}#${index} → ${item.externalId ?? "(no externalId)"}`, () => {
       expect(typeof item.externalId).toBe("string");
       expect(item.externalId).not.toBe("");
       expect(typeof item.threadExternalId).toBe("string");
       expect(item.threadExternalId).not.toBe("");
 
-      // ISO-8601로 읽히고, 다른 어댑터와 같은 `.SSSZ` 왕복 포맷을 유지하는지까지 본다.
+      // Check that it reads as ISO-8601 and keeps the same `.SSSZ` round-trip format as the other
+      // adapters.
       expect(new Date(item.sentAt).toString()).not.toBe("Invalid Date");
       expect(new Date(item.sentAt).toISOString()).toBe(item.sentAt);
 
@@ -66,8 +68,8 @@ describe("Telegram contract: NormalizedItem invariants", () => {
       expect(typeof item.author?.kind).toBe("string");
       expect(item.author?.kind).not.toBe("");
 
-      // 본문이 비어 있으면 첨부가 그 아이템의 내용이어야 한다 — 둘 다 비면 커널에 아무것도
-      // 전달하지 못하는 아이템이다(normalize()가 그런 raw를 버리는 이유와 같다).
+      // If the body is empty, the attachments have to be that item's content — if both are empty the
+      // item carries nothing the kernel can use (the same reason normalize() drops such raws).
       const attachments = item.attachments ?? [];
       expect(item.body.length > 0 || attachments.length > 0).toBe(true);
       for (const attachment of attachments) {

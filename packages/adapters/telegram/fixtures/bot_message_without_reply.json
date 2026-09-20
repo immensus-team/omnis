@@ -12,7 +12,7 @@
       "username": "omnis_bot",
       "isBot": true
     },
-    "text": "빌드 #1284 성공했어요 ✅",
+    "text": "Build #1284 succeeded ✅",
     "date": 1700009000,
     "viaBot": {
       "id": 777000,
@@ -29,7 +29,7 @@
           "kind": "person",
           "id": "777000"
         },
-        "body": "빌드 #1284 성공했어요 ✅",
+        "body": "Build #1284 succeeded ✅",
         "attachments": [],
         "sentAt": "2023-11-15T00:43:20.000Z",
         "status": "received",

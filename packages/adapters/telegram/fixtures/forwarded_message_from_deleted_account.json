@@ -5,14 +5,14 @@
     "chat": {
       "id": 2002,
       "type": "group",
-      "title": "omnis 운영"
+      "title": "omnis ops"
     },
     "sender": {
       "id": 43,
       "firstName": "Logan",
       "username": "logankim"
     },
-    "text": "공유합니다",
+    "text": "Sharing this",
     "date": 1700012200,
     "forward": {
       "fromName": "Deleted Account",
@@ -29,7 +29,7 @@
           "kind": "person",
           "id": "43"
         },
-        "body": "공유합니다",
+        "body": "Sharing this",
         "attachments": [],
         "sentAt": "2023-11-15T01:36:40.000Z",
         "status": "received",
@@ -37,7 +37,7 @@
         "threadMeta": {
           "externalId": "2002",
           "kind": "group",
-          "title": "omnis 운영",
+          "title": "omnis ops",
           "participants": [
             {
               "externalId": "43",

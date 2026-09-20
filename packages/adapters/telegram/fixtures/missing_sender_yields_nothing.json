@@ -6,7 +6,7 @@
       "id": 1001,
       "type": "private"
     },
-    "text": "sender가 없는 partial update",
+    "text": "partial update with no sender",
     "date": 1700012000
   },
   "expected": {

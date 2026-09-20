@@ -196,7 +196,7 @@ interface TgMessage {
   chat?: { id?: number | string; type?: string; title?: string };
   sender?: TgSender;
   text?: string;
-  // raw에서는 Date가 아니라 정수/문자열로 온다(아래 parseSentAt 참고).
+  // In raw form these arrive as integers/strings rather than Date (see parseSentAt below).
   date?: number | string;
   editDate?: number | string;
   media?: TgMedia;
@@ -211,24 +211,28 @@ function tgAttachmentKind(type: string | undefined): Attachment["kind"] {
   return "file";
 }
 
-/** Telegram의 date는 초 단위 unix 정수지만, raw로 오는 건 항상 그렇진 않다 — JSON을 한 번 왕복한
- *  mtcute 메시지는 Date가 ISO 문자열로 직렬화되고, 게이트웨이를 거친 raw는 숫자 문자열로 온다.
- *  그대로 곱하면 NaN이 되고 toISOString()이 RangeError를 던진다 — normalize()는 backfill()/subscribe()
- *  루프 안에서 메시지마다 불리므로 그 메시지 하나가 스트림 전체를 죽인다. 그래서 후보(date → editDate)
- *  마다 타입을 보고 읽는다: 숫자는 초 단위(unix)로, 문자열은 먼저 ISO-8601로 파싱한다(이 결과는 이미
- *  ms라 1000을 곱하지 않는다). ISO로 안 읽히는 문자열만 초 단위 숫자 문자열로 본다 — 순서를 뒤집으면
- *  ISO 문자열("2023-11-14T22:13:20.000Z")이 실패해 editDate(수정 시각)로 미끄러지므로, 보낸 시각을
- *  복구하려면 ISO를 먼저 시도해야 한다. 그렇게도 유한한 값이 안 나오면 다음 후보로 넘어가고, 전부
- *  실패하면 원래 기본값 0으로 물러난다(Gmail internalDate / Outlook sentDateTime 폴백과 같은 원칙).
- *  now()가 아니라 0인 건 기존 기본값을 보존하고 픽스처를 결정적으로 만들기 위해서다. 빈/공백 문자열은
- *  숫자로도 읽히지 않게 건너뛴다 — Number("")는 0이라 그냥 두면 epoch으로 확정돼 버린다. */
+/** Telegram's date is a unix integer in seconds, but what arrives as raw is not always that — a mtcute
+ *  message that went through one JSON round-trip has its Date serialized as an ISO string, and raw that
+ *  passed through the gateway arrives as a numeric string. Multiplying blindly gives NaN and
+ *  toISOString() throws a RangeError — normalize() is called per message inside the
+ *  backfill()/subscribe() loops, so one such message kills the entire stream. So each candidate
+ *  (date → editDate) is read by type: numbers as seconds (unix), strings parsed as ISO-8601 first
+ *  (that result is already in ms, so it is not multiplied by 1000). Only strings that do not read as
+ *  ISO are treated as second-unit numeric strings — reversing that order makes the ISO string
+ *  ("2023-11-14T22:13:20.000Z") fail and slide through to editDate (the edit time), so ISO has to be
+ *  tried first to recover the sent time. If that still yields no finite value we move on to the next
+ *  candidate, and if every one fails we fall back to the original default of 0 (the same principle as
+ *  the Gmail internalDate / Outlook sentDateTime fallbacks). It is 0 rather than now() to preserve
+ *  that existing default and keep fixtures deterministic. Empty/whitespace-only strings are skipped so
+ *  they do not read as numbers either — Number("") is 0, and leaving it alone would settle the
+ *  timestamp on the epoch. */
 function parseSentAt(date?: number | string, editDate?: number | string): string {
   const ms = [date, editDate]
     .map((v) => {
-      if (typeof v === "number") return v * 1000; // raw 숫자는 초 단위 unix
+      if (typeof v === "number") return v * 1000; // raw numbers are unix seconds
       if (typeof v !== "string" || v.trim() === "") return Number.NaN;
-      const iso = new Date(v).getTime(); // ISO-8601은 ms 그대로 파싱된다
-      return Number.isFinite(iso) ? iso : Number(v) * 1000; // 아니면 초 단위 숫자 문자열
+      const iso = new Date(v).getTime(); // ISO-8601 parses straight to ms
+      return Number.isFinite(iso) ? iso : Number(v) * 1000; // otherwise a second-unit numeric string
     })
     .find((n) => Number.isFinite(n));
   return new Date(ms ?? 0).toISOString();
@@ -238,9 +242,10 @@ export function normalize(raw: unknown): NormalizedItem[] {
   const m = raw as TgMessage;
   if (m.deletedMessageIds !== undefined) return []; // 삭제 업데이트는 콘텐츠가 없다 — 아이템을 만들지 않는다
   if (m.id === undefined || m.chat?.id === undefined || m.sender?.id === undefined) return [];
-  // text도 media도 없으면 이 어댑터가 표현할 수 있는 내용이 없다: new_chat_members 같은 서비스
-  // 메시지가 액션만 싣고 오는 경우다(액션은 매핑하지 않는다). 빈 body/attachments 아이템을 내보내는
-  // 대신 삭제 업데이트와 같은 방식으로 버린다 — Slack 어댑터도 같은 이유로 같은 가드를 둔다.
+  // With neither text nor media there is nothing this adapter can represent: that is the case where a
+  // service message like new_chat_members arrives carrying only an action (actions are not mapped).
+  // Rather than emit an item with an empty body/attachments, drop it the same way as a delete update —
+  // the Slack adapter keeps the same guard for the same reason.
   if (!m.text && !m.media) return [];
 
   const chatId = String(m.chat.id);

@@ -12,7 +12,7 @@
       "firstName": "Logan",
       "username": "logankim"
     },
-    "text": "배포 끝났습니다 🚀",
+    "text": "Deploy is done 🚀",
     "date": 1700005000,
     "reactions": [
       {
@@ -49,7 +49,7 @@
           "kind": "person",
           "id": "43"
         },
-        "body": "배포 끝났습니다 🚀",
+        "body": "Deploy is done 🚀",
         "attachments": [],
         "sentAt": "2023-11-14T23:36:40.000Z",
         "status": "received",

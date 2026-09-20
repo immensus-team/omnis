@@ -12,7 +12,7 @@
       "lastName": "Lee",
       "username": "danalee"
     },
-    "text": "이 곡 들어봐",
+    "text": "Check out this track",
     "date": 1700006500,
     "media": {
       "type": "audio",
@@ -31,7 +31,7 @@
           "kind": "person",
           "id": "42"
         },
-        "body": "이 곡 들어봐",
+        "body": "Check out this track",
         "attachments": [
           {
             "kind": "audio",

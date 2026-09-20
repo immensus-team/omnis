@@ -12,7 +12,7 @@
       "lastName": "Lee",
       "username": "danalee"
     },
-    "text": "partial update라 date가 없음"
+    "text": "partial update, so date is missing"
   },
   "expected": {
     "items": [
@@ -24,7 +24,7 @@
           "kind": "person",
           "id": "42"
         },
-        "body": "partial update라 date가 없음",
+        "body": "partial update, so date is missing",
         "attachments": [],
         "sentAt": "1970-01-01T00:00:00.000Z",
         "status": "received",

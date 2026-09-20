@@ -8,7 +8,7 @@
       "lastName": "Lee",
       "username": "danalee"
     },
-    "text": "chat이 없는 partial update",
+    "text": "partial update with no chat",
     "date": 1700012100
   },
   "expected": {

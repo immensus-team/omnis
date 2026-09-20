@@ -10,7 +10,7 @@
     "sender": {
       "id": 424242
     },
-    "text": "@logankim 알림 봇입니다",
+    "text": "@logankim this is the alert bot",
     "date": 1700007100
   },
   "expected": {
@@ -23,7 +23,7 @@
           "kind": "person",
           "id": "424242"
         },
-        "body": "@logankim 알림 봇입니다",
+        "body": "@logankim this is the alert bot",
         "attachments": [],
         "sentAt": "2023-11-15T00:11:40.000Z",
         "status": "received",

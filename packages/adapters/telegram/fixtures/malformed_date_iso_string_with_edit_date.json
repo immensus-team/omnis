@@ -12,7 +12,7 @@
       "lastName": "Lee",
       "username": "danalee"
     },
-    "text": "date가 ISO 문자열로 직렬화된 raw",
+    "text": "raw where date was serialized as an ISO string",
     "date": "2023-11-14T22:13:20.000Z",
     "editDate": 1700000500
   },
@@ -26,7 +26,7 @@
           "kind": "person",
           "id": "42"
         },
-        "body": "date가 ISO 문자열로 직렬화된 raw",
+        "body": "raw where date was serialized as an ISO string",
         "attachments": [],
         "sentAt": "2023-11-14T22:13:20.000Z",
         "status": "received",

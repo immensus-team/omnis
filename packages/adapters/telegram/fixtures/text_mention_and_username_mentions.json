@@ -13,7 +13,7 @@
       "lastName": "Lee",
       "username": "danalee"
     },
-    "text": "@logankim @omnis_bot 10am 어때요?",
+    "text": "@logankim @omnis_bot 10am work for you?",
     "date": 1700007000,
     "entities": [
       {
@@ -47,7 +47,7 @@
           "kind": "person",
           "id": "42"
         },
-        "body": "@logankim @omnis_bot 10am 어때요?",
+        "body": "@logankim @omnis_bot 10am work for you?",
         "attachments": [],
         "sentAt": "2023-11-15T00:10:00.000Z",
         "status": "received",

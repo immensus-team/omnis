@@ -13,7 +13,7 @@
       "lastName": "Lee",
       "username": "danalee"
     },
-    "text": "sync tomorrow at 11am (수정)",
+    "text": "sync tomorrow at 11am (edited)",
     "date": 1700003600,
     "editDate": 1700003900
   },
@@ -27,7 +27,7 @@
           "kind": "person",
           "id": "42"
         },
-        "body": "sync tomorrow at 11am (수정)",
+        "body": "sync tomorrow at 11am (edited)",
         "attachments": [],
         "sentAt": "2023-11-14T23:13:20.000Z",
         "status": "received",
