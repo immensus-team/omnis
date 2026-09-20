@@ -1,20 +1,23 @@
-// Gate ⑦ — Codex app-server 버전 핀 + 1턴 JSON-RPC 왕복.
+// Gate ⑦ — Codex app-server version pin + one-turn JSON-RPC roundtrip.
 //
-// 사용법:
-//   npx tsx run.ts                      실제 `codex app-server` 자식에 1턴을 보낸다
-//   npx tsx run.ts --replay <ndjson>    기록된 로그에서 같은 판정을 재산출한다(네트워크 불필요)
+// Usage:
+//   npx tsx run.ts                      send one turn to a real `codex app-server` child process
+//   npx tsx run.ts --replay <ndjson>    recompute the same verdict from a recorded log (no network required)
 //
-// 계획 원문 스크립트에서의 이탈(result.md 비고에 기록):
-//  1. turn-start 메서드 탐지: 계획의 정규식(/sendUserTurn|newTurn|userTurn/i over $defs 키)은
-//     이 스키마와 맞지 않는다 — codex 0.155.1은 wire 메서드 문자열("thread/start","turn/start")로
-//     이름을 노출한다. 스키마 원문에서 그 리터럴을 찾는다.
-//  2. TurnStartParams는 `threadId`가 필수라 `thread/start`를 먼저 부른다(A2 §4.2 스레드/턴/아이템 3원 구조).
-//  3. 이벤트 판정은 줄 전체 부분문자열이 아니라 `params.item.type`을 파싱해서 한다 —
-//     서버는 우리가 보낸 프롬프트를 `item.type="userMessage"`로 **에코**하므로, 생짜 매칭은
-//     A2 §4.2의 `item/started (agentMessage)` 행을 증명하지 못한다(에코만 보고 초록불이 켜진다).
-//  4. `turn/completed`의 `turn.status`(TurnStatus: completed|interrupted|failed|inProgress)를 읽어
-//     pass / degraded를 구분한다 — 사용량 한도 초과로 아무 일도 안 일어난 턴과 모델이 실제로 답한 턴이
-//     같은 초록 줄을 찍으면 재실행 계측기로서 쓸모가 없다.
+// Deviations from the plan's original script (recorded in the result.md notes):
+//  1. turn-start method detection: the plan's regex (/sendUserTurn|newTurn|userTurn/i over the
+//     $defs keys) does not match this schema — codex 0.155.1 exposes the names as wire method
+//     strings ("thread/start", "turn/start"). So we look for those literals in the raw schema text.
+//  2. TurnStartParams requires `threadId`, so we call `thread/start` first (the thread/turn/item
+//     three-part structure of A2 §4.2).
+//  3. Event detection parses `params.item.type` rather than substring-matching the whole line —
+//     the server **echoes** the prompt we sent back as `item.type="userMessage"`, so raw matching
+//     cannot prove the A2 §4.2 `item/started (agentMessage)` row (the green light turns on from
+//     the echo alone).
+//  4. Read `turn.status` of `turn/completed` (TurnStatus: completed|interrupted|failed|inProgress)
+//     to distinguish pass from degraded — if a turn where nothing happened because the usage limit
+//     was exceeded and a turn where the model actually answered print the same green line, the
+//     instrument is useless for reruns.
 import { spawn } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 
@@ -24,13 +27,14 @@ export interface Observations {
   turnCompleted: boolean;
   turnStatus?: string;
   turnErrorInfo?: string;
-  /** `item.type === "userMessage"` — 서버가 되돌려주는 우리 자신의 입력 에코. */
+  /** `item.type === "userMessage"` — the echo of our own input that the server sends back. */
   userItemsStarted: Set<string>;
   userItemsCompleted: Set<string>;
-  /** 그 외 모든 item 타입(agentMessage, commandExecution, …) = 에이전트 측 아이템. */
+  /** Every other item type (agentMessage, commandExecution, …) = agent-side item. */
   agentItemsStarted: Set<string>;
   agentItemsCompleted: Set<string>;
-  /** JSON-RPC 레벨 에러 응답(= 프로토콜 에러). `method:"error"` 알림은 애플리케이션 레벨이라 별도. */
+  /** JSON-RPC-level error response (= protocol error). A `method:"error"` notification is
+   * application-level, so it is tracked separately. */
   protocolErrors: string[];
 }
 
@@ -58,7 +62,8 @@ type Wire = {
   };
 };
 
-/** 한 줄(로그의 `<< `/`>> ` 접두사 허용)을 파싱해 관측치에 반영한다. JSON이 아니면 무시. */
+/** Parses one line (allowing the log's `<< `/`>> ` prefixes) and folds it into the observations.
+ * Lines that are not JSON are ignored. */
 export function observeLine(line: string, obs: Observations): Wire | undefined {
   const text = line.replace(/^\s*(<<|>>)\s*/, "").trim();
   if (!text.startsWith("{")) return undefined;
@@ -98,9 +103,9 @@ export function observeLine(line: string, obs: Observations): Wire | undefined {
 }
 
 export interface Verdict extends Observations {
-  /** A6 §11.3의 pass 기준: "프로토콜 에러 없이 1턴 완주". */
+  /** The pass criterion from A6 §11.3: "one turn completed with no protocol errors". */
   protocolRoundtrip: boolean;
-  /** A2 §4.2 표의 `item/started (agentMessage)` 행이 실제로 관측됐는가. */
+  /** Whether the `item/started (agentMessage)` row of the A2 §4.2 table was actually observed. */
   agentMessageObserved: boolean;
   result: "pass" | "degraded" | "fail";
 }
@@ -132,7 +137,7 @@ export function report(v: Verdict): void {
   );
 }
 
-/** pass=0, degraded=2(프로토콜은 통과했으나 모델 응답 미관측), fail=1. */
+/** pass=0, degraded=2 (protocol passed but no model response observed), fail=1. */
 export function exitCodeFor(result: Verdict["result"]): number {
   return result === "pass" ? 0 : result === "degraded" ? 2 : 1;
 }
