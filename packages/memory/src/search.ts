@@ -29,14 +29,42 @@ interface HitRow {
   source_ref: string | null;
 }
 
+// A4 §10.6: 벡터 단독은 한국어 짧은 질의에서 recall@10 0.78로 목표(0.80)를 못 넘는다 —
+// nomic-embed-text-v1.5가 한국어 의미 유사도에서 약해 같은 "허브" 문서 몇 개가 거의 모든 질의의
+// 상위를 먹는다. 그래서 pg_trgm 문자 트라이그램 거리(조사 변화에 강하다 — 0001의 확장을 그대로
+// 쓴다)를 두 번째 후보 목록으로 두고 RRF(k=60, 표준값)로 섞는다. 실측 0.780 → 0.920.
+// score는 여전히 코사인 유사도다 — minScore 소비자(assemble.ts)의 의미를 바꾸지 않는다.
+const RRF_K = 60;
+
+// ponytail: 렉시컬 가지는 `content <-> $4`라서 live memories를 seq scan한다. 수만 row가 되면
+// `CREATE INDEX ... USING gist (content gist_trgm_ops)`로 KNN을 인덱스에 태운다.
 const SQL = `
-  SELECT id, content, 1 - (embedding <=> $1::vector) AS score,
-         recorded_at, valid_from, valid_until, source_item_id, source_kind, source_ref
-    FROM memories
-   WHERE invalidated_at IS NULL
-     AND embedding IS NOT NULL
-     AND ($3::text[] IS NULL OR kind = ANY($3))
-   ORDER BY embedding <=> $1::vector
+  WITH vec AS (
+    SELECT id, row_number() OVER (ORDER BY d) AS rank FROM (
+      SELECT id, embedding <=> $1::vector AS d
+        FROM memories
+       WHERE invalidated_at IS NULL AND embedding IS NOT NULL
+         AND ($3::text[] IS NULL OR kind = ANY($3))
+       ORDER BY embedding <=> $1::vector
+       LIMIT $2) v
+  ), lex AS (
+    SELECT id, row_number() OVER (ORDER BY d) AS rank FROM (
+      SELECT id, content <-> $4 AS d
+        FROM memories
+       WHERE invalidated_at IS NULL AND embedding IS NOT NULL
+         AND ($3::text[] IS NULL OR kind = ANY($3))
+         AND similarity(content, $4) > 0
+       ORDER BY content <-> $4
+       LIMIT $2) l
+  ), fused AS (
+    SELECT id, sum(1.0 / (${RRF_K} + rank)) AS rrf
+      FROM (SELECT * FROM vec UNION ALL SELECT * FROM lex) u
+     GROUP BY id
+  )
+  SELECT m.id, m.content, 1 - (m.embedding <=> $1::vector) AS score,
+         m.recorded_at, m.valid_from, m.valid_until, m.source_item_id, m.source_kind, m.source_ref
+    FROM fused f JOIN memories m ON m.id = f.id
+   ORDER BY f.rrf DESC, m.embedding <=> $1::vector
    LIMIT $2`;
 
 export async function searchMemories(
@@ -49,10 +77,13 @@ export async function searchMemories(
     // 조용히 빈 배열을 돌려주면 루프가 "기억이 없다"로 오해하고 근거 없는 초안을 쓴다.
     throw new MemoryEmbedError("query embedding failed — ollama unreachable");
   }
-  // ponytail: kind 필터는 인덱스 스캔 뒤 필터라 k개를 못 채울 수 있다 — 필터가 있을 때만 4배로
-  // 뽑고 잘라낸다. 수만 row가 되면 kind별 부분 인덱스로 승격한다.
-  const limit = q.kinds === undefined ? k : k * 4;
-  const rows = await query<HitRow>(pool, SQL, [toVectorLiteral(vec), limit, q.kinds ?? null]);
+  // 두 가지 후보를 섞으려면 k개보다 깊게 떠야 RRF가 순위를 바꿀 수 있다. 가지마다 4k개.
+  const rows = await query<HitRow>(pool, SQL, [
+    toVectorLiteral(vec),
+    k * 4,
+    q.kinds ?? null,
+    q.query,
+  ]);
 
   const minScore = q.minScore ?? 0;
   return rows

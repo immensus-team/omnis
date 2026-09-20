@@ -113,6 +113,30 @@ describe("searchMemories", () => {
     );
   });
 
+  // A4 §10.6: 벡터만으로는 한국어 짧은 질의에서 recall이 0.80을 못 넘는다. 조사가 붙어 낱말이
+  // 안 겹치면 임베딩은 직교에 가까워지지만 문자 트라이그램은 여전히 겹친다 — 그 가지가 실제로
+  // 순위를 바꾸는지 본다. 디코이 11건은 질의와 낱말도 트라이그램도 겹치지 않아 코사인이 모두
+  // 같고(공유 토큰 없음), 목표 행을 1위로 올릴 수 있는 것은 렉시컬 가지뿐이다.
+  it("lexical trigram branch outranks vector ties", async () => {
+    await upsertMemory(pool, {
+      ...base,
+      kind: "fact",
+      content: "드라이브는 폴링으로 변경분을 가져온다",
+      source_ref: "/target.md",
+    });
+    for (let i = 0; i < 11; i += 1) {
+      await upsertMemory(pool, {
+        ...base,
+        kind: "fact",
+        content: `자전거 정비 기록 ${i}`,
+        source_ref: `/d${i}.md`,
+      });
+    }
+
+    const hits = await searchMemories(pool, { query: "폴링 방식", k: 5 });
+    expect(hits[0]?.source_ref).toBe("/target.md");
+  });
+
   it("defaults k to 10", async () => {
     for (let i = 0; i < 12; i += 1) {
       await upsertMemory(pool, {

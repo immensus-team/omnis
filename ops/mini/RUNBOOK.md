@@ -91,6 +91,24 @@ zero-cache 재기동 **전에** 한 번 더 돌린다 — 안 그러면 쿼리�
 > `--delete`는 미니 쪽에만 있는 파일을 지운다. `ops/mini/env.sh`는 제외 목록에 있으니 살아남는다.
 > `--exclude dist`를 넣지 않으면 맥북에서 빌드한 산출물이 덮어써진다 — 미니에서 다시 `pnpm build`하면 된다.
 
+## 임베딩 재생성 (모델·프리픽스가 바뀌었을 때)
+
+`packages/memory/src/embed.ts`의 `EMBED_MODEL`이나 `EMBED_DOCUMENT_PREFIX`/`EMBED_QUERY_PREFIX`가
+바뀌면 **이미 저장된 벡터는 새 질의 벡터와 다른 공간에 있다** — 검색이 조용히 나빠진다. 버전 컬럼을
+두지 않았으므로(그럴 만큼 자주 바뀌지 않는다) 한 번에 통째로 버리고 되메운다.
+
+```bash
+ssh <hub-user>@<hub-host> 'psql omnis -c "UPDATE memories SET embedding = NULL WHERE invalidated_at IS NULL"'
+```
+
+`drive_poll`(10분)이 틱마다 `reembedNulls()`로 100건씩 되메운다 — 1만 건이면 약 17시간이다. 급하면
+Ollama가 떠 있는 동안 위 SQL 뒤에 미니에서 `pnpm --filter @omnis/hub start`를 재기동하지 말고
+그대로 두고 기다리면 된다. 진행 상황은 `psql omnis -c "SELECT count(*) FROM memories WHERE
+embedding IS NULL AND invalidated_at IS NULL"`로 본다.
+
+> 되메우는 동안 그 행들은 검색에 잡히지 않는다(부분 HNSW가 NULL을 인덱싱하지 않는다).
+> 2026-09-21의 프리픽스 도입(`search_document: ` / `search_query: `)이 이 절차가 필요한 첫 사례다.
+
 ## Web Push VAPID 키 (US-B16)
 
 ```bash

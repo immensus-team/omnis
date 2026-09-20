@@ -1,5 +1,9 @@
 // A4 §10.6: recall@10 ≥ 0.80 + 제외 규칙 위반 0건(하드 게이트).
 // 골든 세트가 seed를 들고 있으므로 실계정·실파일 없이 돈다(백로그 B-D5).
+//
+// `--gate-only`: 제외 규칙 스캔만 돌고 시드를 넣지 않는다. 채점 모드는 DATABASE_URL이 가리키는
+// DB에 50건의 가짜 기억을 심으므로 **실 DB에서 돌리면 안 된다** — 허브의 주간 잡은 반드시
+// --gate-only로 부른다(apps/hub/src/ingest-job.ts).
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createPool, query } from "../../packages/db/src/index.js";
@@ -19,6 +23,7 @@ interface EvalCase {
   as_of: string;
 }
 
+const GATE_ONLY = process.argv.includes("--gate-only");
 const RECALL_TARGET = 0.8;
 const K = 10;
 const SET_PATH = fileURLToPath(new URL("../../eval/memory_recall.jsonl", import.meta.url));
@@ -47,6 +52,13 @@ async function main(): Promise<void> {
       for (const l of leaked.slice(0, 20)) console.error(`  ${l.id}  ${l.source_ref}`);
       console.error(`패턴 ${DENY_PATTERNS.length}종과 대조했다.`);
       process.exit(1);
+    }
+
+    if (GATE_ONLY) {
+      console.log(
+        `제외 규칙 위반 0건 (패턴 ${DENY_PATTERNS.length}종, source_ref ${refs.length}건 대조).`,
+      );
+      return;
     }
 
     // ── 시드: 골든 세트의 기억을 넣는다(멱등 — upsertMemory가 같은 내용을 재사용한다) ──

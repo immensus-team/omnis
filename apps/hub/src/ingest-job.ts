@@ -7,6 +7,7 @@ import {
   createLocalMacbookProvider,
   createLocalMiniProvider,
   createT1Extractor,
+  reembedNulls,
   registerIngestProvider,
   runIngest,
   setExtractor,
@@ -56,21 +57,29 @@ export async function registerIngestJobs(deps: {
     await runIngest({ pool, logger, kind: "file" });
     await runIngest({ pool, logger, kind: "calendar" });
     await runIngest({ pool, logger, kind: "drive" });
+    // A4 §10.5가 약속한 "다음 주기에 줍는다"를 실제로 부르는 유일한 자리. Ollama가 죽어 있던
+    // 동안 embedding=NULL로 들어간 행은 여기서만 살아난다. 임베딩 모델·프리픽스가 바뀌어
+    // 기존 벡터를 버려야 할 때도 이 틱이 되메운다(ops/mini/RUNBOOK.md "임베딩 재생성").
+    const filled = await reembedNulls(pool);
+    if (filled > 0) logger.info("reembedded memories", { filled });
   });
   scheduler.register("github_poll", "*/15 * * * *", async () => {
     await runIngest({ pool, logger, kind: "github" });
   });
 
-  // A4 §10.6: 주간 평가. 실패해도 허브를 죽이지 않는다 — 점수는 로그와 다음 브리핑이 알린다.
+  // A4 §10.6: 주간 제외 규칙 점검. **--gate-only가 필수다** — 채점 모드는 DATABASE_URL이
+  // 가리키는 DB에 골든 세트 50건을 시드하는데, 허브의 DATABASE_URL은 실 DB(omnis)라서
+  // 가짜 기억이 영구히 검색에 섞인다. recall 채점은 CI/개발 DB의 몫이다.
+  // 실패해도 허브를 죽이지 않는다 — 결과는 로그와 다음 브리핑이 알린다.
   scheduler.register("eval_weekly", "0 22 * * 0", async () => {
     const { execFile } = await import("node:child_process");
     const { promisify } = await import("node:util");
     const run = promisify(execFile);
     try {
-      const { stdout } = await run("pnpm", ["eval:memory"], { cwd: process.cwd() });
-      logger.info("memory recall eval", { report: stdout.trim().slice(0, 2000) });
+      const { stdout } = await run("pnpm", ["eval:memory", "--gate-only"], { cwd: process.cwd() });
+      logger.info("memory deny-pattern gate", { report: stdout.trim().slice(0, 2000) });
     } catch (e) {
-      logger.error("memory recall eval failed", {
+      logger.error("memory deny-pattern gate failed", {
         err: e instanceof Error ? e.message : String(e),
       });
     }
