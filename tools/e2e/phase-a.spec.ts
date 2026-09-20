@@ -99,8 +99,8 @@ test("Phase A seeded smoke", async ({ page }) => {
     return CHANNEL_LABELS.join(" / ");
   });
 
-  // 시드 행의 제목은 스레드 제목이다 — Phase A는 author_person_id를 안 채우고 Slack에는
-  // subject가 없어서, 이 검증이 없으면 모든 행이 "(no title)"이어도 A1이 통과한다.
+  // A seeded row's title is the thread title — Phase A never fills author_person_id and Slack has
+  // no subject, so without this check A1 passes even when every row reads "(no title)".
   await check("A2b Inbox rows show the seeded thread titles", async () => {
     for (const title of ["#omnis-launch", "omnis launch sync"]) {
       await expect(page.getByText(title, { exact: true }).first()).toBeVisible({ timeout: 15_000 });

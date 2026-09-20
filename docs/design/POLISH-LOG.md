@@ -265,3 +265,58 @@
 세 폭 전부 `overflow 0px, 12개 행 중 칩/우측슬롯 겹침 0건`.
 `pnpm e2e:phase-a`는 공유 포트(5173/8787/4848)를 `resetDatabase()`/`assertPortsFree()`로
 잡기 때문에 다른 체인을 방해하지 않으려고 돌리지 않았다 — `shots.ts`가 같은 스택을 올린다.
+
+## US-D02b rework — brand marks, responsive shell and list (2026-09-21, attempt 2)
+
+Screenshots: `screens/responsive/{390,768,1024,1440}.png` (the visual record, unfiltered over a
+densified list) and `screens/responsive/{…}-filtered.png` (one label filter on, which is what holds
+the 40px filter-strip invariant down). Two passes because one set cannot do both jobs: a filtered
+list is one row in an empty card, which shows nothing about density, and an unfiltered strip has
+too little in it for the wrap assertion to mean anything.
+
+This branch is English-only from the `main` merge onward (repo `CLAUDE.md`). Every comment, test
+name and fixture string the US-D02b commits added is now English; `apps/desktop/src/app.css`,
+`apps/desktop/src/screens/Inbox.tsx` and the components and tests this story touched were converted
+in full rather than line by line.
+
+1. **The time goes back next to the name.** Attempt 1 re-added `margin-left: auto` on
+   `.inbox-row__time`, reversing the decision recorded above (kinso sets the time next to the name:
+   "Natasha Corwin 3m") in a code comment alone. The drift that reversal was chasing came from
+   titles wrapping to two lines, and `grid-template-columns: 40px minmax(0, 1fr) auto` plus the
+   title ellipsis had already fixed it at the source. The `auto` is gone again and
+   `.inbox-row__name` is `flex: 0 1 auto` — it shrinks but never grows, so it cannot push the time
+   away. The far-right column holds the brand mark, as in the reference.
+2. **The summary keeps its line at 390px.** `.inbox-row__chips` was `flex: 0 0 auto` beside a
+   `flex: 1 1 auto` summary, so on a narrow pane the chips took the line and the AI summary — the
+   row's reason to exist — collapsed to about two characters (`Draft: …`). The chips now
+   `display: none` inside `@container list (max-width: 479.98px)`. Same failure class as the
+   filter row this story was opened on: an unshrinkable child starving its sibling.
+3. **Active filters lead the strip.** The label chip doing the filtering sat behind five
+   always-present view pills, so at 390px it scrolled off the right edge behind the fade: a list
+   cut to one row with nothing on screen saying why. The chips render in front of the pills now,
+   in DOM order so the tab sequence matches. The `+ Label` trigger stays at the end as a second
+   bar — moving one bar would remount its popover mid-selection and break multi-select.
+4. **One rhythm in the collapsed rail.** `space-around` was applied at two scopes (the nav over two
+   children, the plate over five), which left the Inbox tile hard left and stretched the other five
+   to a ~142px pitch at 768px. `.channel-rail__plate` takes `display: contents` in the narrow tier,
+   so all six tiles are children of the bar's own flex row, centred with `gap: min(5vw, 24px)`.
+   The plate no longer has a box there, so `border-radius: 0` is gone and the `0` row has been
+   removed from the radius table in `DESIGN-DIRECTION.md`.
+5. **No dead controls.** The wide shell's More chevron had a label, a tab stop and no handler; it is
+   a decorative `<span aria-hidden>` now, and the real trigger stays in the narrow tier. Account and
+   Settings are gated with `disabled` and a title that says why, at the same 0.55 opacity floor the
+   ask panel's un-wired actions use.
+6. **A focus ring the strip can show.** `:focus-visible` on the filter chips only set `--state-hover`,
+   which is the hover value, and the view pills and the Archived toggle had nothing. All four now
+   take `outline: 2px solid var(--accent)` at `outline-offset: 1px`. `overflow-x: auto` forces the
+   computed `overflow-y` to `auto`, so the strip's vertical padding (4px above, 6px below) is the
+   room that ring needs — the row still measures 40px at every width.
+
+### Evidence
+
+`pnpm lint` and `pnpm typecheck` exit 0. `pnpm --filter @omnis/ui test` 18 files / 170 passed;
+`pnpm --filter @omnis/desktop test` 10/11 files, 63 passed — the one failing suite
+(`test/integration/zero-client.test.ts`, unresolved `@omnis/db`) is pre-existing and predates this
+branch. `pnpm tsx tools/e2e/shots-responsive.ts` reports `overflow 0px` at 390/768/1024/1440 in both
+passes, a filter row of 36–40px (never above the 40px cap) and a 57px rail pinned to the bottom edge
+at 390 and 768.

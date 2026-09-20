@@ -3,9 +3,10 @@ import { Command } from "cmdk";
 import { useState } from "react";
 import { LuSearch } from "react-icons/lu";
 
-/** US-D02: 리스트 위에 얹는 필터 칩 바(ref-issue-tracker-density.webp의 필터 DSL 칩).
- *  칩은 필드 칸과 값 칸으로 갈린다 — 문장을 통째로 받지 않는다. 무엇을 거는지(채널/라벨)는
- *  여전히 호출자가 정한다: Inbox 말고도 Tasks·Needs-approval이 같은 바를 쓴다. */
+/** US-D02: the filter chip bar laid over the list (the filter-DSL chips in
+ *  ref-issue-tracker-density.webp). A chip splits into a field cell and a value cell — it never
+ *  takes a whole sentence. What is being filtered on (channel, label) is still the caller's
+ *  decision: Tasks and Needs-approval use this same bar alongside Inbox. */
 
 export interface FilterChipOption {
   id: string;
@@ -14,16 +15,19 @@ export interface FilterChipOption {
 
 export interface FilterChip {
   id: string;
-  /** 왼쪽(옅은) 칸 = 무엇을 거는가. 칩 ×의 접근성 이름도 여기서 나온다. 예: "라벨". */
+  /** The left (pale) cell = what is being filtered on. The chip's x takes its accessible name
+   *  from this too. For example: "Label". */
   field: string;
-  /** 오른쪽(틴트) 칸 = 무엇으로 거는가. 조사·수량사까지 포함한 완성 어구. 예: "2개 중 하나". */
+  /** The right (tinted) cell = what it is filtered to, as a finished phrase including any
+   *  quantifier. For example: "any of 2". */
   value: string;
   onRemove: () => void;
 }
 
 export interface FilterChipBarProps {
   chips: FilterChip[];
-  /** 이 바가 새 칩을 만들 수 있는 필드. 없으면 "+" 트리거 자체를 안 그린다(추가할 게 없다). */
+  /** The field this bar can create new chips for. Without it the "+" trigger is not drawn at all
+   *  — there is nothing to add. */
   addOptions?: {
     fieldLabel: string;
     options: FilterChipOption[];
@@ -34,10 +38,11 @@ export interface FilterChipBarProps {
 
 export function FilterChipBar({ chips, addOptions }: FilterChipBarProps) {
   return (
-    // 레퍼런스의 칩은 `[▣ Priority][is any of][2 priorities][×]` — 칸마다 채움이 번갈아 들고
-    // 가운데 연산자 칸만 옅다. 한국어는 조사가 명사에 붙어("라벨은", "2개 중 하나") 연산자를
-    // 따로 떼면 문장이 깨지므로 칸을 셋이 아니라 둘로 나눈다. 번갈이 채움은 그대로 가져와
-    // 필드 칸을 옅게, 값 칸을 틴트로 둔다 — 칩이 한 덩어리 태그로 뭉개지지 않는 게 핵심이다.
+    // The reference's chip is `[Priority][is any of][2 priorities][x]` — the fills alternate cell
+    // by cell, with only the middle operator cell pale. Here the operator is folded into the value
+    // phrase, so there are two cells rather than three. The alternating fill carries over: the
+    // field cell pale, the value cell tinted — what matters is that the chip does not collapse
+    // into one undifferentiated tag.
     <div className="filter-chip-bar">
       {chips.map((chip) => (
         <span key={chip.id} className="filter-chip">
@@ -45,8 +50,9 @@ export function FilterChipBar({ chips, addOptions }: FilterChipBarProps) {
           <span className="filter-chip__value">{chip.value}</span>
           <button
             type="button"
-            // 브리프 문구는 "필터 제거" 하나였지만, 칩이 둘 이상이면 접근성 이름이 같아져
-            // 스크린리더가 어느 ×인지 구분할 수 없다 — 필드명을 앞에 붙인다.
+            // The brief said just "remove filter", but with more than one chip every x would
+            // share that accessible name and a screen reader could not tell them apart — so the
+            // field name goes in front.
             aria-label={`Remove ${chip.field} filter`}
             onClick={chip.onRemove}
           >
@@ -59,10 +65,10 @@ export function FilterChipBar({ chips, addOptions }: FilterChipBarProps) {
   );
 }
 
-/** 칩 편집 팝오버. Radix Popover가 위치를 잡고 cmdk가 목록·검색을 맡는다 — 이 저장소의
- *  검색 리스트 문법은 이미 cmdk 하나뿐이라(CommandPalette) 두 번째 패턴을 만들지 않는다.
- *  스타일은 Popover.Content에 glass-surface를 그대로 입힌다: 떠 있는 패널은 유리다
- *  (DESIGN-DIRECTION.md "Liquid Glass는 …플로팅 패널에만"). */
+/** The chip-editing popover. Radix Popover places it and cmdk owns the list and the search — this
+ *  repo already has exactly one searchable-list grammar (CommandPalette) and does not grow a
+ *  second. Styling puts glass-surface straight on Popover.Content: a floating panel is glass
+ *  (DESIGN-DIRECTION.md, Liquid Glass on floating panels only). */
 function AddFilterPopover({
   fieldLabel,
   options,
@@ -77,9 +83,10 @@ function AddFilterPopover({
         <button
           type="button"
           className="filter-chip-bar__add"
-          // 좁은 리스트 팬에서는 라벨 글자가 사라지고 "+"만 남는다(app.css @container list).
-          // 그때 이름을 잃지 않도록 명시적 aria-label + 네이티브 툴팁을 함께 단다 —
-          // 접근성 이름은 화면에 보이는 텍스트가 아니라 이 aria-label이 계속 갖는다.
+          // In a narrow list pane the label word disappears and only the "+" is left (app.css
+          // @container list). An explicit aria-label plus a native tooltip keep the name through
+          // that collapse — the accessible name comes from this aria-label, never from the text
+          // that may or may not be on screen.
           aria-label={`Add ${fieldLabel} filter`}
           title={fieldLabel}
         >
@@ -96,8 +103,9 @@ function AddFilterPopover({
           sideOffset={6}
         >
           <Command label={`${fieldLabel} filter`}>
-            {/* 레퍼런스의 필터 팝오버와 같은 입력 크롬: 돋보기 + 아래 헤어라인 한 줄.
-                맨몸 placeholder는 목록 위에 뜬 회색 글자일 뿐 입력칸으로 안 읽힌다. */}
+            {/* The same input chrome as the reference's filter popover: a magnifier and one
+                hairline below. A bare placeholder is just grey text floating over a list and does
+                not read as a field. */}
             <div className="filter-chip-popover__search">
               <LuSearch aria-hidden="true" />
               <Command.Input placeholder={`Search ${fieldLabel}`} autoFocus />
@@ -107,8 +115,9 @@ function AddFilterPopover({
               {options.map((option) => (
                 <Command.Item
                   key={option.id}
-                  // 다중 선택: 골라도 팝오버를 닫지 않는다(레퍼런스의 체크박스 목록은 클릭을
-                  // 거듭해도 열려 있다). 여기서 open을 건드리는 코드가 없는 게 곧 그 동작이다.
+                  // Multi-select: picking does not close the popover (the reference's checkbox
+                  // list stays open through repeated clicks). The absence of any code touching
+                  // `open` here is that behaviour.
                   onSelect={() => onToggle(option.id)}
                   data-checked={selected.has(option.id) ? "true" : undefined}
                 >

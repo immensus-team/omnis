@@ -1,17 +1,18 @@
-/* 셸 레이아웃만. 색·타이포는 @omnis/ui/tokens.css의 토큰을 그대로 쓴다(A5 §1).
-   react-virtuoso는 스크롤러가 실제 높이를 가져야 한 행도 그리므로 여기서 높이 사슬을 잇는다. */
+/* Shell layout only. Colour and type come from @omnis/ui/tokens.css (A5 §1).
+   react-virtuoso needs its scroller to have a real height before it draws even one row, so the
+   height chain is joined here. */
 html,
 body {
   height: 100%;
   margin: 0;
 }
 
-/* US-D02b: 셸의 반응형은 뷰포트가 아니라 셸 자신의 박스에 반응한다 — 그래서 @media가 아니라
-   @container다(같은 셸이 더 작은 웹뷰 프레임에 박혀도 규칙이 그대로 맞아야 한다).
-   container-type: inline-size는 #root를 크기 컨테이너로 만들고, 그 부수효과로 layout
-   containment가 붙어 #root가 fixed 자손의 컨테이닝 블록이 된다. 아래 좁은 셸들의
-   `position: fixed`(상세 시트·하단 바)가 뷰포트가 아니라 #root 기준으로 앉는 건 그래서다 —
-   여기선 #root가 화면 전체라 두 값이 같다. */
+/* US-D02b: the shell responds to its own box, not the viewport — hence @container rather than
+   @media (the same shell has to keep its rules when it is embedded in a smaller webview frame).
+   `container-type: inline-size` makes #root a size container, and as a side effect applies layout
+   containment, which makes #root the containing block for fixed descendants. That is why the
+   `position: fixed` in the narrow tiers below (the detail sheet, the bottom bar) is placed against
+   #root rather than the viewport — here #root is the whole screen, so the two agree. */
 #root {
   height: 100%;
   margin: 0;
@@ -20,8 +21,9 @@ body {
 }
 
 body {
-  /* U1: 따뜻한 오프화이트 캔버스 + 옅은 그리드/그라데이션 배경(DESIGN-DIRECTION.md, 23 §2 실측 근사).
-     다크 테마(data-theme="dark")에서는 tokens.css가 --canvas-grid를 none으로 지워 평범한 단색이 된다. */
+  /* U1: warm off-white canvas with a faint grid/gradient behind it (DESIGN-DIRECTION.md, 23 §2,
+     measured approximation). Under data-theme="dark", tokens.css clears --canvas-grid to none and
+     the canvas becomes a plain flat colour. */
   background-color: var(--bg-canvas);
   background-image: var(--canvas-grid);
   background-size: var(--canvas-grid-size);
@@ -34,7 +36,8 @@ body {
 
 .app-shell {
   display: grid;
-  /* kinso: 레일 + 메인 컬럼. 상세 패널은 열렸을 때만 세 번째 칼럼으로 붙는다(App.tsx). */
+  /* kinso: rail + main column. The detail pane only becomes a third column when it is open
+     (App.tsx). */
   grid-template-columns: 76px minmax(0, 1fr);
   align-items: stretch;
   height: 100%;
@@ -55,12 +58,12 @@ body {
   padding: 12px 0;
 }
 
-/* kinso의 레일 타일은 캔버스가 아니라 레일 플레이트 위에 얹혀 있다 — 이 플레이트가 없으면
-   --bg-elevated와 --bg-canvas의 명도차(1%)가 너무 작아 타일이 그냥 안 보인다.
-   US-D01: 여기 있던 `background: var(--bg-base)` + `box-shadow: var(--shadow-row-selected)`는
-   표면을 불투명하게 되돌려 유리를 죽이고 있었다(app.css가 tokens.css 다음에 로드돼 같은 명시도에서
-   이긴다). 지우면 .glass-surface의 blur/틴트/--shadow-glass가 그대로 살아난다 — 그래서 여기선
-   아무것도 다시 선언하지 않는다(중복 선언 금지). 남는 건 플레이트 고유의 모양(레이아웃)뿐. */
+/* kinso's rail tiles sit on a rail plate, not straight on the canvas — without the plate the 1%
+   lightness gap between --bg-elevated and --bg-canvas is too small for a tile to read at all.
+   US-D01: the `background: var(--bg-base)` + `box-shadow: var(--shadow-row-selected)` that used to
+   live here made the surface opaque again and killed the glass (app.css loads after tokens.css and
+   wins at equal specificity). Removing them brings .glass-surface's blur, tint and --shadow-glass
+   back — which is why nothing is re-declared here. What is left is the plate's own shape. */
 .channel-rail__plate {
   display: flex;
   flex-direction: column;
@@ -123,20 +126,32 @@ body {
   border-radius: 30%;
 }
 
+/* Account and Settings have no screen behind them yet. They are disabled rather than silently
+   inert, and they read as gated at the same 0.55 floor the ask panel's un-wired actions use — any
+   fainter and it stops looking gated and starts looking erased. */
+.channel-rail__avatar:disabled,
+.channel-rail__icon-button:disabled,
+.channel-rail__popover-row:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .channel-rail__spacer {
   flex: 1 1 auto;
 }
 
-/* US-D02b: 좁은 셸의 More 팝오버 — 하단 바에 다 못 선 타일들과 아바타/설정이 여기로 내려온다.
-   떠 있는 패널이라 유리다(.glass-surface + palette 슬롯은 TSX가 준다). 행은 아이콘 + 텍스트
-   라벨이다: 44px 바 타일과 달리 여기는 글자를 놓을 자리가 있다. */
+/* US-D02b: the narrow shell's More popover — the tiles that did not fit in the bottom bar, plus
+   the avatar and settings. It is a floating panel, so it is glass (.glass-surface + the palette
+   slot come from the TSX). Rows are icon + text label: unlike the 44px bar tiles there is room for
+   words here. */
 .channel-rail__popover {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 176px;
   padding: 6px;
-  /* 떠 있는 면의 반경(DESIGN-DIRECTION 반경 스케일) — 필터 팝오버와 같은 값. */
+  /* The floating-surface radius (DESIGN-DIRECTION radius scale) — same value as the filter
+     popover. */
   border-radius: 12px;
 }
 
@@ -157,7 +172,7 @@ body {
   cursor: pointer;
 }
 
-/* 유리 위의 상태는 밝히는 게 아니라 어둡게 한다 — .ask-panel__action과 같은 토큰. */
+/* State on glass darkens rather than lightens — the same token .ask-panel__action uses. */
 .channel-rail__popover-row:hover {
   background: var(--state-hover);
 }
@@ -174,20 +189,23 @@ body {
   min-height: 0;
 }
 
-/* U1 ask/search pill — CommandPalette mode="inline"이 렌더한다.
-   .glass-surface의 기본 hairline 보더 대신 그라데이션 스트로크(포커스 시 --ask-gradient). */
+/* U1 ask/search pill — rendered by CommandPalette mode="inline".
+   A gradient stroke instead of .glass-surface's default hairline border (--ask-gradient on
+   focus). */
 .ask-bar {
   position: relative;
 }
 
-/* US-D01: 채움은 .glass-surface(--bg-overlay + blur)가 그대로 맡고, 여기선 모양만 준다.
-   예전의 "padding-box 채움 + border-box 그라데이션" 2겹 트릭은 버렸다 — 채움이 불투명일 때만
-   성립하는 트릭이라, 채움을 유리(78%)로 바꾼 순간 border-box 레이어가 22% 비쳐서 그라데이션이
-   1.5px 스트로크가 아니라 필 전체(~820px)를 물들였다. DESIGN-DIRECTION은 "포커스 시 그라데이션
-   스트로크"다(장식 워시가 아니다) — 그래서 스트로크는 아래 ::after 링 하나가 전담한다.
-   box-shadow는 지웠다 — .glass-surface의 --shadow-glass가 이미 표면을 띄운다.
-   position+z-index: backdrop-filter가 스태킹 컨텍스트를 만들어서, 모델 메뉴(안쪽)는 자기 z-index로는
-   패널(z 5) 위로 못 올라온다 — pill 자체가 패널 위에 서야 메뉴가 레퍼런스처럼 패널을 덮는다. */
+/* US-D01: the fill stays with .glass-surface (--bg-overlay + blur); this rule only gives shape.
+   The old two-layer "padding-box fill + border-box gradient" trick is gone — it only holds while
+   the fill is opaque, and the moment the fill became glass (78%) the border-box layer showed
+   through at 22%, so the gradient washed the whole ~820px pill instead of drawing a 1.5px stroke.
+   DESIGN-DIRECTION asks for a gradient *stroke* on focus, not a decorative wash — so the ::after
+   ring below owns the stroke by itself.
+   box-shadow is gone: .glass-surface's --shadow-glass already lifts the surface.
+   position + z-index: backdrop-filter creates a stacking context, so the model menu inside cannot
+   rise above the panel (z 5) on its own z-index — the pill itself has to stand above the panel for
+   the menu to cover it the way the reference does. */
 .ask-bar__pill {
   display: flex;
   align-items: center;
@@ -199,9 +217,10 @@ body {
   z-index: 6;
 }
 
-/* 둥근 모서리를 따라가는 그라데이션 링. border-image는 border-radius를 못 따라가고 outline은
-   그라데이션을 못 받는다 — 마스크로 안쪽을 도려낸 1.5px 테두리가 남는 방법이다.
-   inset: -1px로 .glass-surface의 1px 헤어라인 자리를 그대로 덮는다(선이 두 겹으로 겹치지 않게). */
+/* A gradient ring that follows the rounded corner. border-image cannot follow border-radius and
+   outline cannot take a gradient — a 1.5px border with its inside masked out is what is left.
+   `inset: -1px` covers .glass-surface's own 1px hairline exactly, so the two lines do not double
+   up. */
 .ask-bar__pill::after {
   content: "";
   position: absolute;
@@ -230,8 +249,9 @@ body {
   background: var(--ask-gradient);
 }
 
-/* min-width: 0 — input의 기본 min-content(20자)를 풀지 않으면 320px에서 컴포저 어포던스가
-   붙은 바가 뷰포트를 밀어낸다(모바일 가로 스크롤 금지 규칙). */
+/* min-width: 0 — without releasing an input's default min-content (about 20 characters), the bar
+   with its composer affordances pushes the viewport wider at 320px (the no-horizontal-scroll rule
+   on mobile). */
 .ask-bar__pill [cmdk-input] {
   padding: 0;
   min-width: 0;
@@ -247,7 +267,8 @@ body {
   white-space: nowrap;
 }
 
-/* 컴포저 아이콘 버튼(@ 멘션 + 첨부) — 레퍼런스에서 둘은 같은 크기·같은 무게로 나란히 선다. */
+/* Composer icon buttons (@ mention + attach) — in the reference the two stand side by side at the
+   same size and the same weight. */
 .ask-bar__composer-button {
   display: flex;
   align-items: center;
@@ -267,7 +288,8 @@ body {
   color: var(--text-primary);
 }
 
-/* 비활성은 opacity 0.55가 바닥이다(hallmark slop-test) — 더 흐리면 "고장난 UI"로 읽힌다. */
+/* 0.55 is the floor for a disabled signal (hallmark slop-test) — any fainter reads as broken UI
+   rather than a gated control. */
 .ask-bar__composer-button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -300,8 +322,9 @@ body {
   color: var(--text-primary);
 }
 
-/* 일부러 불투명하다(주석 참조): 유리 위에 유리를 겹치면(apple-design §12) 글자가 죽는다.
-   레퍼런스(ref-glass-mail-ai-panel.webp)의 모델 드롭다운도 패널보다 확실히 불투명하다. */
+/* Deliberately opaque: stacking glass on glass (apple-design §12) collapses legibility. The model
+   dropdown in the reference (ref-glass-mail-ai-panel.webp) is clearly more opaque than its panel
+   too. */
 .ask-bar__model-menu {
   position: absolute;
   top: calc(100% + 8px);
@@ -339,14 +362,15 @@ body {
   font-weight: 600;
 }
 
-/* US-D01: ask 바 아래로 펼쳐지는 플로팅 유리 패널(.glass-surface 유리 표면 + palette 슬롯).
-   레퍼런스(ref-glass-mail-ai-panel.webp)의 AI 채팅 패널: 바 바로 아래 앵커, 위에서 내려오는 등장. */
+/* US-D01: the floating glass panel that unfolds under the ask bar (.glass-surface + the palette
+   slot). The reference's AI chat panel (ref-glass-mail-ai-panel.webp): anchored directly below the
+   bar, entering downward from it. */
 .ask-panel {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  /* 레퍼런스의 패널은 바 전체 폭을 먹는 드롭다운이 아니라 오브 아래에 선 카드다 —
-     1440px에서 바 전체로 늘리면 4.4:1 빈 밴드가 된다. */
+  /* The reference's panel is a card standing under the orb, not a dropdown that eats the bar's
+     full width — stretched across the bar at 1440px it becomes a 4.4:1 empty band. */
   width: min(420px, 100%);
   z-index: 5;
   display: flex;
@@ -354,12 +378,13 @@ body {
   gap: 2px;
   padding: 10px;
   border-radius: 20px;
-  /* 명령 목록 탭이 길어질 수 있다 — 패널이 뷰포트를 넘기지 않게 여기서 자른다. */
+  /* The command-list tab can get long — capped here so the panel never outgrows the viewport. */
   max-height: min(60vh, 420px);
   overflow-y: auto;
   transform-origin: top left;
-  /* 스프링 등장(240ms, --ease-spring). 별도 reduced-motion 블록이 필요 없다: tokens.css가
-     reduce에서 --dur-panel을 0ms로 낮추므로 애니메이션이 즉시 끝 상태로 떨어진다. */
+  /* Spring entrance (240ms, --ease-spring). No separate reduced-motion block is needed: under
+     reduce, tokens.css drops --dur-panel to 0ms, so the animation lands on its end state at
+     once. */
   animation: ask-panel-in var(--dur-panel) var(--ease-spring);
 }
 
@@ -374,8 +399,8 @@ body {
   }
 }
 
-/* 나간 길로 되돌아온다(apple-design §7 spatial consistency): 들어온 경로를 그대로 뒤집는다.
-   CommandPalette가 --dur-panel 동안 패널을 DOM에 붙들어 둔다(useClosingSpring). */
+/* It leaves the way it arrived (apple-design §7, spatial consistency): the entrance path,
+   reversed. CommandPalette holds the panel in the DOM for --dur-panel (useClosingSpring). */
 .ask-panel--closing {
   animation: ask-panel-out var(--dur-panel) var(--ease-spring) forwards;
   pointer-events: none;
@@ -416,9 +441,10 @@ body {
   cursor: pointer;
 }
 
-/* 유리(--bg-overlay = --gray-000 78%, L≈0.988) 위에 --bg-base(L 0.99)를 더 얹으면 명도차가
-   0.15%라 상태가 아예 안 보인다. 유리 위의 상태는 밝히는 게 아니라 어둡게 한다 —
-   채움은 --bg-elevated(L 0.97), 호버는 --state-hover(텍스트색 6%). 둘 다 이미 있는 토큰이다. */
+/* Laying --bg-base (L 0.99) over glass (--bg-overlay = --gray-000 at 78%, L≈0.988) leaves a 0.15%
+   lightness difference, so the state is invisible. State on glass darkens rather than lightens:
+   fills use --bg-elevated (L 0.97) and hover uses --state-hover (text colour at 6%). Both are
+   tokens that already exist. */
 .ask-panel__tabs button[aria-pressed="true"] {
   background: var(--bg-elevated);
   color: var(--text-primary);
@@ -475,15 +501,16 @@ body {
   background: var(--state-hover);
 }
 
-/* Phase B 미배선 액션은 "누를 수 있는 척"하지 않는다 — 금지 커서 + disabled + 오른쪽 태그.
-   흐리기는 0.55가 바닥이다(hallmark slop-test): 더 내리면 "게이트된 기능"이 아니라
-   "지워진 화면"으로 읽힌다. */
+/* An un-wired Phase B action does not pretend to be pressable — not-allowed cursor, disabled, and
+   a tag on the right. 0.55 is the floor for the fade (hallmark slop-test): below it the row stops
+   reading as a gated feature and starts reading as an erased screen. */
 .ask-panel__action:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-/* 행이 왼쪽 15%만 쓰고 끝나지 않게 — 왜 못 누르는지를 행의 오른쪽 끝에서 말한다. */
+/* So the row does not end after using 15% of its width — the reason it cannot be pressed is said
+   at the row's right edge. */
 .ask-panel__tag {
   margin-left: auto;
   flex: 0 0 auto;
@@ -500,7 +527,8 @@ body {
   color: var(--text-secondary);
 }
 
-/* 패널이 무엇을 대상으로 일하는지 먼저 말하는 줄 — 레퍼런스의 대화 영역 자리다. */
+/* The line that says what the panel is working on — the reference puts its conversation area
+   here. */
 .ask-panel__context {
   margin: 0 0 8px;
   padding: 10px 10px 11px;
@@ -513,7 +541,7 @@ body {
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 600;
-  /* 긴 제목이 패널을 늘리지 않는다(420px 고정 폭). */
+  /* A long title must not stretch the panel (fixed 420px width). */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -539,17 +567,19 @@ body {
   border-radius: 20px;
   box-shadow: var(--shadow-row-selected);
   overflow: hidden;
-  /* US-D02b: 셸(#root, container-name: shell) **안에** 중첩된 두 번째 컨테이너. 리스트 팬은
-     상세 패널이 열려 있으면 창보다 좁으므로, "좁다"의 기준은 창이 아니라 이 팬 자신의 폭이다.
-     아래 `@container list (…)` 블록들이 여기를 보고 판단한다 — 셸 브레이크포인트와 숫자가
-     달라도 되는 이유가 이것이다(560px은 팬의 560px). */
+  /* US-D02b: a second container nested *inside* the shell (#root, container-name: shell). With
+     the detail pane open the list pane is narrower than the window, so "narrow" is measured
+     against this pane's own width, not the window's. The `@container list (…)` blocks below read
+     this — which is why their numbers need not match the shell breakpoints (560px means 560px of
+     pane). */
   container-type: inline-size;
   container-name: list;
 }
 
-/* US-D02b: 제목만 남은 줄 — 예전엔 이 안에 필터 pill과 보관 토글이 같이 있어서 좁은 폭에서
-   셋이 서로를 밀어냈다(그게 "Archived가 두 줄로 접힌" 스크린샷이다). 이제 이 줄은 제목 전용이고
-   필터 UI는 전부 아래 스트립 하나로 내려갔다. */
+/* US-D02b: the title line, and nothing else. The filter pills and the Archived toggle used to
+   share it, so at narrow widths the three fought each other (that is the screenshot where
+   "Archived" broke across two lines). The whole filter UI moved down into the single strip
+   below. */
 .inbox-card__header {
   padding: 14px 16px 8px;
 }
@@ -560,20 +590,25 @@ body {
   font-weight: 600;
 }
 
-/* US-D02b: 필터 UI의 전부 — 라디오 pill · 보관 토글 · 라벨 칩이 한 줄에 산다. 좁아지면
-   줄바꿈하는 게 아니라 **옆으로 밀린다**(가로 스크롤). 자식은 전부 flex: 0 0 auto라
-   어느 것도 줄어들거나 접히지 않는다 — 접히면 그게 3줄로 깨지던 원래 버그다.
-   마스크는 스크롤된 내용이 팬의 둥근 모서리 밑으로 하드클립되지 않고 사라지게 한다
-   (스크롤 컨테이너의 마스크는 박스에 걸리므로 페이드는 가장자리에 고정된다). */
+/* US-D02b: the whole filter UI — radio pills, the Archived toggle and the label chips on one
+   line. Narrow does not wrap it, it **slides** (horizontal scroll). Every child is `flex: 0 0
+   auto`, so none of them shrinks or folds — folding is the original three-line bug.
+   The mask lets scrolled content fade out instead of being hard-clipped by the pane's rounded
+   corner (a scroll container's mask is anchored to its box, so the fade stays at the edges). */
 .inbox-card__filter-row {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: nowrap;
   overflow-x: auto;
-  /* 스크롤은 기능이고 스크롤바는 문법이 아니다 — 칩 줄 아래 회색 막대는 이 화면에 없다. */
+  /* Scrolling is the behaviour; a scrollbar is not part of this screen's grammar — no grey bar
+     under the chip row. */
   scrollbar-width: none;
-  padding: 0 16px 10px;
+  /* `overflow-x: auto` forces the computed `overflow-y` to `auto` as well, so anything drawn
+     outside a child's box — a focus ring above all — is clipped by this 40px strip. The vertical
+     padding is that ring's room: 4px above and 6px below clears `outline-offset: 1px` + a 2px
+     outline while the strip stays within its 40px budget. */
+  padding: 4px 16px 6px;
   mask-image: linear-gradient(
     to right,
     transparent,
@@ -594,8 +629,8 @@ body {
   display: none;
 }
 
-/* 칩 바는 바깥 여백을 이제 필터 행이 갖는다 — 여기 안에서는 안쪽 여백만 0으로 되돌린다
-   (칩 바 자체의 padding은 다른 화면이 쓰는 값이라 건드리지 않는다). */
+/* The filter row now owns the chip bar's outer spacing, so inside it the bar's own padding is
+   reset to 0 — the component's default padding is left alone because other screens use it. */
 .inbox-card__filter-row .filter-chip-bar {
   padding: 0;
 }
@@ -636,8 +671,20 @@ body {
   font: inherit;
   font-size: 11px;
   cursor: pointer;
-  /* 필터 행의 다른 자식들과 같다 — 좁아져도 이 버튼은 줄지 않는다. */
+  /* Same as the filter row's other children — this button does not shrink as the pane does. */
   flex: 0 0 auto;
+}
+
+/* Keyboard focus was indistinguishable from hover across this strip: the chips only swapped in
+   `--state-hover`, which is the hover value, and the view pills and the Archived toggle had no
+   focus treatment at all. One ring, one offset, every control in the strip — `--accent` is the
+   only colour in the row that hover never uses. */
+.inbox-card__pills button:focus-visible,
+.inbox-card__archived-pill:focus-visible,
+.inbox-card__filter-row .filter-chip button:focus-visible,
+.inbox-card__filter-row .filter-chip-bar__add:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .inbox-card__archived-pill[aria-pressed="true"] {
@@ -646,34 +693,38 @@ body {
   border-color: transparent;
 }
 
-/* 아이콘은 좁은 팬에서만 글자 자리를 대신한다(@container list 아래) — 넓을 땐 지금처럼 글자만. */
+/* The icon stands in for the word only in a narrow pane (@container list below) — wide keeps the
+   word alone. */
 .inbox-card__archived-icon {
   display: none;
 }
 
-/* U2: kinso 대화 행 — 아바타 | (이름·시간 / 요약·칩) | (채널아이콘 또는 상태배지). 3칼럼×2행 그리드,
-   우측 슬롯은 두 행에 걸쳐 세로 중앙 정렬(kinso 실측 — 행 전체 기준 우측 끝 고정, 23 §2). */
+/* U2: the kinso conversation row — avatar | (name·time / summary·chips) | (channel mark or status
+   badge). A 3-column x 2-row grid whose right slot spans both rows and centres vertically
+   (measured from kinso — pinned to the row's right edge, 23 §2). */
 .inbox-row {
   display: grid;
-  /* US-D02b: 가운데 칼럼은 minmax(0, 1fr)이어야 한다 — 그냥 1fr은 최소 크기가 min-content라
-     긴 제목이 행을 넓히고(가로 스크롤) ellipsis 대신 두 줄로 접힌다. 이 한 단어가 대부분의 수정이다. */
+  /* US-D02b: the middle column must be minmax(0, 1fr) — a bare 1fr has a min-content minimum, so
+     a long title widens the row (horizontal scroll) and wraps to two lines instead of
+     ellipsizing. That one word is most of this fix. */
   grid-template-columns: 40px minmax(0, 1fr) auto;
   grid-template-rows: auto auto;
   column-gap: 12px;
   row-gap: 4px;
   align-items: center;
-  /* U1/U2/U5: 넉넉한 행 높이 — kinso는 10px보다 훨씬 여유 있는 패딩으로 밀도를 낮춘다.
-     P1(kinso polish): 12px 세로 리듬으로 맞춘다(DESIGN-DIRECTION P1). */
+  /* U1/U2/U5: generous row height — kinso lowers density with padding well beyond 10px.
+     P1 (kinso polish): settled on a 12px vertical rhythm (DESIGN-DIRECTION P1). */
   padding: 12px 16px;
-  /* 헤어라인 구분선을 뺀다(23 §2 — kinso는 padding만으로 행을 나눈다).
-     선택된 행만 .inbox-row--selected의 카드+그림자로 구분된다. */
+  /* No hairline separators (23 §2 — kinso divides rows with padding alone). Only the selected row
+     is set apart, by .inbox-row--selected's card and shadow. */
   cursor: pointer;
 }
 
 .inbox-row--selected {
   background: var(--bg-base);
-  /* P1: kinso는 선택 카드 라운드가 얕다(8px) — 이전 14px은 다른 카드류(inbox-card 20px,
-     channel-rail__plate 22px)에 맞춰 너무 컸다. */
+  /* P1: kinso's selection card has a shallow radius (8px) — the previous 14px was sized against
+     the other cards (inbox-card 20px, channel-rail__plate 22px) and was far too large for a
+     row. */
   border-radius: 8px;
   box-shadow: var(--shadow-row-selected);
 }
@@ -698,7 +749,8 @@ body {
 .inbox-row__avatar--runtime {
   background: var(--gray-950, #14141a);
   color: var(--gray-000, #fff);
-  /* P1: 사람 아바타(원)와 구분되는 "런타임 로고 타일" — channel-rail 타일과 같은 스쿼클. */
+  /* P1: a runtime logo tile, told apart from a person's circular avatar by shape — the same
+     squircle the channel-rail tiles use. */
   border-radius: 30%;
 }
 
@@ -714,18 +766,22 @@ body {
   display: flex;
   align-items: baseline;
   gap: 6px;
-  /* flex 아이템의 기본 min-width는 auto다 — 이 한 줄이 없으면 이름이 줄어들지 않고
-     메타 줄 자체를 넓혀 행을 밀어낸다(제목이 두 줄로 접히던 것도, 시간이 밀리던 것도 여기서 시작한다). */
+  /* A flex item's default min-width is auto — without this line the name refuses to shrink and
+     widens the meta line, which pushes the row out (both the two-line title and the drifting time
+     start here). */
   min-width: 0;
 }
 
 .inbox-row__name {
-  /* P1: kinso 이름은 15px semibold(DESIGN-DIRECTION P1) — unread는 그보다 한 단계 더 굵게
-     구분한다(U2 결정 유지, kinso 자체엔 안읽음 개념이 없어 omnis가 얹은 것). */
+  /* P1: kinso's name is 15px semibold (DESIGN-DIRECTION P1) — unread goes one weight heavier
+     (the U2 decision, kept: kinso has no unread concept, this is omnis's addition). */
   font-size: 15px;
   font-weight: 600;
-  /* 줄어드는 건 이름이다(시간이 아니다) — 잘릴 땐 두 줄로 접히지 않고 "…"로 끝난다. */
-  flex: 1 1 auto;
+  /* The name is what shrinks, not the time — and when it does it ends in an ellipsis rather than
+     wrapping to a second line. It must not *grow*: growing pushes the time to the far end of the
+     row, which is the arrangement POLISH-LOG recorded removing (kinso sets the time next to the
+     name: "Natasha Corwin 3m"). */
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -745,26 +801,24 @@ body {
 }
 
 .inbox-row__timestamp {
-  /* US-D02b: 시간은 메타 줄의 오른쪽 끝에 고정한다. P1에서 kinso 실측("Natasha Corwin 3m")을
-     근거로 이 auto를 뺐었는데, 그러면 시간의 x가 제목 길이를 따라 움직인다 — 잘린 제목마다
-     시간이 다른 자리에 서서 행을 훑을 때 시간 칸이 흔들린다(스크린샷의 "시간이 밀린다").
-     정렬 안정성을 kinso의 밀도보다 위에 둔다. margin-left:auto는 이 flex 줄(메타)의 끝으로
-     미는 것이고, 행 전체의 오른쪽 끝은 별개 칼럼(.inbox-row__side)이다.
-     min-width + tabular-nums는 "3m"과 "4 Aug"가 서로 다른 폭을 갖지 않게 하는 하한이다. */
+  /* The time sits right after the name, as POLISH-LOG (2026-09-20) decided and the kinso reference
+     shows; the far-right column holds only the brand mark. The drift this story reported came from
+     titles wrapping to two lines, which `minmax(0, 1fr)` + the ellipsis above fixed at the source —
+     pushing the time to the row's end was treating the symptom. `tabular-nums` and the min-width
+     keep "3m" and "4 Aug" from re-measuring the gap on every row. */
   color: var(--text-secondary);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   flex: 0 0 auto;
   min-width: 32px;
-  text-align: right;
-  margin-left: auto;
 }
 
 .inbox-row__summary-line {
   grid-row: 2;
-  /* col 3은 .inbox-row__side 전용이다(그 쪽이 grid-row 1/span 2 + align center라 아래 절반이
-     정확히 이 줄 위에 내려앉는다). 여기서 `2 / span 2`로 넘어가면 라벨 칩이 채널 글리프·승인
-     점·보관 버튼 밑에 깔린다 — US-A33 이후 계속 깨져 있던 자리다. 칩은 col 2에서 끝낸다. */
+  /* Column 3 belongs to .inbox-row__side alone (it is grid-row 1 / span 2 with align center, so
+     its lower half lands exactly over this line). Spilling to `2 / span 2` here buries the label
+     chips under the channel mark, the approval dot and the archive button — the spot that had
+     been broken ever since US-A33. The chips end in column 2. */
   grid-column: 2;
   display: flex;
   align-items: baseline;
@@ -776,8 +830,9 @@ body {
   flex: 1 1 auto;
   min-width: 0;
   color: var(--text-secondary);
-  /* US-D02b: AI 한 줄 요약은 실제로 두 줄까지 쓴다 — 한 줄로 자르면 요약이 문장 중간에서
-     끊겨 읽히지 않는다. 좁은 팬(479.98px 이하)에서는 다시 한 줄로 떨어진다(아래 @container list). */
+  /* US-D02b: the AI summary really does use two lines — clamped to one it breaks mid-sentence and
+     stops being readable. In a narrow pane (479.98px and below) it drops back to one line (see
+     @container list further down). */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -812,7 +867,8 @@ body {
   color: var(--text-secondary);
 }
 
-/* US-A36: 보관/되살리기는 hover(와 키보드 포커스) 때만 나타난다 — 행이 늘 버튼을 이고 있지 않는다. */
+/* US-A36: archive/restore appears on hover (and keyboard focus) only — a row does not carry a
+   button at all times. */
 .inbox-row__action {
   border: var(--hairline);
   border-radius: 999px;
@@ -825,18 +881,19 @@ body {
   opacity: 0;
 }
 
-/* US-D02: 행 자체의 hover 채움. 400ms 호버 카드가 이 행에서 나왔다는 걸 보여 주는 건 카드가
-   아니라 행이다 — 채움이 없으면 카드가 아무 데도 안 붙어 떠 있는 것처럼 보인다. 채움은 이
-   화면의 다른 인터랙티브 요소들과 같은 --state-hover고, 반경은 선택 행 카드와 똑같은 8px다 —
-   가리켰다가 고르는 동안 행 모양이 바뀌면 안 된다. 구분은 모양이 아니라 채움이 한다
-   (호버 = 회색 채움 / 선택 = 흰 카드 + 섀도). */
+/* US-D02: the row's own hover fill. What shows that the 400ms hover card came out of *this* row
+   is the row, not the card — without a fill the card looks anchored to nothing. The fill is the
+   same --state-hover every other interactive element on this screen uses, and the radius is the
+   selected row's 8px exactly: the row must not change shape between pointing at it and choosing
+   it. The fill does the distinguishing, not the shape (hover = grey fill / selected = white card
+   + shadow). */
 .inbox-row:hover {
   background: var(--state-hover);
   border-radius: 8px;
 }
 
-/* 선택 행은 이미 흰 카드 + 섀도로 떠 있다(.inbox-row--selected) — 그 위에 회색 채움을 덧대면
-   선택이 흐려진다. */
+/* The selected row already floats as a white card with a shadow (.inbox-row--selected) — laying a
+   grey fill over it only muddies the selection. */
 .inbox-row--selected:hover {
   background: var(--bg-base);
 }
@@ -863,17 +920,19 @@ body {
   white-space: nowrap;
 }
 
-/* US-D02b: 라벨 이름은 사용자가 짓는다 — 긴 이름 하나가 칩 줄을 밀어내지 않게 상한을 둔다
-   (몇 개를 보여줄지는 inbox-row.tsx의 pickChips가 이미 JS에서 정한다: 2개 + "+N"). */
+/* US-D02b: label names are written by the user — a cap keeps one long name from pushing the chip
+   line out (how many chips to show is already decided in JS by inbox-row.tsx's pickChips: two plus
+   "+N"). */
 .inbox-row__chip {
   max-width: 96px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* P1: 상태 배지는 라벨 칩(outline)과 달리 "soft pill" — 테두리 대신 은은한 채운 배경
-   (DESIGN-DIRECTION P1). blocked만 톤 컬러로 눈에 띄게(herdr "내가 봐야 함" 신호) — 그 색은
-   여기가 아니라 .status-pill[data-tone="warning"] 규칙이 함께 준다(한 상태 = 한 색). */
+/* P1: unlike the outlined label chips, the status badge is a soft pill — a faint filled
+   background instead of a border (DESIGN-DIRECTION P1). Only `blocked` takes a tone colour, as
+   herdr's "this one is mine to look at" signal — and that colour comes from the shared
+   .status-pill[data-tone="warning"] rule rather than from here (one state, one colour). */
 .status-badge {
   border: 0;
   border-radius: 999px;
@@ -900,7 +959,7 @@ body {
   margin-bottom: 12px;
 }
 
-/* US-A36 / A5 §3.8: 오프라인 배너와 같은 톤의 상단 고정 바. */
+/* US-A36 / A5 §3.8: a pinned top bar in the same tone as the offline banner. */
 .thread-screen__archived-banner {
   display: flex;
   align-items: center;
@@ -961,8 +1020,9 @@ body {
   cursor: pointer;
 }
 
-/* cmdk의 Command.Dialog는 스타일이 없는 채로 문서 끝에 붙는다 — 셸이 띄우는 오버레이이므로
-   위치만 여기서 잡는다(칩·유리 표면 등 시각 토큰은 @omnis/ui가 계속 소유한다). */
+/* cmdk's Command.Dialog attaches unstyled at the end of the document — it is an overlay the shell
+   raises, so only its position is set here (@omnis/ui keeps owning the visual tokens: chips, glass
+   surfaces and the rest). */
 [cmdk-overlay] {
   position: fixed;
   inset: 0;
@@ -1011,22 +1071,26 @@ body {
   background: var(--bg-elevated);
 }
 
-/* US-D02: 밀도 높은 리스트의 그룹 헤더/필터용 tinted pill — ref-issue-tracker-density.webp 실측
-   (높이 28px, radius 12px, 라벨 13px/590, leading 8px 도트, trailing 카운트는 회색).
-   레퍼런스 실물은 상태 pill 쪽이 완전 캡슐이고 필터 칩이 테두리 있는 라운드 렉트다(이 자리에
-   있던 예전 주석은 둘을 반대로 적어 놨었다 — 픽셀은 멀쩡했지만 다음 사람이 따라 읽을 기록이라
-   고친다). 여기서 12px 라운드를 쓰는 건 레퍼런스가 아니라 브리프의 실측 지정(28px/12px/13px)을
-   따른 것이고, .status-badge(999px 캡슐)와 굳이 같은 모양을 쓰지 않으려는 이유도 겸한다.
-   카운트는 pill 밖 별도 회색 칩(.group-header__count)이다 — 레퍼런스도 숫자를 pill에서 뺀다.
-   flat, 테두리·그림자 없음(레퍼런스 그대로).
-   톤 배경·라벨 둘 다 color-mix가 아니라 상대 색상 문법(oklch(from … L c h))으로 만든다.
-   color-mix(in oklch, 톤, --bg-elevated)는 색상각까지 보간해서 hue를 돌려버린다: --bg-elevated가
-   h260이라 warn(h80)은 정확히 180° 반대 → 청록, danger(h25)·success(h150)은 각각 자홍·파랑으로
-   끌려간다(실측: 네 톤 틴트가 전부 #d?e?f? 계열 파랑으로 나왔다). 대비는 7:1로 통과하는데 색만
-   틀리는 종류의 버그라 숫자만 봐서는 안 잡힌다. 상대 색상 문법은 h를 그대로 물려받으므로 틴트는
-   L만 올리고 채도만 낮추면 되고, 라벨은 L만 내리면 된다. 라벨 L=0.44는 톤 원값(accent L0.62·
-   warn L0.75)이 자기 틴트 위에서 2.4:1이라 13px 텍스트로 못 읽기 때문 — 실측 5.5~6.4:1로
-   WCAG AA(4.5:1)를 넘는다. */
+/* US-D02: the tinted pill for group headers and filters in a dense list — measured from
+   ref-issue-tracker-density.webp (28px tall, 12px radius, 13px/590 label, leading 8px dot,
+   trailing count in grey).
+   In the reference the status pill is a full capsule and the filter chip is a bordered rounded
+   rect (an older comment here had the two the wrong way round — the pixels were fine, but this is
+   the record the next person reads, so it is corrected). The 12px radius comes from the brief's
+   measured spec (28px/12px/13px) rather than from the reference, and doubles as a reason not to
+   share a shape with .status-badge's 999px capsule.
+   The count is a separate grey chip outside the pill (.group-header__count) — the reference takes
+   the number out of the pill too. Flat: no border, no shadow, as in the reference.
+   Both the tone background and the label are built with relative colour syntax
+   (oklch(from … L c h)) rather than color-mix. `color-mix(in oklch, tone, --bg-elevated)`
+   interpolates the hue angle as well and spins the hue: --bg-elevated sits at h260, so warn (h80)
+   is exactly 180 degrees away and lands on cyan, while danger (h25) and success (h150) are pulled
+   toward magenta and blue (measured: all four tone tints came out as #d?e?f? blues). Contrast
+   still passes at 7:1, so it is the kind of bug the numbers alone never catch. Relative colour
+   syntax inherits h untouched, so a tint only raises L and lowers chroma, and a label only lowers
+   L. The label's L=0.44 is there because the raw tone values (accent L0.62, warn L0.75) sit at
+   2.4:1 on their own tint, which 13px text cannot carry — measured 5.5–6.4:1, past WCAG AA
+   (4.5:1). */
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -1047,11 +1111,12 @@ body {
   flex: 0 0 auto;
 }
 
-/* ponytail: 다크(data-theme="dark") 오버라이드 없음 — 라이트 기본이 이 프로젝트의 결정이고
-   (DESIGN-DIRECTION.md), data-theme="dark"를 세팅하는 코드가 아직 없다(tokens.css에 블록만 존재).
-   다크가 실제로 켜지는 날 4개 톤 라벨이 L0.4 vs 틴트 L0.25로 1.8:1이 되니 그때 여기 아래에
+/* ponytail: no data-theme="dark" override — light is this project's decision
+   (DESIGN-DIRECTION.md) and nothing sets data-theme="dark" yet (tokens.css only holds the block).
+   On the day dark actually turns on, the four tone labels land at L0.4 against an L0.25 tint,
+   which is 1.8:1, so add
    `:root[data-theme="dark"] .status-pill[data-tone="…"] { color: oklch(from currentColor 0.8 c h); }`
-   4줄을 붙인다. */
+   four times below, one per tone. */
 .status-pill[data-tone="neutral"] {
   background: var(--bg-elevated);
   color: var(--text-secondary);
@@ -1062,10 +1127,11 @@ body {
   color: oklch(from var(--accent) 0.44 c h);
 }
 
-/* 그룹 헤더 pill(12px 라운드)과 행 배지(999px 캡슐)는 모양이 다르지만 **색은 하나**다: 같은
-   "확인 필요"가 헤더에선 빨강, 700px 옆 행에선 파랑으로 갈렸던 게 2회차 거절 사유였다.
-   선택자 두 개에 값 한 벌 — 규칙이 하나면 갈라질 수가 없다. blocked가 warning인 이유는
-   status-pill.tsx의 AGENT_META 주석에 있다(내 차례지 에러가 아니다). */
+/* The group-header pill (12px radius) and the row badge (999px capsule) differ in shape but share
+   **one colour**: the same "needs approval" reading red in a header and blue in a row 700px to its
+   right was the second round's rejection. Two selectors, one set of values — a single rule cannot
+   diverge. Why `blocked` is a warning tone is explained in status-pill.tsx's AGENT_META comment
+   (it means "your turn", not "error"). */
 .status-pill[data-tone="warning"],
 .status-badge--agent[data-agent-state="blocked"] {
   background: oklch(from var(--warn-500) 0.92 calc(c * 0.25) h);
@@ -1082,30 +1148,34 @@ body {
   color: oklch(from var(--success-500) 0.44 c h);
 }
 
-/* US-D02: needs-approval 탭 pill 안의 숫자. 그룹 헤더가 아니라 여기 사는 이유는 Inbox.tsx의
-   `grouped` 주석에 있다(이 뷰는 pending만 쿼리해 그룹이 언제나 하나다). 탭 안이라 --tabular-nums
-   없이도 흔들릴 일이 없고, 회색 대신 현재 라벨 색을 물려받아 "탭의 일부"로 읽힌다. */
+/* US-D02: the number inside the needs-approval tab pill. Why it lives here rather than in a group
+   header is in Inbox.tsx's `grouped` comment (this view queries only pending, so there is always
+   exactly one group). Inside a tab it has nothing to shift against, so it needs no tabular-nums,
+   and it inherits the current label colour instead of going grey so it reads as part of the
+   tab. */
 .inbox-card__pill-count {
   margin-left: 5px;
   opacity: 0.65;
   font-variant-numeric: tabular-nums;
 }
 
-/* US-D02: Agents 뷰의 상태별 그룹 헤더(ref-issue-tracker-density.webp "In review 6 +").
-   세로 패딩이 비대칭(10/6)인 건 의도다 — 헤더가 위가 아니라 아래 행들에 붙어 보여야 "이 묶음의
-   라벨"로 읽힌다. 카드 크롬(테두리·배경·그림자)은 두지 않는다: 헤더는 또 하나의 서피스가 아니라
-   리스트 문법이라, 톤 컬러 좌측 스트라이프 같은 강조 리본도 쓰지 않는다(pill이 이미 상태를 말한다). */
+/* US-D02: the Agents view's per-state group header (ref-issue-tracker-density.webp, "In review 6
+   +"). The asymmetric vertical padding (10/6) is deliberate — the header has to look attached to
+   the rows below it, not the ones above, to read as that group's label. No card chrome (border,
+   background, shadow): a header is list grammar, not another surface, which also rules out an
+   accent ribbon such as a tone-coloured left stripe (the pill already says the state). */
 .group-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  /* 위 20px / 아래 6px. 필터 칩 줄과 붙어 있으면 헤더가 "네 번째 필터 칩"으로 읽힌다 —
-     위쪽 여백이 행 간격(12px)보다 커야 앞 묶음이 끝났다는 신호가 된다. */
+  /* 20px above, 6px below. Pressed against the filter chip row, the header reads as a fourth
+     filter chip — the space above has to beat the row gap (12px) to signal that the previous
+     group ended. */
   padding: 20px 16px 6px;
 }
 
-/* 레퍼런스의 "In review [6] +" 중 [6] — pill 밖 중립 회색 칩이다. 톤 컬러는 pill이 다 쓰고
-   숫자는 밀도만 담당한다. */
+/* The [6] in the reference's "In review [6] +" — a neutral grey chip outside the pill. The pill
+   spends the tone colour; the number only carries density. */
 .group-header__count {
   min-width: 20px;
   padding: 0 6px;
@@ -1118,16 +1188,18 @@ body {
   text-align: center;
 }
 
-/* US-D02: 필터 칩 바 — 리스트 헤더 바로 아래, 행들 위에 얹힌다. 칩은 캡슐(999px)이 아니라
-   모서리를 남긴 8px 라운드에 테두리가 있는 렉트다(ref-issue-tracker-density.webp 실물 그대로).
-   상태 pill(틴트만, 테두리 없음)과 모양·채움을 둘 다 다르게 둬서 두 문법이 안 섞이게 한다.
-   레퍼런스의 칩은 안쪽이 칸으로 갈리고 칸마다 채움이 번갈아 든다 — 그 구조를 칸 둘로 옮겼다
-   (왜 셋이 아닌지는 filter-chip-bar.tsx 주석에 있다). */
+/* US-D02: the filter chip bar — directly under the list header, laid over the rows. A chip is not
+   a capsule (999px) but a bordered rect with an 8px radius that keeps its corners, exactly as in
+   ref-issue-tracker-density.webp. Shape and fill both differ from the status pill (tint only, no
+   border) so the two grammars never blur together.
+   The reference's chip is split into cells with alternating fills — that structure is carried over
+   into two cells (why two and not three is in filter-chip-bar.tsx's comment). */
 .filter-chip-bar {
   display: flex;
-  /* US-D02b: 인박스에서는 이 바가 필터 행(가로 스크롤)의 자식이라 접히면 안 된다 — 접히는 순간
-     3줄짜리 칩 더미가 되돌아온다. 다른 화면도 같은 바를 쓰지만, 그쪽도 폭이 모자라면 접는 것보다
-     미는 게 맞다(레퍼런스의 필터 DSL도 한 줄이다). */
+  /* US-D02b: in the inbox this bar is a child of the horizontally scrolling filter row, so it
+     must not wrap — the moment it does, the three-line chip pile is back. Other screens use the
+     same bar, and sliding beats wrapping there too when width runs out (the reference's filter
+     DSL is one line as well). */
   flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
@@ -1141,12 +1213,13 @@ body {
   height: 28px;
   border: 1px solid var(--accent);
   border-radius: 8px;
-  /* 칸이 칩의 둥근 모서리에 맞춰 잘리게 — 칸마다 따로 반경을 주지 않는다. */
+  /* Cells are clipped to the chip's rounded corner rather than each carrying its own radius. */
   overflow: hidden;
   padding-right: 2px;
   font-size: 12px;
-  /* 틴트 문법은 이 파일에 하나뿐이다 — .status-pill 위 주석이 color-mix의 hue 회전을
-     설명해 놓고 여기서 다시 color-mix를 쓰면 다음 사람이 어느 쪽을 믿을지 알 수 없다. */
+  /* There is exactly one tint grammar in this file — after the comment above .status-pill spends
+     a paragraph on color-mix's hue rotation, reaching for color-mix again here would leave the
+     next reader unsure which to believe. */
   background: oklch(from var(--accent) 0.97 calc(c * 0.18) h);
 }
 .filter-chip__field,
@@ -1155,12 +1228,14 @@ body {
   align-items: center;
   padding: 0 8px;
 }
-/* 옅은 칸 = 무엇을 거는가(상수). 레퍼런스에서 `is any of`가 받던 자리다. */
+/* The pale cell = what is being filtered on (the constant). In the reference this is the slot
+   `is any of` occupied. */
 .filter-chip__field {
   background: var(--bg-base);
   color: var(--text-secondary);
 }
-/* 틴트 칸 = 무엇으로 거는가(값). 칩 배경을 그대로 쓰므로 채움을 다시 선언하지 않는다. */
+/* The tinted cell = what it is filtered to (the value). It reuses the chip background, so no fill
+   is declared again. */
 .filter-chip__value {
   color: var(--text-primary);
 }
@@ -1170,8 +1245,9 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* 칠은 20px — 28px 칩 안에서 위아래 3px씩 떠 테두리에 닿지 않는다(칩 높이 28 − 테두리 2
-     − 칠 20 = 3px×2). 포인터 타깃만 ::after로 28x28까지 넓힌다. */
+  /* The painted area is 20px — inside a 28px chip that leaves 3px above and below so it never
+     touches the border (28 chip − 2 border − 20 paint = 3px x 2). Only the pointer target is
+     widened, to 28x28, by ::after. */
   width: 20px;
   height: 20px;
   align-self: center;
@@ -1200,7 +1276,7 @@ body {
   transform: scale(0.9);
 }
 .filter-chip-bar__add {
-  /* "+"와 라벨 글자를 한 덩어리로 — 좁은 팬에서 라벨이 사라져도 "+"는 남는다. */
+  /* "+" and the label word as one unit — when the word goes in a narrow pane, the "+" stays. */
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1224,19 +1300,22 @@ body {
 .filter-chip-bar__add:active {
   transform: scale(0.97);
 }
-/* 칩 편집 팝오버 = 떠 있는 패널 → glass-surface(유리). 폭만 잡아 준다. */
+/* The chip-editing popover is a floating panel, so it is glass (.glass-surface). Only its width
+   is set here. */
 .filter-chip-popover {
   width: 240px;
   border-radius: 12px;
   padding: 6px;
 }
-/* [cmdk-item]의 기본 레이아웃은 팔레트용(이름 왼쪽 · 단축키 오른쪽 space-between)이다.
-   여기선 체크 표시 + 라벨을 왼쪽에 붙여야 하므로 이 팝오버 안에서만 덮는다 — 팔레트는 그대로. */
+/* [cmdk-item]'s default layout is built for the palette (name left, shortcut right,
+   space-between). Here the check mark and the label both belong on the left, so it is overridden
+   inside this popover only — the palette keeps its own. */
 .filter-chip-popover [cmdk-item] {
   justify-content: flex-start;
   gap: 8px;
 }
-/* 레퍼런스의 필터 팝오버 입력: 돋보기 + 아래 헤어라인 한 줄이 목록을 끊는다. */
+/* The reference's filter-popover input: a magnifier, and one hairline underneath separating it
+   from the list. */
 .filter-chip-popover__search {
   display: flex;
   align-items: center;
@@ -1252,8 +1331,9 @@ body {
   height: 14px;
 }
 .filter-chip-popover__search [cmdk-input] {
-  /* [cmdk-input]의 기본 padding 8px은 팔레트 폭 기준이다 — 240px 팝오버에선 돋보기와
-     placeholder 사이가 벌어져 둘이 한 입력칸으로 안 읽힌다. 좌우만 0으로 되돌린다. */
+  /* [cmdk-input]'s default 8px padding is sized for the palette's width — in a 240px popover it
+     opens a gap between the magnifier and the placeholder, and the two stop reading as one field.
+     Only the horizontal padding is reset. */
   flex: 1 1 auto;
   min-width: 0;
   padding: 6px 0;
@@ -1264,25 +1344,28 @@ body {
   font-size: 12px;
 }
 
-/* US-D02: 인박스 행 호버 카드. 떠 있는 패널이라 유리 표면을 그대로 입는다(.glass-surface는
-   TSX에서 함께 준다). 밀도는 레퍼런스(ref-issue-tracker-density.webp 하단좌측 카드)를 따른다:
-   제목 + 키-값 몇 줄짜리 컴팩트 카드지 상세 패널이 아니다. */
+/* US-D02: the inbox row's hover card. A floating panel, so it wears the glass surface (the TSX
+   supplies .glass-surface). Its density follows the reference (the lower-left card in
+   ref-issue-tracker-density.webp): a compact card of a title plus a few key-value lines, not a
+   detail pane. */
 .row-hover-card {
   min-width: 220px;
   max-width: 280px;
   padding: 12px 14px;
   border-radius: 12px;
-  /* 카드는 행 오른쪽에 뜬다 → 행에서 나온 것처럼 트리거 쪽 모서리를 축으로 자란다
-     (apple-design §7 spatial consistency: 뜬 것은 자기 트리거에서 시작해야 한다).
-     Radix가 트리거 위치·충돌 회피 결과에 맞춰 이 변수를 넣어 주므로 side가 뒤집히면 축도
-     따라 뒤집힌다 — 폴백은 side="right" 기준값이다. */
+  /* The card appears to the row's right, so it grows from the corner nearest its trigger and
+     looks as though it came out of the row (apple-design §7, spatial consistency: a floating
+     thing starts at its trigger). Radix fills this variable from the trigger's position and its
+     collision handling, so the origin flips when the side does — the fallback is the
+     side="right" value. */
   transform-origin: var(--radix-hover-card-content-transform-origin, left center);
 }
-/* 등장은 ask 패널과 같은 한 벌이다(@keyframes + --dur-panel + --ease-spring) — 플로팅 패널마다
-   다른 문법을 만들지 않는다. Radix Popper는 자리를 잡기 전까지 인라인 `animation: none`을
-   걸어 두므로 이 애니메이션은 위치가 확정된 뒤에야 시작한다(엉뚱한 방향에서 튀어 들어오지 않게
-   하는 Radix의 장치다). reduced-motion 블록도 따로 필요 없다 — ask 패널과 같은 이유로
-   tokens.css가 reduce에서 --dur-panel을 0ms로 낮춘다. */
+/* The entrance is the same set the ask panel uses (@keyframes + --dur-panel + --ease-spring) —
+   this repo does not grow a different grammar per floating panel. Radix Popper keeps an inline
+   `animation: none` on the element until it has been placed, so this animation only starts once
+   the position is settled (Radix's own guard against a panel flying in from the wrong side). No
+   separate reduced-motion block is needed either: as with the ask panel, tokens.css drops
+   --dur-panel to 0ms under reduce. */
 .row-hover-card[data-state="open"] {
   animation: row-hover-card-in var(--dur-panel) var(--ease-spring);
 }
@@ -1290,8 +1373,9 @@ body {
 @keyframes row-hover-card-in {
   from {
     opacity: 0;
-    /* ask 패널은 위에서 6px 내려오지만 이 카드는 행 오른쪽에서 뜬다 — 같은 6px/0.98을
-       진행 방향에 맞춰 축만 뒤집었다(§7 들어온 길로 나간다). */
+    /* The ask panel drops 6px from above; this card comes in from the row's right — the same
+       6px/0.98, with only the axis turned to match the direction of travel (§7: it leaves the way
+       it arrived). */
     transform: translateX(-6px) scale(0.98);
   }
   to {
@@ -1300,13 +1384,14 @@ body {
   }
 }
 
-/* 퇴장은 등장 경로를 그대로 되짚는다(apple-design §7 — 들어온 길로 나간다). ask 패널처럼
-   JS 스프링 훅(useClosingSpring)이 필요 없다: Radix Presence가 붙들고 있다가 animationend에
-   언마운트해 준다. 그 판정이 **계산된 animation-name의 변화**라서, 닫힘 상태에는 열림과 다른
-   이름(row-hover-card-out)을 반드시 줘야 한다 — 같은 이름이면 Presence가 "안 바뀌었다"고 보고
-   애니메이션 없이 즉시 언마운트한다. fill-mode는 Presence가 직접 관리하므로 여기선 안 쓴다.
-   (위치가 잡히기 전에는 Radix Popper가 인라인 animation: none을 걸어 두는데, 그때는 Presence가
-   즉시 언마운트한다 — 보이지도 않던 카드를 굳이 붙들 이유가 없으니 맞는 동작이다.) */
+/* The exit retraces the entrance (apple-design §7 — it leaves the way it arrived). Unlike the ask
+   panel this needs no JS spring hook (useClosingSpring): Radix Presence holds the node and
+   unmounts it on animationend. That decision is made from a **change in the computed
+   animation-name**, so the closed state must carry a different name (row-hover-card-out) from the
+   open one — with the same name Presence sees "nothing changed" and unmounts immediately, with no
+   animation. fill-mode is left alone here because Presence manages it.
+   (Before placement, Radix Popper's inline `animation: none` means Presence unmounts at once —
+   which is right: there is no reason to hold a card that was never visible.) */
 .row-hover-card[data-state="closed"] {
   animation: row-hover-card-out var(--dur-panel) var(--ease-spring);
 }
@@ -1327,8 +1412,8 @@ body {
   font-size: 13px;
   font-weight: 600;
 }
-/* 행에서 한 줄 ellipsis로 잘린 요약의 전문 — 이 카드의 본문이다. 5줄에서 끊는 건 카드가
-   상세 패널로 자라지 않게 하려는 것(레퍼런스 카드도 3줄짜리 제목에서 멈춘다). */
+/* The full summary that the row had to ellipsize — this card's body. It stops at five lines so
+   the card never grows into a detail pane (the reference card stops at a three-line title). */
 .row-hover-card__summary {
   margin: 0 0 10px;
   color: var(--text-secondary);
@@ -1362,17 +1447,19 @@ body {
 }
 
 /* ==========================================================================================
-   US-D02b 반응형 셸 — 셸 자신의 폭에 반응한다(@container shell, 위 #root가 컨테이너).
-   세 티어: ≥1280(지금의 3칼럼), 900~1279.98(2칼럼 + 상세는 떠 있는 유리 시트),
-   <900(1칼럼 + 레일이 하단 바로 접힘 + 상세는 거의 전폭 시트).
-   경계에 .98을 붙이는 건 1279.98/899.98처럼 정확히 같은 픽셀에서 두 블록이 동시에 맞지
-   않게 하려는 것 — 겹치면 어느 쪽이 이기는지가 소스 순서에 달려 버린다.
+   US-D02b responsive shell — it responds to its own width (@container shell; #root above is the
+   container). Three tiers: >=1280 (today's three columns), 900–1279.98 (two columns, with the
+   detail pane as a floating glass sheet) and <900 (one column, the rail folded into a bottom bar,
+   the detail pane a near-full-width sheet).
+   The .98 on each boundary keeps two blocks from matching at the very same pixel (1279.98,
+   899.98) — where they overlap, which one wins comes down to source order.
    ========================================================================================== */
 
-/* ≥1280: 지금까지의 레이아웃 그대로. 상세 패널은 여기서 떠 있는 면이 아니라 그리드 칼럼이므로
-   유리를 벗는다 — glass는 sidebar/toolbar/sheet/팔레트/플로팅 전용이라는 규칙(DESIGN-DIRECTION).
-   TSX는 폭을 모른 채 무조건 glass-surface를 달고 나오니, 되돌리는 방향의 오버라이드다
-   (position/inset은 되돌릴 게 없다 — fixed는 아래 블록들에만 있다). */
+/* >=1280: the layout as it has always been. Here the detail pane is a grid column rather than a
+   floating surface, so it takes the glass off — glass belongs to the sidebar, toolbar, sheet,
+   palette and floating panels only (DESIGN-DIRECTION). The TSX attaches .glass-surface
+   unconditionally because it cannot know the width, so this override undoes it (there is nothing
+   to undo for position/inset — `fixed` only appears in the blocks below). */
 @container shell (min-width: 1280px) {
   .app-shell__detail {
     background: var(--bg-base);
@@ -1383,8 +1470,9 @@ body {
   }
 }
 
-/* ≤1279.98: 상세 패널 = 리스트 위에 뜬 유리 시트(유리 자체는 TSX의 .glass-surface가 이미 진다).
-   900~1279는 2칼럼, 900 미만은 1칼럼이지만 시트의 골격은 같다 — 폭만 아래 <900 블록이 덮는다. */
+/* <=1279.98: the detail pane becomes a glass sheet floating over the list (the glass itself
+   already comes from the TSX's .glass-surface). 900–1279 is two columns and below 900 is one, but
+   the sheet's skeleton is the same in both — only its width is overridden by the <900 block. */
 @container shell (max-width: 1279.98px) {
   .app-shell__detail {
     position: fixed;
@@ -1392,24 +1480,26 @@ body {
     right: 16px;
     bottom: 16px;
     width: min(420px, calc(100% - 32px));
-    /* "화면을 채우는 큰 면" 반경(DESIGN-DIRECTION 반경 스케일). */
+    /* The "large surface that fills the screen" radius (DESIGN-DIRECTION radius scale). */
     border-radius: 20px;
     z-index: 20;
-    /* 스프링 등장(240ms, --ease-spring). 별도 reduced-motion 블록이 필요 없다: tokens.css가
-       reduce에서 --dur-panel을 0ms로 내리므로 애니메이션이 즉시 끝 상태로 떨어진다.
-       transition이 아니라 @keyframes인 이유: 시트는 `{detail && …}`로 조건부 렌더돼서 "닫힌
-       상태"가 없다 — 걸릴 출발값이 없으면 전환은 아무 일도 안 한다(마운트된 요소의 transform이
-       이미 none이다). @starting-style이 정답이지만 이 저장소의 CSS 파서(Biome 1.9.4)가 중첩
-       @starting-style을 아직 못 읽어 lint가 깨진다. 그래서 ask 패널·호버 카드와 같은 한 벌로
-       간다 — 플로팅 패널마다 다른 등장 문법을 만들지 않는다는 그 규칙 그대로다. */
+    /* Spring entrance (240ms, --ease-spring). No separate reduced-motion block is needed:
+       tokens.css drops --dur-panel to 0ms under reduce, so the animation lands on its end state
+       at once.
+       @keyframes rather than a transition because the sheet is rendered conditionally
+       (`{detail && …}`) and therefore has no closed state — with no starting value to move from,
+       a transition does nothing (a freshly mounted element's transform is already none).
+       @starting-style is the right answer, but this repo's CSS parser (Biome 1.9.4) cannot read a
+       nested @starting-style yet and lint breaks. So it uses the same set as the ask panel and
+       the hover card — the same rule about not inventing a new entrance grammar per panel. */
     animation: detail-sheet-in var(--dur-panel) var(--ease-spring);
   }
 }
 
 @keyframes detail-sheet-in {
   from {
-    /* 오른쪽에서 밀려 들어온다 — 시트가 붙는 모서리가 오른쪽이다(apple-design §7: 뜬 것은
-       자기가 붙을 자리에서 시작한다). */
+    /* It slides in from the right, which is the edge the sheet attaches to (apple-design §7: a
+       floating thing starts where it will live). */
     transform: translateX(16px);
   }
   to {
@@ -1417,8 +1507,9 @@ body {
   }
 }
 
-/* 900~1279.98: 레일 + 리스트 2칼럼. 상세가 열려 있어도 세 번째 칼럼은 만들지 않는다
-   (.app-shell--with-detail까지 같이 덮는 건 명시도가 같아 소스 순서에 기대지 않으려는 것). */
+/* 900–1279.98: two columns, rail + list. No third column is created even with the detail pane
+   open (.app-shell--with-detail is covered by the same rule rather than left to source order,
+   since the two selectors have equal specificity). */
 @container shell (min-width: 900px) and (max-width: 1279.98px) {
   .app-shell,
   .app-shell--with-detail {
@@ -1426,29 +1517,32 @@ body {
   }
 }
 
-/* <900: 리스트 한 칼럼. 레일은 하단 바로 접히고(ChannelRail이 이 티어에서만 타일 4개 + More만
-   그리고 아바타/설정을 More 팝오버로 내린다 — 그 JS 브레이크포인트는 channel-rail.tsx의
-   NARROW_RAIL_QUERY이고 이 숫자와 같아야 한다), 상세는 좌우 16px만 남긴 전폭 시트다. */
+/* <900: one column for the list. The rail folds into a bottom bar (only in this tier does
+   ChannelRail draw four tiles plus More and move the avatar and settings into the More popover —
+   its JS breakpoint is channel-rail.tsx's NARROW_RAIL_QUERY and must match this number), and the
+   detail pane becomes a full-width sheet with 16px of margin each side. */
 @container shell (max-width: 899.98px) {
   .app-shell,
   .app-shell--with-detail {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* 고정 바가 마지막 행과 ask 바를 덮지 않게 — 바 높이 56px + 숨 쉴 틈. */
+  /* Keeps the fixed bar off the last row and the ask bar — the bar's 56px plus room to
+     breathe. */
   .app-shell__main {
     padding-bottom: 72px;
   }
 
-  /* 420px을 남길 자리가 없다 — 좌우 16px 마진만 남기고 전폭으로 간다. */
+  /* There is no room to keep 420px — full width, with 16px of margin each side. */
   .app-shell__detail {
     width: calc(100% - 32px);
   }
 
-  /* 레일이 기둥에서 툴바로 바뀌었다 — 툴바는 유리가 맞는 자리다(DESIGN-DIRECTION).
-     값은 .glass-surface 한 벌 그대로 가져온다(새 blur/틴트를 만들지 않는다).
-     보더만 예외로 위쪽 한 줄이다: 화면 아래·양옆 끝에 붙는 바에 네 변 헤어라인을 두르면
-     뷰포트 가장자리에 실선 테두리가 남는다. */
+  /* The rail has gone from a column to a toolbar, and a toolbar is a place glass belongs
+     (DESIGN-DIRECTION). The values are .glass-surface's own set, copied rather than reinvented as
+     a new blur/tint. The border is the one exception — a single top line: a four-sided hairline
+     on a bar flush with the bottom and both side edges leaves a drawn border around the
+     viewport. */
   .channel-rail {
     position: fixed;
     left: 0;
@@ -1457,7 +1551,13 @@ body {
     height: 56px;
     flex-direction: row;
     align-items: center;
-    justify-content: space-around;
+    /* One rhythm, not two. The Inbox tile lives outside the plate in the DOM, so spacing the nav
+       and the plate separately gave the Inbox tile one pitch and the other five another (the 768px
+       screenshot: Inbox hard left, then a ~142px stretch across the rest). The plate goes
+       `display: contents` below, which dissolves its box and makes all six tiles direct children
+       here — one gap, one centred group, capped so a wide bar does not stretch 18px marks apart. */
+    justify-content: center;
+    gap: min(5vw, 24px);
     padding: 0 8px;
     z-index: 20;
     background: var(--bg-overlay);
@@ -1468,43 +1568,38 @@ body {
     box-shadow: inset 0 1px 0 var(--glass-highlight), var(--shadow-glass);
   }
 
-  /* 유리를 바가 가져갔다 — 안쪽 플레이트는 같은 유리를 한 겹 더 겹치지 않게 벗고(apple-design
-     §12: 유리 위 유리), 세로 기둥에서 바를 채우는 한 줄로 눕는다. 남는 건 모양뿐이다. */
+  /* The bar already is the glass (above), so the plate has no surface left to carry — and a second
+     glass layer on top of glass is exactly what apple-design warns about. `display: contents`
+     removes the plate's box entirely: its tiles become children of the bar's own flex row, so they
+     share the bar's gap instead of being distributed a second time inside a stretched child. It
+     also retires the pill outline the vertical column's 22px radius used to leave mid-bar. */
   .channel-rail__plate {
-    flex: 1 1 auto;
-    flex-direction: row;
-    justify-content: space-around;
-    gap: 4px;
-    padding: 0;
-    /* 세로 기둥의 둥근 모서리(22px)는 가로 바로 눕는 순간 사라져야 한다 — 안 그러면 바
-       한가운데에 알약 모양 윤곽이 남는다. */
-    border-radius: 0;
-    background: none;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border: none;
-    box-shadow: none;
+    display: contents;
   }
 
-  /* 기둥 전용 아래 여백 — 가로 바에서는 타일을 2px 위로 밀어내기만 한다. */
+  /* Margin that only makes sense in the vertical column — in a horizontal bar it just shoves the
+     tile 2px upward. */
   .channel-rail__tile--inbox {
     margin-bottom: 0;
   }
 }
 
 /* ==========================================================================================
-   US-D02b 반응형 리스트 팬 — 셸이 아니라 **리스트 팬 자신**의 폭에 반응한다
-   (@container list, 위 .inbox-card가 컨테이너). 상세 패널이 열려 있으면 팬이 창보다 좁으므로
-   여기 숫자는 창 폭이 아니다: 560px은 팬의 560px이다. 창 기준으로 잡으면 3칼럼 레이아웃에서
-   팬이 이미 좁은데도 규칙이 안 걸린다.
-   경계에 .98을 붙이는 건 셸 블록과 같은 이유 — 같은 픽셀에서 두 블록이 겹치지 않게.
+   US-D02b responsive list pane — it responds to **the list pane's own** width, not the shell's
+   (@container list; .inbox-card above is the container). With the detail pane open the list pane
+   is narrower than the window, so these numbers are not window widths: 560px means 560px of pane.
+   Measured against the window, the rules would never fire in the three-column layout even though
+   the pane is already narrow.
+   The .98 on each boundary is there for the same reason as in the shell block — so two blocks
+   never match at the same pixel.
    ========================================================================================== */
 
-/* ≤559.98: 필터 행의 두 버튼이 글자를 벗고 아이콘만 남는다. 필터 행이 가로로 밀리긴 하지만
-   탭 5개 + 보관 + 칩 + "+"는 560px 아래에서 한 화면에 안 들어간다 — 가장 정보가 적은 둘
-   ("+ Label"의 "Label", "Archived"의 글자)을 접어 스크롤해야 하는 양 자체를 줄인다.
-   높이는 지켜야 한다: 이 블록에서 버튼이 32px가 되므로 아래 여백을 10px→8px로 내려
-   필터 행 전체를 40px 이하로 유지한다(넓은 폭에서는 여백이 그대로 10px다). */
+/* <=559.98: two buttons in the filter row drop their words and keep only their icons. The row
+   does slide horizontally, but five tabs + Archived + a chip + "+" simply do not fit on one
+   screen below 560px — collapsing the two that carry the least information ("Label" in "+ Label",
+   and the word "Archived") cuts how far there is to scroll in the first place.
+   The height still has to hold: the buttons become 32px in this block, so the bottom padding
+   comes down to keep the whole row inside 40px. */
 @container list (max-width: 559.98px) {
   .filter-chip-bar__add-label,
   .inbox-card__archived-label {
@@ -1515,7 +1610,8 @@ body {
     display: block;
   }
 
-  /* 아이콘만 남은 버튼의 타깃은 32px 이상 — 글자가 빠진 만큼을 아이콘 여백이 메운다. */
+  /* An icon-only button keeps a target of at least 32px — the padding takes back what the word
+     gave up. */
   .filter-chip-bar__add,
   .inbox-card__archived-pill {
     min-height: 32px;
@@ -1523,15 +1619,25 @@ body {
     justify-content: center;
   }
 
+  /* The controls grow to a 32px touch target here, so the strip gives back two of its six bottom
+     pixels to stay inside the same 40px budget (4 + 32 + 4). */
   .inbox-card__filter-row {
-    padding-bottom: 8px;
+    padding-bottom: 4px;
   }
 }
 
-/* ≤479.98: 요약도 한 줄로. 두 줄 클램프를 유지하면 행 높이가 요약 길이에 따라 들쭉날쭉해지는데,
-   이 폭에서는 행 하나가 세로로 쓸 수 있는 여유가 없다. */
+/* <=479.98: the summary drops to one line too. Holding the two-line clamp makes row height vary
+   with summary length, and at this width a row has no vertical slack to spend. */
 @container list (max-width: 479.98px) {
   .inbox-row__summary {
     -webkit-line-clamp: 1;
+  }
+
+  /* The chips were `flex: 0 0 auto` on the same line as the summary, so every pixel they took came
+     out of the summary — at 390px that left the AI summary about two characters wide ("Draft: ...").
+     The summary is the row's reason to exist and the chips repeat what the filter strip already
+     says, so at this width the chips step off the line rather than starving it. */
+  .inbox-row__chips {
+    display: none;
   }
 }

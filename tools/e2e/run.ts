@@ -212,7 +212,7 @@ ${rows(p)}
 
 \`tools/e2e/evidence/\`의 PNG 8장 (01-inbox / 02-inbox-filter-work / 03-thread /
 04-agent-session / 05-approval-card / 06-command-palette / 07-g5-live-item /
-08-archived — "Archived" pill을 켠 Archived 뷰, US-A36).
+08-archived — the Archived view with the "Archived" pill on, US-A36).
 05는 승인 카드 요소만 잘라 찍는다 — 전체 화면으로 찍으면 04와 완전히 같은 그림이 된다
 (셸이 승인 카드를 상세 패널 위에 고정해 두기 때문에 04에도 이미 떠 있다).
 

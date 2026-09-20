@@ -20,58 +20,67 @@ export interface LabelChip {
   color: string | null;
 }
 
-/** U2 아바타: 사람 사진(있으면) → 이니셜+파스텔 폴백, agent_session 행은 런타임 로고
- * (DESIGN-DIRECTION.md U2 — identities에 사진 필드가 아직 없어 "photo"는 데이터가 들어올 때를 위한 자리). */
+/** U2 avatar: a person's photo when there is one, otherwise the initials+pastel fallback; an
+ * agent_session row shows its runtime logo (DESIGN-DIRECTION.md U2 — identities has no photo field
+ * yet, so "photo" is the slot held open for when that data arrives). */
 export type RowAvatar =
   | { kind: "photo"; url: string; name: string }
   | { kind: "initials"; name: string }
   | { kind: "runtime"; runtime: AgentRuntimeKind };
 
 export interface InboxRowProps {
-  /** thread id — U2부터 행은 item이 아니라 thread 하나당 하나다. */
+  /** thread id — since U2 a row is one per thread, not one per item. */
   id: string;
-  /** 이름/제목(사람 표시명 → 스레드 제목 → 채널 핸들, Inbox.tsx의 inboxRowTitle). */
+  /** Name or title (person display name -> thread title -> channel handle; Inbox.tsx's
+   *  inboxRowTitle). */
   name: string;
-  /** 이미 포맷된 상대시간 문자열("3m"/"2w"/"4 Aug" — @omnis/ui/lib/relative-time). */
+  /** An already-formatted relative time string ("3m"/"2w"/"4 Aug" — @omnis/ui/lib/relative-time). */
   timestamp: string;
-  /** threads.meta.summary 우선, 없으면 subject/본문 첫 줄(Inbox.tsx의 threadSummary). */
+  /** threads.meta.summary first, else the subject or the body's first line (Inbox.tsx's
+   *  threadSummary). */
   summary: string;
-  /** 마지막 item이 draft 상태면 요약 앞에 "Draft: "를 붙인다(A5 §3.1). */
+  /** When the last item is a draft, the summary is prefixed with "Draft: " (A5 §3.1). */
   isDraft: boolean;
   avatar: RowAvatar;
   channel: UiChannel;
-  /** null이 아니면 agent_session 행 — 우측 슬롯이 채널 아이콘 대신 상태 배지를 보여준다.
-   *  세션 여부의 사실은 여기 하나로 산다: 그룹 뷰라고 null로 덮으면 행이 채널 글리프로 떨어져
-   *  런타임 세션이 "Slack message"가 되고, 호버 카드까지 없는 채널 줄을 보여준다. */
+  /** Non-null means this is an agent_session row — the right slot shows a status badge instead of
+   *  a channel mark. Whether a row is a session lives here and nowhere else: overwriting it with
+   *  null for a grouped view drops the row back to a channel glyph, so a runtime session claims to
+   *  be a "Slack message" and the hover card grows a channel line it does not have. */
   agentState: AgentSessionKinsoState | null;
-  /** 바로 위 그룹 헤더가 이미 이 행의 상태를 말하고 있다(Agents 뷰). 행은 상태를 되풀이하지
-   *  않되, 비는 자리를 무관한 채널 글리프로 메우지도 않는다 — 세션 행의 우측 슬롯은 빈다. */
+  /** The group header directly above already states this row's status (the Agents view). The row
+   *  does not repeat it, and does not fill the gap with an unrelated channel glyph either — a
+   *  session row's right slot is simply empty. */
   groupedByState?: boolean;
   unread: boolean;
-  /** Unread 개수(threads.unread_count). 행은 점 하나로만 줄여 보여주므로 호버 카드가 수를 말한다. */
+  /** The unread count (threads.unread_count). The row reduces it to a single dot, so the hover
+   *  card is where the number is said. */
   unreadCount?: number;
   selected: boolean;
   hasPendingApproval: boolean;
   labels: LabelChip[];
   onSelect: (id: string) => void;
-  /** US-A36 행 hover 액션. 없으면 버튼을 그리지 않는다(A5 §3.1 "hover 시 우측에 아이콘 버튼"). */
+  /** US-A36 row hover action. Without it no button is drawn (A5 §3.1, "an icon button on the
+   *  right on hover"). */
   onArchive?: (id: string) => void;
-  /** 보관된 행이면 액션이 "Restore"가 된다(A5 §3.8). */
+  /** On an archived row the action becomes "Restore" (A5 §3.8). */
   archived?: boolean;
 }
 
 function pickChips(labels: LabelChip[]): { shown: LabelChip[]; more: number } {
   const scope = labels.find((l) => l.kind === "scope");
   const rest = labels.filter((l) => l !== scope);
-  // A5 §3.1: 칩은 최대 2개. scope가 없으면 그 자리를 비우지 않고 나머지 라벨로 채운다.
+  // A5 §3.1: at most two chips. With no scope label, that slot is filled from the remaining
+  // labels rather than left empty.
   const shown = (scope ? [scope, ...rest] : rest).slice(0, 2);
   return { shown, more: labels.length - shown.length };
 }
 
 function RowAvatarView({ avatar }: { avatar: RowAvatar }) {
   if (avatar.kind === "runtime") {
-    // U5: 실제 브랜드 마크가 있는 런타임(Claude/DeepSeek/…)은 그 로고, 없는 런타임(Hermes)은
-    // 사람 아바타의 이니셜 폴백과 같은 발상으로 글자 한 글자(RUNTIME_LETTER)를 보여준다.
+    // U5: a runtime with a real brand mark (Claude, DeepSeek, ...) shows that logo; one without
+    // (Hermes) shows a single letter (RUNTIME_LETTER), the same idea as a person's initials
+    // fallback.
     const Icon = RUNTIME_ICON[avatar.runtime];
     return (
       <span
@@ -104,11 +113,12 @@ export function InboxRow(props: InboxRowProps) {
   const { shown, more } = pickChips(props.labels);
   const summaryText = props.isDraft ? `Draft: ${props.summary}` : props.summary;
   return (
-    // US-D02: HoverCard.Trigger는 asChild라 이 행 div에 hover 핸들러만 얹는다 — 래퍼 엘리먼트가
-    // 생기지 않고 행의 role="option"·클릭·키보드 동작은 그대로다(Radix Slot이 기존 props에 merge).
-    // openDelay 400ms는 의도한 지연이다: 이 리스트는 행 높이가 낮아 포인터가 훑고 지나가기 쉽고,
-    // 지연이 없으면 카드가 줄줄이 번쩍인다(hover intent). closeDelay는 짧게(100ms) 둬서
-    // 행 사이를 옮겨 다닐 때는 카드가 따라오게 한다.
+    // US-D02: HoverCard.Trigger is asChild, so it only adds hover handlers to this row div — no
+    // wrapper element appears and the row's role="option", click and keyboard behaviour are
+    // untouched (Radix Slot merges into the existing props).
+    // The 400ms openDelay is deliberate: rows here are short, so a pointer sweeps across many of
+    // them, and with no delay the cards flash one after another (hover intent). closeDelay stays
+    // short (100ms) so the card follows while moving between rows.
     <HoverCard.Root openDelay={400} closeDelay={100}>
       <HoverCard.Trigger asChild>
         {/* biome-ignore lint/a11y/useSemanticElements: A5 §3.1 listbox/option pattern — <option> is only valid inside <select> and can't hold this row's markup. */}
@@ -151,7 +161,8 @@ export function InboxRow(props: InboxRowProps) {
               <button
                 type="button"
                 className="inbox-row__action"
-                // 행 전체가 클릭 타깃이라 버블링을 막지 않으면 보관과 동시에 스레드가 열린다.
+                // The whole row is a click target, so without stopping propagation archiving
+                // also opens the thread.
                 onClick={(e) => {
                   e.stopPropagation();
                   props.onArchive?.(props.id);
@@ -186,9 +197,10 @@ export function InboxRow(props: InboxRowProps) {
         </div>
       </HoverCard.Trigger>
       <HoverCard.Portal>
-        {/* 떠 있는 패널이라 유리다(DESIGN-DIRECTION.md "Liquid Glass는 …플로팅 패널에만").
-            밀도는 레퍼런스(ref-issue-tracker-density.webp 하단좌측 카드)를 따른다 — 제목 +
-            키-값 몇 줄짜리 컴팩트 카드지 상세 패널이 아니다. */}
+        {/* A floating panel, so it is glass (DESIGN-DIRECTION.md: Liquid Glass on floating panels
+            only). Its density follows the reference (the lower-left card in
+            ref-issue-tracker-density.webp) — a compact card of a title plus a few key-value lines,
+            not a detail pane. */}
         <HoverCard.Content
           className="glass-surface row-hover-card"
           data-glass-slot="sheet"
@@ -197,9 +209,10 @@ export function InboxRow(props: InboxRowProps) {
           sideOffset={8}
         >
           <p className="row-hover-card__title">{props.name}</p>
-          {/* 카드가 말하는 건 "행이 잘라 낸 것"뿐이다 — 행이 이미 그대로 보여 주는 값을 한 번 더
-              쓰지 않는다. 요약은 행에서 두 줄로 클램프되므로(.inbox-row__summary의 line-clamp)
-              여기서만 전문이 보이고, 라벨 줄은 칩 2개 + "+N"으로 잘렸을 때만 나온다. */}
+          {/* The card says only what the row had to cut — it never repeats a value the row is
+              already showing in full. The summary is clamped to two lines in the row
+              (.inbox-row__summary's line-clamp), so this is the only place it appears complete,
+              and the labels line shows up only once the chips clipped it to two plus "+N". */}
           {summaryText && <p className="row-hover-card__summary">{summaryText}</p>}
           <dl className="row-hover-card__meta">
             {more > 0 && (

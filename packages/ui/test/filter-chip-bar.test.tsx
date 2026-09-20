@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// 루트 `pnpm test`(vitest.workspace.ts)는 packages/ui/vitest.config.ts를 읽지 않는다.
-// 환경과 셋업(jest-dom matchers + afterEach(cleanup))을 파일 자체가 선언한다.
+// The root `pnpm test` (vitest.workspace.ts) does not read packages/ui/vitest.config.ts, so the
+// file declares its own environment and setup (jest-dom matchers + afterEach(cleanup)).
 import "./setup";
 
 import { fireEvent, render, screen, within } from "@testing-library/react";
@@ -27,8 +27,9 @@ function addOptions(over: Partial<{ selectedIds: string[]; onToggle: (id: string
 }
 
 describe("FilterChipBar (US-D02)", () => {
-  // 레퍼런스(ref-issue-tracker-density.webp)의 칩은 한 덩어리 문장이 아니라 채움이 번갈아 드는
-  // 칸들이다 — `[▣ Priority][is any of][2 priorities][×]`. 그 구조가 이 컴포넌트의 계약이다.
+  // The reference's chip (ref-issue-tracker-density.webp) is not one run-together sentence but
+  // cells with alternating fills — `[Priority][is any of][2 priorities][x]`. That structure is
+  // this component's contract.
   it("draws each chip as a field cell and a value cell, not one flat string", () => {
     const chips: FilterChip[] = [
       { id: "channel", field: "Channel", value: "Slack", onRemove: vi.fn() },
@@ -58,7 +59,8 @@ describe("FilterChipBar (US-D02)", () => {
       />,
     );
 
-    // 칩이 둘이면 ×도 둘 — 접근성 이름이 필드명으로 갈려야 어느 쪽인지 고를 수 있다.
+    // Two chips means two x buttons — their accessible names have to differ by field for either
+    // to be selectable.
     fireEvent.click(screen.getByRole("button", { name: "Remove Channel filter" }));
     expect(channel).toHaveBeenCalledOnce();
     expect(labels).not.toHaveBeenCalled();
@@ -72,21 +74,22 @@ describe("FilterChipBar (US-D02)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add Label filter" }));
 
     const popover = screen.getByRole("dialog");
-    // placeholder는 필드명을 물려받는다 — 하드코딩된 영어 "Filter…"는 한국어 UI 한가운데
-    // 혼자 영어로 남는다(실사용 화면에서 그대로 보였다).
+    // The placeholder inherits the field name rather than hardcoding one, so the popover always
+    // says which field it is searching.
     expect(within(popover).getByPlaceholderText("Search Label")).toBeInTheDocument();
     expect(within(popover).getByText("Integrations")).toBeInTheDocument();
     expect(within(popover).getByText("Billing")).toBeInTheDocument();
 
-    // 다중 선택: 한 번 고르고 나서도 목록이 살아 있어야 두 번째를 고를 수 있다.
+    // Multi-select: the list has to survive the first pick for a second to be possible.
     fireEvent.click(within(popover).getByText("Integrations"));
     expect(onToggle).toHaveBeenCalledWith("l1");
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("Billing")).toBeInTheDocument();
   });
 
-  // 레퍼런스의 필터 팝오버 입력은 맨 왼쪽에 돋보기가 서고 아래 헤어라인 한 줄이 목록을
-  // 끊는다. 그 크롬이 없으면 placeholder가 목록 위에 맨몸으로 떠 입력칸으로 안 읽힌다.
+  // The reference's filter-popover input puts a magnifier at the far left with one hairline
+  // underneath separating it from the list. Without that chrome the placeholder floats bare over
+  // the list and stops reading as a field.
   it("gives the popover input a search glyph and a rule above the list", () => {
     render(<FilterChipBar chips={[]} addOptions={addOptions()} />);
     fireEvent.click(screen.getByRole("button", { name: "Add Label filter" }));

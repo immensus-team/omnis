@@ -9,34 +9,34 @@ import {
 } from "../src/lib/row-meta";
 import type { UiChannel } from "../src/types";
 
-describe("initialsFromName (U2 아바타 폴백)", () => {
-  it("두 단어 이름은 각 단어 첫 글자", () => {
+describe("initialsFromName (U2 avatar fallback)", () => {
+  it("takes the first letter of each word in a two-word name", () => {
     expect(initialsFromName("Sora Kim")).toBe("SK");
   });
-  it("한 단어 이름은 앞 두 글자", () => {
+  it("takes the first two letters of a one-word name", () => {
     expect(initialsFromName("Codex")).toBe("CO");
   });
-  it("빈 문자열은 물음표", () => {
+  it("falls back to a question mark for an empty string", () => {
     expect(initialsFromName("")).toBe("?");
   });
-  it("여러 단어면 처음과 마지막만 쓴다", () => {
+  it("uses only the first and last word when there are several", () => {
     expect(initialsFromName("David Yun Park")).toBe("DP");
   });
 });
 
-describe("pastelFromName (U2 아바타 배경색)", () => {
-  it("같은 이름은 항상 같은 색(결정적)", () => {
+describe("pastelFromName (U2 avatar background colour)", () => {
+  it("gives the same name the same colour every time", () => {
     expect(pastelFromName("Sora Kim")).toBe(pastelFromName("Sora Kim"));
   });
-  it("다른 이름은 대체로 다른 색", () => {
+  it("generally gives different names different colours", () => {
     expect(pastelFromName("Sora Kim")).not.toBe(pastelFromName("David Park"));
   });
-  it("oklch 파스텔(고명도) 문자열을 반환한다", () => {
+  it("returns an oklch pastel (high lightness) string", () => {
     expect(pastelFromName("Sora Kim")).toMatch(/^oklch\(0\.88 0\.06 \d+\)$/);
   });
 });
 
-describe("agentSessionKinsoState (A3 agent_sessions.state → herdr 4상태)", () => {
+describe("agentSessionKinsoState (A3 agent_sessions.state -> herdr four states)", () => {
   it.each([
     ["starting", "working"],
     ["running", "working"],
@@ -47,7 +47,7 @@ describe("agentSessionKinsoState (A3 agent_sessions.state → herdr 4상태)", (
   ] as const)("%s → %s", (dbState, expected) => {
     expect(agentSessionKinsoState(dbState)).toBe(expected);
   });
-  it("모르는 값은 idle로 폴백한다", () => {
+  it("falls back to idle for an unknown value", () => {
     expect(agentSessionKinsoState("unknown-future-state")).toBe("idle");
   });
 });
@@ -87,14 +87,14 @@ describe("CHANNEL_BRAND_ASSET (US-D02b: official brand PNGs replace tinted react
   });
 });
 
-describe("RUNTIME_ICON / RUNTIME_LETTER (U5: 에이전트 세션 아바타 = 런타임 로고)", () => {
-  it("Claude Code는 Anthropic 마크(react-icons/si)를 쓴다", () => {
+describe("RUNTIME_ICON / RUNTIME_LETTER (U5: an agent session's avatar is its runtime logo)", () => {
+  it("uses the Anthropic mark (react-icons/si) for Claude Code", () => {
     expect(RUNTIME_ICON.claude_code).toBeDefined();
   });
-  it("DeepSeek은 브랜드 마크를 쓴다", () => {
+  it("uses the brand mark for DeepSeek", () => {
     expect(RUNTIME_ICON.claude_ds).toBeDefined();
   });
-  it("Hermes는 브랜드 마크가 없어 아이콘 대신 글자 폴백('H')이다", () => {
+  it("falls back to the letter 'H' for Hermes, which has no brand mark", () => {
     expect(RUNTIME_ICON.hermes).toBeUndefined();
     expect(RUNTIME_LETTER.hermes).toBe("H");
   });

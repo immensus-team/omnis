@@ -1,8 +1,9 @@
-// docs/design/screens/*.png 캡처 스크립트. e2e 스택을 그대로 올리고 seed.ts 위에 "밀도"를
-// 더한 뒤(needs-approval 여러 건 + 에이전트 세션 4상태) Playwright로 찍는다.
-// 커밋한다: 디자인 스크린샷은 라운드마다 다시 찍어야 하고, 그때 화면에 무엇이 있었는지가
-// 스크린샷만큼 증거다(어떤 픽스처가 그 밀도를 만들었는지는 densify()에만 적혀 있다).
-// 실행: pnpm tsx tools/e2e/shots.ts (e2e와 같은 포트를 쓰므로 e2e와 동시에 돌리지 않는다).
+// Capture script for docs/design/screens/*.png. It brings up the same e2e stack, adds "density"
+// on top of seed.ts (several needs-approval items + all four agent session states) and shoots with
+// Playwright. It is committed: design screenshots have to be retaken every round, and what was on
+// the screen at the time is as much evidence as the picture — which fixture produced that density
+// is written down only in densify().
+// Run: pnpm tsx tools/e2e/shots.ts (same ports as the e2e smoke — never run both at once).
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "@playwright/test";
@@ -31,7 +32,7 @@ const logger = createLogger("@omnis/shots");
 async function densify(pool: Pool): Promise<void> {
   const kernel = createKernel({ pool, logger });
   try {
-    // needs-approval 여러 건 — 전부 커널의 실제 propose 경로.
+    // Several needs-approval items, all through the kernel's real propose path.
     const threads = await query<{ id: string; title: string | null }>(
       pool,
       "SELECT id, title FROM threads WHERE kind <> 'agent_session' ORDER BY created_at",
@@ -160,9 +161,10 @@ async function main(): Promise<void> {
     await page.waitForSelector(".inbox-row", { timeout: 60_000 });
     await page.waitForTimeout(2500);
 
-    // 1) needs-approval — 탭 pill 안의 대기 건수 + Pending approval 행들 + 필터 칩 바.
-    //    파일 이름이 "approvals-density"였는데 이 뷰에는 상태 pill도 그룹 헤더도 없다
-    //    (아래 2번이 그 둘을 담는 뷰다) — 화면 이름 그대로 needs-approval.png로 부른다.
+    // 1) needs-approval — the pending count inside the tab pill, the pending-approval rows and
+    //    the filter chip bar. It used to be filed as "approvals-density", but this view has
+    //    neither status pills nor group headers (view 2 below is the one that has both), so it is
+    //    named after the screen: needs-approval.png.
     await page.getByRole("radio", { name: /^needs-approval/ }).click();
     await page.waitForTimeout(800);
     await page.screenshot({ path: join(OUT, "needs-approval.png") });

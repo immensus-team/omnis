@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// 루트 `pnpm test`(vitest.workspace.ts)는 packages/ui/vitest.config.ts를 읽지 않는다.
-// 환경과 셋업(jest-dom matchers + afterEach(cleanup))을 파일 자체가 선언한다.
+// The root `pnpm test` (vitest.workspace.ts) does not read packages/ui/vitest.config.ts, so the
+// file declares its own environment and setup (jest-dom matchers + afterEach(cleanup)).
 import "./setup";
 
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
@@ -11,7 +11,7 @@ const baseProps = {
   id: "thread-1",
   name: "Sora Kim",
   timestamp: "3m",
-  summary: "회의 자료 확인 부탁드립니다",
+  summary: "Please take a look at the meeting notes",
   isDraft: false,
   avatar: { kind: "initials" as const, name: "Sora Kim" },
   channel: "slack" as const,
@@ -26,14 +26,14 @@ const baseProps = {
   onSelect: vi.fn(),
 };
 
-describe("InboxRow (U2 kinso 대화 행 — 스레드 단위)", () => {
+describe("InboxRow (U2 kinso conversation row, one per thread)", () => {
   it("renders name, timestamp, summary, avatar, channel icon and calls onSelect with the thread id", () => {
     render(<InboxRow {...baseProps} />);
     expect(screen.getByText("Sora Kim")).toBeInTheDocument();
     expect(screen.getByText("3m")).toBeInTheDocument();
-    expect(screen.getByText("회의 자료 확인 부탁드립니다")).toBeInTheDocument();
-    expect(screen.getByLabelText("Sora Kim")).toBeInTheDocument(); // 아바타
-    expect(screen.getByLabelText("Slack message")).toBeInTheDocument(); // 채널 브랜드 아이콘
+    expect(screen.getByText("Please take a look at the meeting notes")).toBeInTheDocument();
+    expect(screen.getByLabelText("Sora Kim")).toBeInTheDocument(); // avatar
+    expect(screen.getByLabelText("Slack message")).toBeInTheDocument(); // channel brand mark
     fireEvent.click(screen.getByRole("option"));
     expect(baseProps.onSelect).toHaveBeenCalledWith("thread-1");
   });
@@ -51,11 +51,11 @@ describe("InboxRow (U2 kinso 대화 행 — 스레드 단위)", () => {
   });
 
   it("prefixes draft summaries with 'Draft: ' (A5 §3.1)", () => {
-    render(<InboxRow {...baseProps} isDraft={true} summary="네 확인했습니다" />);
-    expect(screen.getByText("Draft: 네 확인했습니다")).toBeInTheDocument();
+    render(<InboxRow {...baseProps} isDraft={true} summary="Yes, got it" />);
+    expect(screen.getByText("Draft: Yes, got it")).toBeInTheDocument();
   });
 
-  it("shows at most 2 chips + N more, scope label first (A5 §3.1 우선순위)", () => {
+  it("shows at most 2 chips + N more, scope label first (A5 §3.1 priority)", () => {
     render(
       <InboxRow
         {...baseProps}
@@ -71,8 +71,8 @@ describe("InboxRow (U2 kinso 대화 행 — 스레드 단위)", () => {
   });
 });
 
-// US-D02b: 채널 마크는 react-icons 단색 SVG가 아니라 실제 브랜드 PNG다. 해시된 에셋 URL은
-// Vite가 다시 쓸 수 있으므로 파일명·1x/2x 접미사만 본다.
+// US-D02b: a channel mark is the real brand PNG, not a monochrome react-icons SVG. Vite may
+// rewrite the hashed asset URL, so only the filename and the 1x/2x suffixes are asserted.
 describe("InboxRow channel mark (US-D02b: official brand PNGs)", () => {
   it("renders the channel's real brand PNG in the 16px slot", () => {
     render(<InboxRow {...baseProps} channel="gmail" />);
@@ -91,7 +91,8 @@ describe("InboxRow channel mark (US-D02b: official brand PNGs)", () => {
     expect(img).toHaveAttribute("aria-hidden", "true");
   });
 
-  // KakaoTalk의 노란 타일은 이제 CSS 배경이 아니라 PNG 안에 들어 있다 — 한 번 더 감싸면 이중 프레임.
+  // KakaoTalk's yellow tile now lives inside the PNG rather than in a CSS background — wrapping
+  // it again would double-frame the mark.
   it("does not wrap KakaoTalk in a CSS tile on top of the baked-in one", () => {
     render(<InboxRow {...baseProps} channel="kakaotalk" />);
     const wrap = screen.getByLabelText("KakaoTalk message");
@@ -100,14 +101,14 @@ describe("InboxRow channel mark (US-D02b: official brand PNGs)", () => {
   });
 });
 
-describe("InboxRow 아바타 (U2: 사진 → 이니셜+파스텔 폴백, agent_session은 런타임 로고)", () => {
+describe("InboxRow avatar (U2: photo -> initials+pastel fallback; agent_session shows its runtime logo)", () => {
   it("shows initials on a pastel background when there is no photo", () => {
     render(<InboxRow {...baseProps} avatar={{ kind: "initials", name: "Sora Kim" }} />);
     expect(screen.getByLabelText("Sora Kim")).toHaveTextContent("SK");
   });
 
   it("shows the runtime logo for an agent session row and a status badge instead of the channel icon", () => {
-    render(
+    const { container } = render(
       <InboxRow
         {...baseProps}
         avatar={{ kind: "runtime", runtime: "claude_code" }}
@@ -116,15 +117,19 @@ describe("InboxRow 아바타 (U2: 사진 → 이니셜+파스텔 폴백, agent_s
     );
     const avatarEl = screen.getByLabelText("Claude Code session");
     expect(avatarEl).toBeInTheDocument();
-    expect(avatarEl.querySelector("svg")).toBeInTheDocument(); // Anthropic 브랜드 마크
-    expect(screen.getByText("확인 필요")).toBeInTheDocument();
+    expect(avatarEl.querySelector("svg")).toBeInTheDocument(); // the Anthropic brand mark
+    // Asserted through the badge's own DOM hook rather than its text: the agent state labels are
+    // product copy that still goes through the app's Korean-first i18n layer, and this test is
+    // about which slot the row fills, not about what that copy says today.
+    expect(container.querySelector(".status-badge--agent")).toBeInTheDocument();
     expect(screen.queryByLabelText("Slack message")).not.toBeInTheDocument();
   });
 
-  // 그룹 헤더가 이미 상태를 말할 때(Agents 뷰) 행은 상태를 되풀이하지 않는다 — 그런데 그 자리를
-  // 채널 글리프로 메우면 런타임 세션 행이 "Slack message"라고 주장한다. 슬롯을 비운다.
-  it("groupedByState면 상태 배지도, 대신 들어오는 채널 글리프도 그리지 않는다", () => {
-    render(
+  // When the group header already says the state (the Agents view), the row does not repeat it —
+  // but filling that slot with a channel glyph makes a runtime session row claim to be a "Slack
+  // message". The slot is left empty instead.
+  it("draws neither the status badge nor a stand-in channel glyph under groupedByState", () => {
+    const { container } = render(
       <InboxRow
         {...baseProps}
         avatar={{ kind: "runtime", runtime: "claude_code" }}
@@ -132,12 +137,13 @@ describe("InboxRow 아바타 (U2: 사진 → 이니셜+파스텔 폴백, agent_s
         groupedByState={true}
       />,
     );
-    expect(screen.queryByText("확인 필요")).not.toBeInTheDocument();
+    expect(container.querySelector(".status-badge--agent")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Slack message")).not.toBeInTheDocument();
   });
 
-  // 세션이 아닌 행(agentState null)은 그룹 뷰에 섞여 있어도 채널이 그 행의 진짜 사실이다.
-  it("groupedByState라도 세션이 아닌 행은 채널 글리프를 그대로 갖는다", () => {
+  // For a non-session row (agentState null) the channel is a true fact about that row, even mixed
+  // into a grouped view.
+  it("keeps the channel glyph on non-session rows even under groupedByState", () => {
     render(<InboxRow {...baseProps} groupedByState={true} />);
     expect(screen.getByLabelText("Slack message")).toBeInTheDocument();
   });
@@ -159,15 +165,20 @@ describe("InboxRow pending-approval badge", () => {
   });
 });
 
-describe("InboxRow 리스트 (U2: 스레드 하나당 행 하나)", () => {
+describe("InboxRow list (U2: one row per thread)", () => {
   it("renders one row per thread, each with an avatar, name, time, summary and brand icon", () => {
     const rows = [
-      { ...baseProps, id: "t1", name: "Sora Kim", summary: "회의 자료 확인 부탁드립니다" },
+      {
+        ...baseProps,
+        id: "t1",
+        name: "Sora Kim",
+        summary: "Please take a look at the meeting notes",
+      },
       {
         ...baseProps,
         id: "t2",
         name: "#omnis-launch",
-        summary: "adapter 테스트 3개 실패",
+        summary: "three adapter tests failing",
         avatar: { kind: "runtime" as const, runtime: "codex" as const },
         agentState: "working" as const,
         channel: "agent" as const,
@@ -183,15 +194,15 @@ describe("InboxRow 리스트 (U2: 스레드 하나당 행 하나)", () => {
     const options = screen.getAllByRole("option");
     expect(options).toHaveLength(2);
     expect(screen.getByText("Sora Kim")).toBeInTheDocument();
-    expect(screen.getByText("회의 자료 확인 부탁드립니다")).toBeInTheDocument();
+    expect(screen.getByText("Please take a look at the meeting notes")).toBeInTheDocument();
     expect(screen.getByLabelText("Slack message")).toBeInTheDocument();
     expect(screen.getByText("#omnis-launch")).toBeInTheDocument();
-    expect(screen.getByText("adapter 테스트 3개 실패")).toBeInTheDocument();
+    expect(screen.getByText("three adapter tests failing")).toBeInTheDocument();
     expect(screen.getByLabelText("Codex session")).toBeInTheDocument();
   });
 });
 
-describe("InboxRow 보관 액션 (US-A36)", () => {
+describe("InboxRow archive action (US-A36)", () => {
   it("renders no action button unless onArchive is given", () => {
     render(<InboxRow {...baseProps} />);
     expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
@@ -212,26 +223,27 @@ describe("InboxRow 보관 액션 (US-A36)", () => {
   });
 });
 
-describe("InboxRow 호버 카드 (US-D02)", () => {
-  // 카드는 openDelay(400ms)가 지나야 뜬다 — fake timer로 그 400ms만 실제로 흘려보낸다
-  // (command-palette.test.tsx의 닫힘 스프링 테스트와 같은 패턴).
+describe("InboxRow hover card (US-D02)", () => {
+  // The card only opens after openDelay (400ms) — fake timers advance exactly that 400ms (the
+  // same pattern as command-palette.test.tsx's closing-spring test).
   afterEach(() => vi.useRealTimers());
 
   function hoverRow(over: Partial<typeof baseProps> & Record<string, unknown> = {}) {
     vi.useFakeTimers();
     render(<InboxRow {...baseProps} {...over} />);
-    // Radix HoverCard 1.1.23의 트리거는 pointer 이벤트만 듣는다 — mouseEnter로는 열리지 않는다.
+    // Radix HoverCard 1.1.23's trigger listens to pointer events only — mouseEnter never opens
+    // it.
     fireEvent.pointerEnter(screen.getAllByRole("option")[0] as HTMLElement);
     return () => document.querySelector(".row-hover-card") as HTMLElement | null;
   }
 
-  it("호버 전에는 없고, 400ms가 지나야 카드가 뜬다", () => {
+  it("stays absent before hover and only appears once 400ms have passed", () => {
     const card = hoverRow();
 
-    // 리스트를 훑고 지나갈 때 카드가 줄줄이 번쩍이지 않는다.
+    // Sweeping the pointer down the list must not flash a card on every row.
     expect(card()).toBeNull();
 
-    // 400ms 직전까지는 여전히 없다 — 이 지연이 곧 hover intent다.
+    // Still absent right up to 400ms — that delay is the hover intent.
     act(() => vi.advanceTimersByTime(399));
     expect(card()).toBeNull();
 
@@ -239,11 +251,11 @@ describe("InboxRow 호버 카드 (US-D02)", () => {
     expect(card()).not.toBeNull();
   });
 
-  // 카드의 존재 이유: 행이 line-clamp로 잘라 낸 요약의 전문.
-  it("행이 자른 요약 전문과, 행에 없는 채널·Unread 수를 보여준다", () => {
+  // The card's reason to exist: the full summary the row had to line-clamp.
+  it("shows the full summary the row clipped, plus the channel and unread count it omits", () => {
     const long =
-      "브라이트스톤 리얼티 매매계약서 최신본을 공유해 달라는 요청입니다. 지난주 검토본 이후 " +
-      "특약 두 줄이 바뀌었고 금요일까지 회신이 필요하다고 합니다.";
+      "Asks you to share the latest Brightstone Realty sales contract. Two clauses moved since " +
+      "last week's review, and they need a reply by Friday.";
     const card = hoverRow({ summary: long, unreadCount: 3 });
     act(() => vi.advanceTimersByTime(400));
     const meta = within(card() as HTMLElement);
@@ -257,9 +269,9 @@ describe("InboxRow 호버 카드 (US-D02)", () => {
     expect(meta.getByText("3m")).toBeInTheDocument();
   });
 
-  // 카드는 행을 되풀이하지 않는다. 제목(=이름)은 한 번뿐이고, 행이 이미 칩으로 다 보여 준
-  // 라벨은 카드에 다시 나오지 않는다.
-  it("행이 다 보여 준 것은 반복하지 않는다", () => {
+  // The card does not repeat the row. The title (the name) appears once, and labels the row
+  // already showed in full as chips do not come back in the card.
+  it("does not repeat what the row already showed in full", () => {
     const card = hoverRow({ unreadCount: 0 });
     act(() => vi.advanceTimersByTime(400));
     const meta = within(card() as HTMLElement);
@@ -269,23 +281,24 @@ describe("InboxRow 호버 카드 (US-D02)", () => {
     expect(meta.queryByText("Unread")).not.toBeInTheDocument();
   });
 
-  // 칩 2개 + "+N"으로 잘렸을 때만 전체 라벨 목록이 값을 더한다.
-  it("칩에서 잘린 라벨이 있으면 전체 목록을 보여준다", () => {
+  // The full label list only adds value when the row clipped it to two chips plus "+N".
+  it("lists every label once the chips have clipped some away", () => {
     const card = hoverRow({
       labels: [
         { kind: "scope" as const, name: "work", color: null },
         { kind: "topic" as const, name: "davich", color: null },
-        { kind: "topic" as const, name: "계약", color: null },
+        { kind: "topic" as const, name: "contract", color: null },
       ],
     });
     act(() => vi.advanceTimersByTime(400));
     const meta = within(card() as HTMLElement);
     expect(meta.getByText("Labels")).toBeInTheDocument();
-    expect(meta.getByText("work, davich, 계약")).toBeInTheDocument();
+    expect(meta.getByText("work, davich, contract")).toBeInTheDocument();
   });
 
-  // agent_session 행은 우측 슬롯이 채널 아이콘 대신 상태 배지라 "Channel"이 의미가 없다.
-  it("agent 세션 행에는 채널 줄이 없다", () => {
+  // An agent_session row's right slot is a status badge rather than a channel mark, so a
+  // "Channel" line would mean nothing.
+  it("omits the channel line on an agent session row", () => {
     const card = hoverRow({ agentState: "working" as const });
     act(() => vi.advanceTimersByTime(400));
     expect(within(card() as HTMLElement).queryByText("Channel")).not.toBeInTheDocument();

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-// US-D02: 인박스 헤더 아래 라벨 필터 칩 바 — 팝오버에서 라벨 2개를 고르면 칩이 생기고 리스트가
-// 그 라벨을 단 스레드만 남기며, 칩의 ×가 필터를 되돌린다.
-// archive-inbox.test.tsx의 테이블 태깅 목을 그대로 쓴다(Inbox는 쿼리마다 다른 행이 필요하다).
+// US-D02: the label filter chip bar under the inbox header — picking two labels in the popover
+// creates chips, the list keeps only threads carrying those labels, and a chip's x undoes it.
+// It reuses archive-inbox.test.tsx's table-tagging mock (Inbox needs different rows per query).
 import "./setup";
 
 import { readFileSync } from "node:fs";
@@ -30,7 +30,7 @@ function item(threadId: string, title: string) {
     status: "received",
     scope: "work",
     subject: null,
-    body: `${title} 본문`,
+    body: `${title} body`,
     sent_at: Date.now(),
     author_person_id: null,
     author_agent_id: null,
@@ -49,10 +49,10 @@ function item(threadId: string, title: string) {
 
 const store: Record<string, unknown[]> = {
   items: [
-    item(THREADS.none, "라벨 없음"),
-    item(THREADS.integration, "통합 건"),
-    item(THREADS.billing, "청구 건"),
-    item(THREADS.both, "둘 다 건"),
+    item(THREADS.none, "No labels"),
+    item(THREADS.integration, "Integration thread"),
+    item(THREADS.billing, "Billing thread"),
+    item(THREADS.both, "Both labels"),
   ],
   accounts: [{ id: "acct-1", channel: "gmail" }],
   pending_approvals: [],
@@ -70,7 +70,7 @@ const store: Record<string, unknown[]> = {
   agent_runtimes: [],
 };
 
-/** zero.query.<table>....(체인) → { __table }. 체인 메서드는 전부 자기 자신을 돌려준다. */
+/** zero.query.<table>....(chain) -> { __table }. Every chain method returns the proxy itself. */
 function taggedQuery(table: string): unknown {
   const proxy: unknown = new Proxy(
     {},
@@ -97,9 +97,9 @@ globalThis.ResizeObserver ??= class {
   disconnect() {}
 } as unknown as typeof ResizeObserver;
 
-// 칩 팝오버가 여는 cmdk 목록은 마운트할 때 선택 항목을 scrollIntoView로 끌어온다.
-// packages/ui/test/setup.ts는 이 구멍을 이미 메우지만 apps/desktop/test/setup.ts는 안 한다
-// (그쪽에선 지금까지 cmdk를 렌더한 테스트가 없었다) — 여기서만 메운다.
+// The cmdk list the chip popover opens calls scrollIntoView on its selected item at mount.
+// packages/ui/test/setup.ts already fills that gap; apps/desktop/test/setup.ts does not (no test
+// there had rendered cmdk until now) — so it is filled here only.
 if (typeof Element.prototype.scrollIntoView === "undefined") {
   Element.prototype.scrollIntoView = () => {};
 }
@@ -118,12 +118,13 @@ const renderInbox = (props: ComponentProps<typeof Inbox> = {}) =>
     </VirtuosoMockContext.Provider>,
   );
 
-/** 행 이름만 클래스로 긁는다 — 팝오버가 열려 있으면 cmdk의 항목들도 role="option"이라
- *  role 기반 쿼리는 리스트 행과 섞인다. */
+/** Scrape row names by class — while the popover is open cmdk's items are role="option" too, so a
+ *  role-based query would mix them in with the list rows. */
 const rowNames = (): string[] =>
   [...document.querySelectorAll(".inbox-row__name")].map((el) => el.textContent ?? "");
 
-/** 칩은 필드 칸 + 값 칸이다(레퍼런스의 필터 DSL) — 한 덩어리 문자열로 읽지 않는다. */
+/** A chip is a field cell plus a value cell (the reference's filter DSL) — never read as one
+ *  run-together string. */
 const chipCells = (): (string | null | undefined)[][] =>
   [...document.querySelectorAll(".filter-chip")].map((chip) => [
     chip.querySelector(".filter-chip__field")?.textContent,
@@ -134,28 +135,37 @@ const addTrigger = () => screen.getByRole("button", { name: "Add Label filter" }
 const optionIn = (label: string) => within(screen.getByRole("dialog")).getByText(label);
 
 describe("Inbox label filter chips (US-D02)", () => {
-  it("고른 라벨을 단 스레드만 남기고, 칩의 ×가 전체 목록을 되돌린다", () => {
+  it("keeps only threads carrying the chosen label, and the chip's x restores the full list", () => {
     renderInbox();
-    expect(rowNames()).toEqual(["라벨 없음", "통합 건", "청구 건", "둘 다 건"]);
+    expect(rowNames()).toEqual([
+      "No labels",
+      "Integration thread",
+      "Billing thread",
+      "Both labels",
+    ]);
 
     fireEvent.click(addTrigger());
     fireEvent.click(optionIn("Integrations"));
-    expect(rowNames()).toEqual(["통합 건", "둘 다 건"]);
-    // 다중 선택 — 첫 클릭 뒤에도 목록이 살아 있어야 두 번째를 고를 수 있다.
+    expect(rowNames()).toEqual(["Integration thread", "Both labels"]);
+    // Multi-select — the list has to survive the first click for a second pick to be possible.
     expect(screen.getByRole("dialog")).toBeInTheDocument();
 
     fireEvent.click(optionIn("Billing"));
-    expect(rowNames()).toEqual(["통합 건", "청구 건", "둘 다 건"]);
+    expect(rowNames()).toEqual(["Integration thread", "Billing thread", "Both labels"]);
 
     fireEvent.click(screen.getByRole("button", { name: "Remove Label filter" }));
-    expect(rowNames()).toEqual(["라벨 없음", "통합 건", "청구 건", "둘 다 건"]);
+    expect(rowNames()).toEqual([
+      "No labels",
+      "Integration thread",
+      "Billing thread",
+      "Both labels",
+    ]);
   });
 
-  // 칩 문구는 이 화면의 나머지(Archived/Pending approval/…)와 같은 언어다 — 영어 필터 DSL
-  // ("Label is any of 2 labels")을 그대로 옮기면 한 칩 안에 두 언어가 섞인다.
-  // 레퍼런스도 값이 하나면 수량사를 접는다("Channel is Slack") — "one of 1"은 사람이
-  // 쓰지 않는 말이라 1개일 때는 채널 칩과 같이 이름만 값 칸에 남는다.
-  it("라벨이 하나면 이름을, 둘 이상이면 개수를 값 칸에 말한다", () => {
+  // The reference collapses the quantifier when there is a single value ("Channel is Slack") —
+  // "one of 1" is not something a person writes, so with one label the value cell holds just the
+  // name, exactly as the channel chip does.
+  it("names the label in the value cell for one, and counts them for more than one", () => {
     renderInbox();
     fireEvent.click(addTrigger());
     expect(document.querySelector(".filter-chip")).toBeNull();
@@ -166,7 +176,7 @@ describe("Inbox label filter chips (US-D02)", () => {
     expect(chipCells()).toEqual([["Label", "one of 2"]]);
   });
 
-  it("워크스페이스에 라벨이 하나도 없으면 빈 바를 그리지 않는다", () => {
+  it("draws no bar at all when the workspace has no labels", () => {
     const saved = store.labels;
     store.labels = [];
     try {
@@ -179,9 +189,10 @@ describe("Inbox label filter chips (US-D02)", () => {
 });
 
 describe("Inbox channel filter chips (US-D02)", () => {
-  // 채널 칩의 ×는 셸(App.tsx)이 소유한 레일 선택을 되돌린다 — 레일 상태가 여기 없으므로
-  // 콜백이 없으면 칩도 그리지 않는다(아무 일도 안 하는 ×는 없는 것만 못하다).
-  it("channelFilter + 콜백이 있으면 칩을 그리고 ×가 null을 돌려준다", () => {
+  // The channel chip's x undoes the rail selection, which the shell (App.tsx) owns. With no rail
+  // state here there is no callback, and without a callback there is no chip — an x that does
+  // nothing is worse than no x at all.
+  it("draws a chip when channelFilter and its callback are both present, and x returns null", () => {
     const onChannelFilterChange = vi.fn();
     renderInbox({ channelFilter: "gmail", onChannelFilterChange });
 
@@ -190,7 +201,7 @@ describe("Inbox channel filter chips (US-D02)", () => {
     expect(onChannelFilterChange).toHaveBeenCalledWith(null);
   });
 
-  it("콜백이 없으면 channelFilter가 걸려 있어도 칩을 그리지 않는다", () => {
+  it("draws no chip without the callback, even with channelFilter set", () => {
     renderInbox({ channelFilter: "gmail" });
     expect(document.querySelector(".filter-chip")).toBeNull();
   });
@@ -213,6 +224,36 @@ describe("Inbox filter row responsive contract (US-D02b)", () => {
     ).toEqual(["inbox-card__pills", "inbox-card__archived-pill", "filter-chip-bar"]);
   });
 
+  // An active filter must never be the first thing to scroll off the right edge. Behind five
+  // always-present view pills, the chip currently cutting the list down — and its x — left the
+  // screen entirely at 390px. The order is DOM order, not CSS `order`, so focus order follows.
+  it("moves an active label chip in front of the view pills", () => {
+    const { container } = renderInbox();
+    const classesInStrip = () =>
+      [...(container.querySelector(".inbox-card__filter-row")?.children ?? [])].map(
+        (child) => child.className,
+      );
+
+    expect(classesInStrip()).toEqual([
+      "inbox-card__pills",
+      "inbox-card__archived-pill",
+      "filter-chip-bar",
+    ]);
+
+    fireEvent.click(addTrigger());
+    fireEvent.click(optionIn("Integrations"));
+
+    // Two bars, not one moved bar: the chips take the front, and the "+" trigger keeps the end so
+    // its popover is never torn down and remounted in the middle of a multi-select.
+    expect(classesInStrip()).toEqual([
+      "filter-chip-bar",
+      "inbox-card__pills",
+      "inbox-card__archived-pill",
+      "filter-chip-bar",
+    ]);
+    expect(chipCells()).toEqual([["Label", "Integrations"]]);
+  });
+
   it("keeps that strip and the chip bar single-line in the stylesheet", () => {
     const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
     // Matches the rule that starts the line — `.inbox-card__filter-row .filter-chip-bar` (the
@@ -226,6 +267,41 @@ describe("Inbox filter row responsive contract (US-D02b)", () => {
     // The same bar is used by other screens, which have no scrolling host — it must not wrap there
     // either, or the inbox's 3-line chip pile comes back through the shared component.
     expect(ruleFor("\\.filter-chip-bar")).toContain("flex-wrap: nowrap");
+
+    // `overflow-x: auto` forces the computed `overflow-y` to `auto`, so the strip clips anything a
+    // child paints outside its box. Vertical padding is what keeps a focus ring visible in there.
+    expect(filterRow).toMatch(/padding: \d+px 16px \d+px/);
+    expect(filterRow).not.toContain("padding: 0 16px");
+  });
+
+  // Keyboard focus used to be indistinguishable from hover in this strip: the chips swapped in
+  // `--state-hover`, which is the hover value, and the pills and the Archived toggle had nothing
+  // at all. A ring with an offset is the signal hover never uses.
+  it("gives every control in the strip a focus ring hover does not also draw", () => {
+    const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
+    const ring = css.match(/\.inbox-card__pills button:focus-visible,[\s\S]*?\{([\s\S]*?)\}/)?.[0];
+
+    expect(ring).toBeDefined();
+    for (const selector of [
+      ".inbox-card__archived-pill:focus-visible",
+      ".inbox-card__filter-row .filter-chip button:focus-visible",
+      ".inbox-card__filter-row .filter-chip-bar__add:focus-visible",
+    ]) {
+      expect(ring).toContain(selector);
+    }
+    expect(ring).toContain("outline: 2px solid var(--accent)");
+    expect(ring).toContain("outline-offset");
+  });
+
+  // The chips were `flex: 0 0 auto` next to the summary, so at 390px they took the whole line and
+  // the AI summary — the row's reason to exist — collapsed to about two characters.
+  it("hands the row's second line back to the summary below a 480px pane", () => {
+    const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
+    const narrow = css.match(/@container list \(max-width: 479\.98px\) \{([\s\S]*?)\n\}/)?.[1];
+
+    expect(narrow).toBeDefined();
+    expect(narrow).toContain("-webkit-line-clamp: 1");
+    expect(narrow).toMatch(/\.inbox-row__chips \{\s*display: none;/);
   });
 
   // Below a 560px list pane the container query hides `.inbox-card__archived-label` and shows the

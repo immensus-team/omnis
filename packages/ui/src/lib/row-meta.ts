@@ -24,9 +24,10 @@ import whatsapp1x from "../assets/brands/whatsapp@1x.png";
 import whatsapp2x from "../assets/brands/whatsapp@2x.png";
 import type { UiChannel } from "../types.js";
 
-/** channel-rail.tsx(U1)와 inbox-row.tsx(U2)가 둘 다 필요한 채널 한글 라벨 + 브랜드 아이콘.
- * 예전에는 inbox-row.tsx에 있었고 channel-rail이 거기서 import했다 — U2에서 inbox-row도
- * 아이콘이 필요해지면서 그대로 두면 순환 import가 생겨 공용 lib로 옮긴다. */
+/** The channel display labels that channel-rail.tsx (U1) and inbox-row.tsx (U2) both need.
+ * They used to live in inbox-row.tsx and channel-rail imported them from there — once inbox-row
+ * needed the marks too in U2, leaving them in place would have made a circular import, so they
+ * moved into this shared lib. */
 export const CHANNEL_LABEL: Record<UiChannel, string> = {
   slack: "Slack",
   gmail: "Gmail",
@@ -40,11 +41,12 @@ export const CHANNEL_LABEL: Record<UiChannel, string> = {
   system: "System",
 };
 
-/** US-D02b: 채널 마크는 react-icons 단색 SVG가 아니라 실제 브랜드 PNG다(Logan 제공, 64px/128px).
- * react-icons는 멀티톤 마크를 못 주고(Slack/LinkedIn/Outlook은 상표 정책으로 simple-icons에 아예
- * 없다) 그래서 U5는 단색 아이콘에 브랜드 hex를 *근사*해 칠하고 KakaoTalk만 CSS로 노란 타일을
- * 덧씌웠다 — 이제 그 근사 레이어가 통째로 필요 없다(KakaoTalk의 노란 타일도 PNG 안에 있다).
- * 파일명 = UiChannel 값이라 채널이 늘면 여기 한 항목 + assets/brands PNG 2장만 추가하면 된다. */
+/** US-D02b: a channel mark is the real brand PNG (supplied by Logan at 64px/128px), not a
+ * single-colour react-icons SVG. react-icons cannot give a multi-tone mark, and simple-icons has
+ * no Slack/LinkedIn/Outlook at all for trademark reasons, so U5 *approximated* brand hexes over
+ * monochrome glyphs and laid a CSS yellow tile under KakaoTalk — that whole approximation layer is
+ * gone (KakaoTalk's yellow tile is inside its PNG). Filename = the UiChannel value, so a new
+ * channel means one entry here plus two PNGs in assets/brands. */
 export const CHANNEL_BRAND_ASSET: Record<UiChannel, { at1x: string; at2x: string }> = {
   slack: { at1x: slack1x, at2x: slack2x },
   gmail: { at1x: gmail1x, at2x: gmail2x },
@@ -58,7 +60,7 @@ export const CHANNEL_BRAND_ASSET: Record<UiChannel, { at1x: string; at2x: string
   system: { at1x: system1x, at2x: system2x },
 };
 
-/** A3 agent_runtimes_runtime_ck의 실제 enum(0002_core_inbox.sql). */
+/** The actual enum behind A3's agent_runtimes_runtime_ck (0002_core_inbox.sql). */
 export type AgentRuntimeKind = "claude_code" | "codex" | "claude_ds" | "hermes" | "omnis";
 
 export const RUNTIME_LABEL: Record<AgentRuntimeKind, string> = {
@@ -69,16 +71,16 @@ export const RUNTIME_LABEL: Record<AgentRuntimeKind, string> = {
   omnis: "omnis",
 };
 
-// 런타임 배지는 채널 마크와 별개다 — 여기는 react-icons/lucide 그대로 간다(에이전트 런타임은
-// 공식 PNG 세트에 없고, 없는 마크를 손으로 그리지 않는다).
-// hermes는 RUNTIME_ICON에서 아예 뺀다(undefined) — simple-icons의 SiHermes는 명품 브랜드
-// 에르메스 마크지 이 런타임의 마크가 아니므로 그걸 갖다 붙이는 건 "아무 아이콘이나 브랜드 자리에
-// 넣기" 슬롭이다. inbox-row.tsx가 RUNTIME_LETTER["H"]로 폴백한다.
-// ponytail: codex는 PiOpenAiLogo(react-icons/pi — 이 파일이 Outlook에 이미 쓰는 세트)로 간다.
-// 스펙은 react-icons/si의 SiOpenai를 지목했지만 simple-icons는 OpenAI 로고를 상표 정책으로 뺐다
-// (5.7.0에는 SiOpenaigym만 남아 있다 — 이름이 SiOpenai로 "보이는" 건 접두 매치다). OpenAI 마크가
-// 실제로 있는 세트 중 pi를 골랐다. 이전 lucide Bot은 OpenAI 마크가 없던 시절의 대체물이었다.
-// hermes용 진짜 마크는 생기면 여기 한 줄 추가.
+// Runtime badges are separate from channel marks — these stay on react-icons/lucide (the agent
+// runtimes are not in the official PNG set, and a mark that does not exist is not hand-drawn).
+// hermes is left out of RUNTIME_ICON entirely (undefined): simple-icons' SiHermes is the luxury
+// brand's mark, not this runtime's, and putting any icon in a brand's slot is exactly the slop
+// this rule exists to stop. inbox-row.tsx falls back to RUNTIME_LETTER's "H".
+// ponytail: codex uses PiOpenAiLogo (react-icons/pi — the set this file already uses for Outlook).
+// The spec named react-icons/si's SiOpenai, but simple-icons dropped the OpenAI logo for trademark
+// reasons (5.7.0 only has SiOpenaigym left — it "looks like" SiOpenai because of prefix matching).
+// pi is the set that actually carries the mark. The earlier lucide Bot was a stand-in from when no
+// OpenAI mark existed. A real hermes mark, if one appears, is one line here.
 export const RUNTIME_ICON: Partial<Record<AgentRuntimeKind, ElementType>> = {
   claude_code: SiAnthropic,
   claude_ds: SiDeepseek,
@@ -86,8 +88,9 @@ export const RUNTIME_ICON: Partial<Record<AgentRuntimeKind, ElementType>> = {
   omnis: Sparkles,
 };
 
-/** RUNTIME_ICON에 마크가 없는 런타임(현재 hermes)의 글자 폴백 — 아바타 폴백(initialsFromName)과
- * 같은 발상, 사람 이니셜 대신 런타임 이니셜 한 글자다(DESIGN-DIRECTION.md P1: Hermes → "H"). */
+/** The letter fallback for a runtime with no mark in RUNTIME_ICON (today: hermes) — the same idea
+ * as the avatar fallback (initialsFromName), one runtime initial instead of a person's
+ * (DESIGN-DIRECTION.md P1: Hermes -> "H"). */
 export const RUNTIME_LETTER: Record<AgentRuntimeKind, string> = {
   claude_code: "C",
   claude_ds: "DS",
@@ -96,9 +99,10 @@ export const RUNTIME_LETTER: Record<AgentRuntimeKind, string> = {
   omnis: "O",
 };
 
-/** herdr/kinso 4-상태 배지(idle/working/blocked/done)로 내리는 agent_sessions.state 매핑
+/** Maps agent_sessions.state down to the herdr/kinso four-state badge (idle/working/blocked/done)
  * (A3 agent_sessions_state_ck: starting/idle/running/waiting_approval/ended/failed).
- * failed는 별도 상태 없이 blocked로 합친다 — 둘 다 "내가 봐야 한다"는 같은 사용자 행동을 요구한다. */
+ * `failed` folds into blocked rather than getting a state of its own — both ask the user for the
+ * same thing: look at this. */
 export type AgentSessionKinsoState = "idle" | "working" | "blocked" | "done";
 
 const DB_STATE_TO_KINSO: Record<string, AgentSessionKinsoState> = {
@@ -114,8 +118,9 @@ export function agentSessionKinsoState(dbState: string): AgentSessionKinsoState 
   return DB_STATE_TO_KINSO[dbState] ?? "idle";
 }
 
-/** 아바타 폴백(사람 사진이 없을 때, A5 §3.1 + DESIGN-DIRECTION U2): 이름에서 결정적으로
- * 이니셜 + 파스텔 배경을 만든다. 같은 이름은 항상 같은 색 — 세션 간 리렌더로 색이 안 튄다. */
+/** The avatar fallback when there is no photo (A5 §3.1 + DESIGN-DIRECTION U2): initials and a
+ * pastel background derived deterministically from the name. The same name always gets the same
+ * colour, so a re-render never makes it jump. */
 export function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   const first = parts[0];
@@ -129,6 +134,7 @@ export function pastelFromName(name: string): string {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
   const hue = hash % 360;
-  // oklch 고명도·저채도 = 파스텔, 프로젝트 톤 토큰(tokens.css)과 같은 컬러 스페이스.
+  // High lightness, low chroma in oklch = pastel, in the same colour space as the project's tone
+  // tokens (tokens.css).
   return `oklch(0.88 0.06 ${hue})`;
 }

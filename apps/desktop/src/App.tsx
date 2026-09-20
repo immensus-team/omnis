@@ -14,14 +14,15 @@ import { Inbox, type OpenTarget } from "./screens/Inbox.js";
 import { Thread } from "./screens/Thread.js";
 import { initZero, useZeroClient } from "./zero-client.js";
 
-// 모듈 스코프에서 만들면 App을 import만 해도 WebSocket이 열린다 — 첫 렌더까지 미룬다.
+// Created at module scope it would open a WebSocket on import alone — deferred to first render.
 let zeroClient: ReturnType<typeof initZero> | undefined;
 function getZero() {
   zeroClient ??= initZero();
   return zeroClient;
 }
 
-/** A5 §2.4의 키맵(useKeymap)은 수식키가 붙은 입력을 의도적으로 무시하므로 ⌘K는 셸이 직접 받는다. */
+/** A5 §2.4's keymap (useKeymap) deliberately ignores input with modifier keys, so Cmd+K is handled
+ *  by the shell itself. */
 function useCommandPaletteKey(toggle: () => void) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -36,7 +37,7 @@ function useCommandPaletteKey(toggle: () => void) {
 }
 
 export function App() {
-  // ZeroProvider가 없으면 useQuery가 "useZero must be used within a ZeroProvider"로 죽는다.
+  // Without ZeroProvider, useQuery dies with "useZero must be used within a ZeroProvider".
   return (
     <ZeroProvider zero={getZero()}>
       <Shell />
@@ -49,18 +50,22 @@ function Shell() {
   const [open, setOpen] = useState<OpenTarget | null>(null);
   const [askOpen, setAskOpen] = useState(false);
   const [railChannel, setRailChannel] = useState<RailSelection>(null);
-  // US-D01 결정: ⌘K는 별도 모달 팔레트가 아니라 ask 바의 플로팅 AI 패널을 연다. 같은 액션 목록을
-  // 두 표면(모달 + 패널)에 각각 띄우면 어느 쪽이 진짜인지 알 수 없다 — 하나로 모은다.
-  // CommandPalette mode="dialog" 자체는 @omnis/ui에 남아 있고 테스트도 그대로다(셸이 안 쓴다).
+  // US-D01 decision: Cmd+K opens the ask bar's floating AI panel rather than a separate modal
+  // palette. Putting the same action list on two surfaces (modal + panel) leaves no way to tell
+  // which is the real one, so they are merged into one.
+  // CommandPalette mode="dialog" itself stays in @omnis/ui with its tests — the shell just does
+  // not use it.
   useCommandPaletteKey(() => setAskOpen((v) => !v));
 
-  // 승인은 Zero로 읽고(읽기 전용 경로) 결정만 허브 HTTP로 보낸다 — 계약 §5.
+  // Approvals are read through Zero (the read-only path) and only the decision goes to the hub
+  // over HTTP — contract §5.
   const [approvals] = useQuery(zero.query.pending_approvals.where("state", "=", "pending"));
   const [accounts] = useQuery(zero.query.accounts);
 
-  // US-D01: 선택된 스레드의 AI 요약(threads.meta.summary — T1 요약 루프가 채운다, packages/agents).
-  // 새 백엔드 호출이 필요 없다: Thread.tsx가 archived_at을 읽는 것과 같은 쿼리 모양이다.
-  // 선택이 없으면 빈 문자열로 질의한다(빈 결과) — 훅 개수를 조건부로 바꿀 수 없어서다.
+  // US-D01: the selected thread's AI summary (threads.meta.summary, filled by the T1 summary loop
+  // in packages/agents). No new backend call is needed — it is the same query shape Thread.tsx
+  // uses to read archived_at. With nothing selected it queries the empty string (an empty result),
+  // because the number of hooks cannot be made conditional.
   const [selectedThreadRows] = useQuery(zero.query.threads.where("id", "=", open?.threadId ?? ""));
   const selectedThread = (
     selectedThreadRows as unknown as {
@@ -71,7 +76,8 @@ function Shell() {
   const selectedThreadSummary = selectedThread?.meta?.summary ?? null;
   const selectedThreadTitle = selectedThread?.title ?? null;
 
-  // U1 채널 레일: 연결된 계정의 채널을 중복 없이, 처음 등장한 순서대로.
+  // U1 channel rail: the connected accounts' channels, de-duplicated, in order of first
+  // appearance.
   const connectedChannels = useMemo(() => {
     const seen = new Set<UiChannel>();
     const list: UiChannel[] = [];
@@ -88,9 +94,9 @@ function Shell() {
   const actions: PaletteAction[] = [
     {
       id: "go-inbox",
-      name: "Inbox로 이동",
+      name: "Go to Inbox",
       shortcut: "g i",
-      group: "이동",
+      group: "Navigate",
       perform: () => {
         setOpen(null);
         setRailChannel(null);
@@ -98,8 +104,9 @@ function Shell() {
     },
   ];
 
-  // kinso 레퍼런스는 레일 + 메인 컬럼 둘뿐이다 — 상세 패널은 볼 게 생겼을 때만 세 번째 칼럼을 연다.
-  // (빈 패널을 늘 띄워두면 Inbox 카드가 창의 1/3짜리 사이드바로 쪼그라든다.)
+  // The kinso reference has only a rail and a main column — the detail pane opens a third column
+  // only when there is something to look at. (Keeping an empty pane open shrinks the Inbox card
+  // into a sidebar taking a third of the window.)
   const detail = open !== null || approvals.length > 0;
 
   return (
@@ -124,10 +131,11 @@ function Shell() {
           onChannelFilterChange={setRailChannel}
         />
       </div>
-      {/* US-D02b: 상세 패널은 폭과 무관하게 시트 유리를 달고 나온다 — 좁은 셸(≤1279.98px)에서는
-          이게 실제 모습이고(리스트 위에 뜬 유리 시트), 넓은 셸에서는 app.css의
-          `@container shell (min-width: 1280px)`가 유리를 벗겨 지금의 불투명 칼럼으로 되돌린다.
-          폭에 따라 JS가 분기하지 않으면 고칠 곳이 한 군데뿐이다. */}
+      {/* US-D02b: the detail pane always renders with the sheet's glass, whatever the width. In
+          the narrow shells (<=1279.98px) that is what it actually is — a glass sheet floating over
+          the list — and in the wide shell app.css's `@container shell (min-width: 1280px)` takes
+          the glass back off, returning it to today's opaque column. With no JS branch on width,
+          there is only one place to change. */}
       {detail && (
         <section
           data-testid="detail-pane"
