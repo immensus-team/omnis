@@ -34,6 +34,15 @@ export {
 } from "./jobs/cost-daily.js";
 export type { CostDailyDeps } from "./jobs/cost-daily.js";
 export {
+  COST_REPORT_CRON,
+  COST_REPORT_JOB_NAME,
+  LOW_CACHE_HIT_RATIO,
+  attachReportToDigest,
+  buildMonthlyCostReport,
+  registerCostReportJob,
+} from "./jobs/cost-report.js";
+export type { CostReportRow, MonthlyCostReport } from "./jobs/cost-report.js";
+export {
   TASK_REMIND_CRON,
   TASK_REMIND_JOB_NAME,
   registerTaskRemindJob,
