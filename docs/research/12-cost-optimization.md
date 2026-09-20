@@ -2,7 +2,7 @@
 
 ## 1. TL;DR
 
-omnis는 하루 ~2,000건 메시지를 처리하는 솔로 파운더용 개인 툴이므로, 프론티어 모델 direct 호출은 낭비다. 핵심 전략: (1) classification/labeling/embedding은 M5 Max MacBook에서 MLX로 로컬 실행(무료, Qwen3.x-30B-A3B급 MoE 60 tok/s급), M4 16GB Mac mini는 32GB 미만이라 MLX 가속 불가 — 소형 임베딩/1-3B 모델만; (2) reply draft는 DeepSeek V4.1 Flash를 기본으로 하고 cache-hit 위주 프롬프트 설계, VIP/고위험 스레드만 Claude Sonnet 5로 escalate하는 cascade; (3) nightly digest는 Batch API(50% 할인) + DeepSeek off-peak 시간대(한국시간 밤~오전) 스케줄링; (4) Claude Code/Codex CLI는 이미 보유한 Max/Plus 구독으로 "ordinary individual use" 범위 내에서만 — OAuth 토큰을 Agent SDK나 제품 백엔드에 우회 사용하는 것은 Anthropic ToS 명시적 금지. OpenRouter/Vercel AI Gateway는 둘 다 토큰에 마크업이 없다(OpenRouter는 크레딧 구매 시 5.5% 수수료만).
+omnis is a personal tool for a solo founder handling ~2,000 messages per day, so calling frontier models directly is wasteful. Core strategy: (1) run classification/labeling/embedding locally with MLX on the M5 Max MacBook (free, Qwen3.x-30B-A3B-class MoE at ~60 tok/s); the M4 16GB Mac mini has under 32GB, so MLX acceleration is unavailable — small embedding / 1–3B models only; (2) reply drafts default to DeepSeek V4.1 Flash with cache-hit-heavy prompt design, cascading to Claude Sonnet 5 only for VIP/high-risk threads; (3) schedule the nightly digest with the Batch API (50% discount) + DeepSeek's off-peak window (KST night–morning); (4) Claude Code/Codex CLI only within "ordinary individual use" of the already-owned Max/Plus subscriptions — routing OAuth tokens through the Agent SDK or a product backend is explicitly prohibited by Anthropic's ToS. Neither OpenRouter nor Vercel AI Gateway marks up tokens (OpenRouter charges only a 5.5% fee on credit purchases).
 
 ## 2. Facts
 
