@@ -6,3 +6,4 @@ export { applyRules, WORK_DOMAINS, DETERMINISTIC_RULES, type RuleHit } from "./c
 export { knnVote, KNN_K, KNN_MARGIN_MIN, KNN_SIM_MIN, type KnnVerdict } from "./classify/knn.js";
 export { classifyWithT1, T1ClassifyOutput, SchemaViolationError } from "./t1/classify-t1.js";
 export { T1_BASE_URL, T1_MODEL_ID, T1_RUN_MODEL } from "./t1/provider.js";
+export { sensitivityFor, pickSensitivity, SENSITIVITY_PRIORITY } from "./sensitivity.js";
