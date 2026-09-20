@@ -26,3 +26,5 @@ tools/e2e/.tmp/
 tools/e2e/.playwright/
 ops/mini/env.sh
 tools/auth-kit/accounts.local.json
+# visual 회귀 테스트 스크래치 산출물(스크린샷/리포트) — 커밋 대상 아님, baseline/은 별도로 커밋한다.
+tools/visual/.current/

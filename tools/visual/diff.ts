@@ -7,7 +7,7 @@ import { captureAll, repoRoot } from "./capture.js";
 const BASELINE_DIR = path.join(repoRoot, "tools/visual/baseline");
 /** Git-ignored scratch dir: fresh shots plus the diff visualizations for failures. */
 const SCRATCH_DIR = path.join(repoRoot, "tools/visual/.current");
-const REPORT_PATH = path.join(repoRoot, "tools/visual/report.md");
+const REPORT_PATH = path.join(SCRATCH_DIR, "report.md");
 
 /** pixelmatch's per-pixel color-delta sensitivity (library default). */
 const PIXEL_THRESHOLD = 0.1;
