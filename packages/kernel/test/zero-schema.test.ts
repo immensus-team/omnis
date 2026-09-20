@@ -24,6 +24,7 @@ const EXPECTED_TABLES = [
   "pending_approvals",
   "notes",
   "digests",
+  "settings",
 ];
 
 // A3 §7 제외 테이블. 하나라도 새어 들어가면 비밀·감사·768d 임베딩이 폰까지 간다.
@@ -40,7 +41,7 @@ const FORBIDDEN_TABLES = [
 ];
 
 describe("zeroSchema", () => {
-  it("replicates exactly the 16 tables A3 §7 lists", () => {
+  it("replicates exactly the 17 tables A3 §7 + 델타 §6 list", () => {
     expect([...ZERO_TABLES].sort()).toEqual([...EXPECTED_TABLES].sort());
     expect(Object.keys(zeroSchema.tables).sort()).toEqual([...EXPECTED_TABLES].sort());
   });

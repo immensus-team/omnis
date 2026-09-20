@@ -11,7 +11,7 @@ afterAll(async () => {
 });
 
 describe("0008_publication", () => {
-  it("publishes exactly the 16 whitelisted tables", async () => {
+  it("publishes exactly the 17 whitelisted tables (0008의 16 + 0013의 settings)", async () => {
     const rows = await query<{ tablename: string }>(
       pool,
       `SELECT tablename FROM pg_publication_tables WHERE pubname = 'zero_omnis' ORDER BY tablename`,
@@ -30,6 +30,7 @@ describe("0008_publication", () => {
       "notes",
       "pending_approvals",
       "persons",
+      "settings",
       "tasks",
       "thread_labels",
       "threads",

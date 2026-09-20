@@ -281,6 +281,16 @@ const digests = table("digests")
   })
   .primaryKey("id");
 
+// 델타 §6/§10 (US-B33): 설정 kv. 관계 없음 — 단순 키-값이라 조인이 필요 없다.
+// 쓰기는 Zero가 아니라 허브 HTTP(PUT /settings/:key)를 거친다(계약 §5).
+const settings = table("settings")
+  .columns({
+    key: string(),
+    value: json(),
+    updated_at: number(),
+  })
+  .primaryKey("key");
+
 // Inbox(스레드 목록 → 마지막 item)와 Thread(스레드 → item들 → 작성자) 화면이 실제로 타는 3개만.
 const threadRelationships = relationships(threads, ({ many }) => ({
   items: many({ sourceField: ["id"], destField: ["thread_id"], destSchema: items }),
@@ -308,6 +318,7 @@ export const zeroSchema = createSchema({
     pending_approvals,
     notes,
     digests,
+    settings,
   ],
   relationships: [threadRelationships, itemRelationships],
   // US-A22 편차: @rocicorp/zero@1.9.0에서 `createRunnableBuilder`(= `zero.query.<table>...run()`,
