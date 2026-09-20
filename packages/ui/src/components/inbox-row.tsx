@@ -1,12 +1,16 @@
 import { cn } from "../lib/cn.js";
-
-// Task 4가 여기 로컬로 선언했던 UiChannel/UiItemStatus는 Task 5(US-A27)에서 ../types.ts로 옮겼다.
-// Task 4의 apps/desktop/src/screens/Inbox.tsx가 이미 이 모듈 경로("@omnis/ui/components/inbox-row")에서
-// 두 타입을 import하므로, 여기서 재export하지 않으면 그 import가 깨진다. 이 파일 안에서도 아래
-// CHANNEL_LABEL/InboxRowProps가 두 타입을 쓰므로 import type으로 로컬 바인딩도 함께 가져온다
-// (export type { X } from "mod" 단독으로는 re-export만 되고 로컬 스코프에 X가 들어오지 않는다).
-import type { UiChannel, UiItemStatus } from "../types.js";
-export type { UiChannel, UiItemStatus };
+import {
+  type AgentRuntimeKind,
+  type AgentSessionKinsoState,
+  CHANNEL_ICON,
+  CHANNEL_LABEL,
+  RUNTIME_ICON,
+  RUNTIME_LABEL,
+  initialsFromName,
+  pastelFromName,
+} from "../lib/row-meta.js";
+import type { UiChannel } from "../types.js";
+import { AgentStatusBadge } from "./status-badge.js";
 
 export interface LabelChip {
   kind: "scope" | "topic" | "priority" | "person";
@@ -14,47 +18,34 @@ export interface LabelChip {
   color: string | null;
 }
 
+/** U2 아바타: 사람 사진(있으면) → 이니셜+파스텔 폴백, agent_session 행은 런타임 로고
+ * (DESIGN-DIRECTION.md U2 — identities에 사진 필드가 아직 없어 "photo"는 데이터가 들어올 때를 위한 자리). */
+export type RowAvatar =
+  | { kind: "photo"; url: string; name: string }
+  | { kind: "initials"; name: string }
+  | { kind: "runtime"; runtime: AgentRuntimeKind };
+
 export interface InboxRowProps {
+  /** thread id — U2부터 행은 item이 아니라 thread 하나당 하나다. */
   id: string;
-  title: string;
-  preview: string;
-  channel: UiChannel;
+  /** 이름/제목(사람 표시명 → 스레드 제목 → 채널 핸들, Inbox.tsx의 inboxRowTitle). */
+  name: string;
+  /** 이미 포맷된 상대시간 문자열("3m"/"2w"/"4 Aug" — @omnis/ui/lib/relative-time). */
   timestamp: string;
-  status: UiItemStatus;
+  /** threads.meta.summary 우선, 없으면 subject/본문 첫 줄(Inbox.tsx의 threadSummary). */
+  summary: string;
+  /** 마지막 item이 draft 상태면 요약 앞에 "초안: "을 붙인다(A5 §3.1). */
+  isDraft: boolean;
+  avatar: RowAvatar;
+  channel: UiChannel;
+  /** null이 아니면 agent_session 행 — 우측 슬롯이 채널 아이콘 대신 상태 배지를 보여준다. */
+  agentState: AgentSessionKinsoState | null;
   unread: boolean;
   selected: boolean;
   hasPendingApproval: boolean;
   labels: LabelChip[];
   onSelect: (id: string) => void;
 }
-
-const CHANNEL_LABEL: Record<UiChannel, string> = {
-  slack: "Slack",
-  gmail: "Gmail",
-  gcal: "Google Calendar",
-  outlook: "Outlook",
-  telegram: "Telegram",
-  whatsapp: "WhatsApp",
-  kakaotalk: "KakaoTalk",
-  linkedin: "LinkedIn",
-  agent: "Agent",
-  system: "System",
-};
-
-/** US-A26 채널 아이콘. 글리프는 두 글자 모노그램이다 — 이모지는 헤드리스/폰트 환경마다
- *  렌더가 갈리고, 첫 글자 한 글자는 Gmail/Google Calendar가 겹친다. */
-const CHANNEL_GLYPH: Record<UiChannel, string> = {
-  slack: "SL",
-  gmail: "GM",
-  gcal: "GC",
-  outlook: "OL",
-  telegram: "TG",
-  whatsapp: "WA",
-  kakaotalk: "KA",
-  linkedin: "IN",
-  agent: "AI",
-  system: "SY",
-};
 
 function pickChips(labels: LabelChip[]): { shown: LabelChip[]; more: number } {
   const scope = labels.find((l) => l.kind === "scope");
@@ -64,9 +55,39 @@ function pickChips(labels: LabelChip[]): { shown: LabelChip[]; more: number } {
   return { shown, more: labels.length - shown.length };
 }
 
+function RowAvatarView({ avatar }: { avatar: RowAvatar }) {
+  if (avatar.kind === "runtime") {
+    const Icon = RUNTIME_ICON[avatar.runtime];
+    return (
+      <span
+        className="inbox-row__avatar inbox-row__avatar--runtime"
+        aria-label={`${RUNTIME_LABEL[avatar.runtime]} 세션`}
+      >
+        <Icon size={16} aria-hidden="true" />
+      </span>
+    );
+  }
+  if (avatar.kind === "photo") {
+    return (
+      <span className="inbox-row__avatar" aria-label={avatar.name}>
+        <img className="inbox-row__avatar-img" src={avatar.url} alt="" />
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inbox-row__avatar"
+      style={{ background: pastelFromName(avatar.name) }}
+      aria-label={avatar.name}
+    >
+      {initialsFromName(avatar.name)}
+    </span>
+  );
+}
+
 export function InboxRow(props: InboxRowProps) {
   const { shown, more } = pickChips(props.labels);
-  const previewText = props.status === "draft" ? `초안: ${props.preview}` : props.preview;
+  const summaryText = props.isDraft ? `초안: ${props.summary}` : props.summary;
   return (
     // biome-ignore lint/a11y/useSemanticElements: A5 §3.1 listbox/option pattern — <option> is only valid inside <select> and can't hold this row's markup.
     <div
@@ -82,38 +103,54 @@ export function InboxRow(props: InboxRowProps) {
         }
       }}
     >
+      <RowAvatarView avatar={props.avatar} />
       <div className="inbox-row__meta">
-        <span className="inbox-row__title">{props.title}</span>
+        <span className="inbox-row__name" data-unread={props.unread}>
+          {props.name}
+        </span>
+        {props.unread && <span className="inbox-row__unread-dot" aria-label="안읽음" />}
         <span className="inbox-row__timestamp">{props.timestamp}</span>
       </div>
-      <div className="inbox-row__preview" data-draft={props.status === "draft"}>
-        {previewText}
-      </div>
-      <div className="inbox-row__chips">
-        {shown.map((chip) => (
-          <span
-            key={`${chip.kind}:${chip.name}`}
-            className="inbox-row__chip"
-            aria-label={`${chip.kind} 라벨: ${chip.name}`}
-          >
-            {chip.name}
-          </span>
-        ))}
-        {more > 0 && (
-          <span className="inbox-row__chip-more" aria-label={`라벨 ${more}개 더 보기`}>
-            +{more}
-          </span>
+      <div className="inbox-row__side">
+        {props.agentState ? (
+          <AgentStatusBadge state={props.agentState} />
+        ) : (
+          (() => {
+            const ChannelIcon = CHANNEL_ICON[props.channel];
+            return (
+              <span
+                className="inbox-row__channel-icon"
+                aria-label={`${CHANNEL_LABEL[props.channel]} 메시지`}
+              >
+                <ChannelIcon size={16} aria-hidden="true" />
+              </span>
+            );
+          })()
+        )}
+        {props.hasPendingApproval && (
+          <span className="inbox-row__approval-dot" aria-label="승인 대기" />
         )}
       </div>
-      <div className="inbox-row__channel">
-        <span
-          className="inbox-row__channel-icon"
-          aria-label={`${CHANNEL_LABEL[props.channel]} 메시지`}
-        >
-          {CHANNEL_GLYPH[props.channel]}
+      <div className="inbox-row__summary-line">
+        <span className="inbox-row__summary" data-draft={props.isDraft}>
+          {summaryText}
         </span>
-        {props.unread && <span className="inbox-row__unread" aria-label="안읽음" />}
-        {props.hasPendingApproval && <span className="inbox-row__approval-dot" />}
+        <div className="inbox-row__chips">
+          {shown.map((chip) => (
+            <span
+              key={`${chip.kind}:${chip.name}`}
+              className="inbox-row__chip"
+              aria-label={`${chip.kind} 라벨: ${chip.name}`}
+            >
+              {chip.name}
+            </span>
+          ))}
+          {more > 0 && (
+            <span className="inbox-row__chip-more" aria-label={`라벨 ${more}개 더 보기`}>
+              +{more}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

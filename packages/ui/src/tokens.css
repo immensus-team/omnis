@@ -1,4 +1,4 @@
-/* packages/ui/src/tokens.css — A5 §1.1~§1.4 그대로 옮김, 컴포넌트가 import 한다 */
+/* packages/ui/src/tokens.css — A5 §1.1~§1.4 + U1(kinso 디자인 방향, 2026-09-20 라이트 기본 전환) */
 :root {
   --gray-950: oklch(0.14 0.005 260);
   --gray-900: oklch(0.17 0.006 260);
@@ -13,26 +13,8 @@
   --danger-500: oklch(0.62 0.19 25);
   --warn-500: oklch(0.75 0.15 80);
   --success-500: oklch(0.68 0.14 150);
-  --bg-base: var(--gray-950);
-  --bg-elevated: var(--gray-850);
-  --bg-overlay: color-mix(in oklch, var(--gray-900) 72%, transparent);
-  --border-hairline: oklch(1 0 0 / 0.08);
-  --border-hairline-strong: oklch(1 0 0 / 0.14);
-  --text-primary: var(--gray-100);
-  --text-secondary: var(--gray-500);
-  --text-tertiary: oklch(0.55 0.006 260 / 0.7);
-  --accent: var(--accent-500);
-  --accent-fg: oklch(0.14 0 0);
-  --shadow-row-selected: 0 4px 16px oklch(0 0 0 / 0.35), 0 1px 2px oklch(0 0 0 / 0.4);
-  --font-sans: "Pretendard Variable", "Inter Variable", -apple-system, BlinkMacSystemFont,
-    "SF Pro Text", system-ui, sans-serif;
-  --hairline: 1px solid var(--border-hairline);
-  --dur-fast: 100ms;
-  --dur-base: 160ms;
-  --dur-slow: 400ms;
-  --ease-spring: cubic-bezier(0.2, 0, 0, 1);
-}
-:root[data-theme="light"] {
+  /* U1: 라이트가 기본이다(DESIGN-DIRECTION.md "라이트 테마 기본" — A5의 "다크 우선"은 폐기).
+     예전 라이트 테마 오버라이드 블록에 있던 값을 그대로 기본값으로 올렸다. */
   --bg-base: var(--gray-000);
   --bg-elevated: oklch(0.97 0.002 260);
   --bg-overlay: color-mix(in oklch, var(--gray-000) 78%, transparent);
@@ -44,6 +26,42 @@
   --accent: var(--accent-600);
   --accent-fg: oklch(0.99 0 0);
   --shadow-row-selected: 0 4px 16px oklch(0 0 0 / 0.1), 0 1px 2px oklch(0 0 0 / 0.08);
+  /* kinso 티어다운(23) 실측 그라디언트 stop을 근사 — ask bar 오브/포커스 스트로크 전용,
+     "one accent" 규칙은 --accent 하나만 지키면 되고 이 그라디언트는 그 예외(장식 1곳)다. */
+  --ask-gradient: linear-gradient(135deg, oklch(0.68 0.1 190), oklch(0.72 0.16 55));
+  /* 캔버스 배경: 따뜻한 오프화이트 위에 옅은 그리드 + 피치/민트 그라디언트(23 §2 실측 근사). */
+  --bg-canvas: oklch(0.98 0.004 80);
+  /* background-image는 레이어 목록만 받는다 — `0 0 / 32px 32px` 같은 position/size 절을 섞으면
+     선언 전체가 버려진다(실측: computed backgroundImage === "none"). 크기는 아래 토큰으로 분리. */
+  --canvas-grid: linear-gradient(90deg, oklch(0 0 0 / 0.035) 1px, transparent 1px),
+    linear-gradient(0deg, oklch(0 0 0 / 0.035) 1px, transparent 1px),
+    radial-gradient(60% 50% at 15% 0%, oklch(0.85 0.05 55 / 0.35), transparent 60%),
+    radial-gradient(55% 45% at 100% 20%, oklch(0.85 0.06 190 / 0.3), transparent 60%);
+  --canvas-grid-size: 32px 32px, 32px 32px, auto, auto;
+  --font-sans: "Pretendard Variable", "Inter Variable", -apple-system, BlinkMacSystemFont,
+    "SF Pro Text", system-ui, sans-serif;
+  --hairline: 1px solid var(--border-hairline);
+  --dur-fast: 100ms;
+  --dur-base: 160ms;
+  --dur-slow: 400ms;
+  --ease-spring: cubic-bezier(0.2, 0, 0, 1);
+}
+/* 다크는 옵션이다(data-theme="dark") — 예전 :root 기본값을 그대로 옮겼다. */
+:root[data-theme="dark"] {
+  --bg-base: var(--gray-950);
+  --bg-elevated: var(--gray-850);
+  --bg-overlay: color-mix(in oklch, var(--gray-900) 72%, transparent);
+  --border-hairline: oklch(1 0 0 / 0.08);
+  --border-hairline-strong: oklch(1 0 0 / 0.14);
+  --text-primary: var(--gray-100);
+  --text-secondary: var(--gray-500);
+  --text-tertiary: oklch(0.55 0.006 260 / 0.7);
+  --accent: var(--accent-500);
+  --accent-fg: oklch(0.14 0 0);
+  --shadow-row-selected: 0 4px 16px oklch(0 0 0 / 0.35), 0 1px 2px oklch(0 0 0 / 0.4);
+  --bg-canvas: var(--gray-950);
+  --canvas-grid: none;
+  --canvas-grid-size: auto;
 }
 @media (prefers-reduced-motion: reduce) {
   :root {

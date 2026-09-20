@@ -2,7 +2,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Page, expect, test } from "@playwright/test";
-import { Pool } from "../../packages/db/src/index.js";
+import { Pool, one } from "../../packages/db/src/index.js";
 import { ingestOneMore } from "./seed.js";
 
 const E2E_DIR = new URL(".", import.meta.url).pathname;
@@ -58,29 +58,45 @@ test("Phase A seeded smoke", async ({ page }) => {
   const rows = page.getByRole("option");
   await expect(rows.first()).toBeVisible({ timeout: 30_000 });
 
-  await check("A1 Inbox lists every seeded item", async () => {
-    // Zero의 초기 싱크는 점진적이다 — 시드가 만든 개수가 다 찰 때까지 기다린다.
-    await expect.poll(() => rows.count(), { timeout: 30_000 }).toBe(SEED.itemCount);
-    return `${SEED.itemCount} rows`;
-  });
+  await check(
+    "A1 Inbox lists one row per seeded thread (U2: 행이 item이 아니라 thread 단위)",
+    async () => {
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+      let expectedThreads: number;
+      try {
+        const { count } = await one<{ count: string }>(
+          pool,
+          "SELECT count(DISTINCT thread_id) AS count FROM items WHERE status != 'archived'",
+        );
+        expectedThreads = Number(count);
+      } finally {
+        await pool.end();
+      }
+      // Zero의 초기 싱크는 점진적이다 — 시드가 만든 스레드 수가 다 찰 때까지 기다린다.
+      await expect.poll(() => rows.count(), { timeout: 30_000 }).toBe(expectedThreads);
+      return `${expectedThreads} thread rows (item count was ${SEED.itemCount})`;
+    },
+  );
 
   // 접근성 이름만 보면 빈 div도 통과한다(실제로 그랬다 — 앞 커밋의 fix(desktop) 참고).
-  // 보이는 글리프 텍스트까지 확인해야 "채널 아이콘이 있다"는 주장이 증거가 된다.
-  const CHANNEL_GLYPHS: [string, string][] = [
-    ["Slack 메시지", "SL"],
-    ["Gmail 메시지", "GM"],
-    ["Google Calendar 메시지", "GC"],
-  ];
+  // U2부터 채널 아이콘은 모노그램 텍스트가 아니라 실제 react-icons/si SVG다 — "보이는 무언가가
+  // 있다"는 주장은 이제 svg 자식 노드 존재 + non-zero bounding box로 확인한다.
+  const CHANNEL_LABELS = ["Slack 메시지", "Gmail 메시지", "Google Calendar 메시지"];
   await check("A2 Inbox rows show a visible channel icon for all three channels", async () => {
-    for (const [label, glyph] of CHANNEL_GLYPHS) {
+    for (const label of CHANNEL_LABELS) {
       await expect
         .poll(() => page.getByLabel(label).count(), { timeout: 15_000 })
         .toBeGreaterThan(0);
       const icon = page.getByLabel(label).first();
       await expect(icon).toBeVisible();
-      await expect(icon).toHaveText(glyph);
+      const svg = icon.locator("svg");
+      await expect(svg).toHaveCount(1);
+      const box = await svg.boundingBox();
+      if (!box || box.width === 0 || box.height === 0) {
+        throw new Error(`${label} icon svg has zero size`);
+      }
     }
-    return CHANNEL_GLYPHS.map(([, g]) => g).join(" / ");
+    return CHANNEL_LABELS.join(" / ");
   });
 
   // 시드 행의 제목은 스레드 제목이다 — Phase A는 author_person_id를 안 채우고 Slack에는

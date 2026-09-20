@@ -46,3 +46,12 @@ describe("App shell (US-A25 '빈 셸' + A26~A31 화면 라우팅)", () => {
     expect(screen.getByPlaceholderText("검색 또는 명령…")).toBeInTheDocument();
   });
 });
+
+describe("App shell 레이아웃 (U1 kinso: 레일 + 메인 컬럼)", () => {
+  it("does not reserve a detail column while nothing is open", () => {
+    // kinso 레퍼런스는 선택 전 Inbox 카드가 창 전체를 차지한다 — 빈 상세 패널이 폭을 먹으면 안 된다.
+    render(<App />);
+    expect(screen.queryByTestId("detail-pane")).not.toBeInTheDocument();
+    expect(screen.getByTestId("app-shell")).not.toHaveClass("app-shell--with-detail");
+  });
+});
