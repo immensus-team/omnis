@@ -9,3 +9,14 @@ export {
   type MemoryRow,
 } from "./store.js";
 export { searchMemories, truncateSnippet, type MemoryHit } from "./search.js";
+export { estimateTokens } from "./tokens.js";
+export {
+  SELF_MODEL_FILES,
+  SELF_MODEL_TOKEN_CAPS,
+  invalidateSnapshotCache,
+  loadSelfModel,
+  overCapWarning,
+  selfModelDir,
+  type SelfModelFile,
+  type SelfModelSnapshot,
+} from "./self-model.js";
