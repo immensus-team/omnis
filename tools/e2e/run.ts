@@ -1,5 +1,6 @@
-// `pnpm e2e:phase-a` 진입점. 스택을 올리고 → 시드하고 → Playwright를 돌리고 → 증거와 REPORT.md를
-// 남기고 → 전부 내린다. 멱등성 확인을 위해 같은 일을 두 번 연속 한다.
+// The `pnpm e2e:phase-a` entry point. Bring the stack up → seed → run Playwright → leave evidence
+// and REPORT.md behind → tear it all down. It does the same thing twice in a row to check
+// idempotence.
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -64,7 +65,7 @@ function runPlaywright(env: Record<string, string>): void {
   if (r.status !== 0) console.error(`playwright exited with ${String(r.status)}`);
 }
 
-/** UI가 아니라 허브가 실제로 남긴 흔적을 본다 — 승인 결정은 audit_log와 상태 전이로 증명된다. */
+/** Look at the traces the hub actually left, not the UI — an approval decision is proven by audit_log and the state transition. */
 async function auditAssertions(pool: Pool, seeded: SeedResult): Promise<Assertion[]> {
   const out: Assertion[] = [];
   const started = Date.now();
@@ -123,7 +124,7 @@ async function onePass(pass: number, env: Record<string, string>): Promise<PassR
     writeFileSync(join(TMP, "seed.json"), JSON.stringify(seeded, null, 2));
     writeFileSync(join(TMP, "assertions.json"), "[]");
     if (process.env.E2E_HOLD === "1") {
-      console.log("E2E_HOLD=1 — 스택을 띄운 채로 대기한다. ctrl-c로 끝낸다.");
+      console.log("E2E_HOLD=1 — holding with the stack up. Press ctrl-c to finish.");
       await new Promise(() => {});
     }
     runPlaywright(env);
@@ -158,74 +159,77 @@ function report(passes: PassResult[]): string {
     first.seed.itemCount === second.seed.itemCount &&
     first.assertions.length === second.assertions.length &&
     first.assertions.every((a, i) => a.ok === (second.assertions[i]?.ok ?? false));
-  return `# Phase A 종단 스모크 리포트
+  return `# Phase A End-to-End Smoke Report
 
-생성: ${now} · \`pnpm e2e:phase-a\` (tools/e2e/run.ts)
+Generated: ${now} · \`pnpm e2e:phase-a\` (tools/e2e/run.ts)
 
-스택: PostgreSQL \`${DB_NAME}\` (마이그레이션 0001–0008 + Zero permissions) → zero-cache :${ZERO_PORT}
-→ 허브 :${HUB_PORT} (HTTP + WS /bridge) → 로컬 에이전트 브리지(mock 런타임 픽스처, host=macbook)
-→ 데스크톱 Vite dev :${VITE_PORT} → Playwright(chromium, headless).
+Stack: PostgreSQL \`${DB_NAME}\` (migrations 0001–0008 + Zero permissions) → zero-cache :${ZERO_PORT}
+→ hub :${HUB_PORT} (HTTP + WS /bridge) → local agent bridge (mock runtime fixtures, host=macbook)
+→ desktop Vite dev :${VITE_PORT} → Playwright (chromium, headless).
 
-시드는 전부 실제 코드 경로다: 어댑터 \`normalize()\` → 커널 \`IngestSink\`,
-커널 \`approvals.propose\`, \`@omnis/agents\`의 \`classify()\`(T0 규칙 경로, 네트워크 호출 없음),
-\`ClaudeCodeAdapter\` + \`apps/local-agent/test\` 픽스처 재생.
+Every part of the seed takes a real code path: adapter \`normalize()\` → kernel \`IngestSink\`,
+kernel \`approvals.propose\`, \`classify()\` from \`@omnis/agents\` (T0 rule path, no network calls),
+\`ClaudeCodeAdapter\` + \`apps/local-agent/test\` fixture replay.
 
 ${passes
   .map(
     (p) => `## Pass ${p.pass} (${(p.ms / 1000).toFixed(1)}s, items=${p.seed.itemCount})
 
-| 결과 | 검증 | 소요 | 비고 |
+| Result | Check | Time | Note |
 | --- | --- | --- | --- |
 ${rows(p)}
 `,
   )
   .join("\n")}
-## 멱등성
+## Idempotence
 
-두 번 연속 실행 결과가 ${same ? "동일하다 (PASS)" : "달랐다 (FAIL)"}.
+Two consecutive runs produced ${same ? "the same result (PASS)" : "different results (FAIL)"}.
 
-## 읽는 법 (이 리포트가 주장하지 않는 것)
+## How to read this (what the report does not claim)
 
-- **Inbox는 U2(kinso 대화 행)부터 스레드 목록이다.** 한 스레드의 여러 메시지는 행 하나로
-  합쳐지고(가장 최근 item), 행 제목은 사람 표시명 → 스레드 제목 → 채널 핸들 순으로 정해진다 —
-  Phase A의 커널 IngestSink는 author_person_id를 의도적으로 비워 두어(person 신원 해석은
-  Phase B) 모든 시드 행이 스레드 제목으로 떨어진다. A1이 스레드 수를, A2b가 그 제목이 실제로
-  화면에 있는지 본다.
-- **A2는 접근성 이름이 아니라 눈에 보이는 아이콘을 본다.** 채널 아이콘은 react-icons/si
-  SVG다(U2 이전엔 모노그램 텍스트였다) — A2가 svg 자식 노드와 non-zero bounding box로
-  "정말 뭔가 그려져 있다"를 확인한다.
-- **A2c/A2d가 kinso 셸과 행 해부를 본다.** A2c는 왼쪽 채널 레일 타일(Inbox/Slack/Gmail/
-  Google Calendar/Agent)과 상단 "Start typing to ask or search" 필바가 떠 있는지, A2d는 한
-  행 안에 아바타 · 이름 · **상대시간 문법**(now/3m/2w/4 Aug — ISO 타임스탬프가 아님) · 비어
-  있지 않은 요약 줄이 다 있는지 본다. 이 둘이 없으면 A1/A2/A2b는 요약 줄이 통째로 빠져도 통과한다.
-- **A4는 개수가 아니라 신원을 본다.** 행이 thread 단위가 된 U2 이후로 시드의 work 스레드와
-  personal 스레드는 각각 1개다 — "개수가 다르다"는 더 이상 성립하지 않아(U2 머지에서 실제로
-  깨졌다) 두 필터의 행 집합이 서로 겹치지 않고 둘 다 all의 진부분집합인지로 바꿨다.
-  A4b는 레일 타일 클릭이 목록을 좁히고 Inbox 타일이 되돌리는지를 따로 본다.
-- **T1(DeepSeek/OpenRouter) 호출은 강제로 막혀 있다.** 시드가 classify()를 부르기 전에
-  OMNIS_OPENROUTER_API_KEY를 비운다 — 규칙 1단이 안 맞아 3단까지 흘러내려도 t1Model()이
-  fetch 전에 던진다. A10은 그와 별개로 기록된 run이 tier=T0인지 본다.
-- **이 스모크를 다시 돌리면 REPORT.md와 evidence/ PNG가 덮어써진다.** 머지 전에 돌렸다면
-  \`git checkout -- tools/e2e\`로 되돌리거나, 새 결과를 그대로 커밋해야 한다.
+- **The Inbox has been a thread list since U2 (kinso conversation rows).** Multiple messages in
+  one thread collapse into a single row (the most recent item), and the row title is resolved as
+  person display name → thread title → channel handle — the Phase A kernel IngestSink deliberately
+  leaves author_person_id empty (resolving person identity is Phase B), so every seeded row falls
+  through to the thread title. A1 checks the thread count; A2b checks that those titles are really
+  on screen.
+- **A2 looks at the visible icon, not the accessible name.** Channel icons are react-icons/si SVGs
+  (they were monogram text before U2) — A2 confirms "something is actually drawn" via an svg child
+  node and a non-zero bounding box.
+- **A2c/A2d cover the kinso shell and the row anatomy.** A2c checks that the left channel rail
+  tiles (Inbox/Slack/Gmail/Google Calendar/Agent) and the top "Start typing to ask or search" bar
+  are up; A2d checks that a single row holds avatar, name, **relative-time grammar** (now/3m/2w/
+  4 Aug — never an ISO timestamp) and a non-empty summary line. Without those two, A1/A2/A2b would
+  still pass with the summary line missing entirely.
+- **A4 checks identity, not counts.** Since U2 made rows per thread, the seed's work thread and
+  personal thread are one each — "the counts differ" no longer holds (it actually broke at the U2
+  merge), so the check became: the two filters' row sets do not overlap and both are proper subsets
+  of all. A4b separately checks that clicking a rail tile narrows the list and the Inbox tile
+  restores it.
+- **T1 (DeepSeek/OpenRouter) calls are force-blocked.** The seed clears OMNIS_OPENROUTER_API_KEY
+  before calling classify() — so even if tier 1 misses a rule and falls through to tier 3,
+  t1Model() throws before the fetch. A10 separately checks that the recorded run has tier=T0.
+- **Re-running this smoke overwrites REPORT.md and the evidence/ PNGs.** If you ran it before a
+  merge, either revert with \`git checkout -- tools/e2e\` or commit the new results as they are.
 
-## 증거
+## Evidence
 
-\`tools/e2e/evidence/\`의 PNG 8장 (01-inbox / 02-inbox-filter-work / 03-thread /
+The 8 PNGs in \`tools/e2e/evidence/\` (01-inbox / 02-inbox-filter-work / 03-thread /
 04-agent-session / 05-approval-card / 06-command-palette / 07-g5-live-item /
-08-archived — "보관됨" pill을 켠 Archived 뷰, US-A36).
-05는 승인 카드 요소만 잘라 찍는다 — 전체 화면으로 찍으면 04와 완전히 같은 그림이 된다
-(셸이 승인 카드를 상세 패널 위에 고정해 두기 때문에 04에도 이미 떠 있다).
+08-archived — the Archived view with the archived pill on, US-A36).
+05 crops to just the approval card element — shooting the full screen would produce exactly the
+same image as 04 (the shell pins the approval card above the detail pane, so it is already in 04).
 
-## 로그
+## Logs
 
-\`tools/e2e/.logs/\`의 hub.log · zero-cache.log · desktop.log (커밋 대상 아님).
+hub.log · zero-cache.log · desktop.log under \`tools/e2e/.logs/\` (not committed).
 `;
 }
 
 const env = loadOrCreateEnv();
 const passes: PassResult[] = [];
 try {
-  // 기본은 2회(멱등성 확인). 디버깅 중에는 E2E_PASSES=1로 한 번만 돈다.
+  // Two passes by default (idempotence check). While debugging, E2E_PASSES=1 runs just one.
   const total = Number(process.env.E2E_PASSES ?? "2");
   for (let pass = 1; pass <= total; pass++) {
     passes.push(await onePass(pass, env));
