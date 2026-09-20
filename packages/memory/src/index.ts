@@ -8,3 +8,4 @@ export {
   type MemoryInput,
   type MemoryRow,
 } from "./store.js";
+export { searchMemories, truncateSnippet, type MemoryHit } from "./search.js";
