@@ -1248,17 +1248,19 @@ Two stages.
 
 **A. Rule scanner** (in the assembler, before the LLM call, ~2ms). When a regex set matches, it records the reason in `injection_flags` but does not block by itself (too many false positives) — instead it forces B to run.
 
+> The Korean alternations in these patterns are intentional and must not be translated: they match **inbound user data** (KakaoTalk, Korean Slack/Gmail per A1), not repo prose. Removing them silently disables Korean prompt-injection detection and regresses the §11.3 golden cases.
+
 ```ts
 const SCANNERS: Array<{flag:string; re:RegExp}> = [
-  { flag:'instruction_override', re:/(previous|above|prior|earlier)\s*(instruction|prompt|directive|command)[^.]{0,20}(ignore|disregard|forget)/i },
-  { flag:'role_claim',           re:/(I am|this is)\s*(the\s*)?(system|admin|administrator|developer|anthropic|openai)/i },
+  { flag:'instruction_override', re:/(이전|위의|앞의|previous|above|prior|earlier)\s*(지시|명령|instruction|prompt|directive|command)[^.]{0,20}(무시|잊|ignore|disregard|forget)/i },
+  { flag:'role_claim',           re:/(나는|I am|this is)\s*(the\s*)?(시스템|관리자|system|admin|administrator|developer|anthropic|openai)/i },
   { flag:'tool_invocation',      re:/\b(send_email|send_message|delete_|exec|run_agent|curl|http_fetch|tool_call)\b/i },
-  { flag:'credential_request',   re:/(password|passphrase|token|api\s*key|secret|credential|keychain)/i },
-  { flag:'exfil_target',         re:/(send|forward|deliver)\s*(this|it|to)?\s*[\w.+-]+@[\w.-]+/i },
-  { flag:'urgency_pressure',     re:/(urgent(ly)?|immediately|right now)[^.]{0,30}(approve|execute|send|run)/i },
+  { flag:'credential_request',   re:/(비밀번호|패스워드|토큰|키체인|password|passphrase|token|api\s*key|secret|credential|keychain)/i },
+  { flag:'exfil_target',         re:/(보내|전달|send|forward|deliver)\s*(주세요|해줘|this|it|to)?\s*[\w.+-]+@[\w.-]+/i },
+  { flag:'urgency_pressure',     re:/(즉시|지금\s*당장|urgent(ly)?|immediately|right now)[^.]{0,30}(승인|실행|보내|approve|execute|send|run)/i },
   { flag:'fake_tag',             re:/<\/?\s*(system|data|instructions?|tool)\b/i },
   { flag:'encoded_blob',         re:/[A-Za-z0-9+/]{200,}={0,2}/ },
-  { flag:'self_model_target',    re:/(USER\.md|VOICE\.md|PROJECTS\.md|self[- ]?model|remember this)/i },
+  { flag:'self_model_target',    re:/(USER\.md|VOICE\.md|PROJECTS\.md|self[- ]?model|기억해|remember this)/i },
 ];
 ```
 
