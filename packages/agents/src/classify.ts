@@ -1,5 +1,5 @@
 import { Scope, Sensitivity } from "@omnis/protocol";
-// A4 §2 L1 분류·라벨 루프. 3단(결정론적 규칙 → 임베딩 kNN → T1 LLM)을 순서대로 내려간다.
+// A4 §2 L1 classification/labeling loop. It descends the three stages in order (deterministic rules → embedding kNN → T1 LLM).
 import { z } from "zod";
 import { knnVote } from "./classify/knn.js";
 import { type ClassifyCtx, applyRules } from "./classify/rules.js";
@@ -23,7 +23,7 @@ export const ClassifyOutput = z.object({
 export type ClassifyResult = z.infer<typeof ClassifyOutput>;
 
 export async function classify(item: ItemRow, ctx: ClassifyCtx): Promise<ClassifyResult> {
-  // ── 1단: 결정론적 규칙 (T0, $0)
+  // ── Stage 1: deterministic rules (T0, $0)
   const hit = await applyRules(item, ctx);
   if (hit !== null) {
     const sensitivity = await sensitivityFor(item, ctx);
@@ -42,7 +42,7 @@ export async function classify(item: ItemRow, ctx: ClassifyCtx): Promise<Classif
       matched_rule_ids: [hit.rule_id],
       sensitivity,
       confidence: hit.confidence,
-      rationale: `규칙 ${hit.rule_id}이 이 메시지를 ${hit.scope}로 판정했습니다.`,
+      rationale: `Rule ${hit.rule_id} classified this message as ${hit.scope}.`,
       injection_flags: [],
       tier_used: "T0",
     };
@@ -50,7 +50,7 @@ export async function classify(item: ItemRow, ctx: ClassifyCtx): Promise<Classif
     return out;
   }
 
-  // ── 2단: 임베딩 kNN (T0, $0)
+  // ── Stage 2: embedding kNN (T0, $0)
   const knn = await knnVote(item, ctx);
   if (knn !== null) {
     const sensitivity = await sensitivityFor(item, ctx);
@@ -70,7 +70,7 @@ export async function classify(item: ItemRow, ctx: ClassifyCtx): Promise<Classif
       matched_rule_ids: [],
       sensitivity,
       confidence,
-      rationale: `비슷한 지난 메시지 ${knn.neighborIds.length}건이 모두 ${knn.scope}였습니다.`,
+      rationale: `${knn.neighborIds.length} similar past messages were all ${knn.scope}.`,
       injection_flags: [],
       tier_used: "T0",
     };
@@ -78,7 +78,7 @@ export async function classify(item: ItemRow, ctx: ClassifyCtx): Promise<Classif
     return out;
   }
 
-  // ── 3단: T1 LLM (DeepSeek V4.1 Flash via OpenRouter)
+  // ── Stage 3: T1 LLM (DeepSeek V4.1 Flash via OpenRouter)
   const runId = await recordRun({
     loop: "classify",
     item_id: item.id,
@@ -99,7 +99,7 @@ export async function classify(item: ItemRow, ctx: ClassifyCtx): Promise<Classif
       injection_flags: t1.output.injection_flags,
       ...t1.usage,
     });
-    // A4 §1.6: injection_flags가 비어있지 않으면 결과물을 만들지 않는다.
+    // A4 §1.6: if injection_flags is non-empty, no output artifact is produced.
     if (blocked) {
       return {
         scope: "unknown",
@@ -107,7 +107,8 @@ export async function classify(item: ItemRow, ctx: ClassifyCtx): Promise<Classif
         matched_rule_ids: [],
         sensitivity: "normal",
         confidence: 0,
-        rationale: "이 메시지에 지시문으로 보이는 내용이 있어 자동 처리를 건너뛰었습니다.",
+        rationale:
+          "This message contains what looks like instructions, so automatic processing was skipped.",
         injection_flags: t1.output.injection_flags,
         tier_used: "T1",
       };
@@ -124,14 +125,14 @@ export async function classify(item: ItemRow, ctx: ClassifyCtx): Promise<Classif
       error: e instanceof Error ? e.message : String(e),
       ...(raw !== undefined ? { raw_output: raw } : {}),
     });
-    // A4 §2.5: 판정 못 하면 unknown으로 두고 Inbox All 탭에만 보인다.
+    // A4 §2.5: if it cannot be classified, leave it as unknown; it appears only in the Inbox All tab.
     return {
       scope: "unknown",
       priority: "fyi",
       matched_rule_ids: [],
       sensitivity: "normal",
       confidence: 0,
-      rationale: "자동 분류에 실패해 미분류로 남겨두었습니다.",
+      rationale: "Automatic classification failed, so this was left unclassified.",
       injection_flags: [],
       tier_used: "T1",
     };

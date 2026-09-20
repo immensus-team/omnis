@@ -1,5 +1,6 @@
-// A4 §1.4 정규화 파이프라인 + §11.1 태그 탈출 차단 + §11.2-A 룰 스캐너.
-// 순서가 방어다: 숨김 노드를 먼저 지우지 않으면 태그를 걷어낸 뒤 숨은 지시문이 본문이 된다.
+// A4 §1.4 normalization pipeline + §11.1 tag-escape blocking + §11.2-A rule scanner.
+// Order is the defense: hidden nodes must go first, or the hidden instructions become the body once
+// tags are stripped.
 import { randomBytes } from "node:crypto";
 
 export const NORMALIZE_MAX_CHARS = 8000;
@@ -7,7 +8,7 @@ const HEAD_CHARS = 4000;
 const TAIL_CHARS = 2000;
 const REDACTED = "⟦redacted-tag⟧";
 
-/** 델타 §4가 고정한 5개. A4 §11.2-A의 9개 정규식은 이 5개로 접힌다. */
+/** The five fixed by delta §4. The 9 regexes of A4 §11.2-A collapse into these 5. */
 export const INJECTION_FLAGS: readonly string[] = [
   "instruction_override",
   "credential_request",
@@ -16,7 +17,7 @@ export const INJECTION_FLAGS: readonly string[] = [
   "tag_escape",
 ] as const;
 
-/** A4 §1.4: 실행마다 새로 뽑는 16 hex. nonce를 모르면 블록을 닫을 수 없다. */
+/** A4 §1.4: 16 hex drawn fresh per run. Without the nonce you cannot close the block. */
 export function newNonce(): string {
   return randomBytes(8).toString("hex");
 }
@@ -30,15 +31,16 @@ const ENTITIES: Array<[RegExp, string]> = [
   [/&#39;/g, "'"],
 ];
 
-// 숨김 노드: 여는 태그의 style 속성에 display:none / font-size:0 / 흰 글씨가 걸린 것.
-// ponytail: 정규식은 같은 태그의 중첩을 못 본다. 메일 본문에서 숨김 div 안에 같은 div가
-// 중첩되는 경우는 관측된 적이 없고, 겉 태그가 지워지면 안쪽 텍스트도 같이 지워진다.
-// 파서가 필요해지면 그때 parse5를 넣는다.
+// Hidden node: an opening tag whose style attribute carries display:none / font-size:0 / white text.
+// ponytail: the regex cannot see nesting of the same tag. In email bodies, a hidden div nesting the
+// same div has never been observed, and when the outer tag is removed the inner text goes with it.
+// If a parser becomes necessary, add parse5 then.
 const HIDDEN_NODE =
   /<([a-z][a-z0-9]*)\b[^>]*style\s*=\s*(["'])(?:(?!\2).)*?(?:display\s*:\s*none|font-size\s*:\s*0|color\s*:\s*#f{3}(?:f{3})?\b)(?:(?!\2).)*?\2[^>]*>[\s\S]*?<\/\1\s*>/gi;
 
-/** 경계 태그(`data`/`system`/`instructions`/`tool`)는 일반 태그 제거에서 **빼 둔다** —
- *  여기서 공백으로 지워 버리면 5단계 탈출 차단이 증거를 잃고 플래그도 못 단다. */
+/** Boundary tags (`data`/`system`/`instructions`/`tool`) are **excluded** from generic tag
+ *  stripping — blanking them here would rob step 5's escape blocking of its evidence, so no flag
+ *  could ever be raised. */
 const BOUNDARY_TAG_NAMES = "data|system|instructions?|tool";
 const HTML_TAG = new RegExp(`<(?!/?\\s*(?:${BOUNDARY_TAG_NAMES})\\b)[^>]+>`, "g");
 const BOUNDARY_TAG = new RegExp(`</?\\s*(?:${BOUNDARY_TAG_NAMES})\\b[^>]*>?`, "gi");
@@ -47,10 +49,10 @@ const BLOB = /[A-Za-z0-9+/]{200,}={0,2}/g;
 const URL_WITH_QUERY = /(https?:\/\/[^\s"'<>]+?)\?[^\s"'<>]*/g;
 
 export function normalizeExternal(text: string, nonce: string): string {
-  // 1. NFKC + zero-width 제거
+  // 1. NFKC + zero-width removal
   let out = text.normalize("NFKC").replace(/[​-‏﻿]/g, "");
 
-  // 2. HTML: 숨김 노드 → script/style → 주석 → 남은 태그 → 엔티티
+  // 2. HTML: hidden nodes → script/style → comments → remaining tags → entities
   out = out
     .replace(HIDDEN_NODE, " ")
     .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, " ")
@@ -62,13 +64,13 @@ export function normalizeExternal(text: string, nonce: string): string {
   for (const [re, to] of ENTITIES) out = out.replace(re, to);
   if (hadTags) out = out.replace(/[ \t]{2,}/g, " ").trim();
 
-  // 3. base64/hex 블록은 디코드하지 않는다. 길이만 말한다.
+  // 3. base64/hex blobs are not decoded. Only the length is reported.
   out = out.replace(BLOB, (m) => `[base64 blob, ${m.length} bytes]`);
 
-  // 4. URL은 스킴+호스트+경로만. 쿼리스트링은 provenance에만 남는다.
+  // 4. URLs keep scheme+host+path only. The query string survives in provenance alone.
   out = out.replace(URL_WITH_QUERY, (_m, head: string) => `${head}?…`);
 
-  // 5. 태그 탈출 차단 — nonce를 모르면 블록을 닫을 수 없게 만드는 마지막 문.
+  // 5. Tag-escape blocking — the last gate that makes the block unclosable without the nonce.
   out = out
     .replaceAll(`d_${nonce}`, REDACTED)
     .replace(BOUNDARY_TAG, REDACTED)
@@ -77,7 +79,7 @@ export function normalizeExternal(text: string, nonce: string): string {
 
   if (out.length > NORMALIZE_MAX_CHARS) {
     const omitted = out.length - HEAD_CHARS - TAIL_CHARS;
-    out = `${out.slice(0, HEAD_CHARS)}[…${omitted}자 생략…]${out.slice(out.length - TAIL_CHARS)}`;
+    out = `${out.slice(0, HEAD_CHARS)}[…${omitted} chars omitted…]${out.slice(out.length - TAIL_CHARS)}`;
   }
   return out;
 }
@@ -90,43 +92,53 @@ export function wrapData(
   return `<data id="d_${attrs.nonce}" source="${attrs.source}"${thread} as_of="${attrs.asOf}">\n${text}\n</data>`;
 }
 
-/** A4 §1.5의 팬텀 tool 12종. `@omnis/agents/src/tools`의 PHANTOM_TOOLS(US-B06)는 레지스트리
- *  쪽 목록이고, 이쪽은 "텍스트에 이 이름이 보이면 스캔한다"는 탐지 쪽이다. 둘이 갈리면
- *  US-B06의 테스트가 두 목록을 대조해 깨뜨린다. */
+/** The 12 phantom tools of A4 §1.5. PHANTOM_TOOLS in `@omnis/agents/src/tools` (US-B06) is the
+ *  registry-side list; this one is the detection side — "if this name shows up in the text, scan
+ *  for it". If the two diverge, the US-B06 test breaks by comparing the two lists. */
 const EGRESS_WORDS =
   /\b(send_message|send_email|reply|delete_item|archive|calendar_create|calendar_update|run_agent|exec|read_file|http_fetch|read_secret)\b/i;
 
 const SCANNERS: Array<{ flag: string; re: RegExp }> = [
+  // FROZEN matcher: the Korean alternatives match Korean-language input, which puts the noun
+  // before the verb. Every `re:` below that contains Korean is frozen the same way — keep the
+  // Korean alternatives verbatim.
   {
     flag: "instruction_override",
     re: /(이전|위의|앞의|previous|above|prior)\s*(지시|명령|instruction|prompt)[^.]{0,20}(무시|잊|ignore|disregard|forget)/i,
   },
-  // 영어는 동사가 앞에 온다("Ignore all previous instructions") — 위 정규식은 명사→동사 순서만 본다.
+  // English puts the verb first ("Ignore all previous instructions") — the regex above only looks
+  // at noun→verb order.
   {
     flag: "instruction_override",
     re: /\b(ignore|disregard|forget)\b[^.]{0,30}\b(instructions?|prompts?|rules?)\b/i,
   },
+  // FROZEN matcher: the Korean alternatives match Korean-language input.
   {
     flag: "instruction_override",
     re: /(나는|I am|this is)\s*(시스템|관리자|admin|system|anthropic|openai|developer)/i,
   },
+  // FROZEN matcher: the Korean alternatives match Korean-language input.
   {
     flag: "instruction_override",
     re: /(즉시|지금\s*당장|urgent(ly)?|immediately)[^.]{0,30}(승인|approve|실행|execute|보내)/i,
   },
+  // FROZEN matcher: the Korean alternatives match Korean-language input.
   {
     flag: "credential_request",
     re: /(비밀번호|패스워드|토큰|api\s*key|secret|credential|키체인|keychain)/i,
   },
+  // FROZEN matcher: the Korean alternatives match Korean-language input.
   { flag: "exfil_link", re: /(보내|전달|forward|send)\s*(주세요|해줘|to)?\s*[\w.+-]+@[\w.-]+/i },
-  // 한국어는 조사가 붙어 주소가 먼저 온다("attacker@evil.com 으로 전달해줘").
+  // FROZEN matcher: in Korean the particle attaches to the address, so the address comes first and
+  // the verb trails it — hence this second, verb-trailing pattern.
   { flag: "exfil_link", re: /[\w.+-]+@[\w.-]+[^.]{0,20}(보내|전달|forward|send)/i },
   { flag: "phantom_tool", re: EGRESS_WORDS },
   { flag: "tag_escape", re: /<\/?\s*(system|data|instructions?|tool)\b/i },
 ];
 
-/** 조립기가 **정규화 전 원문**에 돌린다(~2ms). 정규화가 태그와 숨김 텍스트를 지워버리면
- *  탐지할 것이 사라지기 때문이다. 이 함수는 차단하지 않는다 — 플래그만 단다(A4 §11.2). */
+/** The assembler runs this on the **raw text before normalization** (~2ms), because normalization
+ *  erases tags and hidden text and there would be nothing left to detect. This function does not
+ *  block — it only attaches flags (A4 §11.2). */
 export function scanInjection(text: string): string[] {
   const found = new Set<string>();
   for (const s of SCANNERS) {
