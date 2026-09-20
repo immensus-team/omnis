@@ -24,17 +24,44 @@
 
 Use any model you want — local models through Ollama, DeepSeek, Claude, or the subscription CLIs you already pay for. Work routes through a four-tier cascade under a monthly cap, switchable per task from `settings` — no code changes, no lock-in.
 
-| | |
-| --- | --- |
-| **One inbox, people and agents** | Slack, mail, calendar and chat land in the same stream as a delegated agent run. A run that needs your answer sorts to the top, exactly like a person waiting on you. |
-| **Read before you get there** | Every row carries a written summary instead of a subject line, produced by the cheap tier before you open the app. New items reach the screen in under two seconds. |
-| **Drafts in your voice** | Replies are written and waiting, editable inline. Sending is a separate, explicit act — the approval gate lives in the kernel, not in the UI. |
-| **Clears what does not need you** | Manual archive with undo, plus a nightly pass that files what the classifier is confident about and a digest telling you what it moved. |
-| **Turns talk into work** | Messages become tasks; tasks become delegated runs on another machine you own — proposed automatically, executed after you approve. |
-| **Remembers across sessions** | One memory layer over your inbox, local files, Drive and GitHub, with bi-temporal entities: every fact knows when it became true and when it stopped. |
-| **Knows who people are** | Identities resolved across channels into a single person card, with a follow-up loop that notices when a thread has gone quiet and proposes the nudge. |
-| **Everything is searchable** | ⌘K searches channels, memory and agent sessions from any screen, with the palette and the ask bar sharing one surface. |
-| **Runs on your own hardware** | Postgres, the hub and the agents are one process group on a Mac mini behind Tailscale. The same tree is built to run standalone on a laptop later. |
+<table>
+<tr>
+<td width="30%"><b>One inbox, people and agents</b></td>
+<td>Slack, mail, calendar and chat land in the same stream as a delegated agent run. A run that needs your answer sorts to the top, exactly like a person waiting on you.</td>
+</tr>
+<tr>
+<td width="30%"><b>Read before you get there</b></td>
+<td>Every row carries a written summary instead of a subject line, produced by the cheap tier before you open the app. New items reach the screen in under two seconds.</td>
+</tr>
+<tr>
+<td width="30%"><b>Drafts in your voice</b></td>
+<td>Replies are written and waiting, editable inline. Sending is a separate, explicit act — the approval gate lives in the kernel, not in the UI.</td>
+</tr>
+<tr>
+<td width="30%"><b>Clears what does not need you</b></td>
+<td>Manual archive with undo, plus a nightly pass that files what the classifier is confident about and a digest telling you what it moved.</td>
+</tr>
+<tr>
+<td width="30%"><b>Turns talk into work</b></td>
+<td>Messages become tasks; tasks become delegated runs on another machine you own — proposed automatically, executed after you approve.</td>
+</tr>
+<tr>
+<td width="30%"><b>Remembers across sessions</b></td>
+<td>One memory layer over your inbox, local files, Drive and GitHub, with bi-temporal entities: every fact knows when it became true and when it stopped.</td>
+</tr>
+<tr>
+<td width="30%"><b>Knows who people are</b></td>
+<td>Identities resolved across channels into a single person card, with a follow-up loop that notices when a thread has gone quiet and proposes the nudge.</td>
+</tr>
+<tr>
+<td width="30%"><b>Everything is searchable</b></td>
+<td>⌘K searches channels, memory and agent sessions from any screen, with the palette and the ask bar sharing one surface.</td>
+</tr>
+<tr>
+<td width="30%"><b>Runs on your own hardware</b></td>
+<td>Postgres, the hub and the agents are one process group on a Mac mini behind Tailscale. The same tree is built to run standalone on a laptop later.</td>
+</tr>
+</table>
 
 Three theses drive every decision:
 
