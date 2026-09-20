@@ -6,5 +6,28 @@
   },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
   "linter": { "enabled": true, "rules": { "recommended": true } },
-  "javascript": { "formatter": { "quoteStyle": "double", "semicolons": "always" } }
+  "javascript": { "formatter": { "quoteStyle": "double", "semicolons": "always" } },
+  "overrides": [
+    {
+      // US-B07 / A4 §1.1: @omnis/agents는 커널(특히 egress)을 import하지 않는다(계약 §1).
+      "include": ["packages/agents/**"],
+      "linter": {
+        "rules": {
+          "nursery": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@omnis/kernel": "packages/agents는 @omnis/kernel을 의존하지 않는다(계약 §1). LoopKernel 구조적 타입을 쓴다.",
+                  "@omnis/kernel/egress": "egress는 커널 소유다(A4 §1.1).",
+                  "../../kernel/src/egress.js": "egress는 커널 소유다(A4 §1.1).",
+                  "../../../kernel/src/egress.js": "egress는 커널 소유다(A4 §1.1)."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

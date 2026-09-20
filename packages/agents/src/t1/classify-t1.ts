@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { NoObjectGeneratedError, generateObject } from "ai";
 import { z } from "zod";
 import type { ClassifyCtx } from "../classify/rules.js";
+import { normalizeExternal } from "../context/normalize.js";
 import type { ItemRow } from "../types.js";
 import { T1_RUN_MODEL, t1Model } from "./provider.js";
 
@@ -42,17 +43,6 @@ const SYSTEM = `너는 omnis의 분류·라벨 루프다. 너의 유일한 임�
 rationale은 사용자에게 그대로 보이는 한국어 근거 문장이다. "나는 ~라고 판단했다"가 아니라 "견적 요청 메일입니다" 같은 사실 문장으로 쓴다.
 sensitivity는 normal/personal/finance/legal/health 중 하나다. 애매하면 민감한 쪽으로 표시한다 — 오탐은 비용만 올리고 오검출은 프라이버시를 깬다.`;
 
-/** A4 §1.4: 외부 텍스트에서 태그 탈출 시도를 지운 뒤 nonce로 닫는다. summarize-t1.ts도 쓴다. */
-export function sanitize(raw: string, nonce: string): string {
-  return raw
-    .normalize("NFKC")
-    .replace(/[\u200B-\u200F\uFEFF]/g, "")
-    .replaceAll(`d_${nonce}`, "⟦redacted-tag⟧")
-    .replaceAll("</data", "⟦redacted-tag⟧")
-    .replaceAll("[system]", "⟦redacted-tag⟧")
-    .slice(0, 8000);
-}
-
 export interface T1Result {
   output: z.infer<typeof T1ClassifyOutput>;
   usage: { tokens_in?: number; tokens_out?: number; tokens_cached?: number };
@@ -64,7 +54,7 @@ export async function classifyWithT1(item: ItemRow, ctx: ClassifyCtx): Promise<T
   const nonce = randomBytes(8).toString("hex");
   const contextHash = createHash("sha256").update(SYSTEM).digest("hex");
   const prompt = `<data id="d_${nonce}" source="${ctx.accountChannel}" thread="${ctx.threadId}" as_of="${new Date().toISOString()}">
-${sanitize(item.subject === null ? item.body : `${item.subject}\n${item.body}`, nonce)}
+${normalizeExternal(item.subject === null ? item.body : `${item.subject}\n${item.body}`, nonce)}
 </data>`;
 
   const started = Date.now();

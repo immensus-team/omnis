@@ -3,7 +3,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import { NoObjectGeneratedError, generateObject } from "ai";
 import { z } from "zod";
-import { SchemaViolationError, sanitize } from "./classify-t1.js";
+import { normalizeExternal } from "../context/normalize.js";
+import { SchemaViolationError } from "./classify-t1.js";
 import { T1_RUN_MODEL, t1Model } from "./provider.js";
 
 export const T1SummaryOutput = z.object({
@@ -39,7 +40,7 @@ export async function summarizeWithT1(
   const nonce = randomBytes(8).toString("hex");
   const contextHash = createHash("sha256").update(SYSTEM).digest("hex");
   const prompt = `<data id="d_${nonce}" thread="${ctx.threadId}" as_of="${new Date().toISOString()}">
-${sanitize(item.subject === null ? item.body : `${item.subject}\n${item.body}`, nonce)}
+${normalizeExternal(item.subject === null ? item.body : `${item.subject}\n${item.body}`, nonce)}
 </data>`;
 
   const started = Date.now();

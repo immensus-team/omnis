@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 export const omnisAlias: Record<string, string> = {
   "@omnis/db": fileURLToPath(new URL("./packages/db/src/index.ts", import.meta.url)),
   "@omnis/protocol": fileURLToPath(new URL("./packages/protocol/src/index.ts", import.meta.url)),
+  "@omnis/memory": fileURLToPath(new URL("./packages/memory/src/index.ts", import.meta.url)),
   // Vite의 문자열 alias는 prefix 치환이다 — 서브패스 항목이 반드시 bare 항목보다 먼저 와야
   // "@omnis/kernel/zero"가 ".../src/index.ts/zero"로 깨지지 않는다.
   "@omnis/kernel/zero": fileURLToPath(
