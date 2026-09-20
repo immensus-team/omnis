@@ -1,7 +1,6 @@
 -- 0011_push_subscriptions.sql
--- Delta §6 table (US-B36): PWA Web Push subscriptions. Owned by the W0 schema bundle
--- (cross-review M3).
--- Not added to Zero replication (see 0013) — only the hub reads subscriptions.
+-- 델타 §6 표 (US-B36): PWA Web Push 구독. W0 스키마 번들 소유(교차 리뷰 M3).
+-- Zero 복제에는 넣지 않는다(0013 참고) — 구독은 허브만 읽는다.
 CREATE TABLE push_subscriptions (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   endpoint    text UNIQUE NOT NULL,
