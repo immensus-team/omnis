@@ -16,6 +16,10 @@ export const en: Dictionary = {
       respond: "Respond",
     },
     itemCount: "{count, plural, one{# item} other{# items}}",
+    dialog: {
+      confirm: "Confirm",
+      cancel: "Cancel",
+    },
   },
   errors: {
     inbox: { channelDisconnected: "{channel} disconnected — Reconnect" },
@@ -35,10 +39,70 @@ export const en: Dictionary = {
   onboarding: {
     channelNotConnected: "Requires Mac mini setup",
     firstSyncInProgress: "Syncing your messages…",
+    steps: {
+      welcome: "Welcome",
+      connectChannels: "Connect channels",
+      selfModel: "Self-model seed",
+      firstSync: "First sync",
+      firstBriefing: "First briefing",
+    },
+    welcome: "Welcome to omnis",
+    connect: "Connect",
+    connectLater: "Connect later",
   },
   digest: {
     restoredToast: "Restored · Undo",
     briefingPreparing: "Preparing your briefing, refreshes in {n}m",
+    heading: "{date} night digest · {n} archived",
+    categoryHeading: "{category} ({n})",
+    category: {
+      email: "Email",
+      message: "Messages",
+    },
+    categoryCount: "{label} {n}",
+    viewAll: "View all",
+    costReport: "This month's spend: {spent} / {limit} ({percent}%)",
+    restore: "Restore",
+    loading: "Tonight's digest hasn't run yet — it generates at 23:00",
+    empty: "Nothing was archived today",
+    error: "Digest generation failed — retry manually",
+  },
+  settings: {
+    nav: {
+      accounts: "Accounts",
+      autonomy: "Autonomy",
+      modelTiers: "Model tiers",
+      general: "General",
+    },
+    accounts: {
+      status: {
+        connected: "Connected",
+        readOnly: "Read only",
+      },
+      reconnect: "Reconnect",
+      reconnectFailed: "Reconnect failed — Retry",
+      sendEnable: "Enable send",
+      sendEnableCountdown: "Enable send (D-{days})",
+      sendEnableTooltip: "read stable {elapsed}/14 days · activates in {remaining}d",
+    },
+    autonomy: {
+      allowToggle: "Allow autonomy",
+    },
+    modelTiers: {
+      spentHeading: "Spend this month",
+      spent: "{amount} used",
+      limitLabel: "Monthly cost cap",
+      reserveLabel: "VIP/sensitive thread reserve",
+      statusNormal: "Normal",
+      statusWarning: "T2→T1 downgrade",
+      statusOver: "Non-VIP drafts paused",
+      usageBarLabel: "Monthly budget used",
+      save: "Save",
+    },
+    killSwitch: {
+      heading: "Kill switch",
+      stopAll: "Stop all autonomous actions",
+    },
   },
   inbox: {
     title: "Inbox",
@@ -176,5 +240,12 @@ export const en: Dictionary = {
     recentHeading: "Recent notes",
     routedTo: "→ {target}",
     empty: "No notes yet",
+  },
+  relativeTime: {
+    justNow: "Just now",
+    minutesAgo: "{n}m ago",
+    hoursAgo: "{n}h ago",
+    daysAgo: "{n}d ago",
+    yesterday: "Yesterday",
   },
 };

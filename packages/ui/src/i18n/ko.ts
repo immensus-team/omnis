@@ -17,6 +17,12 @@ export const ko = {
     // 복수형 규약(§8 표엔 없는 키 — index.ts의 plural 메커니즘을 실제로 태우는 유일한 키).
     // 한국어는 CLDR상 복수 범주가 "other" 하나뿐이라 평문으로 둔다.
     itemCount: "{count}개 항목",
+    // inferred, not in §8/§3 verbatim — §3.9의 경고/확인 다이얼로그는 본문만 인용하고 버튼 라벨은
+    // 주지 않는다. 두 다이얼로그(자율 허용 경고, kill switch 확인)가 공유하는 네이티브 다이얼로그 버튼.
+    dialog: {
+      confirm: "확인",
+      cancel: "취소",
+    },
   },
   errors: {
     inbox: { channelDisconnected: "{channel} 연결이 끊겼어요 — 재연결" },
@@ -36,10 +42,99 @@ export const ko = {
   onboarding: {
     channelNotConnected: "맥미니에서 설정이 필요해요",
     firstSyncInProgress: "메시지를 가져오는 중…",
+    // §7.1 5단계 이름(Welcome / Connect channels / Self-model seed / First sync / First briefing).
+    // 스펙은 영문 단계명만 주므로 inbox.filters와 같은 방식으로 옮겼다 — 단계 표시줄용이라 짧게.
+    // 4·5단계의 대기 문구는 이미 있는 firstSyncInProgress / digest.briefingPreparing을 그대로 쓴다.
+    steps: {
+      welcome: "환영",
+      connectChannels: "채널 연결",
+      selfModel: "self-model 초안",
+      firstSync: "첫 동기화",
+      firstBriefing: "첫 브리핑",
+    },
+    welcome: "omnis에 오신 걸 환영해요",
+    // inferred, not in §7.1 verbatim — 스펙은 "OAuth, 순서 무관"과 "'나중에 연결' 버튼으로 항상 스킵
+    // 가능"이라고만 적고 연결 버튼 라벨은 주지 않는다(스킵 라벨은 스펙 원문 그대로).
+    connect: "연결",
+    connectLater: "나중에 연결",
   },
   digest: {
     restoredToast: "되살렸습니다 · 실행 취소",
     briefingPreparing: "브리핑 준비 중, {n}분 후 갱신",
+    // §3.8 카드 헤더("9월 19일 밤 다이제스트 · 42개 보관됨"). 날짜 문자열 포맷은 호출부 몫이라 {date}로 받는다.
+    heading: "{date} 밤 다이제스트 · {n}개 보관됨",
+    // 카테고리 헤딩("📧 이메일 (31)") — 이모지는 장식이라 문구에서 뺐다(§9 QA "장식용 이모지 금지").
+    categoryHeading: "{category} ({n})",
+    category: {
+      email: "이메일",
+      message: "메시지",
+    },
+    // 접힌 그룹의 요약 줄("뉴스레터 12건, 알림 8건, 영수증 11건 — [모두 보기]") — 조각을 호출부에서 ", "로 잇는다.
+    categoryCount: "{label} {n}건",
+    viewAll: "모두 보기",
+    // 월간 비용 리포트(마스터 §14 비용 정책의 UI 노출 지점). 예: "이번 달 비용 리포트: $34 / $60 (57%)".
+    costReport: "이번 달 비용 리포트: {spent} / {limit} ({percent}%)",
+    restore: "되살리기",
+    loading: "오늘 밤 다이제스트는 아직 생성 전이에요, 23:00에 생성됩니다",
+    // 빈 상태는 §7.2의 "Notes/Digest 빈 = 담백하게" 지침대로 짧게 — 그래서 emptyStates가 아니라 여기 있다.
+    empty: "오늘은 보관할 게 없었어요",
+    // 스펙이 오류 상태를 "다이제스트 생성 실패, 수동으로 다시 시도"라는 한 덩어리 버튼으로 인용한다 —
+    // 메시지/버튼으로 쪼개면 스펙에 없는 문구를 만드는 셈이라 인용 그대로 한 키로 둔다.
+    error: "다이제스트 생성 실패, 수동으로 다시 시도",
+  },
+  settings: {
+    // 좌측 서브 nav 4개(§3.9 다이어그램). 스펙이 영문 표기뿐이라 inbox.filters와 같은 방식으로 옮겼다 —
+    // 목업에서 섹션 헤딩이 이 라벨을 그대로 반복하므로 별도 heading 키를 두지 않는다.
+    nav: {
+      accounts: "계정",
+      autonomy: "자율 실행",
+      modelTiers: "모델 티어",
+      general: "일반",
+    },
+    accounts: {
+      // 행의 상태 점 옆 텍스트(§3.9 접근성: 색만으로 상태를 전달하지 않음).
+      status: {
+        connected: "연결됨",
+        readOnly: "읽기 전용",
+      },
+      reconnect: "재연결",
+      // 오류 상태("재연결 실패 시 인라인 에러 + 재시도") — 문구가 따로 없어 에러와 재시도 어포던스를
+      // 한 줄로 합쳤다. 재시도는 같은 행의 [재연결] 버튼이 겸한다.
+      reconnectFailed: "재연결 실패 — 재시도",
+      // KakaoTalk send 게이팅(마스터 §3/§19 Q3): read 안정화 14일 전엔 비활성 + 남은 일수 라벨.
+      // 잔여일은 툴팁과 행 본문 양쪽에 같은 텍스트로 병기한다(툴팁을 못 보는 상황 대비).
+      sendEnable: "send 활성화",
+      sendEnableCountdown: "send 활성화 (D-{days})",
+      sendEnableTooltip: "read 안정화 {elapsed}/14일 · {remaining}일 후 활성화",
+    },
+    autonomy: {
+      // 채널·사람별 승인 게이트 override 토글(§3.9가 "자율 허용"으로 인용한 라벨 그대로).
+      // 켤 때 뜨는 경고 다이얼로그 본문은 §8 표 문구(approvals.autonomyOnWarning)를 재사용한다 —
+      // §3.9는 "이 채널/사람에게는 …"으로 조금 더 길지만 표가 정본이라 중복 정의하지 않는다.
+      allowToggle: "자율 허용",
+    },
+    modelTiers: {
+      spentHeading: "이번 달 현재 지출",
+      spent: "{amount} 사용",
+      // inferred, not in §3.9 verbatim — 스펙은 "상한 숫자 입력 필드"라고만 하고 필드 라벨은 주지 않는다.
+      limitLabel: "월 비용 상한",
+      // 예비비 10%는 상한에 종속된 계산값이라 편집 불가 — 라벨만 고정 텍스트로 노출한다.
+      reserveLabel: "VIP·민감 스레드 예비비",
+      // 진행률 바 위 텍스트(§9 접근성: 색만으로 임계값을 전달하지 않음).
+      statusNormal: "정상",
+      statusWarning: "T2→T1 강등",
+      statusOver: "비VIP 초안 중단",
+      // inferred, not in §3.9 verbatim — 진행률 바에 접근성 이름이 필요해 같은 문법으로 채웠다.
+      usageBarLabel: "월 비용 사용률",
+      save: "저장",
+    },
+    killSwitch: {
+      // §3.9 목업의 섹션 라벨이 영문 그대로("⚠ Kill switch")라 한국어 문장 안에서도 그대로 쓴다.
+      // 확인 다이얼로그 본문은 이미 있는 approvals.killSwitchConfirm을 재사용한다(§8 표가 정본 —
+      // §3.9 본문은 "모든 자율 루프를"로 다른데, 표 문구가 이미 구현돼 있어 그쪽을 따른다).
+      heading: "Kill switch",
+      stopAll: "모든 자율 실행 중지",
+    },
   },
   inbox: {
     title: "받은 편지함",
@@ -204,5 +299,15 @@ export const ko = {
     recentHeading: "최근 노트",
     routedTo: "→ {target}",
     empty: "아직 노트가 없어요",
+  },
+  // derived from §3.1 InboxRow examples + errors.offline.banner pattern, not a dedicated spec table.
+  // 문장 안에서 쓰는 긴 형태의 상대시간이다 — 행의 압축 코드("3m"/"2w"/"4 Aug")는 lib/relative-time.ts가
+  // 담당하고 이 네임스페이스는 관여하지 않는다(같은 값을 두 형식으로 내는 게 의도).
+  relativeTime: {
+    justNow: "방금",
+    minutesAgo: "{n}분 전",
+    hoursAgo: "{n}시간 전",
+    daysAgo: "{n}일 전",
+    yesterday: "어제",
   },
 };
