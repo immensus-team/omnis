@@ -18,10 +18,11 @@ afterAll(async () => {
   await pool.end();
 });
 
-// 계획서 원문은 `DELETE FROM accounts WHERE channel IN (...)` 한 줄이지만, 실제 스키마의
-// threads.account_id는 ON DELETE RESTRICT다(A3 §11 하드 삭제 금지 설계 — accounts를 그냥
-// 지우게 두지 않는다). recordAdapterHealth()가 만드는 시스템 스레드/아이템을 먼저 지워야
-// accounts 삭제가 통과한다(deviation, 계획서의 단일 DELETE는 이 RESTRICT 제약과 맞지 않는다).
+// The plan's original text is a single `DELETE FROM accounts WHERE channel IN (...)` line, but
+// threads.account_id in the real schema is ON DELETE RESTRICT (A3 §11 forbids hard deletes —
+// accounts are not simply deletable). The system threads/items that recordAdapterHealth() creates
+// must go first, or the accounts delete fails (deviation: the plan's single DELETE does not fit
+// this RESTRICT constraint).
 async function cleanupTestData(): Promise<void> {
   await query(
     pool,
@@ -75,7 +76,7 @@ describe("recordAdapterHealth()", () => {
     const sys = await one<{ n: string }>(
       pool,
       `SELECT count(*)::text AS n FROM items i JOIN threads t ON t.id = i.thread_id
-        WHERE i.kind = 'system' AND i.body LIKE '%outlook%연결 끊김%'`,
+        WHERE i.kind = 'system' AND i.body LIKE '%outlook%connection lost%'`,
     );
     expect(Number(sys.n)).toBeGreaterThanOrEqual(1);
   });
