@@ -16,15 +16,16 @@ Generated: 2026-09-21.
 | `auto_archive.jsonl` | 150 | 90 `expect_archive:true` / 60 `expect_archive:false` (keep) |
 | `draft.jsonl` | 40 | 32 clean / 8 injection-exfil-test (`injected:true`) |
 | `task.jsonl` | 100 | 40 `has_action_item:true` / 60 `has_action_item:false` |
-| `route_note.jsonl` | 50 | notes routed to one of 3–8 candidates |
-| `followup.jsonl` | 20 | channel-selection cases incl. no-cold-outreach tests |
+| `route_note.jsonl` | 50 | 41 routed to a `thread` / 9 to a `person`; 45 rows offer 4 candidates, 5 offer 3 (schema allows 3–8) |
+| `followup.jsonl` | 20 | 5 `first_contact:true`; 2 exercise the linkedin/kakao no-cold-outreach gate |
 
-### Status of these files in this slice
+### Status
 
-**Slice 1/6 ships the scaffold and validator only.** The five `.jsonl` files exist as
-**empty (0-byte) placeholders** so the directory structure and the validator's file list are
-real. Later slices fill them with synthetic rows. Running `pnpm eval:validate` today
-therefore fails on row count for every file — that is the expected, correct state.
+**Complete as of slice 6/6.** All five files hold real synthetic rows at their full target
+counts, and `pnpm eval:validate` passes across all of them. The counts above are the source
+of truth and are additionally enforced by the validator itself: each file is checked against
+an expected row count and a hard-coded per-class tally, so a data edit that shifts a
+breakdown fails the run rather than silently invalidating this table.
 
 ## What `pnpm eval:validate` checks
 
