@@ -62,13 +62,31 @@ function firstLine(body: string): string {
   return (idx === -1 ? body : body.slice(0, idx)).trim();
 }
 
-/** U2 요약: threads.meta.summary(B3가 채울 것) → subject → 마지막 item 본문 첫 줄. */
+/** Gmail 어댑터는 subject를 본문 맨 앞에 "Subject: …\n\n"으로 합성해 넣는다 —
+ * NormalizedItem에 subject 필드가 없어서다(packages/adapters/gmail/src/index.ts). 행 요약에
+ * 메일 헤더 텍스트를 그대로 내보낼 이유는 없으니 벗겨 낸다. */
+function stripSubjectHeader(body: string): string {
+  if (!body.startsWith("Subject: ")) return body;
+  const blank = body.indexOf("\n\n");
+  return blank === -1 ? "" : body.slice(blank + 2);
+}
+
+/** U2 요약: threads.meta.summary(B3가 채울 것) → subject → 마지막 item 본문 첫 줄.
+ * 단 행 제목과 같은 문자열은 건너뛴다. Gmail/gcal은 thread.title을 subject/summary에서 만들고
+ * (gcal은 body까지 같은 문자열이다) Phase A는 author_person_id를 안 채워 행 제목도 thread.title로
+ * 떨어진다 — 그대로 두면 한 행에 같은 말이 두 줄 찍힌다. 남은 후보가 제목뿐이면 요약 줄을
+ * 비운다(그리드 2행이 0높이로 접혀 한 줄짜리 행이 된다). B3 요약이 붙으면 이 경로는 사라진다. */
 export function threadSummary(row: {
   metaSummary?: string | null;
   subject?: string | null;
   body: string;
+  title?: string | null;
 }): string {
-  return row.metaSummary || row.subject || firstLine(row.body);
+  if (row.metaSummary) return row.metaSummary;
+  for (const candidate of [row.subject, firstLine(stripSubjectHeader(row.body))]) {
+    if (candidate && candidate !== row.title) return candidate;
+  }
+  return "";
 }
 
 export interface SortableInboxRow {
@@ -210,6 +228,7 @@ export function Inbox({
           metaSummary: (item.thread?.meta as { summary?: string } | null)?.summary ?? null,
           subject: item.subject ?? null,
           body: item.body,
+          title,
         }),
         isDraft: (item.status as UiItemStatus) === "draft",
         channel: channelByAccount.get(item.account_id) ?? "system",

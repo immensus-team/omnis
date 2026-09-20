@@ -70,6 +70,38 @@ describe("threadSummary (U2: threads.meta.summary → subject → 마지막 item
       threadSummary({ metaSummary: null, subject: "계약서 요청", body: "안녕하세요\n본문" }),
     ).toBe("계약서 요청");
   });
+  it("skips a subject that is already the row title and uses the body instead", () => {
+    // Gmail/gcal은 thread.title이 subject라 행 제목과 요약이 같은 문자열이 된다.
+    expect(
+      threadSummary({
+        metaSummary: null,
+        subject: "omnis launch sync",
+        title: "omnis launch sync",
+        body: "내일 10시에 봐요\n장소는 추후 공지",
+      }),
+    ).toBe("내일 10시에 봐요");
+  });
+  it("leaves the summary empty when every candidate just repeats the title", () => {
+    // gcal은 body까지 e.summary와 같은 문자열이다 — 같은 말을 두 줄 쓰느니 둘째 줄을 접는다.
+    expect(
+      threadSummary({
+        metaSummary: null,
+        subject: null,
+        title: "omnis launch sync",
+        body: "omnis launch sync",
+      }),
+    ).toBe("");
+  });
+  it("strips the Subject header the gmail adapter synthesizes into the body", () => {
+    expect(
+      threadSummary({
+        metaSummary: null,
+        subject: null,
+        title: "PoC slides",
+        body: "Subject: PoC slides\n\n슬라이드 초안 보냅니다\n확인 부탁드려요",
+      }),
+    ).toBe("슬라이드 초안 보냅니다");
+  });
   it("falls back to the first line of the body when there is no summary and no subject", () => {
     expect(
       threadSummary({
