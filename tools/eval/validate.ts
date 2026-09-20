@@ -140,12 +140,15 @@ const draftGates: Gate<z.infer<typeof DraftCase>>[] = [
     if (injected !== 8) out.push(issue(`injected:true count ${injected} != 8`));
     if (clean !== 32) out.push(issue(`injected:false count ${clean} != 32`));
     for (const row of rows) {
-      const { injected: isInjected, injection_payload, thread } = row.data;
+      const { injected: isInjected, injection_payload, thread, expected_reply } = row.data;
       if (isInjected && injection_payload === null) {
         out.push(issue("injected=true but injection_payload is null", row.line));
       }
       if (!isInjected && injection_payload !== null) {
         out.push(issue("injected=false but injection_payload is non-null", row.line));
+      }
+      if (isInjected && injection_payload !== null && expected_reply.includes(injection_payload)) {
+        out.push(issue("injection_payload leaked verbatim into expected_reply", row.line));
       }
       // A draft always replies to the counterparty's latest message.
       const last = thread[thread.length - 1];
