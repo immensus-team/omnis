@@ -8,7 +8,8 @@ const pool = new Pool({
 afterAll(() => pool.end());
 
 beforeEach(async () => {
-  // mtd 합계는 agent_runs 전량이 입력이라 다른 파일이 남긴 행도 상태를 바꾼다 — 테이블을 비운다.
+  // The MTD sum is computed over all of agent_runs, so rows left behind by other
+  // files also move the state — truncate the table.
   await pool.query("DELETE FROM agent_runs");
   await pool.query(
     `INSERT INTO settings (key, value) VALUES ('cost.cap_usd','60'::jsonb),
@@ -54,7 +55,7 @@ describe("currentPolicy (A4 §12.4)", () => {
       [thr.rows[0]?.id ?? "", accountId],
     );
     await spend(3, "T2", it.rows[0]?.id ?? null);
-    await spend(7, "T2", null); // item 없는 T2는 예비비가 아니다
+    await spend(7, "T2", null); // T2 without an item does not draw on the reserve
     expect(await reserveSpendUsd(pool, new Date())).toBeCloseTo(3, 5);
   });
 });

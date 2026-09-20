@@ -10,8 +10,9 @@ const pool = new Pool({
 afterAll(() => pool.end());
 
 beforeEach(async () => {
-  // 상태는 agent_runs 전량의 월 합계로 결정된다 — 다른 테스트 파일이 남긴 비용까지 세면
-  // 같은 입력이 다른 상태를 낳는다. 그래서 model='cd-test'가 아니라 테이블을 비운다.
+  // The state is decided by the monthly sum over all of agent_runs — counting costs left
+  // behind by other test files would make the same input yield a different state. So we
+  // truncate the table rather than filtering on model='cd-test'.
   await pool.query("DELETE FROM agent_runs");
   await pool.query("DELETE FROM audit_log WHERE action = 'cost.state_changed'");
   await pool.query(
@@ -63,7 +64,7 @@ describe("cost_daily job (A4 §12.4)", () => {
       `SELECT body FROM items WHERE kind = 'system' AND body LIKE '%80%' ORDER BY sent_at DESC LIMIT 1`,
     );
     expect(items.rows[0]?.body).toContain("T2");
-    // 두 번째 실행은 상태가 같으므로 아무것도 더 남기지 않는다
+    // The second run sees the same state, so it records nothing further
     await runCostDaily({ pool, audit: createAudit(pool), logger, now: new Date() });
     const again = await pool.query<{ n: string }>(
       "SELECT count(*)::text AS n FROM audit_log WHERE action = 'cost.state_changed'",
