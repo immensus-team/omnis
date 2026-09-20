@@ -351,6 +351,7 @@ Later: 메시지 본문 컬럼 암호화(SQLCipher 급), 프롬프트 인젝션 
 | Q10 | 위임을 에이전트가 자동 실행까지 하는가 | **자동 제안 + 승인 실행. 완전 자율은 런타임·레포별 허용 규칙을 열 때만** (브리프의 "먼저 일을 시키기도"를 한 번의 승인으로 구현) | 안전 경계 |
 | Q11 | 비용 상한에 걸리면 VIP 초안도 멈추는가 | **아니다. 10% 예비비로 VIP·민감 초안은 계속(§14)** | 비용 |
 | Q12 | 터미널에서 직접 연 Claude Code·Codex 세션도 인박스에 보이게 하는가 | **Phase C에 읽기 전용 import 후보로 두고 지금은 안 한다** | Phase C 범위 |
+| Q13 | 위임된 Claude Code 실행의 인증·격리 모드. `--bare`는 hooks·CLAUDE.md를 끄지만 **인증도 API 키로만** 받아 구독(T3)을 못 쓴다(2026-09-20 맥북 프로브, `tools/spikes/_probes`) | **게이트 ⑪이 결정.** non-bare + omnis hooks를 `--settings`로 주입 + 새 worktree cwd + `--permission-mode manual`이 프로젝트 hooks를 무력화하면 그 모드로 구독 인증 유지. 아니면 Claude Code 위임은 API 키(T2 단가)로 돌리고 기본 위임 대상을 claude-ds·Codex로 둔다. claude-ds는 `--bare` 그대로 | A2-D11, D9 비용 |
 
 ## 20. 부록
 
