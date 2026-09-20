@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+target/
+.pnpm-store/
+*.log
+.env
+.env.*
+!.env.example
+*.sops.yaml.dec
+.DS_Store
+coverage/
+.turbo/
+apps/desktop/src-tauri/gen/
+tools/spikes/**/out/
