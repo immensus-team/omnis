@@ -1,0 +1,19 @@
+{
+  "name": "@omnis/kernel",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./zero": { "types": "./dist/zero-schema.d.ts", "default": "./dist/zero-schema.js" }
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run",
+    "test:integration": "vitest run test/integration"
+  },
+  "dependencies": { "@omnis/db": "workspace:*", "pg": "8.13.1" },
+  "devDependencies": { "@types/pg": "8.11.10" }
+}
