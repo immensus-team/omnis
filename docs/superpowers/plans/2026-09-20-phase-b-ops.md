@@ -1330,6 +1330,10 @@ describe("cost_report_monthly job", () => {
 });
 ```
 
+Implementation correction (review-driven). Two lines in the block above are stale and must not be copied:
+- `AUG` is a UTC month, but the job aggregates the **Asia/Seoul** calendar month. The test now uses the KST boundaries (`2026-07-31T15:00:00Z` .. `2026-08-31T15:00:00Z`) and derives its injected clock from `nextRunAt(COST_REPORT_CRON, ...)` rather than a hand-written instant, so the fixture cannot drift away from what the scheduler actually does. A first `it` also pins that fire time to `2026-08-31T15:10:00.000Z`.
+- `DELETE FROM jobs WHERE name = $1` is **wrong and was removed**. `cost_report_monthly` is seeded by `0012_jobs_phase_b.sql`, and deleting it breaks `packages/db`'s `schema-0006` assertion on that row. Tests must never delete migration-seeded rows. (`healthcheck-job.test.ts` still deletes its own row, and that is correct: `hub_healthcheck` is *not* seeded by any migration, so the scheduler's `register` upsert created it.)
+
 - [x] 2. 테스트를 돌려 실패를 확인한다.
 
 ```bash
@@ -1482,6 +1486,8 @@ export function registerCostReportJob(
   });
 }
 ```
+
+Implementation correction (review-driven). The three `Date.UTC(...)`/`getUTC*` lines at the top of the handler above are **wrong** and were replaced. `cron.ts` evaluates `10 0 1 * *` on the **Asia/Seoul** calendar, so the handler actually fires at 15:10 UTC on the *last* day of the month it reports on; reading UTC calendar fields off `now()` lands a month early on every single run. The handler now shifts `now()` by `SEOUL_OFFSET_MS` — imported from `../cron.js` and exported there so the offset has one definition instead of being re-hardcoded — to read KST calendar fields, then shifts back out when forming the `[monthStart, monthEnd)` instants. `forDate` is the last KST day of the reported month, expressed as a UTC-midnight instant naming that date, which is the convention `attachReportToDigest` documents and slices with `toISOString().slice(0, 10)`.
 
 - [x] 4. 배럴에 추가한다.
 
