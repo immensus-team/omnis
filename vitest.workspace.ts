@@ -34,7 +34,9 @@ export default defineWorkspace([
       name: "integration",
       include: ["packages/*/test/integration/**/*.test.ts", "apps/*/test/integration/**/*.test.ts"],
       globalSetup: ["./vitest.global-setup.ts"],
-      fileParallelism: false,
+      // ponytail: vitest 2.1은 프로젝트 레벨 fileParallelism을 무시한다(루트/CLI 전용). 통합 테스트는
+      // omnis_test 한 DB를 공유하므로 파일이 겹쳐 돌면 NOTIFY가 서로 섞인다 → singleFork로 직렬화.
+      poolOptions: { forks: { singleFork: true } },
       testTimeout: 20_000,
       hookTimeout: 60_000,
     },
