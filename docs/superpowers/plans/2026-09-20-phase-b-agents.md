@@ -2131,7 +2131,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 > **스토리** — 목표: `cost_daily` 집계 뷰 + 00:05 잡, 상태 전이 → `audit_log` + 시스템 Item, 루프 게이트. 산출물: `packages/kernel/src/jobs/cost-daily.ts`, `packages/db/migrations/0012_jobs_phase_b.sql`. 검증: `pnpm --filter @omnis/kernel test:integration`.
 
 **읽을 것:** 델타 §6(`0012` 행)·§8(잡 4건 표), A3 §6(`jobs` seed 형식), `packages/kernel/src/scheduler.ts`.
-**오너십 주의:** `0012_jobs_phase_b.sql`은 **이 태스크가 유일한 오너**다. channels 계획(`outlook_delta_poll`)과 ops 계획(`cost_report_monthly`)은 이 파일을 다시 만들지 않고 여기 seed된 행을 그대로 쓴다.
+**오너십 주의(2026-09-20 교차 리뷰 M1에서 바뀜):** `0012_jobs_phase_b.sql`은 이제 **웨이브 0 스키마 번들**이 만든다(델타 §6 — `0009`·`0011`·`0012`·`0013`을 한 워크트리·한 커밋으로). 아래 스텝 1의 SQL이 그 번들이 그대로 옮겨 쓰는 **정본 정의**다. **W0가 이미 머지된 뒤라면 파일이 이미 존재하므로 스텝 1을 건너뛰고** 내용이 아래와 같은지 확인만 한다(마이그레이션 러너가 sha256 변경을 throw한다 — 다시 쓰면 안 된다). channels·ops 계획도 이 파일을 만들지 않고 seed된 행을 쓴다.
 **만들지 말 것(YAGNI):** materialized view + REFRESH 잡. 하루치 집계라 일반 뷰로 충분하고, 느려지면 그때 승격한다.
 
 **Files:**
@@ -2145,12 +2145,13 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Steps
 
-- [ ] 1. 마이그레이션을 쓴다. 델타 §8의 잡 4건 + `cost_daily` 뷰.
+- [ ] 1. 마이그레이션을 쓴다 — **W0 번들이 아직 머지되지 않았을 때만**(위 오너십 주의). 델타 §8의 잡 4건 + `cost_daily` 뷰.
 
 ```sql
 -- packages/db/migrations/0012_jobs_phase_b.sql
 -- 델타 §8: Phase B가 더하는 잡 4건. 나머지 16건은 0006_kernel.sql이 이미 seed했다.
--- 소유: agents 계획 Task 7. channels(B37)·ops(B44)는 이 파일을 다시 만들지 않는다.
+-- 소유: W0 스키마 번들(델타 §6). 이 블록이 정본 정의이고 번들이 그대로 옮긴다.
+-- channels(B37)·ops(B44)·surfaces는 이 파일을 다시 만들지 않는다.
 
 INSERT INTO jobs (name, schedule, next_run_at) VALUES
   ('cost_daily',          '5 0 * * *',        now()),   -- A4 §12.4 00:05 KST 집계
@@ -3253,8 +3254,9 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 > **스토리** — 목표: VAPID 서명 Web Push(`push_subscriptions` 조회, 액션 2개, 410/404 정리) + Tauri 알림 딥링크. 산출물: `packages/kernel/src/notify/webpush.ts`, `apps/desktop/src-tauri/src/notify.rs`. 검증: `pnpm --filter @omnis/kernel test`. 의존: B15, B16.
 
-**읽을 것:** A5 §4.4, 델타 §2.3(`PushPayload`)·§6(`0011_push_subscriptions.sql`은 surfaces 계획 US-B36 소유)·§9(VAPID 환경변수).
-**의존 주의:** `push_subscriptions` 테이블은 **surfaces 계획의 `0011`이 만든다**. 이 태스크의 통합 테스트는 그 마이그레이션이 적용된 DB를 전제한다. 적용 전이면 `pnpm db:migrate`가 아직 `0011`을 못 가진 상태이므로 **surfaces 계획 Task(0011) 머지 후**에 이 태스크를 실행한다.
+**읽을 것:** A5 §4.4, 델타 §2.3(`PushPayload`)·§6(`0011_push_subscriptions.sql`은 **웨이브 0 스키마 번들** 소유)·§9(VAPID 환경변수).
+**의존 주의:** `push_subscriptions` 테이블은 **W0 스키마 번들의 `0011`이 만든다**(델타 §6, 2026-09-20 교차 리뷰 M3에서 surfaces US-B36 소유에서 옮겨졌다 — 옛 배치는 B17↔B36 순환이었다). 이 태스크의 통합 테스트는 그 마이그레이션이 적용된 DB를 전제하므로 **W0 머지 후**에 실행한다.
+**Web Push 단일 오너(2026-09-20 교차 리뷰 M-webpush):** VAPID 설정과 실제 발송·구독 정리는 **이 파일(`packages/kernel/src/notify/webpush.ts`)만** 갖는다 — `vapidFromEnv`/`sendWebPush`/`pruneSubscription`/`WEBPUSH_GONE_CODES`/`VapidKeys`. surfaces 계획 Task 10은 `POST`/`DELETE /push/subscribe`와 `GET /push/vapid-public-key` **라우트만** 만들고 이 모듈을 `@omnis/kernel`에서 import해 쓴다(`web-push` 의존도 여기 한 곳에만 둔다). `apps/hub`에 두 번째 발송 구현(`sendPush`/`configureWebPush`/`PushSender`)을 만들지 않는다.
 **만들지 말 것(YAGNI):** 자체 VAPID 서명 구현, 재시도 큐. `web-push`가 서명·암호화를 다 하고, 실패한 엔드포인트는 다음 발송에서 다시 만난다.
 
 **Files:**
@@ -4131,10 +4133,7 @@ void createPool;
 {"id":"e4","handle":"no-reply@bank.example","body":"이체 내역 안내","meta":{},"sensitivity":"finance","vip":false,"i_replied":false,"expect_archive":false}
 ```
 
-```jsonc
-// package.json(루트) scripts에 추가
-"eval:archive": "tsx tools/eval/auto-archive.ts"
-```
+> **루트 `package.json` 스크립트는 건드리지 않는다(2026-09-20 교차 리뷰 M12).** `"eval:archive": "tsx tools/eval/auto-archive.ts"` 항목은 memory-ingestion 플랜 Task 1이 **단일 오너**로 이미 넣는다(델타 §1). 이 태스크는 그 스크립트가 가리키는 `tools/eval/auto-archive.ts`만 만든다 — 스크립트 블록을 다시 넣으면 루트 `package.json`에서 머지 충돌이 난다.
 
 - [ ] 5. 통과를 확인한다. 기대: `auto-archive.test.ts` 4 tests passed, `pnpm eval:archive`가 `unsafe=0`을 찍고 exit 0.
 
@@ -4145,7 +4144,7 @@ pnpm --filter @omnis/agents test -- auto-archive && pnpm eval:archive && pnpm li
 - [ ] 6. 커밋한다.
 
 ```bash
-git add packages/agents/src/loops/auto-archive.ts packages/agents/src/index.ts packages/agents/test/integration/auto-archive.test.ts tools/eval/auto-archive.ts eval/auto_archive.jsonl package.json
+git add packages/agents/src/loops/auto-archive.ts packages/agents/src/index.ts packages/agents/test/integration/auto-archive.test.ts tools/eval/auto-archive.ts eval/auto_archive.jsonl
 git commit -m "US-B18: L8 자동 보관 루프
 
 - 하드 게이트 5종(민감·VIP·pending approval·injection_flags·kind)을 규칙보다 먼저 본다
@@ -4161,7 +4160,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 15: `taskLoop` — 정밀도 우선 투두 추출 (US-B19, tier: Sonnet)
 
-> **스토리** — 목표: 트리거 3종, `confidence < 0.70`은 저장조차 안 함, item당 최대 3, `duplicate_of` 병합, `due_basis='inferred'` 표시. 산출물: `packages/agents/src/loops/task.ts`. 검증: `pnpm --filter @omnis/agents test`. 의존: B07.
+> **스토리** — 목표: 트리거 3종, `confidence < 0.70`은 저장조차 안 함, item당 최대 3, `duplicate_of` 병합, `due_basis='inferred'` 표시. 산출물: `packages/agents/src/loops/task.ts`. 검증: `pnpm --filter @omnis/agents test`. 의존: B07, **B20**(백로그 §2, 2026-09-20 교차 리뷰 M14 — `taskLoop`이 `routeByRule`을 import한다).
 
 **읽을 것:** A4 §4.1~§4.2·§4.5, Task 5의 `propose_task`.
 **만들지 말 것(YAGNI):** 별도 중복 판정 서비스. 조립기가 넣어준 open task 목록과 모델의 `duplicate_of` 한 필드로 끝난다.
@@ -4596,7 +4595,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Task 17: `extractHints` / `routeByRule` — 규칙이 먼저다 (US-B20, tier: Opus)
 
-> **스토리** — 목표: `DelegationHints` 추출(정규식, LLM 아님) + `routeByRule()`(~1ms, 규칙 5종) + 폭주 방지 상수. 산출물: `packages/agents/src/delegate/route.ts`. 검증: `pnpm --filter @omnis/agents test`. 의존: B19.
+> **스토리** — 목표: `DelegationHints` 추출(정규식, LLM 아님) + `routeByRule()`(~1ms, 규칙 5종) + 폭주 방지 상수. 산출물: `packages/agents/src/delegate/route.ts`. 검증: `pnpm --filter @omnis/agents test`. 의존: **B07**(백로그 §2, 2026-09-20 교차 리뷰 M14 — 옛 `B19`는 방향이 거꾸로였다: `routeByRule`은 `tasks`를 읽지 않는다).
 > **실행 순서 주의:** Task 15(`taskLoop`)가 이 모듈을 import한다. **Task 17을 Task 15보다 먼저 구현한다.**
 
 **읽을 것:** A4 §5.2 전체(코드 블록 + 런타임 표), B-D6·B-D7(Hermes 제외).
@@ -6733,7 +6732,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 1. **Task 1 → 5 → 2 → 3 → 4** (US-B06·B07). Task 3(`runLoopSpec`)이 Task 5의 `toolRegistry`를 import하므로 **Task 5가 Task 3보다 먼저다**.
 2. **Task 6 → 7** (US-B14). Task 7의 `0012_jobs_phase_b.sql`을 channels·ops 계획이 기다린다 — 웨이브 초반에 머지한다.
 3. **Task 8 → 9** (US-B13). Task 9는 US-B05(`buildContext`)가 머지된 뒤에 실행한다.
-4. **Task 10 → 11 → 12** (US-B15·B17). Task 12는 surfaces 계획의 `0011_push_subscriptions.sql`이 머지된 뒤에 실행한다.
+4. **Task 10 → 11 → 12** (US-B15·B17). Task 12는 **W0 스키마 번들**(`0011_push_subscriptions.sql`)이 머지된 뒤에 실행한다(델타 §6).
 5. **Task 13 → 14** (US-B18).
 6. **Task 17 → 15 → 16** (US-B20·B19). `taskLoop`이 `routeByRule`을 import하므로 **Task 17이 먼저다**.
 7. **Task 17 → 18** (US-B20).
@@ -6786,10 +6785,10 @@ SELECT count(*) FROM audit_log WHERE action = 'item.sent' AND approval_id IS NUL
 
 ## 열린 항목
 
-1. **`0012_jobs_phase_b.sql`의 오너십.** 델타 §6이 이 파일을 B14·B15·B37·B44 넷에 걸쳐 놓았다. 이 계획의 Task 7이 유일 오너로 만들고 나머지 셋은 seed된 행을 쓴다 — channels·ops 계획 작성자와 이 규칙을 맞춰야 한다.
-2. **`LoopSpec.decide?`와 `TriggerContext`가 델타에 없다.** 둘 다 A4 본문이 요구하는 것이라 이 계획이 추가했다(위 "델타에 더하는 것" 표). 델타 문서를 갱신할지, 이 계획을 출처로 둘지 결정이 필요하다.
+1. ~~**`0012_jobs_phase_b.sql`의 오너십.**~~ **닫힘(2026-09-20 교차 리뷰 M1)**: `0009`·`0011`·`0012`·`0013`은 **웨이브 0 스키마 번들**(단일 워크트리·단일 커밋)이 만든다(델타 §6). 이 계획의 Task 7은 `cost_daily` 뷰 정의의 **출처**이고(번들이 그 정의를 그대로 옮긴다) 마이그레이션 파일 자체를 만들지 않는다 — Task 7은 W0 머지 후 실행한다.
+2. ~~**`LoopSpec.decide?`와 `TriggerContext`가 델타에 없다.**~~ **닫힘**: 델타 §4에 `TriggerContext`·`LoopSpec.decide?()`·`runLoopSpec`·`LoopKernel`/`LoopLogger`·`writeSystemItem`·`LoopId`가 추가되었다(교차 리뷰 M4·M5). 델타가 정본이다.
 3. **T2 게이트웨이.** A4 §12.1은 "Anthropic은 API 키로 직접 호출한다"지만, 새 SDK 핀을 피하려고 동기 T2는 OpenRouter(`anthropic/claude-sonnet-5`)로, Batch API만 Anthropic 직접 `fetch`로 갈랐다. 단가는 같고 배치 할인도 유지되지만 `agent_runs.provider`가 동기 T2에서 `openrouter`로 기록된다 — 비용 리포트(US-B44)가 이 구분을 어떻게 볼지 ops 계획과 맞춰야 한다.
 4. **`item.labeled` 이벤트의 발행자.** `draftLoop`·`taskLoop`·`autoArchiveLoop`이 전부 이 이벤트를 기다리는데, Phase A의 `classify()`는 아직 이벤트를 쏘지 않는다. 허브의 분류 파이프라인이 `kernel.events.emit('ephemeral', 'item.labeled', …)`를 부르도록 memory-ingestion 계획(US-B03이 `ingest.sink`를 고칠 때)과 배선 지점을 맞춰야 한다. 같은 이유로 `note.created`·`task.created`·`person.inactive`의 발행자도 정해야 한다(앞 둘은 NOTIFY 채널이 이미 있고, `person.inactive`는 `sweepFollowups`가 쏜다).
-5. **골든 세트 데이터.** `eval/auto_archive.jsonl` 150건, `eval/draft.jsonl` 40건, `eval/task.jsonl` 100건, `eval/route_note.jsonl` 50건, `eval/followup.jsonl` 20건은 이 계획이 형식과 하드 게이트만 정하고 **내용은 Logan의 실제 인박스에서 뽑아야 한다**. 실계정 연결 전까지는 합성 데이터로 하한만 지킨다.
+5. **골든 세트 데이터.** `eval/auto_archive.jsonl` 150건, `eval/draft.jsonl` 40건, `eval/task.jsonl` 100건, `eval/route_note.jsonl` 50건, `eval/followup.jsonl` 20건은 이 계획이 형식과 하드 게이트만 정하고 **내용은 Logan의 실제 인박스에서 뽑아야 한다**. 실계정 연결 전까지는 합성 데이터로 하한만 지킨다. → **Logan 결정(백로그 §7-1)**: 초안 채택률·무수정 전송률·브리핑 커버리지 세 지표는 Phase B 종료 판정에서 **유예**한다. `eval/auto_archive.jsonl`의 **VIP·민감 보관 0건 게이트는 유예 대상이 아니다** — 합성 데이터로도 깨지면 안 되는 안전 불변식이다.
 6. **`NightlyDigest.still_open`.** Task 22가 빈 배열로 둔다 — 아침 브리핑의 `needs_you` 후보를 재사용하면 되지만 "내일 아침 예고"의 선정 규칙이 A4 §6.4에 없다. Logan 확인이 필요하다.
 7. **`cost` 필드 주입 지점.** `nightlyDigestLoop`이 `ctx.payload.cost`로 받는데, 이 값을 넣는 cron 핸들러(허브)는 `currentPolicy(pool)`를 부른다. `morning_digest`/`nightly_digest` 잡 핸들러를 허브의 어느 파일에 둘지(현재 `apps/hub/src/main.ts`)는 surfaces 계획의 허브 라우트 추가와 겹칠 수 있다.

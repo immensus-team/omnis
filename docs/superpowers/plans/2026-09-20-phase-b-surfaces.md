@@ -34,72 +34,21 @@
 **Files:**
 - Create: `apps/hub/src/search.ts`
 - Modify: `apps/hub/src/http.ts`(GET /search, GET /memory/search 라우트 추가), `apps/hub/package.json`(`@omnis/memory` 의존 추가)
-- Modify: `packages/memory/src/search.ts`(`truncateSnippet` export 추가)
-- Test: `apps/hub/src/search.test.ts`, `packages/memory/test/search-snippet.test.ts`
+- Test: `apps/hub/src/search.test.ts`
 
 **Interfaces:**
-- Consumes: `SearchHit`/`SearchGroup`/`SearchResponse`/`SearchGroupKind`/`SearchHitKind`(`@omnis/protocol`, 델타 §2.2), `Channel`/`MemorySourceKind`(`@omnis/protocol`), `searchMemories`/`MemoryHit`(`@omnis/memory`, 델타 §3), `query`(`@omnis/db`)
-- Produces: `normalizeScores`, `mergedScore`, `buildGroup`, `runSearch`, `createSearchDeps`, `SearchDeps`, `ItemHitRow`, `ThreadHitRow`, `PersonHitRow`(`apps/hub/src/search.ts`); `truncateSnippet`(`packages/memory/src/search.ts`)
+- Consumes: `SearchHit`/`SearchGroup`/`SearchResponse`/`SearchGroupKind`/`SearchHitKind`(`@omnis/protocol`, 델타 §2.2), `Channel`/`MemorySourceKind`(`@omnis/protocol`), `searchMemories`/`MemoryHit`/**`truncateSnippet`**(`@omnis/memory`, 델타 §3 + memory-ingestion 계획 Task 4), `query`(`@omnis/db`)
+- Produces: `normalizeScores`, `mergedScore`, `buildGroup`, `runSearch`, `createSearchDeps`, `SearchDeps`, `ItemHitRow`, `ThreadHitRow`, `PersonHitRow`(`apps/hub/src/search.ts`)
 
 **Steps:**
 
-1. [ ] `packages/memory/src/search.ts`에 스니펫 절단 헬퍼의 실패하는 테스트부터 쓴다(memory-ingestion 플랜이 먼저 만든 파일에 한 함수를 더하는 것 — 이 워크트리에는 아직 그 파일이 없다면 최소 골격만 있다고 가정하고 이어 붙인다).
-   ```ts
-   // packages/memory/test/search-snippet.test.ts
-   import { describe, expect, it } from "vitest";
-   import { truncateSnippet } from "../src/search.js";
-
-   describe("truncateSnippet (A4 §14.4 snippet ≤160자)", () => {
-     it("returns short text unchanged", () => {
-       expect(truncateSnippet("오전 미팅 선호")).toBe("오전 미팅 선호");
-     });
-     it("truncates to 160 chars with an ellipsis", () => {
-       const long = "가".repeat(200);
-       const out = truncateSnippet(long);
-       expect(out.length).toBe(160);
-       expect(out.endsWith("...")).toBe(true);
-     });
-     it("respects a custom max", () => {
-       expect(truncateSnippet("abcdefgh", 5)).toBe("ab...");
-     });
-   });
-   ```
-
-2. [ ] 실행 → 실패 확인.
+1. [ ] **선행 확인** — `truncateSnippet`은 **memory-ingestion 계획 Task 4가 낸다**(2026-09-20 교차 리뷰 M13: `packages/memory/src/search.ts`는 그 계획의 단일 오너 파일이라 이 워크트리에서 덧붙이면 교차 소유가 된다). 이 태스크는 import만 한다 — 없으면 이 태스크를 시작하지 않고 memory-ingestion Task 4 머지를 기다린다.
    ```bash
-   pnpm --filter @omnis/memory test
+   cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function truncateSnippet" packages/memory/src/search.ts && grep -n "truncateSnippet" packages/memory/src/index.ts
    ```
-   기대 출력: `truncateSnippet is not a function` 또는 `Cannot find module`(export가 아직 없음).
+   기대 출력: 두 grep 모두 1줄씩 hit(`packages/memory/src/index.ts`가 `export { searchMemories, truncateSnippet, type MemoryHit } from "./search.js";`). hit이 없으면 **중단**하고 W1의 memory-ingestion C1 체인(Task 1–4)이 머지될 때까지 기다린다.
 
-3. [ ] `packages/memory/src/search.ts` 끝에 export를 추가한다.
-   ```ts
-   // packages/memory/src/search.ts (기존 파일 끝에 추가)
-   /** A4 §14.4: snippet은 ≤160자. items는 ts_headline이 있지만 memories는 없으므로 절단만 한다. */
-   export function truncateSnippet(text: string, max = 160): string {
-     if (text.length <= max) return text;
-     return `${text.slice(0, max - 3)}...`;
-   }
-   ```
-
-4. [ ] 재실행 → 통과 확인, 커밋.
-   ```bash
-   pnpm --filter @omnis/memory test
-   ```
-   기대 출력: `truncateSnippet` 3개 테스트 PASS.
-   ```bash
-   git add packages/memory/src/search.ts packages/memory/test/search-snippet.test.ts
-   git commit -m "$(cat <<'EOF'
-   US-B26: truncateSnippet helper for unified search memory hits
-
-   - ≤160 char truncation shared by hub search.ts (A4 §14.4 snippet contract)
-
-   Implemented-by: Claude Opus
-   Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
-   EOF
-   )"
-   ```
-
-5. [ ] 병합 랭킹 순수 함수(`normalizeScores`/`mergedScore`/`buildGroup`)의 실패하는 테스트를 쓴다.
+2. [ ] 병합 랭킹 순수 함수(`normalizeScores`/`mergedScore`/`buildGroup`)의 실패하는 테스트를 쓴다.
    ```ts
    // apps/hub/src/search.test.ts
    import { describe, expect, it } from "vitest";
@@ -193,13 +142,13 @@
    });
    ```
 
-6. [ ] 실행 → 실패 확인.
+3. [ ] 실행 → 실패 확인.
    ```bash
    pnpm --filter @omnis/hub test
    ```
    기대 출력: `Cannot find module './search.js'`.
 
-7. [ ] `apps/hub/src/search.ts`를 구현한다.
+4. [ ] `apps/hub/src/search.ts`를 구현한다.
    ```ts
    // apps/hub/src/search.ts
    import type {
@@ -422,7 +371,7 @@
    }
    ```
 
-8. [ ] 재실행 → 통과 확인, 커밋.
+5. [ ] 재실행 → 통과 확인, 커밋.
    ```bash
    pnpm --filter @omnis/hub test
    ```
@@ -442,13 +391,13 @@
    )"
    ```
 
-9. [ ] `apps/hub/package.json`에 `@omnis/memory` 의존을 추가한다(델타 §1 "apps/hub → @omnis/memory 추가").
+6. [ ] `apps/hub/package.json`에 `@omnis/memory` 의존을 추가한다(델타 §1 "apps/hub → @omnis/memory 추가").
    ```json
    // apps/hub/package.json — "dependencies"에 한 줄 추가
    "@omnis/memory": "workspace:*",
    ```
 
-10. [ ] `apps/hub/src/http.ts`의 마지막 분기("// /search, /memory/search, /transcript/:id는 다른 부록이 소유한다…") 바로 앞에 두 라우트를 추가한다.
+7. [ ] `apps/hub/src/http.ts`의 마지막 분기("// /search, /memory/search, /transcript/:id는 다른 부록이 소유한다…") 바로 앞에 두 라우트를 추가한다.
     ```ts
     // apps/hub/src/http.ts — handle() 안, 기존 "/search... Phase A는 열지 않는다" 주석/404 이전에 삽입
     import { createSearchDeps, runSearch } from "./search.js";
@@ -478,7 +427,7 @@
     }
     ```
 
-11. [ ] 커밋.
+8. [ ] 커밋.
     ```bash
     git add apps/hub/package.json apps/hub/src/http.ts
     git commit -m "$(cat <<'EOF'
@@ -855,7 +804,8 @@
 **검증 명령**: `pnpm --filter @omnis/desktop test`
 **의존**: B23(아침 브리핑 루프 — `digests(kind='morning')` row를 채움)
 **읽을 스펙**: A5 §3.4(전체), §5.2(`DigestCard` 역할)
-**하지 말 것(YAGNI)**: 로딩/오류/오프라인 3상태 배너(스토리 목표는 화면 자체 — 상태 배너는 Inbox 전례처럼 별도 스코프로 후속), 인라인 `ApprovalSheet` 전체 4-way 재구현(기존 `ApprovalCardView`를 그대로 재사용).
+**4상태(로딩/빈/오류/오프라인)는 이 태스크가 전부 만든다**(백로그 US-B28 산출물 문구 그대로, 2026-09-20 교차 리뷰 M-B28). 구현은 작게 간다: 상태 판정은 순수 함수 `screenState()` 하나로 뽑아 유닛 테스트하고, 화면은 그 값으로 **한 줄짜리 배너** `<p role="status">` 또는 `role="alert"`를 화면 최상단에 렌더링한다. `offline`/`error`일 때도 이미 동기화된 로컬 데이터는 아래에 그대로 보여준다(Zero는 로컬 캐시를 갖고 있다 — 화면을 비우면 오히려 퇴보다).
+**하지 말 것(YAGNI)**: 공용 `<StateBanner>` 컴포넌트를 `@omnis/ui`에 새로 만들지 않는다(소비처가 이 화면 하나다 — 두 번째 화면이 같은 걸 요구하면 그때 올린다), 재시도 버튼·백오프 표시, 인라인 `ApprovalSheet` 전체 4-way 재구현(기존 `ApprovalCardView`를 그대로 재사용).
 
 **Files:**
 - Create: `packages/ui/src/components/digest-card.tsx`, `apps/desktop/src/screens/Today.tsx`
@@ -863,7 +813,7 @@
 
 **Interfaces:**
 - Consumes: `OpaqueSurface`, `Button`(기존 `@omnis/ui`), `ApprovalCardView`, `ApprovalCardInterrupt`(기존)
-- Produces: `DigestCard`, `DigestCardProps`(`packages/ui/src/components/digest-card.tsx`); `greetingLine`, `isSameLocalDay`(`apps/desktop/src/screens/Today.tsx`)
+- Produces: `DigestCard`, `DigestCardProps`(`packages/ui/src/components/digest-card.tsx`); `greetingLine`, `isSameLocalDay`, `screenState`, `ScreenState`, `STATE_COPY`(`apps/desktop/src/screens/Today.tsx`)
 
 **Steps:**
 
@@ -946,7 +896,7 @@
    ```ts
    // apps/desktop/test/today-screen.test.tsx
    import { describe, expect, it } from "vitest";
-   import { greetingLine, isSameLocalDay } from "../src/screens/Today";
+   import { STATE_COPY, greetingLine, isSameLocalDay, screenState } from "../src/screens/Today";
 
    describe("greetingLine (A5 §3.4 인사말 <h1>)", () => {
      it("includes the pending item count and approval count", () => {
@@ -969,6 +919,30 @@
        expect(isSameLocalDay(new Date("2026-09-20T23:59:00"), new Date("2026-09-21T00:01:00"))).toBe(false);
      });
    });
+
+   describe("screenState (US-B28 4상태 — 로딩/빈/오류/오프라인)", () => {
+     const ok = { online: true, resultTypes: ["complete", "complete"] as const };
+     it("error wins over everything — a failed query is the most specific thing we know", () => {
+       expect(screenState({ online: false, resultTypes: ["error", "unknown"], hasContent: true })).toBe("error");
+     });
+     it("offline beats loading — offline queries never reach 'complete', so 'loading' would hang forever", () => {
+       expect(screenState({ online: false, resultTypes: ["unknown", "complete"], hasContent: false })).toBe("offline");
+     });
+     it("loading while any query is still 'unknown'", () => {
+       expect(screenState({ online: true, resultTypes: ["unknown", "complete"], hasContent: false })).toBe("loading");
+     });
+     it("empty when every query completed and there is nothing to show", () => {
+       expect(screenState({ ...ok, hasContent: false })).toBe("empty");
+     });
+     it("ready when every query completed and there is something to show", () => {
+       expect(screenState({ ...ok, hasContent: true })).toBe("ready");
+     });
+     // 오프라인이어도 이미 동기화된 로컬 데이터는 화면에 남는다 — 배너만 뜨고 목록은 살아 있다.
+     it("offline still reports content so the caller keeps rendering the cached lists", () => {
+       expect(STATE_COPY.offline).not.toBe("");
+       expect(STATE_COPY.ready).toBe("");
+     });
+   });
    ```
 
 6. [ ] 실행 → 실패.
@@ -984,11 +958,9 @@
    import { DigestCard } from "@omnis/ui/components/digest-card";
    import { ApprovalCardView, type ApprovalCardInterrupt } from "@omnis/ui/components/approval-card";
    import { useQuery } from "@rocicorp/zero/react";
-   import { useMemo, useState } from "react";
+   import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
    import { decideApproval } from "../api/approvals.js";
-   import { initZero } from "../zero-client.js";
-
-   const zero = initZero();
+   import { useZeroClient } from "../zero-client.js";
 
    /** A5 §3.4: 인사말 텍스트, 스크린리더가 페이지 요지를 즉시 읽도록 <h1>으로 렌더링된다. */
    export function greetingLine(name: string, pendingCount: number, approvalCount: number): string {
@@ -1003,16 +975,55 @@
      );
    }
 
+   export type ScreenState = "error" | "offline" | "loading" | "empty" | "ready";
+
+   /** US-B28 4상태. Zero의 쿼리 결과 타입은 'unknown' | 'complete' | 'error'이고(@rocicorp/zero
+    * 1.9.0 `ResultType`), 오프라인이면 쿼리가 영영 'complete'에 못 간다 — 그래서 offline이
+    * loading보다 먼저다. error는 가장 구체적인 정보라 맨 앞. */
+   export function screenState(input: {
+     online: boolean;
+     resultTypes: readonly ("unknown" | "complete" | "error")[];
+     hasContent: boolean;
+   }): ScreenState {
+     if (input.resultTypes.includes("error")) return "error";
+     if (!input.online) return "offline";
+     if (input.resultTypes.includes("unknown")) return "loading";
+     return input.hasContent ? "ready" : "empty";
+   }
+
+   /** 배너 문구. `ready`는 빈 문자열 = 배너를 그리지 않는다. */
+   export const STATE_COPY: Record<ScreenState, string> = {
+     error: "오늘 화면을 불러오지 못했어요. 허브 로그를 확인해 주세요.",
+     offline: "오프라인이에요. 마지막으로 받아 둔 내용을 보여주는 중입니다.",
+     loading: "불러오는 중…",
+     empty: "오늘은 비어 있어요. 새 항목이 오면 여기에 쌓입니다.",
+     ready: "",
+   };
+
+   /** zero.online을 React 상태로 읽는다(zero.onOnline이 구독 해제 함수를 돌려준다). */
+   function useZeroOnline(zero: ReturnType<typeof useZeroClient>): boolean {
+     const subscribe = useCallback((cb: () => void) => zero.onOnline(() => cb()), [zero]);
+     return useSyncExternalStore(
+       subscribe,
+       () => zero.online,
+       () => true, // 서버 렌더·테스트 기본값: 온라인으로 본다
+     );
+   }
+
    export function Today({ onOpenThread }: { onOpenThread?: (threadId: string) => void }) {
+     const zero = useZeroClient();
      const [expandedApprovalId, setExpandedApprovalId] = useState<string | null>(null);
      const now = useMemo(() => new Date(), []);
 
-     const [morningDigests] = useQuery(zero.query.digests.where("kind", "=", "morning"));
-     const [nightlyDigests] = useQuery(
+     const online = useZeroOnline(zero);
+     const [morningDigests, morningR] = useQuery(zero.query.digests.where("kind", "=", "morning"));
+     const [nightlyDigests, nightlyR] = useQuery(
        zero.query.digests.where("kind", "=", "nightly").orderBy("for_date", "desc").limit(1),
      );
-     const [eventItems] = useQuery(zero.query.items.where("kind", "=", "event"));
-     const [approvals] = useQuery(zero.query.pending_approvals.where("state", "=", "pending"));
+     const [eventItems, eventsR] = useQuery(zero.query.items.where("kind", "=", "event"));
+     const [approvals, approvalsR] = useQuery(
+       zero.query.pending_approvals.where("state", "=", "pending"),
+     );
 
      const morning = useMemo(
        () => morningDigests.find((d) => isSameLocalDay(new Date(d.for_date), now)) ?? null,
@@ -1024,8 +1035,25 @@
        [eventItems, now],
      );
 
+     const state = screenState({
+       online,
+       resultTypes: [morningR.type, nightlyR.type, eventsR.type, approvalsR.type],
+       hasContent:
+         morning !== null || nightly !== null || todaysEvents.length > 0 || approvals.length > 0,
+     });
+     const banner = STATE_COPY[state];
+
      return (
-       <OpaqueSurface className="today-screen">
+       <OpaqueSurface className="today-screen" data-state={state}>
+         {banner !== "" && (
+           <p
+             className="today-screen__banner"
+             data-state={state}
+             role={state === "error" ? "alert" : "status"}
+           >
+             {banner}
+           </p>
+         )}
          <h1 className="today-screen__greeting">
            {greetingLine("Logan", todaysEvents.length + approvals.length, approvals.length)}
          </h1>
@@ -1103,13 +1131,14 @@
    ```bash
    pnpm --filter @omnis/desktop test
    ```
-   기대 출력: `greetingLine`/`isSameLocalDay` 4개 PASS.
+   기대 출력: `greetingLine`/`isSameLocalDay`/`screenState` 10개 PASS.
    ```bash
    git add apps/desktop/src/screens/Today.tsx apps/desktop/test/today-screen.test.tsx
    git commit -m "$(cat <<'EOF'
-   US-B28: Today screen — greeting <h1>, nightly digest card, today's calendar, inline approval chips
+   US-B28: Today screen — greeting <h1>, nightly digest card, today's calendar, inline approval chips, 4 states
 
-   - greetingLine()/isSameLocalDay() are pure and unit-tested; the screen only wires Zero data to them
+   - greetingLine()/isSameLocalDay()/screenState() are pure and unit-tested; the screen only wires Zero data to them
+   - 4 states (loading/empty/error/offline) render as one banner line; offline/error keep showing cached rows
    - approval chip click expands ApprovalCardView inline (no screen navigation, A5 §3.4)
 
    Implemented-by: Claude Sonnet
@@ -1312,9 +1341,7 @@
    import { TaskRow, type TaskKind, type TaskState } from "@omnis/ui/components/task-row";
    import { useQuery } from "@rocicorp/zero/react";
    import { useMemo, useState } from "react";
-   import { initZero } from "../zero-client.js";
-
-   const zero = initZero();
+   import { useZeroClient } from "../zero-client.js";
 
    export const TASKS_VIEWS = ["today", "week", "someday", "delegated"] as const;
    export type TasksView = (typeof TASKS_VIEWS)[number];
@@ -1355,6 +1382,7 @@
      onOpenSource?: (itemId: string) => void;
      onOpenDelegation?: (sessionId: string) => void;
    }) {
+     const zero = useZeroClient();
      const [view, setView] = useState<TasksView>("today");
      const [quickAdd, setQuickAdd] = useState("");
      const now = useMemo(() => new Date(), []);
@@ -1454,7 +1482,22 @@
 - Test: `packages/ui/test/person-card.test.tsx`, `apps/desktop/test/network-screen.test.tsx`
 
 **Interfaces:**
-- Consumes: `OpaqueSurface`, `Button`, `initialsFromName`, `pastelFromName`(기존 `@omnis/ui/lib/row-meta`)
+- Consumes: `OpaqueSurface`, `Button`(`@omnis/ui`), `initialsFromName`/`pastelFromName`(`@omnis/ui/lib/row-meta`), `formatRelativeTime`(`@omnis/ui/lib/relative-time`)
+
+**소비 심볼 출처 실측(2026-09-20 교차 리뷰 M-B30 — 새로 만들지 않는다):** 아래 셋은 **Wave 4/5에서 이미 main에 들어간 코드**다. 새 헬퍼를 발명하거나 이름을 바꾸지 말고 그대로 import한다.
+
+| 심볼 | 파일 | 시그니처 |
+|---|---|---|
+| `initialsFromName` | `packages/ui/src/lib/row-meta.ts` | `(name: string) => string` — 공백 분리 후 첫/마지막 이니셜, 한 단어면 앞 2글자, 빈 이름은 `"?"` |
+| `pastelFromName` | `packages/ui/src/lib/row-meta.ts` | `(name: string) => string` — 이름 해시 → `oklch(0.88 0.06 <hue>)` CSS 색 문자열(같은 이름 = 항상 같은 색) |
+| `formatRelativeTime` | `packages/ui/src/lib/relative-time.ts` | `(timestampMs: number, now?: number) => string` — `"now"`/`"3m"`/`"5h"`/`"2d"`/`"3w"`/`"4 Aug"`. **epoch ms를 받는다**(Date 아님) — `persons.last_contact_at`이 Zero에서 `number`로 내려오므로 그대로 넣으면 된다 |
+
+서브패스 import가 되는 이유: `packages/ui/package.json`의 `exports`가 `"./*": "./src/*.ts"`와 `"./components/*": "./src/components/*.tsx"`를 갖는다(실측). `apps/desktop/src/screens/Inbox.tsx`가 이미 같은 세 심볼을 같은 경로로 쓴다 — 의심되면 그 파일을 먼저 읽는다.
+
+시작 전에 존재를 확인한다(없으면 Wave 4/5 머지 전이라는 뜻이다):
+```bash
+cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromName\|export function pastelFromName" packages/ui/src/lib/row-meta.ts && grep -n "export function formatRelativeTime" packages/ui/src/lib/relative-time.ts
+```
 - Produces: `PersonCard`, `PersonCardProps`, `relationshipDot`, `RelationshipDot`(`packages/ui/src/components/person-card.tsx`); `followupQueue`(`apps/desktop/src/screens/Network.tsx`)
 
 **Steps:**
@@ -1624,9 +1667,7 @@
    import { formatRelativeTime } from "@omnis/ui/lib/relative-time";
    import { useQuery } from "@rocicorp/zero/react";
    import { useMemo } from "react";
-   import { initZero } from "../zero-client.js";
-
-   const zero = initZero();
+   import { useZeroClient } from "../zero-client.js";
 
    export interface FollowupCandidate {
      id: string;
@@ -1644,6 +1685,7 @@
    }
 
    export function Network({ onOpenPerson }: { onOpenPerson?: (id: string) => void }) {
+     const zero = useZeroClient();
      const now = useMemo(() => Date.now(), []);
      const [persons] = useQuery(zero.query.persons.orderBy("last_contact_at", "desc"));
 
@@ -1884,9 +1926,7 @@
    import { useQuery } from "@rocicorp/zero/react";
    import { useState } from "react";
    import { routeNote } from "../api/notes.js";
-   import { initZero } from "../zero-client.js";
-
-   const zero = initZero();
+   import { useZeroClient } from "../zero-client.js";
 
    export interface NoteRouteRow {
      route_state: "proposed" | "accepted" | "rejected" | "none";
@@ -1905,6 +1945,7 @@
    }
 
    export function Notes() {
+     const zero = useZeroClient();
      const [body, setBody] = useState("");
      const [notes] = useQuery(zero.query.notes.orderBy("created_at", "desc").limit(20));
 
@@ -2159,9 +2200,7 @@
    import { useQuery } from "@rocicorp/zero/react";
    import { useState } from "react";
    import { undoDigestGroup } from "../api/digest.js";
-   import { initZero } from "../zero-client.js";
-
-   const zero = initZero();
+   import { useZeroClient } from "../zero-client.js";
 
    export interface DigestGroup {
      reason: string;
@@ -2184,6 +2223,7 @@
    }
 
    export function Digest() {
+     const zero = useZeroClient();
      const [expanded, setExpanded] = useState<Set<string>>(new Set());
      const [nightlyDigests] = useQuery(
        zero.query.digests.where("kind", "=", "nightly").orderBy("for_date", "desc").limit(1),
@@ -2655,9 +2695,7 @@
     import { useQuery } from "@rocicorp/zero/react";
     import { useState } from "react";
     import { putSetting } from "../api/settings.js";
-    import { initZero } from "../zero-client.js";
-
-    const zero = initZero();
+    import { useZeroClient } from "../zero-client.js";
 
     export const SETTINGS_TABS = ["accounts", "autonomy", "model-tiers", "general"] as const;
     export type SettingsTab = (typeof SETTINGS_TABS)[number];
@@ -2687,6 +2725,7 @@
     };
 
     export function Settings() {
+      const zero = useZeroClient();
       const [tab, setTab] = useState<SettingsTab>("accounts");
       const [accounts] = useQuery(zero.query.accounts);
       const [settingsRows] = useQuery(zero.query.settings);
@@ -3090,50 +3129,33 @@
 **검증 명령**: `pnpm --filter @omnis/web test`
 **의존**: B17(알림 전달 — `createNotifier`/`PushPayload` 발송 인프라), B35(이 플랜 Task 9)
 **읽을 스펙**: 델타 §2.3(`PushSubscription`/`PushPayload`), §6(`0011_push_subscriptions.sql`), §7(`/push/*`), A5 §4.4(전체)
-**하지 말 것(YAGNI)**: 실제 알림 6종의 발송 트리거 배선(그건 agents US-B17의 `createNotifier`가 이미 소유 — 이 태스크는 구독 저장 + 클릭 핸들러만), Approve 버튼이 성공했는지 재시도 로직(실패해도 앱을 열면 되므로 fire-and-forget으로 충분, YAGNI).
+**Web Push 단일 오너(2026-09-20 교차 리뷰 M-webpush):** VAPID 설정·서명·실제 발송·410/404 구독 정리는 **agents 계획 Task 12의 `packages/kernel/src/notify/webpush.ts`가 유일한 오너**다(`vapidFromEnv`/`sendWebPush`/`pruneSubscription`/`WEBPUSH_GONE_CODES`/`VapidKeys`). 이 태스크는 **라우트 3개만** 만든다 — `GET /push/vapid-public-key`, `POST /push/subscribe`, `DELETE /push/subscribe` — 그리고 구독 행 저장·삭제(`saveSubscription`/`removeSubscription`)까지다. `apps/hub`에 두 번째 발송 구현(`sendPush`/`configureWebPush`/`PushSender`)을 만들지 않고 `web-push` 의존도 `apps/hub`에 추가하지 않는다.
+
+**하지 말 것(YAGNI)**: 실제 알림 6종의 발송 트리거 배선(그건 agents US-B17의 `createNotifier`가 이미 소유 — 이 태스크는 구독 저장 + 클릭 핸들러만), 허브 쪽 발송 함수(위 단일 오너 규칙), Approve 버튼이 성공했는지 재시도 로직(실패해도 앱을 열면 되므로 fire-and-forget으로 충분, YAGNI).
 
 **Files:**
-- Create: `packages/db/migrations/0011_push_subscriptions.sql`, `apps/hub/src/push.ts`, `apps/web/src/push/subscribe.ts`, `apps/web/src/push/sw-push.ts`
+- Create: `apps/hub/src/push.ts`, `apps/web/src/push/subscribe.ts`, `apps/web/src/push/sw-push.ts`
 - Modify: `apps/hub/src/http.ts`(GET /push/vapid-public-key, POST/DELETE /push/subscribe), `apps/hub/src/config.ts`(VAPID 3개 env 필드 추가)
 - Test: `apps/hub/src/push.test.ts`, `apps/web/test/push-subscribe.test.ts`, `apps/web/test/sw-push.test.ts`
+- **만들지 않음**: `packages/db/migrations/0011_push_subscriptions.sql`(W0 스키마 번들 소유, 델타 §6 — 교차 리뷰 M3), `packages/kernel/src/notify/webpush.ts`(agents 계획 Task 12 소유)
 
 **Interfaces:**
-- Consumes: `PushSubscription`, `PushPayload`(`@omnis/protocol`, 델타 §2.3), `query`(`@omnis/db`)
-- Produces: `saveSubscription`, `removeSubscription`, `sendPush`, `configureWebPush`, `VapidKeys`, `PushSender`(`apps/hub/src/push.ts`); `toSubscriptionPayload`(`apps/web/src/push/subscribe.ts`); `buildNotificationOptions`, `resolveNotificationClick`(`apps/web/src/push/sw-push.ts`)
+- Consumes: `PushSubscription`, `PushPayload`(`@omnis/protocol`, 델타 §2.3), `query`(`@omnis/db`), `sendWebPush`/`pruneSubscription`/`vapidFromEnv`/`VapidKeys`(`@omnis/kernel`, agents Task 12 — 이 태스크는 import만 하고 호출은 `createNotifier`가 한다)
+- Produces: `saveSubscription`, `removeSubscription`(`apps/hub/src/push.ts`); `toSubscriptionPayload`(`apps/web/src/push/subscribe.ts`); `buildNotificationOptions`, `resolveNotificationClick`(`apps/web/src/push/sw-push.ts`)
 
 **Steps:**
 
-1. [ ] `packages/db/migrations/0011_push_subscriptions.sql`을 쓴다(델타 §6 표 그대로).
-   ```sql
-   -- packages/db/migrations/0011_push_subscriptions.sql
-   CREATE TABLE push_subscriptions (
-     id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-     endpoint   text UNIQUE NOT NULL,
-     p256dh     text NOT NULL,
-     auth       text NOT NULL,
-     ua         text,
-     created_at timestamptz NOT NULL DEFAULT now(),
-     last_ok_at timestamptz,
-     fail_count integer NOT NULL DEFAULT 0
-   );
-   ```
-   커밋.
+1. [ ] **선행 확인** — 이 태스크는 스키마도 발송기도 만들지 않는다. 둘 다 이미 있어야 시작한다.
    ```bash
-   git add packages/db/migrations/0011_push_subscriptions.sql
-   git commit -m "$(cat <<'EOF'
-   US-B36: 0011_push_subscriptions.sql (delta §6)
-
-   Implemented-by: Claude Sonnet
-   Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
-   EOF
-   )"
+   cd /Users/logankim/AI-Workspaces/omnis && ls packages/db/migrations/0011_push_subscriptions.sql && grep -n "export async function sendWebPush\|export async function pruneSubscription\|export function vapidFromEnv" packages/kernel/src/notify/webpush.ts
    ```
+   기대 출력: 마이그레이션 파일 1줄 + `webpush.ts`의 export 3줄. 없으면 **중단**한다 — `0011`은 **W0 스키마 번들**(델타 §6), `webpush.ts`는 **agents 계획 Task 12**가 낸다. 둘 다 이 워크트리에서 다시 만들지 않는다(마이그레이션 러너가 sha256 변경을 throw하고, 발송기를 두 벌 두면 VAPID 설정이 두 군데서 갈린다).
 
-2. [ ] `apps/hub/src/push.ts`(구독 저장/삭제/발송)의 실패하는 테스트를 쓴다 — `web-push`의 실제 네트워크 호출은 `PushSender`로 주입해 목업한다.
+2. [ ] `apps/hub/src/push.ts`(구독 저장/삭제)의 실패하는 테스트를 쓴다. 발송은 여기 없다 — `@omnis/kernel`의 `sendWebPush`가 한다.
    ```ts
    // apps/hub/src/push.test.ts
    import { describe, expect, it, vi } from "vitest";
-   import { removeSubscription, saveSubscription, sendPush } from "./push.js";
+   import { removeSubscription, saveSubscription } from "./push.js";
 
    function fakePool(rows: unknown[] = []) {
      return { query: vi.fn().mockResolvedValue({ rows }) };
@@ -3163,42 +3185,6 @@
        expect(await removeSubscription(pool as never, "https://nope")).toBe(false);
      });
    });
-
-   describe("sendPush", () => {
-     const sub = { id: "sub-1", endpoint: "https://push.example/abc", p256dh: "p", auth: "a" };
-     const payload = {
-       kind: "draft" as const, title: "새 초안", body: "확인 부탁드립니다",
-       deep_link: "omnis://thread/t1",
-     };
-
-     it("delegates to the injected sender", async () => {
-       const pool = fakePool();
-       const sendNotification = vi.fn().mockResolvedValue(undefined);
-       await sendPush(pool as never, { sendNotification }, sub, payload);
-       expect(sendNotification).toHaveBeenCalledWith(
-         { endpoint: sub.endpoint, keys: { p256dh: "p", auth: "a" } },
-         JSON.stringify(payload),
-       );
-     });
-
-     it("deletes the subscription on a 410 Gone instead of throwing", async () => {
-       const pool = fakePool();
-       const sendNotification = vi.fn().mockRejectedValue({ statusCode: 410 });
-       await expect(sendPush(pool as never, { sendNotification }, sub, payload)).resolves.toBeUndefined();
-       expect(pool.query).toHaveBeenCalledWith(expect.stringContaining("DELETE FROM push_subscriptions"), [
-         "sub-1",
-       ]);
-     });
-
-     it("bumps fail_count and rethrows on any other error", async () => {
-       const pool = fakePool();
-       const sendNotification = vi.fn().mockRejectedValue({ statusCode: 500 });
-       await expect(sendPush(pool as never, { sendNotification }, sub, payload)).rejects.toBeDefined();
-       expect(pool.query).toHaveBeenCalledWith(expect.stringContaining("fail_count = fail_count + 1"), [
-         "sub-1",
-       ]);
-     });
-   });
    ```
 
 3. [ ] 실행 → 실패.
@@ -3206,27 +3192,14 @@
    pnpm --filter @omnis/hub test
    ```
 
-4. [ ] `apps/hub/src/push.ts`를 구현한다.
+4. [ ] `apps/hub/src/push.ts`를 구현한다 — 구독 행 저장·삭제만. `web-push`를 import하지 않는다.
    ```ts
    // apps/hub/src/push.ts
+   // 발송은 여기 없다: VAPID 설정·서명·410/404 정리는 @omnis/kernel의 notify/webpush.ts가
+   // 유일한 오너다(agents 계획 Task 12, 교차 리뷰 M-webpush). 이 파일은 PWA가 보내온 구독을
+   // push_subscriptions에 넣고 빼는 것까지만 한다.
    import { query } from "@omnis/db";
    import type { Pool } from "pg";
-   import webpush from "web-push";
-
-   export interface VapidKeys {
-     publicKey: string;
-     privateKey: string;
-     subject: string;
-   }
-
-   export function configureWebPush(keys: VapidKeys): void {
-     webpush.setVapidDetails(keys.subject, keys.publicKey, keys.privateKey);
-   }
-
-   export interface PushSender {
-     sendNotification: typeof webpush.sendNotification;
-   }
-   export const realPushSender: PushSender = { sendNotification: webpush.sendNotification };
 
    export interface PushSubscriptionInput {
      endpoint: string;
@@ -3254,44 +3227,6 @@
      ]);
      return rows.length > 0;
    }
-
-   export interface StoredSubscription {
-     id: string;
-     endpoint: string;
-     p256dh: string;
-     auth: string;
-   }
-
-   export interface PushPayload {
-     kind: "draft" | "approval" | "vip" | "briefing" | "digest" | "followup" | "adapter_down";
-     title: string;
-     body: string;
-     deep_link: string;
-     approval_id?: string;
-   }
-
-   /** 410/404(Gone/Not Found)는 조용히 구독을 지운다 — 그 외는 fail_count만 올리고 다시 던진다. */
-   export async function sendPush(
-     pool: Pool,
-     sender: PushSender,
-     sub: StoredSubscription,
-     payload: PushPayload,
-   ): Promise<void> {
-     try {
-       await sender.sendNotification(
-         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-         JSON.stringify(payload),
-       );
-     } catch (e) {
-       const status = (e as { statusCode?: number }).statusCode;
-       if (status === 404 || status === 410) {
-         await query(pool, `DELETE FROM push_subscriptions WHERE id = $1`, [sub.id]);
-         return;
-       }
-       await query(pool, `UPDATE push_subscriptions SET fail_count = fail_count + 1 WHERE id = $1`, [sub.id]);
-       throw e;
-     }
-   }
    ```
 
 5. [ ] 재실행 → 통과. `apps/hub/src/config.ts`에 VAPID 필드를 더하고(`zeroAuthSecret`과 같은 "빈 문자열=미설정" 패턴), `http.ts`에 `/push/*` 3개 라우트를 배선한다.
@@ -3313,16 +3248,11 @@
    ```
    ```ts
    // apps/hub/src/http.ts — 추가 import + createHubServer 상단 + 라우트
-   import { configureWebPush, realPushSender, removeSubscription, saveSubscription, sendPush } from "./push.js";
+   import { removeSubscription, saveSubscription } from "./push.js";
    // (createHubServer 함수 상단, config가 이미 있으므로)
+   // VAPID 키를 web-push에 물리는 쪽(setVapidDetails)은 @omnis/kernel의 sendWebPush다 —
+   // 허브는 "설정됐는지"만 보고 공개키를 내려준다. 설정이 없으면 /push/*는 503(델타 §7).
    const webpushConfigured = config.webpushVapidPublic !== "" && config.webpushVapidPrivate !== "";
-   if (webpushConfigured) {
-     configureWebPush({
-       publicKey: config.webpushVapidPublic,
-       privateKey: config.webpushVapidPrivate,
-       subject: config.webpushSubject,
-     });
-   }
 
    if (path === "/push/vapid-public-key") {
      if (method !== "GET") return send(res, 405, { error: "method not allowed" });
@@ -3367,13 +3297,15 @@
      return send(res, 405, { error: "method not allowed" });
    }
    ```
-   `sendPush`/`realPushSender`는 이 태스크에서 라우트로 노출하지 않는다 — 실제 발송 트리거는 agents US-B17의 `createNotifier`가 이 함수를 가져다 쓴다(계약 §5 `Notifier.send`).
+   발송 경로는 이 태스크에 없다 — agents US-B17의 `createNotifier`가 `@omnis/kernel`의 `sendWebPush(deps, payload)`를 부른다(계약 §5 `Notifier.send`). 허브는 구독을 받아 저장하는 쪽만 책임진다.
 
 6. [ ] 커밋.
    ```bash
    git add apps/hub/src/push.ts apps/hub/src/push.test.ts apps/hub/src/config.ts apps/hub/src/http.ts
    git commit -m "$(cat <<'EOF'
-   US-B36: hub push.ts (VAPID send/save/remove) + GET vapid-public-key, POST/DELETE /push/subscribe
+   US-B36: hub subscription store + GET vapid-public-key, POST/DELETE /push/subscribe
+
+   - sending stays in @omnis/kernel notify/webpush.ts (single owner); the hub only stores subscriptions
 
    Implemented-by: Claude Sonnet
    Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
@@ -3536,10 +3468,337 @@
 
 ---
 
+### Task 11: `GET /transcript/:session_id` — 에이전트 세션 트랜스크립트 (US-B39 허브 몫, tier: Sonnet)
+
+**왜 이 플랜에 있나(2026-09-20 교차 리뷰 M8)**: 델타 §7이 이 라우트를 US-B39에 달았지만, channels 플랜의 US-B39 산출물은 `apps/local-agent/src/bridges/hermes.ts` 하나뿐이라 아무도 구현하지 않는 **고아 라우트**였다. `apps/hub/src/http.ts`는 이 플랜 Task 1(`/search`)·Task 8(`/settings`)·Task 10(`/push/*`)이 이미 건드리는 파일이라 여기로 옮긴다. 델타 §7 표의 오너 열도 `surfaces 계획 Task 11`로 갱신되어 있다.
+
+**목표**: `GET /transcript/:session_id?last_n` → `SessionSummary`(A3 §7, 스키마는 `@omnis/protocol`의 `SessionSummary`가 정본). durable 요약(`agent_sessions.summary`) + 그 세션 스레드의 **마지막 N턴**을 `items`에서 읽어 돌려준다.
+**산출물**: `apps/hub/src/transcript.ts`, `apps/hub/src/http.ts`(수정)
+**검증 명령**: `pnpm --filter @omnis/hub test`
+**의존**: 없음 — `agent_sessions`/`agent_runtimes`/`items`는 전부 Phase A 스키마다. Task 1~10과 병렬 가능하고 `http.ts` 한 줄 충돌만 조심하면 된다.
+**읽을 스펙**: A2 §6(`SessionSummary`), A3 §7(예고된 경로), 델타 §7, `packages/protocol/src/bridge.ts`의 `SessionSummary`(FIXED, 필드 정본), `apps/hub/src/sessions.ts`(`purposeOf`/`runtimeOf`/`writeAgentItem` — 같은 테이블을 쓰는 코드)
+**하지 말 것(YAGNI)**: `open_questions`/`artifacts`를 추론하는 LLM 호출(A2-D13이 raw 델타·reasoning 원문 저장을 금지했고 지금 스키마에 근거가 없다 — **빈 배열**로 두고 열린 질문에 적는다), `session_key`로도 조회되는 별칭 라우트(델타 §7은 `:session_id` 하나다), 페이지네이션(`last_n`이 상한 10이라 필요 없다).
+
+**Files:**
+- Create: `apps/hub/src/transcript.ts`, `apps/hub/src/transcript.test.ts`
+- Modify: `apps/hub/src/http.ts`(`GET /transcript/:session_id` 라우트 추가)
+- Test: `apps/hub/src/transcript.test.ts`
+
+**Interfaces:**
+- Consumes: `SessionSummary`(`@omnis/protocol`), `query`(`@omnis/db`), `purposeOf`/`runtimeOf`(`apps/hub/src/sessions.ts`)
+- Produces: `toSessionState`, `clampLastN`, `buildSessionSummary`, `loadTranscript`, `TranscriptSessionRow`, `TranscriptItemRow`(`apps/hub/src/transcript.ts`)
+
+**Steps:**
+
+1. [ ] 순수 변환부터 실패하는 테스트를 쓴다. DB 행 모양(`TranscriptSessionRow`/`TranscriptItemRow`)을 받아 `SessionSummary`를 만드는 함수가 본체다 — Pool은 `loadTranscript`에서만 만난다.
+   ```ts
+   // apps/hub/src/transcript.test.ts
+   import { SessionSummary } from "@omnis/protocol";
+   import { describe, expect, it } from "vitest";
+   import {
+     buildSessionSummary,
+     clampLastN,
+     toSessionState,
+     type TranscriptItemRow,
+     type TranscriptSessionRow,
+   } from "./transcript.js";
+
+   const session: TranscriptSessionRow = {
+     id: "11111111-1111-1111-1111-111111111111",
+     session_key: "agent:claude_code:macbook:omnis",
+     runtime: "claude_code",
+     host: "macbook",
+     state: "running",
+     summary: "Phase B 계획 교차 리뷰 반영 중",
+     started_at: new Date("2026-09-20T01:00:00.000Z"),
+     last_turn_at: new Date("2026-09-20T04:00:00.000Z"),
+     turn_count: 42,
+   };
+
+   const items: TranscriptItemRow[] = [
+     { id: "i1", kind: "agent_turn", body: "계획을 읽었습니다", tool: null, author_is_me: false, sent_at: new Date("2026-09-20T03:58:00.000Z") },
+     { id: "i2", kind: "tool_call", body: "", tool: { label: "Read docs/plan.md", state: "ok" }, author_is_me: false, sent_at: new Date("2026-09-20T03:59:00.000Z") },
+     { id: "i3", kind: "agent_turn", body: "다음 태스크로 갑니다", tool: null, author_is_me: true, sent_at: new Date("2026-09-20T04:00:00.000Z") },
+   ];
+
+   describe("toSessionState (agent_sessions.state 6값 → SessionState 5값)", () => {
+     it("maps starting/idle/ended to the protocol's three", () => {
+       expect(toSessionState("starting")).toBe("idle");
+       expect(toSessionState("idle")).toBe("idle");
+       expect(toSessionState("ended")).toBe("closed");
+     });
+     it("maps waiting_approval to awaiting_approval (the names differ)", () => {
+       expect(toSessionState("waiting_approval")).toBe("awaiting_approval");
+     });
+     it("passes running and failed through", () => {
+       expect(toSessionState("running")).toBe("running");
+       expect(toSessionState("failed")).toBe("failed");
+     });
+     // DB CHECK 제약이 6값을 강제하지만, 새 값이 늘면 조용히 'idle'로 뭉개지 않는다.
+     it("throws on an unknown state instead of guessing", () => {
+       expect(() => toSessionState("teleporting")).toThrow();
+     });
+   });
+
+   describe("clampLastN (A2 §6 recent_turns ≤ 10)", () => {
+     it("defaults to 10 and clamps out-of-range input", () => {
+       expect(clampLastN(null)).toBe(10);
+       expect(clampLastN("3")).toBe(3);
+       expect(clampLastN("0")).toBe(1);
+       expect(clampLastN("99")).toBe(10);
+       expect(clampLastN("맥주")).toBe(10);
+     });
+   });
+
+   describe("buildSessionSummary", () => {
+     it("produces a payload that parses against the protocol schema", () => {
+       const out = buildSessionSummary(session, items);
+       expect(() => SessionSummary.parse(out)).not.toThrow();
+       expect(out.purpose).toBe("omnis");
+       expect(out.state).toBe("running");
+       expect(out.summary).toBe("Phase B 계획 교차 리뷰 반영 중");
+       expect(out.open_questions).toEqual([]);
+       expect(out.artifacts).toEqual([]);
+     });
+
+     it("folds tool_call items into the preceding turn instead of emitting a turn for them", () => {
+       const out = buildSessionSummary(session, items);
+       expect(out.recent_turns.map((t) => t.turn_id)).toEqual(["i1", "i3"]);
+       expect(out.recent_turns[0]?.tool_calls).toEqual([{ label: "Read docs/plan.md", status: "ok" }]);
+       expect(out.recent_turns[1]?.tool_calls).toEqual([]);
+     });
+
+     it("marks author_is_me turns as 'user' and the rest as 'agent'", () => {
+       const out = buildSessionSummary(session, items);
+       expect(out.recent_turns.map((t) => t.role)).toEqual(["agent", "user"]);
+     });
+
+     // SessionSummary.text는 max(1000)이다 — 넘치면 parse가 throw하므로 여기서 잘라야 한다.
+     it("truncates turn text to 1000 chars so the schema never rejects a long turn", () => {
+       // noUncheckedIndexedAccess 때문에 items[0]을 스프레드하지 않는다 — 행을 직접 만든다.
+       const long: TranscriptItemRow[] = [
+         { id: "i9", kind: "agent_turn", body: "가".repeat(2000), tool: null, author_is_me: false, sent_at: new Date("2026-09-20T04:01:00.000Z") },
+       ];
+       const out = buildSessionSummary(session, long);
+       expect(out.recent_turns[0]?.text.length).toBe(1000);
+       expect(() => SessionSummary.parse(out)).not.toThrow();
+     });
+
+     // summary가 NULL인 세션(아직 요약 잡이 안 돈 세션)도 200을 줘야 한다 — 404가 아니다.
+     it("uses an empty summary when the session has none yet", () => {
+       const out = buildSessionSummary({ ...session, summary: null, last_turn_at: null }, []);
+       expect(out.summary).toBe("");
+       expect(out.last_turn_at).toBeNull();
+       expect(() => SessionSummary.parse(out)).not.toThrow();
+     });
+   });
+   ```
+
+2. [ ] 실행 → 실패 확인.
+   ```bash
+   pnpm --filter @omnis/hub test
+   ```
+   기대 출력: `Cannot find module './transcript.js'`.
+
+3. [ ] `apps/hub/src/transcript.ts`를 구현한다.
+   ```ts
+   // apps/hub/src/transcript.ts
+   // 델타 §7 GET /transcript/:session_id. A3 §7이 예고한 경로이고 스키마 정본은
+   // @omnis/protocol의 SessionSummary다(A2 §6). raw 델타·reasoning 원문은 애초에 저장되지
+   // 않으므로(A2-D13) 여기서 재구성할 것도 없다 — items에 남은 turn/tool_call만 읽는다.
+   import { query } from "@omnis/db";
+   import type { SessionState, SessionSummary } from "@omnis/protocol";
+   import type { Pool } from "pg";
+   import { purposeOf } from "./sessions.js";
+
+   export interface TranscriptSessionRow {
+     id: string;
+     session_key: string;
+     runtime: string;
+     host: string;
+     state: string;
+     summary: string | null;
+     started_at: Date;
+     last_turn_at: Date | null;
+     turn_count: number;
+   }
+
+   export interface TranscriptItemRow {
+     id: string;
+     kind: string;
+     body: string;
+     tool: { label?: unknown; state?: unknown } | null;
+     author_is_me: boolean;
+     sent_at: Date;
+   }
+
+   /** agent_sessions.state(6값, 0004 CHECK)는 protocol의 SessionState(5값)와 이름이 다르다. */
+   const STATE_MAP: Readonly<Record<string, SessionState>> = {
+     starting: "idle",
+     idle: "idle",
+     running: "running",
+     waiting_approval: "awaiting_approval",
+     ended: "closed",
+     failed: "failed",
+   };
+
+   export function toSessionState(dbState: string): SessionState {
+     const mapped = STATE_MAP[dbState];
+     // 모르는 값을 idle로 뭉개면 "끝난 세션"과 "새로 생긴 상태"를 구분할 수 없게 된다.
+     if (mapped === undefined) throw new Error(`unknown agent_sessions.state: ${dbState}`);
+     return mapped;
+   }
+
+   export const MAX_RECENT_TURNS = 10;
+   const MAX_TURN_TEXT = 1000;
+
+   export function clampLastN(raw: string | null): number {
+     const n = Number.parseInt(raw ?? "", 10);
+     if (!Number.isFinite(n)) return MAX_RECENT_TURNS;
+     return Math.min(MAX_RECENT_TURNS, Math.max(1, n));
+   }
+
+   /** `items`는 sent_at 오름차순으로 들어온다. tool_call은 자기 턴이 아니라 **직전 턴에 접힌다**
+    * (A2 §3.3: reasoning/tool은 item이 아니라 그 턴의 부속이다). 첫 tool_call이 턴보다 먼저
+    * 오면 붙일 곳이 없으므로 버린다 — SessionSummary에 tool 전용 턴은 없다. */
+   export function buildSessionSummary(
+     session: TranscriptSessionRow,
+     items: readonly TranscriptItemRow[],
+   ): SessionSummary {
+     const turns: SessionSummary["recent_turns"] = [];
+     for (const it of items) {
+       if (it.kind === "tool_call") {
+         const last = turns[turns.length - 1];
+         if (last === undefined) continue;
+         last.tool_calls.push({
+           label: typeof it.tool?.label === "string" ? it.tool.label : "tool",
+           status: it.tool?.state === "failed" ? "failed" : "ok",
+         });
+         continue;
+       }
+       turns.push({
+         turn_id: it.id,
+         at: it.sent_at.toISOString(),
+         role: it.author_is_me ? "user" : "agent",
+         text: it.body.slice(0, MAX_TURN_TEXT),
+         tool_calls: [],
+       });
+     }
+     return {
+       session_key: session.session_key,
+       runtime: session.runtime as SessionSummary["runtime"],
+       host: session.host as SessionSummary["host"],
+       purpose: purposeOf(session.session_key),
+       state: toSessionState(session.state),
+       opened_at: session.started_at.toISOString(),
+       last_turn_at: session.last_turn_at === null ? null : session.last_turn_at.toISOString(),
+       turn_count: session.turn_count,
+       summary: session.summary ?? "",
+       open_questions: [],
+       artifacts: [],
+       recent_turns: turns.slice(-MAX_RECENT_TURNS),
+     };
+   }
+
+   /** 없으면 null → 라우트가 404를 준다. */
+   export async function loadTranscript(
+     pool: Pool,
+     sessionId: string,
+     lastN: number,
+   ): Promise<SessionSummary | null> {
+     const sessions = await query<TranscriptSessionRow>(
+       pool,
+       `SELECT s.id, s.session_key, r.runtime, r.host, s.state, s.summary,
+               s.started_at, s.last_turn_at,
+               (SELECT count(*)::int FROM items i
+                 WHERE i.thread_id = s.thread_id AND i.kind = 'agent_turn') AS turn_count
+          FROM agent_sessions s
+          JOIN agent_runtimes r ON r.id = s.runtime_id
+         WHERE s.id = $1`,
+       [sessionId],
+     );
+     const session = sessions[0];
+     if (session === undefined) return null;
+
+     // 턴 N개를 채우려면 사이에 낀 tool_call까지 받아야 한다 — 넉넉히 뽑고 buildSessionSummary가
+     // 마지막 N턴만 남긴다. ponytail: 상한 N*8. 한 턴에 tool이 8개를 넘으면 앞 턴이 밀린다.
+     const rows = await query<TranscriptItemRow>(
+       pool,
+       `SELECT id, kind, body, tool, author_is_me, sent_at
+          FROM (
+            SELECT i.id, i.kind, i.body, i.tool, i.author_is_me, i.sent_at
+              FROM items i
+              JOIN agent_sessions s ON s.thread_id = i.thread_id
+             WHERE s.id = $1 AND i.kind IN ('agent_turn', 'tool_call')
+             ORDER BY i.sent_at DESC
+             LIMIT $2
+          ) recent
+         ORDER BY sent_at ASC`,
+       [sessionId, lastN * 8],
+     );
+     return buildSessionSummary(session, rows);
+   }
+   ```
+
+4. [ ] 재실행 → 통과 확인.
+   ```bash
+   pnpm --filter @omnis/hub test
+   ```
+   기대 출력: `transcript` 10개 테스트 PASS.
+
+5. [ ] `apps/hub/src/http.ts`에 라우트를 배선한다 — Task 1이 고친 것과 **같은 분기 자리**다(마지막 "다른 부록이 소유한다" 주석 앞). Task 1·8·10과 같은 파일이므로 머지 순서만 지키면 한 줄 충돌이다.
+   ```ts
+   // apps/hub/src/http.ts — import 추가
+   import { clampLastN, loadTranscript } from "./transcript.js";
+
+   // /search·/memory/search 분기 옆
+   if (path.startsWith("/transcript/")) {
+     if (method !== "GET") return send(res, 405, { error: "method not allowed" });
+     const sessionId = path.slice("/transcript/".length);
+     // uuid가 아니면 Postgres가 22P02로 throw한다 — 400으로 먼저 끊는다.
+     if (!/^[0-9a-f-]{36}$/i.test(sessionId)) return send(res, 400, { error: "invalid session_id" });
+     const summary = await loadTranscript(pool, sessionId, clampLastN(url.searchParams.get("last_n")));
+     if (summary === null) return send(res, 404, { error: "session not found" });
+     return send(res, 200, summary);
+   }
+   ```
+
+6. [ ] 전체 검증 후 커밋한다.
+   ```bash
+   pnpm --filter @omnis/hub test && pnpm typecheck && pnpm lint
+   ```
+   ```bash
+   git add apps/hub/src/transcript.ts apps/hub/src/transcript.test.ts apps/hub/src/http.ts
+   git commit -m "$(cat <<'EOF'
+   US-B39: GET /transcript/:session_id — durable summary + last N turns (delta §7)
+
+   - buildSessionSummary() is pure and validated against the protocol's SessionSummary zod schema
+   - tool_call items fold into the preceding turn (A2 §3.3) instead of becoming turns of their own
+   - turn text is truncated to the schema's 1000-char cap; a session with no summary yet returns 200, not 404
+   - reassigned here by the 2026-09-20 cross-plan review (M8): channels US-B39 ships only the local-agent bridge
+
+   Implemented-by: Claude Sonnet
+   Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+   EOF
+   )"
+   ```
+
+**열린 질문**: `SessionSummary.open_questions`와 `artifacts`를 빈 배열로 둔다. 둘 다 A2 §6에 필드로는 있지만 Phase A 스키마에 근거가 없다(`items.tool`의 `{name,args,state,label,icon}`에 파일 경로가 들어오는 경우가 있지만 `action: created|modified|read` 구분이 없다). 채우려면 ① 브리지가 `TurnCompleted`에 artifacts를 싣게 하거나 ② 요약 잡(US-A?? `summarize-job.ts`)이 `agent_sessions`에 컬럼을 더해야 한다 — 어느 쪽이든 Phase C 범위다.
+
+---
+
 ## 완료 체크
 
-- 스토리 10개(US-B26, B27, B28, B29, B30, B31, B32, B33, B35, B36) 전부 태스크 ≥1개(각 정확히 1개, Task 1~10)로 커버됨.
+- 스토리 10개(US-B26, B27, B28, B29, B30, B31, B32, B33, B35, B36) 전부 태스크 ≥1개(각 정확히 1개, Task 1~10)로 커버됨. **Task 11은 스토리 밖**이다 — 델타 §7의 `GET /transcript/:session_id`를 US-B39(channels)에서 넘겨받은 허브 몫이다(2026-09-20 교차 리뷰 M8).
 - 금지 표현(TBD/TODO/"implement later"/"add appropriate error handling"/"similar to Task N"/코드 없는 스텝/미정의 심볼) 없음 — 셀프체크 결과 없음 확인.
 - 이 문서가 소비하는 모든 심볼은 델타 §2~§5(`SearchHit` 계열, `PushSubscription`/`PushPayload`, `getSetting`/`setSetting`/`SettingKey`/`SETTING_DEFAULTS`) 또는 다른 Phase B 플랜이 웨이브 순서상 먼저 만드는 것(`searchMemories`/`MemoryHit`, `undoArchive`, `currentPolicy`)뿐이고, 전부 Global Constraints에 명시했다.
-- 이 플랜이 새로 고정한 심볼(델타에 없던 것, "심볼 산출물" 참고): `runSearch`/`createSearchDeps`/`SearchDeps`(Task 1), `matchesAnyAction`/`UiSearchHit`/`UiSearchGroup`(Task 2), `DigestCard`(Task 3), `TaskRow`/`filterTasksByView`(Task 4), `PersonCard`/`relationshipDot`/`followupQueue`(Task 5), `decideNoteRouting`/`POST /notes/:id/route`(Task 6, 델타에 없던 라우트 — 열린 질문에 기록), `handleUnarchiveItem`/`handleDigestUndo`(Task 7), `packages/kernel/src/settings.ts` 전체(Task 8, 델타 §5를 최초로 구현), `BottomTabBar`/`classifySwipe`/`InstallGuideCard`(Task 9), `apps/hub/src/push.ts` 전체(Task 10, 델타 §2.3을 최초로 구현).
+- 이 플랜이 새로 고정한 심볼(델타에 없던 것, "심볼 산출물" 참고): `runSearch`/`createSearchDeps`/`SearchDeps`(Task 1), `matchesAnyAction`/`UiSearchHit`/`UiSearchGroup`(Task 2), `DigestCard`(Task 3), `TaskRow`/`filterTasksByView`(Task 4), `PersonCard`/`relationshipDot`/`followupQueue`(Task 5), `decideNoteRouting`/`POST /notes/:id/route`(Task 6, 델타에 없던 라우트 — 열린 질문에 기록), `handleUnarchiveItem`/`handleDigestUndo`(Task 7), `packages/kernel/src/settings.ts` 전체(Task 8, 델타 §5를 최초로 구현), `BottomTabBar`/`classifySwipe`/`InstallGuideCard`(Task 9), `apps/hub/src/push.ts`의 구독 저장·삭제(Task 10 — 발송은 `@omnis/kernel` 단일 오너), `toSessionState`/`clampLastN`/`buildSessionSummary`/`loadTranscript`(Task 11).
+
+**2026-09-20 교차 리뷰 반영분(이 문서에서 바뀐 것)**:
+- M8 — `GET /transcript/:session_id`를 **Task 11**로 신설(델타 §7 오너 열도 갱신됨).
+- M13 — `truncateSnippet`을 이 플랜이 만들지 않는다. memory-ingestion 계획 Task 4가 `packages/memory/src/search.ts`에 내고 Task 1은 import만 한다.
+- M-B28 — Task 3(US-B28)의 4상태(로딩/빈/오류/오프라인)를 YAGNI에서 빼고 `screenState()` + 배너 한 줄로 실제 구현했다.
+- M-B30 — Task 5(US-B30)가 쓰는 `initialsFromName`/`pastelFromName`/`formatRelativeTime`의 파일·시그니처를 실측해 표로 박았다(전부 Wave 4/5에서 이미 main에 있다 — 새로 만들지 않는다).
+- M-webpush — Web Push 발송 단일 오너는 agents 계획 Task 12의 `packages/kernel/src/notify/webpush.ts`다. Task 10은 라우트 3개 + 구독 저장/삭제만 하고 `0011`도 만들지 않는다(W0 번들 소유).
+- 배선 교정 — 화면 6개가 모듈 최상단 `const zero = initZero()`를 쓰고 있었다. `apps/desktop/src/zero-client.ts`가 "화면들이 각자 `initZero()`를 부르던 배선으로는 브라우저에서 한 화면도 뜨지 않았다"고 기록해 둔 실패 모드라, 기존 화면 3종(Inbox/Thread/AgentSession)과 같이 **컴포넌트 안에서 `useZeroClient()`**를 부르도록 전부 고쳤다.
 

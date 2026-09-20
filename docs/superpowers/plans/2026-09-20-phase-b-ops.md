@@ -1124,13 +1124,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **읽을 곳**: `packages/kernel/src/jobs/healthcheck.ts`(이 태스크가 그대로 베끼는 잡 패턴), `packages/kernel/src/scheduler.ts`(`register`가 `jobs` upsert까지 한다는 것 — 별도 seed INSERT가 필수는 아니지만 델타 §8·§6이 요구하므로 마이그레이션도 만든다), 델타 §5(`CostState`/`POLICY`는 US-B14 소유라 이 태스크는 그 타입을 쓰지 않는다 — `agent_runs.model_tier`는 원시 `text`로 그룹화한다), 델타 §8(`cost_report_monthly`, cron `10 0 1 * *`), 백로그 종료 기준 표(캐시 히트율 ≥40% 목표, US-B44 소유).
 
-**마이그레이션 번호 결정(열린 질문 참조)**: 델타 §6은 `cost_report_monthly` 시드를 `0012_jobs_phase_b.sql`에 US-B14(`push_batch`)·US-B15·US-B37(`outlook_delta_poll`)과 같이 넣으라고 하지만, 그 셋은 다른 계획 파일(`agents`, `channels`)의 태스크이고 백로그 웨이브 제안(§3)에서 이 스토리(W3)는 그 계획들(W1·W2)이 먼저 병합된 **뒤에** 실행된다. 마이그레이션 러너는 이미 적용된 파일의 sha256이 바뀌면 throw한다(계약 §4) — 그 시점에 `0012_jobs_phase_b.sql`은 이미 존재+적용돼 있을 가능성이 높으므로, 이 태스크가 그 파일을 다시 여는 것은 안전하지 않다. 대신 **`0014_cost_report_job.sql`**(0013 publication 다음 번호)로 이 잡 하나만 독립 시드한다 — `jobs.name UNIQUE` 제약이 있으므로 0012가 이미 이 행을 포함하고 있었더라도 `ON CONFLICT (name) DO NOTHING`로 안전하게 겹친다.
+**마이그레이션 번호 결정 — 2026-09-20 교차 리뷰 M1로 바뀌었다**: 이 태스크는 **마이그레이션을 만들지 않는다**. `0009`·`0011`·`0012`·`0013`이 **웨이브 0 스키마 번들**(한 워크트리·한 커밋)로 묶였고(델타 §6·§11) 그 번들의 `0012_jobs_phase_b.sql`이 `cost_report_monthly` seed를 **이미 포함한다**. 아래 스텝 6의 `0014_cost_report_job.sql`은 "공유 소유라 sha256이 충돌한다"를 피하려던 회피책이었는데, 공유 소유 자체가 없어져 불필요해졌다 — 델타 §11이 "**`0014_cost_report_job.sql`은 만들지 않는다**"로 명시한다. **스텝 6은 파일 생성이 아니라 존재 확인으로 대체한다**(스텝 본문 참조).
 
 **만들지 않을 것(YAGNI)**: `CostState`/`POLICY`(US-B14 소유) 재구현 — 이 잡은 비용 상태 판정이 아니라 순수 집계+리포트만 한다. `digests.kind`에 새 값(`'monthly'` 등) 추가 — CHECK 제약이 `('morning','nightly')`뿐이고(0004 실측) 새 값을 넣으려면 마이그레이션으로 제약을 바꿔야 하는데, 델타 §6은 "기존 마이그레이션은 건드리지 않는다"고 못박았다. 대신 기존 `nightly` 행의 `metrics` jsonb에 `monthly_report` 키로 병합한다.
 
 **Files:**
 - Create: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/jobs/cost-report.ts`
-- Create: `/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0014_cost_report_job.sql`
 - Modify: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/index.ts`
 - Test: `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/cost-report-job.test.ts`
 
@@ -1415,25 +1414,20 @@ cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integ
 ```
 기대: `cost-report-job.test.ts`의 3개 `it` 전부 통과(`buildMonthlyCostReport` 1개 + `cost_report_monthly job` 2개... 실제로는 `describe` 2개에 `it` 2개, 위 파일 기준 통과 케이스는 2개).
 
-- [ ] 6. 마이그레이션을 추가한다(스케줄러가 `start()`에서 upsert하므로 이 seed는 프로세스 기동 전에도 잡 목록에 보이게 하는 문서화 목적 — 계약 §8이 요구).
+- [ ] 6. **마이그레이션을 만들지 않는다**(교차 리뷰 M1). `cost_report_monthly` seed가 W0 번들의 `0012_jobs_phase_b.sql`에 있는지 확인만 한다.
 
-`/Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0014_cost_report_job.sql`:
-```sql
--- US-B44. cost_report_monthly 잡 seed. 델타 §6은 이 행을 공유 0012_jobs_phase_b.sql에 넣으라 하지만,
--- 그 파일은 다른 계획(agents/channels)이 이 스토리(W3)보다 먼저 병합·적용하므로(백로그 §3 웨이브 순서)
--- 이미 적용된 파일을 다시 고치면 마이그레이션 러너가 sha256 불일치로 throw한다(계약 §4). 이 잡만
--- 독립 번호로 append한다 — jobs.name UNIQUE라 0012가 이미 이 행을 포함해도 안전하게 겹친다.
-INSERT INTO jobs (name, schedule, next_run_at) VALUES
-  ('cost_report_monthly', '10 0 1 * *', now())
-ON CONFLICT (name) DO NOTHING;
+```bash
+cd /Users/logankim/AI-Workspaces/omnis && grep -n "cost_report_monthly" packages/db/migrations/0012_jobs_phase_b.sql && test ! -e packages/db/migrations/0014_cost_report_job.sql && echo "0014 없음 — 정상"
 ```
 
-- [ ] 7. 마이그레이션이 두 번 돌아도 no-op인지 확인한다(계약 §4의 검증 기준).
+기대 출력: `cost_report_monthly` seed 1줄 + `0014 없음 — 정상`. `0012`가 아직 없으면 W0 번들이 머지되기 전이므로 **여기서 만들지 말고** 기다린다 — 스케줄러의 `register`가 `jobs` upsert를 하므로 이 태스크의 나머지(잡 핸들러 + 테스트)는 seed 없이도 돈다.
+
+- [ ] 7. 잡 핸들러가 두 번 돌아도 같은 결과인지 확인한다(`digests.metrics` 병합이 멱등이어야 한다).
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && DATABASE_URL=postgres://logan@127.0.0.1:5432/omnis_test pnpm db:migrate && DATABASE_URL=postgres://logan@127.0.0.1:5432/omnis_test pnpm db:migrate
 ```
-기대: 두 번째 실행의 `applied` 배열에 `0014_cost_report_job.sql`이 없다(이미 적용됨, skip).
+기대: 두 번째 실행의 `applied` 배열이 비어 있다(이 태스크가 새 마이그레이션을 더하지 않으므로 앞뒤가 같다).
 
 - [ ] 8. 전체 커널 테스트를 한 번 더 돌려 회귀가 없는지 확인한다.
 
@@ -1451,7 +1445,7 @@ cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B44: �
 - LOW_CACHE_HIT_RATIO=0.4 미만 루프는 lowCacheHitLoops에 경고로 담긴다
 - attachReportToDigest: 전월 마지막 날 nightly digest의 metrics에 병합(body는 안 건드림)
 - registerCostReportJob: cron 10 0 1 * *, cost.report_monthly cold 이벤트
-- 0014_cost_report_job.sql: 공유 0012 대신 독립 번호(sha 불일치 회피, 본문 근거 참조)
+- 마이그레이션 없음: cost_report_monthly seed는 W0 스키마 번들의 0012_jobs_phase_b.sql이 갖는다(교차 리뷰 M1)
 
 Implemented-by: Claude Sonnet
 
@@ -1469,7 +1463,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ## Open Questions
 
-1. **마이그레이션 0012 공유 충돌(델타 §6 vs 백로그 §3 웨이브 순서)**: US-B14(`push_batch`)·US-B15·US-B37(`outlook_delta_poll`)·US-B44(`cost_report_monthly`) 4개 스토리가 서로 다른 계획 파일(`agents`, `channels`, `ops`)·다른 워크트리에서 같은 파일명 `0012_jobs_phase_b.sql`을 쓰도록 델타 §6이 고정해 뒀지만, 마이그레이션 러너는 이미 적용된 파일이 바뀌면 throw한다(계약 §4). 이 계획은 Task 6에서 `0014_cost_report_job.sql`로 회피했다 — 나머지 3개 계획도 각자 독립 번호를 쓸지, 아니면 실제로는 한 사람이 4개를 한 커밋에 몰아서 `0012`를 진짜로 공유할지 Logan 결정 필요(실행 순서가 백로그 웨이브 제안대로 W1→W2→W3라면 후자는 사실상 불가능하다).
+1. ~~**마이그레이션 0012 공유 충돌**~~ **닫힘(2026-09-20 교차 리뷰 M1)**: "한 사람이 한 커밋에 몰아서" 쪽으로 정해졌다 — `0009`·`0011`·`0012`·`0013`은 **웨이브 0 스키마 번들**(단일 워크트리·단일 커밋)이고 `packages/kernel/src/settings.ts`를 같이 낸다(델타 §6). 다섯 계획 중 어느 것도 이 파일들을 만들지 않으며(예외: memory-ingestion의 `0010`), 이 계획의 `0014_cost_report_job.sql`은 **폐기**됐다(델타 §11). W0가 W1보다 먼저 머지되므로 웨이브 순서와도 모순되지 않는다.
 2. **`omnis.healthchecks.<slug>` / `omnis.restic.*` / `omnis.b2.*` Keychain 이름은 이 계획이 새로 정했다** — A1/A6 §9 원문에 healthchecks.io·restic·B2 항목 이름이 없어서(원문은 서비스 자체가 아니라 채널/DB 시크릿만 다룬다) 점 스킴을 그대로 확장했다. 다른 계획이 같은 값을 다른 이름으로 이미 썼다면 여기 맞춰 정정 필요.
 3. **`items(kind='system')` "이중 노출"의 일반 인프라 경로**: 델타는 어댑터별 시스템 아이템을 `recordAdapterHealth`(US-B40, kernel export)로 명시했지만, hub/Postgres/슬롯 같은 **비-어댑터** 인프라 경보의 시스템 아이템 생성 경로는 어느 계약에도 TS 함수로 고정돼 있지 않다. 이 계획은 Task 4에서 `healthcheck-ping.sh`가 psql로 직접 INSERT하는 방식으로 메웠다 — US-B40이 나중에 `recordAdapterHealth`와 통일된 헬퍼(예: `recordInfraHealth`)를 커널에 추가하면 이 스크립트의 SQL 블록을 그 호출로 교체하는 게 더 낫다.
 4. **`ops/scripts/omnis-backup.sh`의 restic 리포지토리 최초 `init`**은 이 계획 밖(사람이 1회 수동)이다 — 실제 미니 배포 시 `RUNBOOK.md` "설치(처음 1회)" 절차에 `restic init` 한 줄을 추가할 시점을 US-B41 실행자가 잡아야 한다.

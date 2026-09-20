@@ -15,7 +15,7 @@
 - Node 22 + pnpm workspaces. TypeScript strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`(루트 `tsconfig.base.json`). Postgres 17.
 - 버전 핀(FIXED, 전 워크스페이스 동일): `vitest 2.1.9` · `zod ^3.24.1` · `pg 8.13.1` · `typescript 5.6.3` · `@rocicorp/zero 1.9.0`(exact) · `ai 7.0.107`. 이 플랜이 새로 더하는 핀: `@microsoft/microsoft-graph-client 3.0.7` · `mtcute 0.29.x`.
 - 루트 스캐폴드(`pnpm-workspace.yaml`/`package.json`/`tsconfig.base.json`/`biome.jsonc`/`vitest.workspace.ts`)는 이미 존재한다(kernel-and-db Task 1이 Phase A에서 만들었다) — 이 플랜은 `test -f`로 존재만 확인하고 건드리지 않는다. `packages/adapters/*`는 `pnpm-workspace.yaml`에 이미 globbed(Phase A), 새 패키지 추가에 워크스페이스 파일 수정이 필요 없다.
-- 마이그레이션은 append-only `packages/db/migrations/000N_<name>.sql`(다음 번호 **0012**, `packages/db/migrations/0011_push_subscriptions.sql`까지는 다른 플랜(surfaces/memory-ingestion) 소유라 이 워크트리엔 없을 수 있다 — migrate 러너는 파일명 정렬이라 gap이 있어도 깨지지 않는다). `0012_jobs_phase_b.sql`은 이 플랜(B37) + agents 플랜(B14, B15) + ops 플랜(B44)이 **공유 소유**한다 — 델타 §8 표를 그대로 옮긴 **결정론적** 내용이라 네 플랜이 각자 병렬 워크트리에서 같은 파일을 만들어도 머지 시 내용이 동일해 충돌하지 않는다(Task 6이 정확한 바이트를 명시한다).
+- 마이그레이션은 append-only `packages/db/migrations/000N_<name>.sql`. **이 플랜은 마이그레이션 파일을 하나도 만들지 않는다** — `0009`·`0011`·`0012`·`0013`은 W0 스키마 번들, `0010`은 memory-ingestion 소유다(델타 §6). 이 워크트리엔 없을 수 있고, migrate 러너는 파일명 정렬이라 gap이 있어도 깨지지 않는다. `0012_jobs_phase_b.sql`은 **이 플랜이 만들지 않는다** — `0009`·`0011`·`0012`·`0013`은 **웨이브 0 스키마 번들**이 한 워크트리·한 커밋으로 낸다(델타 §6, 2026-09-20 교차 리뷰 M1이 옛 "4개 플랜 공유 소유"를 폐기했다: 마이그레이션 러너가 이미 적용된 파일의 sha256 변경을 throw하므로 병렬 워크트리가 나눠 가질 수 없다). Task 5는 그 파일이 이미 있다고 보고 seed된 `outlook_delta_poll` 행을 쓴다.
 - 테스트 DB는 `omnis_test`(로컬 Postgres 17 + pgvector), `DATABASE_URL` 없으면 `postgres://logan@127.0.0.1:5432/omnis_test`. 통합 테스트는 `pnpm --filter <pkg> test:integration`(vitest `integration` 프로젝트, singleFork 직렬).
 - 커밋 전 `pnpm lint`(biome). 커밋 메시지는 헤더 `<story-id>: <한 줄 요약>`, 본문에 충족한 acceptance criteria, `Implemented-by: Claude <tier>` 한 줄, 마지막 줄 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
 - **비가역 tool 금지**: `send()`는 승인 게이트(Phase A US-A07, 이미 존재) 밖에서 실제 채널 API를 호출하지 않는다 — 이 플랜의 모든 어댑터 `send()`는 주입 가능한 mock sink만 부른다. Hermes는 애초에 읽기 전용(`origin:'human'`만, delegation 거부)이라 승인 표면 자체가 없다(A2-D9).
@@ -976,11 +976,11 @@
 
 ---
 
-### Task 5: Outlook 어댑터 — `send()`/`markRead()`/`archive()` write-back + `0012_jobs_phase_b.sql` (US-B37, tier: Sonnet)
+### Task 5: Outlook 어댑터 — `send()`/`markRead()`/`archive()` write-back (US-B37, tier: Sonnet)
 
 **검증 명령:** `pnpm --filter @omnis/adapter-outlook test && pnpm --filter @omnis/db test:integration`.
 
-**Files:** Modify: `packages/adapters/outlook/src/index.ts`. Test: `packages/adapters/outlook/test/send.test.ts`. Create: `packages/db/migrations/0012_jobs_phase_b.sql`. Modify: `packages/db/test/integration/schema-0006.test.ts`(잡 카운트 16→20, Task 6 동시 소유 — 델타 §8 4건 결정론적 내용).
+**Files:** Modify: `packages/adapters/outlook/src/index.ts`. Test: `packages/adapters/outlook/test/send.test.ts`. Modify: `packages/db/test/integration/schema-0006.test.ts`(잡 카운트 단언을 `gte(16)`으로 완화 — `0012`가 있는 워크트리와 없는 워크트리 양쪽에서 통과해야 한다). **만들지 않음**: `packages/db/migrations/0012_jobs_phase_b.sql`(W0 스키마 번들 소유, 델타 §6 · 교차 리뷰 M1).
 
 **Interfaces:** Consumes: `GraphClientLike`, `mapApiError()`. Produces: 완성된 `Adapter`(`send`/`markRead`/`archive`), `jobs` 테이블에 `outlook_delta_poll` 행(+ 델타 §8의 나머지 3건, B14/B15/B44와 공유 소유).
 
@@ -1058,23 +1058,15 @@
 
 - [ ] 4. 테스트를 실행해 통과를 확인한다: `pnpm --filter @omnis/adapter-outlook test` — 예상 출력: 전체 통과(normalize 2 + mapApiError 3 + contract 5 + connect 3 + backfill 2 + send 2 = 17건 내외).
 
-- [ ] 5. `0012_jobs_phase_b.sql`을 만든다 — 델타 §8 표의 4건을 **그대로**(B14/B15/B44 플랜과 바이트 단위로 동일해야 병렬 워크트리 머지가 충돌하지 않는다).
+- [ ] 5. `0012_jobs_phase_b.sql`이 **이미 있는지 확인만** 한다 — 2026-09-20 교차 리뷰 M1 이후 이 파일은 **웨이브 0 스키마 번들** 소유다(델타 §6). 이 워크트리에서 만들지 않는다: 마이그레이션 러너가 이미 적용된 파일의 sha256 변경을 throw하고, `cost_daily` 뷰가 붙은 agents 판과 내용이 달라 머지도 깨진다.
 
   ```bash
-  cat > /Users/logankim/AI-Workspaces/omnis/packages/db/migrations/0012_jobs_phase_b.sql <<'EOF'
-  -- 0012_jobs_phase_b.sql
-  -- Phase B interfaces delta §8: cron 잡 4건. B14(cost_daily)/B15(push_batch)/B37(outlook_delta_poll)/B44(cost_report_monthly)가
-  -- 공유 소유한다 — 내용이 결정론적이라 병렬 워크트리에서 각자 이 파일을 만들어도 머지 시 충돌하지 않는다.
-  INSERT INTO jobs (name, schedule, next_run_at) VALUES
-    ('cost_daily',          '5 0 * * *',          now()),
-    ('push_batch',          '0 9,12,15,18 * * *', now()),
-    ('outlook_delta_poll',  '*/5 * * * *',        now()),
-    ('cost_report_monthly', '10 0 1 * *',         now())
-  ON CONFLICT (name) DO NOTHING;
-  EOF
+  cd /Users/logankim/AI-Workspaces/omnis && grep -n "outlook_delta_poll" packages/db/migrations/0012_jobs_phase_b.sql
   ```
 
-- [ ] 6. 기존 Phase A 잡 카운트 단언(`packages/db/test/integration/schema-0006.test.ts`)이 16→20으로 깨지는 것을 고친다 — 이 파일이 `0012`의 4개 신규 행까지 포함해 세도록 갱신한다(B14/B15/B44가 각자 워크트리에서 같은 자리를 같은 값으로 고치므로 머지 시 동일).
+  기대 출력: `outlook_delta_poll` seed 행 1줄. 파일이 없으면 W0 번들이 아직 머지되지 않은 것이므로 **여기서 만들지 말고** W0 머지를 기다린다(이 태스크의 나머지 스텝은 `0012` 없이도 돈다 — Outlook `send()`/`markRead()`/`archive()`는 잡 seed와 무관하다).
+
+- [ ] 6. 기존 Phase A 잡 카운트 단언(`packages/db/test/integration/schema-0006.test.ts`)이 16→20으로 깨지는 것을 고친다 — `0012`가 적용된 워크트리에서도 아닌 워크트리에서도 통과하도록 하한 단언으로 바꾼다(아래 코드가 이미 `toBeGreaterThanOrEqual(16)`이다).
 
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
@@ -1118,14 +1110,14 @@
   ```bash
   cd /Users/logankim/AI-Workspaces/omnis
   pnpm lint
-  git add packages/adapters/outlook packages/db/migrations/0012_jobs_phase_b.sql packages/db/test/integration/schema-0006.test.ts
+  # 0012_jobs_phase_b.sql은 W0 스키마 번들 소유라 이 커밋에 들어가지 않는다(교차 리뷰 M1).
+  git add packages/adapters/outlook packages/db/test/integration/schema-0006.test.ts
   git commit -m "$(cat <<'EOF'
-  US-B37: Outlook send()/markRead()/archive() + 0012_jobs_phase_b.sql
+  US-B37: Outlook send()/markRead()/archive()
 
   - send()는 여전히 주입된 mock sink만 호출(승인 게이트 밖 비가역 전송 금지)
   - markRead()=isRead PATCH, archive()=Archive 폴더로 move(A1 §2.4)
-  - 0012_jobs_phase_b.sql: cost_daily/push_batch/outlook_delta_poll/cost_report_monthly
-    (B14/B15/B44와 결정론적 내용 공유 — 병렬 워크트리 머지 무충돌)
+  - outlook_delta_poll 잡 seed는 W0 스키마 번들의 0012_jobs_phase_b.sql이 갖는다 — 소비만 한다
   - schema-0006 잡 카운트 단언을 gte(16)으로 완화 + Phase B 4건 스케줄 검증 추가
 
   Implemented-by: Claude Sonnet
@@ -2078,6 +2070,90 @@
 
 ---
 
+### Task 11-S: Hermes SSE 필드명 스파이크 (US-B39 선행, tier: Sonnet)
+
+> **왜 있나(2026-09-20 교차 리뷰 §4-3, Logan 결정 = 백로그 §7-3)**: Task 13이 파싱하는 `/v1/responses` SSE 이벤트의 JSON 필드명(`type: 'delta'|'done'`, `text`)은 **UNVERIFIED**다. `docs/research/09-agents-as-inbox.md`는 세션 헤더 분리·`previous_response_id` 체이닝·keepalive 관례까지는 1차 소스로 검증했지만 이벤트 페이로드의 필드명까지는 못 박지 못했다. A1-⑥/A1-⑦과 같은 급이라 **Phase B 진입 스파이크로 새로 등록**됐다(백로그 §5, 슬러그 `gate-hermes-sse`).
+>
+> **이 스파이크는 US-B39를 막지 않는다.** 메커니즘(스트림 파싱·keepalive 억제·헤더 전파·origin 가드)은 Task 11~13의 mock SSE 테스트로 완전히 검증된다. 이 태스크가 하는 일은 **필드명의 출처와 확신도를 문서에 남기는 것**이고, 실연결이 없으면 `UNVERIFIED`로 적고 넘어간다.
+
+**목표**: `/chat/stream`(또는 `/v1/responses`) 이벤트 샘플 1건을 확보해 `tools/spikes/gate-hermes-sse/result.md`에 남긴다. 실연결이 되면 실제 바이트, 안 되면 문서 인용 + `UNVERIFIED`.
+**산출물**: `tools/spikes/gate-hermes-sse/result.md`
+**검증 명령**: `test -s tools/spikes/gate-hermes-sse/result.md`
+**의존**: 없음. Task 11보다 먼저 돌린다.
+**읽을 것**: `docs/research/09-agents-as-inbox.md`(§Hermes 행 + keepalive 관례), A2 §4.4, Hermes `api_server` 문서.
+**하지 말 것(YAGNI)**: Hermes를 띄우거나 고치려 들지 않는다(미니의 `api_server`는 omnis 소관이 아니다 — 포트 8642와 Hermes/omh/buzz는 건드리지 않는다). 파서를 여기서 만들지 않는다(Task 13이 만든다). 샘플을 픽스처 파일로 커밋하지 않는다 — `result.md` 안의 코드 블록이면 충분하다.
+
+**Files:**
+- Create: `tools/spikes/gate-hermes-sse/result.md`
+
+**Interfaces:** 없음(문서 전용 태스크).
+
+- [ ] 1. 살아 있는 Hermes가 있는지 **한 번만** 확인한다. 없으면 즉시 스텝 3(문서 전용 경로)으로 간다.
+
+```bash
+curl -sS -m 3 -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8642/health || echo "no-hermes"
+```
+
+기대: `200`이면 실연결 경로(스텝 2), 그 외(`000`/`no-hermes`/비 2xx)면 문서 경로(스텝 3). **Hermes가 안 뜬 것은 실패가 아니다** — 미니의 `api_server`는 내려가 있을 수 있고 그게 기본 가정이다.
+
+- [ ] 2. (실연결일 때만) 이벤트 한 덩어리를 뜬다. **토큰은 셸에 직접 쓰지 않는다** — Keychain에서 읽어 환경변수로만 넘긴다.
+
+```bash
+HERMES_KEY="$(security find-generic-password -s omnis.hermes.api_key.mini -a 281932556+jinhologankim@users.noreply.github.com -w)" \
+  timeout 15 curl -sS -N http://127.0.0.1:8642/v1/responses \
+  -H "Authorization: Bearer $HERMES_KEY" \
+  -H 'content-type: application/json' \
+  -d '{"model":"default","input":"say hi in three words","stream":true}' | head -40
+```
+
+기대 출력: `: keepalive` 주석 줄과 `data: {...}` 줄이 섞인 SSE 스트림 앞부분 40줄. **`HERMES_KEY` 값을 `result.md`에 붙여 넣지 않는다.**
+
+- [ ] 3. `tools/spikes/gate-hermes-sse/result.md`를 쓴다. 아래는 **실연결이 없을 때의 정본 내용**이다 — 스텝 2가 성공했다면 `결과`를 `Pass`로, `측정치/근거`의 코드 블록을 실제 캡처로 바꾸고 `UNVERIFIED` 문장을 지운다.
+
+```markdown
+# Gate: gate-hermes-sse
+
+- **질문**: Hermes `api_server`의 `/v1/responses`(및 `/api/sessions/{id}/chat/stream`) SSE 이벤트의 JSON 필드명은 무엇인가 — `apps/local-agent/src/bridges/hermes.ts`의 `#pump`가 `type: 'delta' | 'done'`과 `text`를 그대로 읽어도 되는가?
+- **소유 부록**: A2
+- **Owner**: agent
+- **Host**: mini
+- **실행일**: <YYYY-MM-DD>
+- **결과(Pass/Fail)**: **UNVERIFIED** — 실행 시점에 `127.0.0.1:8642`가 응답하지 않았다(Hermes `api_server`는 omnis 소관이 아니고 내려가 있을 수 있다). 실연결이 생기면 스텝 2를 다시 돌려 이 줄을 Pass/Fail로 바꾼다.
+- **측정치/근거**:
+  - `docs/research/09-agents-as-inbox.md`(1차 소스 인용, VERIFIED): Hermes의 스트리밍 표면 4종(`chat.completion.chunk`, Responses SSE, `/api/sessions/{id}/chat/stream`, `/v1/runs/{id}/events`)이 **keepalive 관례 하나를 공유한다** — 10초 무음마다 `: keepalive` 주석. 세션 헤더는 `X-Hermes-Session-Id`(회전) + `X-Hermes-Session-Key`(안정 스코프)로 분리돼 있다.
+  - `/v1/responses`가 OpenAI Responses API 호환이라는 것도 같은 문서에서 VERIFIED다. 그쪽 규약이라면 이벤트는 `data: {"type":"response.output_text.delta","delta":"..."}` / `data: {"type":"response.completed",...}` 모양이고, **우리가 가정한 `{"type":"delta","text":"..."}`와 필드명이 다르다.**
+  - 따라서 파서는 **두 모양을 모두 받아들이도록** 쓰는 것이 안전하다(아래 대응).
+- **decided_by**: Logan (백로그 §7-3) — 스파이크를 Phase B 진입 목록에 등록하되, 실연결이 없으면 `UNVERIFIED`로 두고 US-B39를 진행한다.
+- **비고 / 후속 대응**:
+  - Task 13의 `#pump`는 **필드명 한 벌에 고정하지 않는다**: `type`이 `delta`로 끝나면(`"delta"`, `"response.output_text.delta"`) 델타로, `done`/`completed`로 끝나면 종료로 보고, 본문은 `text ?? delta ?? ""` 순으로 읽는다. 모르는 `type`은 **버린다**(에러가 아니다 — keepalive와 같은 취급).
+  - 실연결 확인 전까지 `apps/local-agent/src/bridges/hermes.ts` 상단 주석에 `UNVERIFIED: Hermes SSE field names — tools/spikes/gate-hermes-sse/result.md`를 남긴다.
+  - 이 스파이크의 실패(또는 미확인)는 US-B39의 인수 조건이 아니다(B-D5: 픽스처·mock으로만 인수).
+```
+
+- [ ] 4. 파일이 비어 있지 않은지 확인하고 커밋한다.
+
+```bash
+cd /Users/logankim/AI-Workspaces/omnis && test -s tools/spikes/gate-hermes-sse/result.md && pnpm lint
+```
+
+```bash
+git add tools/spikes/gate-hermes-sse/result.md
+git commit -m "$(cat <<'EOF'
+US-B39: gate-hermes-sse spike — SSE event field names recorded (UNVERIFIED without a live Hermes)
+
+- /v1/responses is OpenAI Responses-compatible, so the event type may be response.output_text.delta
+  rather than the plain "delta" this plan assumed — Task 13's pump accepts both suffixes
+- keepalive convention (": keepalive" every 10s) is VERIFIED from docs/research/09-agents-as-inbox.md
+- registered as a Phase B entry spike by the 2026-09-20 cross-plan review (backlog §5, §7-3)
+
+Implemented-by: Claude Sonnet
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+EOF
+)"
+```
+
+---
+
 ### Task 11: Hermes 브리지 — `probe()` + capabilities 자기기술 + session_key_header 검증 (US-B39, tier: Opus)
 
 **US-B39 산출물(백로그):** `apps/local-agent/src/bridges/hermes.ts`. **검증 명령:** `pnpm --filter @omnis/local-agent test`. **목표:** HTTP형 `RuntimeAdapter`(Claude Code/Codex와 같은 계약), `/v1/capabilities` 자기기술로 `session_key_header`를 검증한다.
@@ -2401,6 +2477,8 @@
 **Interfaces:** Consumes: 없음(내부 스트림 파서). Produces: 완성된 `HermesAdapter`(`#pump`/`cancel`/`close`).
 
 읽을 스펙: A2 §4.4("SSE, 10초 무음마다 `: keepalive` 주석. 어댑터는 keepalive를 이벤트로 올리지 않고 health 타이머만 갱신한다"). 페이로드 JSON 필드명(`type: 'delta'|'done'`, `text`)은 **UNVERIFIED against 실제 Hermes API**(`09`가 세션 헤더 분리·capabilities 자기기술·SSE keepalive 존재는 검증했지만 `/v1/responses` 이벤트 페이로드의 정확한 필드명까지는 1차 소스로 못 박지 못했다) — 메커니즘(스트림 파싱, keepalive 억제, 헤더 전파, origin 가드)은 이 태스크의 mock SSE 테스트로 완전히 검증되고, 정확한 필드명은 A1-⑦과 같은 급의 실연결 시점 확인 대상이다(B-D5로 지금은 fixture/mock만).
+
+**Task 11-S(`gate-hermes-sse`)를 먼저 돌린다.** 그 스파이크의 결론: `/v1/responses`는 OpenAI Responses API 호환이라 이벤트 `type`이 `"response.output_text.delta"`/`"response.completed"`일 수 있다. 그래서 `#pump`는 **필드명 한 벌에 고정하지 않는다** — `type`이 `delta`로 **끝나면** 델타, `done`/`completed`로 끝나면 종료로 보고, 본문은 `text ?? delta ?? ""` 순으로 읽으며 모르는 `type`은 keepalive와 같이 **조용히 버린다**(throw하지 않는다). 아래 테스트의 `{"type":"delta","text":"…"}` 샘플에 `{"type":"response.output_text.delta","delta":"…"}` 케이스를 한 줄 더 넣어 두 모양이 같은 결과를 내는지 확인한다. 파일 상단에 `// UNVERIFIED: Hermes SSE field names — tools/spikes/gate-hermes-sse/result.md` 주석을 남긴다.
 
 - [ ] 1. 실패하는 테스트를 추가한다: `apps/local-agent/test/hermes.test.ts`.
 
@@ -3143,16 +3221,392 @@
 
 ---
 
+### Task 17: 허브 어댑터 레지스트리 · 부트스트랩 배선 (US-B45, tier: Opus)
+
+> **스토리** — 목표: `accounts` 행 + Keychain에서 채널별 `Adapter` 인스턴스를 만들어 `createHubServer({adapters})`에 주입하고, 연결된 계정마다 `subscribe()` 루프를 띄워 health를 시스템 Item으로 남긴다. 산출물: `apps/hub/src/adapters.ts`, `apps/hub/src/main.ts`(수정). 검증: `pnpm --filter @omnis/hub test`. 의존: B37, B38, B40.
+
+**왜 있나(2026-09-20 교차 리뷰 §4-2, Logan 결정 = 백로그 §7-2)**: Phase A가 `HubServerDeps.adapters?: ReadonlyMap<string, Adapter>`를 열어 뒀는데(US-A36 보관 write-back이 그 맵을 읽는다) **`apps/hub/src/main.ts`가 아무것도 주입하지 않는다** — 실측: `createHubServer({kernel, pool, config, logger, startedAt, onUpgrade})`에 `adapters`가 없다. 그래서 Slack/Gmail/GCal(Phase A)·Outlook/Telegram(이 플랜 Task 1~10)을 다 만들어도 **허브는 한 번도 인스턴스화하지 않는다**. 다섯 계획 어디에도 없던 구멍이라 여기로 넣는다.
+
+**읽을 것**: `apps/hub/src/http.ts`(`HubServerDeps`, 특히 `adapters` 주석), `apps/hub/src/main.ts`(`startHub`의 현재 배선), `apps/hub/src/archive.ts`(맵을 어떤 키로 찾는지 — **이 태스크는 그 키 규칙을 따라간다, 바꾸지 않는다**), `packages/adapters/gmail/src/index.ts`(`createGmailAdapter(deps)` + `connect(auth: AuthRef)`가 Keychain을 **어댑터 안에서** 읽는 모양), A1 §1(공통 계약), A3 §2(`accounts`/`account_secrets`), 델타 §5(`recordAdapterHealth`, 이 플랜 Task 14).
+
+**하지 말 것(YAGNI)**:
+- **허브가 Keychain을 읽지 않는다.** `account_secrets.auth_ref`(= Keychain 항목 **이름**)를 `AuthRef`에 담아 넘길 뿐이고 비밀 값은 각 어댑터의 `connect()`가 직접 꺼낸다(A3-D4: 비밀은 별도 테이블, 값은 DB에 없다). 허브에 `security find-generic-password` 호출을 만들지 않는다.
+- **재연결 백오프 엔진을 새로 만들지 않는다.** `subscribe()` 루프가 죽으면 `recordAdapterHealth`(Task 14)에 알리고 고정 지연 후 한 번 다시 붙는 것까지다 — 재시도 정책이 더 필요해지면 `token_refresh`(Task 15)와 같은 잡으로 올린다.
+- **local-agent의 `adapters: Map<RuntimeKind, RuntimeAdapter>`는 여기가 아니다.** 그건 런타임 어댑터(Hermes 등)이고 US-B39 Task 11~13이 만드는 클래스를 `apps/local-agent/src/main.ts`가 등록한다 — 이름만 같은 다른 맵이다.
+- `accounts`에 새 컬럼을 더하지 않는다(마이그레이션 없음).
+
+**Files:**
+- Create: `apps/hub/src/adapters.ts`, `apps/hub/src/adapters.test.ts`
+- Modify: `apps/hub/src/main.ts`(`startHub`가 어댑터를 만들어 주입 + 종료 시 루프 정리)
+- Test: `apps/hub/src/adapters.test.ts`
+
+**Interfaces:**
+- Consumes: `Adapter`/`AuthRef`/`Channel`/`NormalizedItem`/`AdapterEvent`(`@omnis/protocol`), `query`(`@omnis/db`), `recordAdapterHealth`(`@omnis/kernel`, Task 14), `Logger`(`@omnis/kernel`), `createOutlookAdapter`(Task 3)·`createTelegramAdapter`(Task 8)·Phase A의 `createSlackAdapter`/`createGmailAdapter`/`createGoogleCalendarAdapter`
+- Produces: `AdapterFactory`, `AdapterFactories`, `DEFAULT_ADAPTER_FACTORIES`, `AccountRow`, `buildAdapters`, `startAdapterLoops`, `AdapterLoops`(`apps/hub/src/adapters.ts`)
+
+- [ ] 1. 실패하는 테스트를 쓴다. **팩토리 레지스트리를 주입 가능하게** 만드는 것이 이 태스크의 설계 핵심이다 — 가짜 팩토리를 넣으면 실계정·실 SDK 없이 전부 인수된다(B-D5).
+
+```ts
+// apps/hub/src/adapters.test.ts
+import type { Adapter, AdapterEvent, AuthRef, NormalizedItem } from "@omnis/protocol";
+import { describe, expect, it, vi } from "vitest";
+import { buildAdapters, startAdapterLoops, type AccountRow, type AdapterFactories } from "./adapters.js";
+
+const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as never;
+
+function fakeAdapter(over: Partial<Adapter> = {}): Adapter {
+  return {
+    id: "fake",
+    channel: "gmail",
+    capabilities: () => ({ read: true, write: false, realtime: false, history: false, media: false, markRead: false, typing: false }) as never,
+    connect: vi.fn(async (_auth: AuthRef) => {}),
+    backfill: async function* () {},
+    subscribe: async function* () {},
+    send: vi.fn(async () => ({ externalId: "x", sentAt: new Date().toISOString() })),
+    health: vi.fn(async () => ({ channel: "gmail", accountExternalId: "me", status: "healthy", lastEventAt: null }) as never),
+    ...over,
+  } as Adapter;
+}
+
+const accounts: AccountRow[] = [
+  { id: "a1", channel: "gmail", external_id: "me@example.com", state: "active", auth_ref: "omnis.gmail.refresh.me@example.com" },
+  { id: "a2", channel: "telegram", external_id: "+8210", state: "broken", auth_ref: "omnis.telegram.session_key" },
+  { id: "a3", channel: "whatsapp", external_id: "w1", state: "active", auth_ref: "omnis.whatsapp.x" },
+  { id: "a4", channel: "outlook", external_id: "me@corp.example", state: "active", auth_ref: null },
+];
+
+describe("buildAdapters", () => {
+  it("builds one adapter per active account that has a factory and a secret, keyed by account id", async () => {
+    const gmail = fakeAdapter();
+    const factories: AdapterFactories = { gmail: () => gmail };
+    const map = await buildAdapters({ accounts, factories, logger });
+    expect([...map.keys()]).toEqual(["a1"]);
+    expect(map.get("a1")).toBe(gmail);
+  });
+
+  it("calls connect() with the AuthRef built from the account row — never with a secret value", async () => {
+    const connect = vi.fn(async () => {});
+    const factories: AdapterFactories = { gmail: () => fakeAdapter({ connect }) };
+    await buildAdapters({ accounts, factories, logger });
+    expect(connect).toHaveBeenCalledWith({
+      channel: "gmail",
+      accountExternalId: "me@example.com",
+      keychainService: "omnis.gmail.refresh.me@example.com",
+      keychainAccount: "281932556+jinhologankim@users.noreply.github.com",
+    });
+  });
+
+  it("skips non-active accounts, channels with no factory, and accounts with no secret — and says which", async () => {
+    const factories: AdapterFactories = { gmail: () => fakeAdapter(), outlook: () => fakeAdapter() };
+    const map = await buildAdapters({ accounts, factories, logger });
+    expect([...map.keys()]).toEqual(["a1"]); // a2 broken, a3 no factory, a4 no auth_ref
+    expect(logger.warn).toHaveBeenCalled();
+  });
+
+  // 한 계정이 못 붙었다고 허브가 안 뜨면 나머지 채널까지 같이 죽는다.
+  it("keeps going when one connect() throws, and reports that account as broken", async () => {
+    const recordAdapterHealth = vi.fn(async () => {});
+    const factories: AdapterFactories = {
+      gmail: () => fakeAdapter({ connect: vi.fn(async () => { throw new Error("auth revoked"); }) }),
+    };
+    const map = await buildAdapters({ accounts, factories, logger, recordAdapterHealth });
+    expect(map.size).toBe(0);
+    expect(recordAdapterHealth).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: "a1", status: "down" }),
+    );
+  });
+});
+
+describe("startAdapterLoops", () => {
+  it("drains subscribe() into the sink and stops cleanly", async () => {
+    const events: (NormalizedItem | AdapterEvent)[] = [
+      { kind: "health", channel: "gmail", status: "healthy" } as unknown as AdapterEvent,
+    ];
+    const adapter = fakeAdapter({ subscribe: async function* () { yield* events; } });
+    const sink = vi.fn(async () => {});
+    const loops = startAdapterLoops({ adapters: new Map([["a1", adapter]]), sink, logger });
+    await loops.drained();
+    expect(sink).toHaveBeenCalledWith("a1", events[0]);
+    await loops.stop();
+  });
+
+  it("a throwing subscribe() reports health and does not reject stop()", async () => {
+    const recordAdapterHealth = vi.fn(async () => {});
+    const adapter = fakeAdapter({
+      subscribe: async function* () { throw new Error("socket closed"); },
+    });
+    const loops = startAdapterLoops({
+      adapters: new Map([["a1", adapter]]), sink: vi.fn(async () => {}), logger, recordAdapterHealth,
+      retryDelayMs: 0, maxRetries: 0,
+    });
+    await loops.drained();
+    expect(recordAdapterHealth).toHaveBeenCalledWith(expect.objectContaining({ accountId: "a1", status: "down" }));
+    await expect(loops.stop()).resolves.toBeUndefined();
+  });
+});
+```
+
+- [ ] 2. 실패를 확인한다. 기대: `Failed to resolve import "./adapters.js"`.
+
+```bash
+cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/hub test -- adapters
+```
+
+- [ ] 3. `apps/hub/src/adapters.ts`를 구현한다.
+
+```ts
+// apps/hub/src/adapters.ts
+// accounts 행 → Adapter 인스턴스. 허브는 Keychain 항목의 **이름**만 다루고 값은 만지지 않는다
+// (A3-D4: account_secrets.auth_ref = Keychain item 이름. 값은 각 어댑터의 connect()가 읽는다).
+// 팩토리 레지스트리를 주입받는 이유는 테스트다 — 가짜 팩토리 하나면 실 SDK 없이 전부 돈다(B-D5).
+import type { Adapter, AdapterEvent, AuthRef, Channel, NormalizedItem } from "@omnis/protocol";
+import type { Logger } from "@omnis/kernel";
+
+/** A6 §9 Keychain account는 전 항목 공통이다. */
+const KEYCHAIN_ACCOUNT = "281932556+jinhologankim@users.noreply.github.com";
+
+export interface AccountRow {
+  id: string;
+  channel: string;
+  external_id: string;
+  state: string;
+  /** account_secrets.auth_ref — Keychain 항목 이름. 값이 아니다. */
+  auth_ref: string | null;
+}
+
+export type AdapterFactory = () => Adapter;
+export type AdapterFactories = Partial<Record<string, AdapterFactory>>;
+
+type HealthReporter = (h: {
+  accountId: string;
+  channel: string;
+  status: "healthy" | "degraded" | "down";
+  error?: string;
+}) => Promise<void>;
+
+export interface BuildAdaptersDeps {
+  accounts: readonly AccountRow[];
+  factories: AdapterFactories;
+  logger: Logger;
+  recordAdapterHealth?: HealthReporter;
+}
+
+export async function buildAdapters(deps: BuildAdaptersDeps): Promise<Map<string, Adapter>> {
+  const { accounts, factories, logger } = deps;
+  const out = new Map<string, Adapter>();
+  for (const a of accounts) {
+    if (a.state !== "active") {
+      logger.info("adapter skipped: account not active", { account: a.id, channel: a.channel, state: a.state });
+      continue;
+    }
+    const make = factories[a.channel];
+    if (make === undefined) {
+      // Phase C 채널(kakaotalk/linkedin/whatsapp)과 'agent'/'system' 의사 계정이 여기로 온다.
+      logger.warn("adapter skipped: no factory for channel", { account: a.id, channel: a.channel });
+      continue;
+    }
+    if (a.auth_ref === null) {
+      logger.warn("adapter skipped: account has no secret", { account: a.id, channel: a.channel });
+      continue;
+    }
+    const auth: AuthRef = {
+      channel: a.channel as Channel,
+      accountExternalId: a.external_id,
+      keychainService: a.auth_ref,
+      keychainAccount: KEYCHAIN_ACCOUNT,
+    };
+    try {
+      const adapter = make();
+      await adapter.connect(auth);
+      out.set(a.id, adapter);
+    } catch (e) {
+      // 한 계정의 만료 토큰이 허브 부팅을 막으면 나머지 채널까지 같이 죽는다.
+      const err = e instanceof Error ? e.message : String(e);
+      logger.error("adapter connect failed", { account: a.id, channel: a.channel, err });
+      await deps.recordAdapterHealth?.({ accountId: a.id, channel: a.channel, status: "down", error: err });
+    }
+  }
+  return out;
+}
+
+export interface AdapterLoops {
+  /** 모든 subscribe() 루프가 끝날 때까지 — 테스트용. 실서비스에선 보통 영원히 안 끝난다. */
+  drained(): Promise<void>;
+  stop(): Promise<void>;
+}
+
+export interface StartLoopsDeps {
+  adapters: ReadonlyMap<string, Adapter>;
+  sink: (accountId: string, e: NormalizedItem | AdapterEvent) => Promise<void>;
+  logger: Logger;
+  recordAdapterHealth?: HealthReporter;
+  retryDelayMs?: number;
+  maxRetries?: number;
+}
+
+export function startAdapterLoops(deps: StartLoopsDeps): AdapterLoops {
+  const { adapters, sink, logger } = deps;
+  const retryDelayMs = deps.retryDelayMs ?? 5_000;
+  const maxRetries = deps.maxRetries ?? 3;
+  let stopped = false;
+
+  async function pump(accountId: string, adapter: Adapter): Promise<void> {
+    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+      if (stopped) return;
+      try {
+        for await (const e of adapter.subscribe()) {
+          if (stopped) return;
+          await sink(accountId, e);
+        }
+        return; // 스트림이 정상 종료했다 — 다시 붙지 않는다.
+      } catch (e) {
+        const err = e instanceof Error ? e.message : String(e);
+        logger.error("adapter subscribe failed", { account: accountId, channel: adapter.channel, attempt, err });
+        await deps.recordAdapterHealth?.({
+          accountId, channel: adapter.channel, status: "down", error: err,
+        });
+        if (attempt === maxRetries || stopped) return;
+        // ponytail: 고정 지연 재접속. 지수 백오프가 필요해지면 token_refresh처럼 잡으로 올린다.
+        await new Promise((r) => setTimeout(r, retryDelayMs));
+      }
+    }
+  }
+
+  const running = [...adapters].map(([id, a]) => pump(id, a));
+  return {
+    drained: () => Promise.all(running).then(() => undefined),
+    async stop() {
+      stopped = true;
+      await Promise.allSettled([...adapters.values()].map((a) => a.disconnect?.()));
+      await Promise.allSettled(running);
+    },
+  };
+}
+```
+
+- [ ] 4. 통과를 확인한다. 기대: `adapters` 6 tests passed.
+
+```bash
+cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/hub test -- adapters
+```
+
+- [ ] 5. `apps/hub/src/main.ts`를 배선한다. 실 팩토리 표는 여기 한 곳에만 있고(`adapters.ts`는 채널 SDK를 import하지 않는다 — 리프 패키지 경계 유지) `startHub`가 만든 맵을 `createHubServer`에 넘긴다.
+
+```ts
+// apps/hub/src/main.ts — import 추가
+import { createGmailAdapter } from "@omnis/adapter-gmail";
+import { createGoogleCalendarAdapter } from "@omnis/adapter-google-calendar";
+import { createOutlookAdapter } from "@omnis/adapter-outlook";
+import { createSlackAdapter } from "@omnis/adapter-slack";
+import { createTelegramAdapter } from "@omnis/adapter-telegram";
+import { recordAdapterHealth } from "@omnis/kernel";
+import { query } from "@omnis/db";
+import { type AccountRow, buildAdapters, startAdapterLoops } from "./adapters.js";
+```
+
+```ts
+// startHub() 안, createHubServer 호출 **앞**에
+const accountRows = await query<AccountRow>(
+  pool,
+  `SELECT a.id, a.channel, a.external_id, a.state, s.auth_ref
+     FROM accounts a
+     LEFT JOIN account_secrets s ON s.account_id = a.id`,
+);
+const adapters = await buildAdapters({
+  accounts: accountRows,
+  factories: {
+    slack: () => createSlackAdapter({}),
+    gmail: () => createGmailAdapter({
+      oauthClientId: config.googleClientId,
+      oauthClientSecret: config.googleClientSecret,
+    }),
+    gcal: () => createGoogleCalendarAdapter({
+      oauthClientId: config.googleClientId,
+      oauthClientSecret: config.googleClientSecret,
+    }),
+    outlook: () => createOutlookAdapter({
+      clientId: config.outlookClientId,
+      tenant: config.outlookTenant,
+    }),
+    telegram: () => createTelegramAdapter({}),
+  },
+  logger,
+  recordAdapterHealth: (h) => recordAdapterHealth({ pool, events: kernel.events, logger }, h),
+});
+const adapterLoops = startAdapterLoops({
+  adapters,
+  sink: (accountId, e) => kernel.ingest.sink(accountId, e),
+  logger,
+  recordAdapterHealth: (h) => recordAdapterHealth({ pool, events: kernel.events, logger }, h),
+});
+```
+
+```ts
+// createHubServer 호출에 한 줄 추가
+const server = createHubServer({
+  kernel,
+  pool,
+  config,
+  logger,
+  startedAt,
+  adapters,                                    // ← US-B45: US-A36 보관 write-back이 이 맵을 읽는다
+  onUpgrade: (req, socket, head) => bridge.handleUpgrade(req, socket, head),
+});
+```
+
+```ts
+// close() 안, bridge.close() 바로 뒤에 한 줄
+await adapterLoops.stop();
+```
+
+- [ ] 6. 부팅이 깨지지 않는지 확인한다. **계정이 한 건도 없는 DB에서 허브가 그대로 떠야 한다**(빈 맵 = Phase A와 동일 동작).
+
+```bash
+cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/hub test && pnpm typecheck && pnpm lint
+```
+
+기대 출력: 기존 hub 테스트 전부 PASS + `adapters` 6 PASS, typecheck·lint clean.
+
+- [ ] 7. 커밋한다.
+
+```bash
+git add apps/hub/src/adapters.ts apps/hub/src/adapters.test.ts apps/hub/src/main.ts apps/hub/package.json
+git commit -m "$(cat <<'EOF'
+US-B45: hub adapter registry & bootstrap — accounts rows become connected Adapter instances
+
+- buildAdapters() maps active accounts to adapters through an injectable factory registry,
+  so the whole path is fixture-testable with a fake factory (B-D5, no real credentials)
+- the hub passes only the Keychain item NAME (account_secrets.auth_ref) in AuthRef; secret values
+  are read inside each adapter's connect() (A3-D4)
+- one failing connect() no longer takes the hub down: it reports adapter health and the rest boot
+- createHubServer({adapters}) is finally populated, so US-A36 archive write-back actually reaches a channel
+- startAdapterLoops() drains subscribe() into kernel.ingest.sink and stops cleanly on shutdown
+
+Implemented-by: Claude Opus
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+EOF
+)"
+```
+
+**열린 질문**: `apps/hub/src/archive.ts`가 `adapters` 맵을 **어떤 키**로 찾는지(계정 id인지 채널명인지)를 구현 직전에 그 파일에서 확인하고 `buildAdapters`의 키를 거기에 맞춘다 — 위 코드는 `accounts.id`를 키로 쓴다(한 채널에 계정이 둘 이상일 수 있어 채널명은 키가 될 수 없다). 불일치하면 **`archive.ts`가 아니라 이 태스크를 맞춘다**(US-A36은 이미 머지된 코드다). `config.googleClientId`/`outlookClientId`/`outlookTenant` 필드가 `HubConfig`에 없으면 델타 §9의 환경변수(`OMNIS_OUTLOOK_CLIENT_ID`/`OMNIS_OUTLOOK_TENANT`)로 `readConfig`에 먼저 더한다 — surfaces Task 10이 VAPID 3필드를 더하는 것과 같은 패턴이다.
+
+---
+
 ## 자체 점검 (writing-plans 마지막 스텝)
 
-**스토리 커버리지** — 백로그 §3의 `channels` 플랜 4개 스토리 전부 ≥1 태스크:
+**스토리 커버리지** — 백로그 §3의 `channels` 플랜 5개 스토리 전부 ≥1 태스크:
 
 | 스토리 | 태스크 |
 |---|---|
 | US-B37(Outlook) | Task 1~5 |
 | US-B38(Telegram) | Task 6~10 |
-| US-B39(Hermes) | Task 11~13 |
+| US-B39(Hermes) | **Task 11-S**(진입 스파이크, 선행) → Task 11~13 |
 | US-B40(하드닝) | Task 14~16 |
+| US-B45(허브 어댑터 배선) | Task 17 |
+
+**실행 순서**: Task 1~5(Outlook) · Task 6~10(Telegram) · Task 11-S → 11 → 12 → 13(Hermes) 세 갈래는 서로 독립이다. Task 14~16(하드닝)은 앞 셋과도 독립이고, **Task 17만 Task 3·8·14가 머지된 뒤**에 돈다(팩토리 3종 + `recordAdapterHealth`를 import한다).
+
+> **번호 규칙**: `Task 11-S`는 Task 11 **앞에** 도는 스파이크라는 뜻이다. 기존 11~16을 밀어 번호를 바꾸면 이 문서 안팎의 교차 참조 15곳이 전부 어긋나므로 번호를 그대로 두고 접미사를 붙였다.
 
 **금지 패턴 검사** — `TBD`/`TODO`/"implement later"/"add appropriate error handling"/"similar to Task N"/코드 없는 스텝/미정의 심볼, 17개 태스크 전부 grep 가능한 실제 코드와 정확한 실행·커밋 명령으로 채워져 있다. "Task N과 동일 패턴"이라고만 적은 곳은 전부 그 옆에 실제 코드 블록이 붙어 있다(예: Keychain 래퍼는 매번 전문을 다시 적는다 — 어댑터 패키지 간 import 금지라 실제로 복제해야 하는 코드이기도 하다).
 
@@ -3172,12 +3626,14 @@
 - `packages/adapters/telegram`: `CHANNEL`, `normalize`, `mapApiError`, `TelegramClientLike`, `TelegramAdapterDeps`, `createTelegramAdapter`, `BACKFILL_MAX_DAYS`, `BACKFILL_MAX_ITEMS`
 - `apps/local-agent/src/bridges/hermes.ts`: `HermesConfig`, `HermesCapabilitiesResponse`, `parseHermesCapabilities`, `HermesSessionHeaderMismatchError`, `HermesAdapter`
 - `@omnis/kernel`(신규 export, `packages/kernel/src/index.ts`에 추가): `ADAPTER_HEALTH_FAIL_THRESHOLD`, `recordAdapterHealth`, `resetAdapterHealthCounters`, `sendNtfy`, `AdapterHealthDeps`, `NtfyDeps`, `TOKEN_REFRESH_JOB_NAME`, `TOKEN_REFRESH_CRON`, `TOKEN_REFRESH_WINDOW_MINUTES`, `registerTokenRefreshJob`, `TokenRefreshDeps`, `TokenRefresher`, `GMAIL_REWATCH_JOB_NAME`, `GMAIL_REWATCH_CRON`, `GRAPH_SUB_RENEW_JOB_NAME`, `GRAPH_SUB_RENEW_CRON`, `registerGmailRewatchJob`, `registerGraphSubRenewJob`, `RewatchDeps`, `RewatchFn`
-- `packages/db/migrations/0012_jobs_phase_b.sql`(공유 소유, B14/B15/B44와 결정론적으로 동일)
+- `apps/hub/src/adapters.ts`(Task 17, US-B45): `AdapterFactory`, `AdapterFactories`, `AccountRow`, `BuildAdaptersDeps`, `buildAdapters`, `StartLoopsDeps`, `startAdapterLoops`, `AdapterLoops`
+- `tools/spikes/gate-hermes-sse/result.md`(Task 11-S, 코드 산출물 없음)
+- ~~`packages/db/migrations/0012_jobs_phase_b.sql`~~ — **이 플랜은 이제 만들지 않는다**. `0009`·`0011`·`0012`·`0013`은 웨이브 0 스키마 번들 소유다(델타 §6, 교차 리뷰 M1). Task 5는 그 파일이 이미 있다고 보고 seed된 `outlook_delta_poll` 행을 쓴다.
 
 ## 미결 질문
 
-1. **`apps/hub` 배선은 이 플랜 밖이다.** `createOutlookAdapter`/`createTelegramAdapter`/`HermesAdapter`를 실제로 인스턴스화해 `TokenRefreshDeps.refreshers`/`RewatchDeps.rewatch`/`local-agent`의 `adapters: Map<RuntimeKind, RuntimeAdapter>`에 등록하는 코드는 어디에도 없다(Phase A의 Slack/Gmail/GCal도 `apps/local-agent/src/main.ts`가 여전히 `adapters: new Map()`으로 비어 있는 것과 같은 상태 — 이 실측은 Task 1 리서치에서 확인됨). 허브·local-agent 부트스트랩 배선 스토리가 어느 계획 문서 소관인지 Logan 확인 필요.
-2. **`GET /transcript/:session_id?last_n`**(델타 §7, US-B39 소유로 표기됨)는 `apps/hub`의 `SessionSummary` 라우트라 이 플랜의 파일 목록(`apps/local-agent/src/bridges/hermes.ts`)엔 없다. 백로그 US-B39의 산출물이 `apps/local-agent` 한 파일뿐이므로 이 라우트는 구현하지 않았다 — surfaces 플랜이나 별도 hub 배선 태스크가 가져가야 한다.
-3. **Hermes `/v1/responses` SSE 이벤트 페이로드의 정확한 필드명**(`type:'delta'|'done'`)은 UNVERIFIED(Task 13 참고) — A1-⑦과 같은 급으로 실연결 시점에 스파이크가 필요하지만 백로그 §5의 "Phase B 진입 스파이크" 목록엔 Hermes가 없다(A1-⑥/A1-⑦만 명시). 이 스파이크를 새로 등록할지, S-A2-5(Phase C 승인 표면 검증)에 흡수할지 Logan 결정 필요.
+1. ~~**`apps/hub` 배선은 이 플랜 밖이다.**~~ **닫힘 — Logan 결정(백로그 §7-2)**: 허브 배선은 **이 플랜의 US-B45 = Task 17**이다. `local-agent`의 런타임 어댑터 맵(`Map<RuntimeKind, RuntimeAdapter>`)은 별개이고 US-B39 Task 11~13이 만드는 `HermesAdapter`를 `apps/local-agent/src/main.ts`가 등록한다.
+2. ~~**`GET /transcript/:session_id?last_n`**~~ **닫힘(교차 리뷰 M8)**: **surfaces 플랜 Task 11**이 가져갔다(`apps/hub/src/transcript.ts`). 델타 §7 표의 오너 열도 갱신됐다. 이 플랜은 그대로 `apps/local-agent/src/bridges/hermes.ts` 한 파일만 만든다.
+3. ~~**Hermes `/v1/responses` SSE 이벤트 페이로드의 정확한 필드명**~~ **닫힘 — Logan 결정(백로그 §7-3)**: `gate-hermes-sse` 슬러그로 **Phase B 진입 스파이크에 새로 등록**했고(백로그 §5) 이 플랜의 **Task 11-S**가 소유한다. 실연결(미니 `api_server` :8642)이 없으면 문서 기반 + `UNVERIFIED` 표기로 진행하고 US-B39를 막지 않는다. 스파이크의 실질 산출은 "필드명 한 벌에 고정하지 말 것"이고 Task 13이 그것을 반영한다.
 4. **`ADAPTER_HEALTH_FAIL_THRESHOLD=3`과 ntfy URL의 출처**는 이 플랜이 고정한 값이다(interfaces delta에 없음) — `settings`(B-D2, US-B33)가 만들어지면 `notify.*` 옆에 `adapter.health_threshold`류 키로 승격할지, ntfy base URL을 환경변수(`OMNIS_NTFY_URL`, 이 플랜이 새로 도입 — 델타 §9에 없다)로 고정할지 미결.
-5. **`0012_jobs_phase_b.sql`의 공유 소유**(B14/B15/B37/B44 4개 플랜)는 내용이 결정론적이라 이론상 무충돌이지만, 실제 병렬 워크트리 머지 순서에 따라 먼저 머지되는 플랜이 파일을 만들고 나머지는 "이미 존재함 + 내용 동일" 확인만 하는 흐름이 되어야 한다 — `worktrunk` 머지 오케스트레이션이 이 케이스(여러 브랜치가 같은 새 파일을 독립적으로 만듦)를 자동으로 merge-clean 처리하는지 실측 필요(A7 §2의 워크트리 스파이크가 이 케이스까지 커버하지 않았다).
+5. ~~**`0012_jobs_phase_b.sql`의 공유 소유**~~ **닫힘(교차 리뷰 M1)**: 공유 소유를 없앴다. `0009`·`0011`·`0012`·`0013`은 **웨이브 0 스키마 번들**이 한 워크트리·한 커밋으로 낸다(델타 §6). 이 플랜은 그 파일을 만들지 않고 seed된 행을 쓴다 — Global Constraints의 "공유 소유" 문장은 폐기됐다.

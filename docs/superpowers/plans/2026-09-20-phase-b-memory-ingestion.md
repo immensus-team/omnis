@@ -890,13 +890,15 @@ EOF
 **만들지 말 것(YAGNI):** 하이브리드(BM25 + 벡터) 랭킹을 만들지 않는다 — 통합 검색(US-B26, surfaces 계획)이 `search_tsv`를 따로 쓴다. 여기는 벡터 하나다.
 
 **Files:**
-- Create: `packages/memory/src/search.ts`, `packages/memory/test/integration/search.test.ts`
+- Create: `packages/memory/src/search.ts`, `packages/memory/test/integration/search.test.ts`, `packages/memory/test/search-snippet.test.ts`
 - Modify: `packages/memory/src/index.ts`
-- Test: `packages/memory/test/integration/search.test.ts`
+- Test: `packages/memory/test/integration/search.test.ts`, `packages/memory/test/search-snippet.test.ts`
 
 **Interfaces:**
 - Consumes: `query` (`@omnis/db`), `embed`/`toVectorLiteral`/`MemoryEmbedError` (Task 2), `upsertMemory` (Task 3).
-- Produces: `interface MemoryHit`, `searchMemories(pool, q): Promise<MemoryHit[]>`.
+- Produces: `interface MemoryHit`, `searchMemories(pool, q): Promise<MemoryHit[]>`, `truncateSnippet(text, max?): string`.
+
+**파일 단일 오너(2026-09-20 교차 리뷰 M13):** `packages/memory/src/search.ts`는 이 태스크가 유일 오너다. surfaces 계획 Task 1(US-B26 통합 검색)이 이 파일에 `truncateSnippet`을 덧붙이려 했는데, 그 워크트리에는 이 파일이 아직 없을 수 있어 교차 소유가 된다 — **여기서 미리 낸다.** surfaces Task 1은 `@omnis/memory`에서 import만 한다.
 
 ### Steps
 
@@ -996,13 +998,34 @@ describe("searchMemories", () => {
 });
 ```
 
+```ts
+// packages/memory/test/search-snippet.test.ts — DB 없이 도는 순수 함수 테스트
+import { describe, expect, it } from "vitest";
+import { truncateSnippet } from "../src/search.js";
+
+describe("truncateSnippet (A4 §14.4 snippet ≤160자)", () => {
+  it("returns short text unchanged", () => {
+    expect(truncateSnippet("오전 미팅 선호")).toBe("오전 미팅 선호");
+  });
+  it("truncates to 160 chars with an ellipsis", () => {
+    const long = "가".repeat(200);
+    const out = truncateSnippet(long);
+    expect(out.length).toBe(160);
+    expect(out.endsWith("...")).toBe(true);
+  });
+  it("respects a custom max", () => {
+    expect(truncateSnippet("abcdefgh", 5)).toBe("ab...");
+  });
+});
+```
+
 - [ ] 2. 실패를 확인한다.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && pnpm test:integration -- packages/memory/test/integration/search.test.ts
+cd /Users/logankim/AI-Workspaces/omnis && pnpm test:integration -- packages/memory/test/integration/search.test.ts && pnpm --filter @omnis/memory test -- search-snippet
 ```
 
-기대 실패: `Failed to resolve import "../../src/search.js"`.
+기대 실패: `Failed to resolve import "../../src/search.js"`(둘 다).
 
 - [ ] 3. 구현한다.
 
@@ -1087,27 +1110,39 @@ export async function searchMemories(
 ```
 
 ```ts
+// packages/memory/src/search.ts (파일 끝에 추가)
+// A4 §14.4: 통합 검색(US-B26, surfaces 계획 Task 1)이 memory hit의 snippet을 ≤160자로 자른다.
+// items는 ts_headline이 있지만 memories는 없어서 절단만 한다. 소비자가 두 곳(hub search.ts,
+// search_memory tool)이라 여기서 한 번만 정의한다 — hub 쪽에 복제하지 않는다.
+export function truncateSnippet(text: string, max = 160): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 3)}...`;
+}
+```
+
+```ts
 // packages/memory/src/index.ts — 한 줄 추가
-export { searchMemories, type MemoryHit } from "./search.js";
+export { searchMemories, truncateSnippet, type MemoryHit } from "./search.js";
 ```
 
 - [ ] 4. 통과를 확인한다.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && pnpm test:integration -- packages/memory/test/integration/search.test.ts
+cd /Users/logankim/AI-Workspaces/omnis && pnpm test:integration -- packages/memory/test/integration/search.test.ts && pnpm --filter @omnis/memory test -- search-snippet
 ```
 
-기대 통과: 7 tests passed.
+기대 통과: 통합 7 tests passed + `search-snippet` 3 tests passed.
 
 - [ ] 5. 커밋한다.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm lint && git add -A && git commit -m "$(cat <<'EOF'
-US-B01: searchMemories — 부분 HNSW 경유 벡터 검색
+US-B01: searchMemories — 부분 HNSW 경유 벡터 검색 + truncateSnippet
 
 - WHERE 술어를 A3 §5 부분 인덱스와 일치시켜 무효화 기억이 되살아나지 않게 한다
 - kind 필터는 k*4 과다 인출 후 절삭(인덱스 뒤 필터)
 - 질의 임베딩 실패는 빈 배열이 아니라 MemoryEmbedError
+- truncateSnippet(≤160자, A4 §14.4)을 여기서 낸다 — US-B26이 import만 한다(교차 리뷰 M13)
 
 Implemented-by: Claude Sonnet
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>

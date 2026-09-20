@@ -428,7 +428,7 @@ Phase A 계약 §5의 표에 더해진다. 전부 `127.0.0.1:8787` bind, Tailsca
 |---|---|---|---|
 | `GET /search?q&k&scope&since` | — | `SearchResponse` (§2.2) | B26 |
 | `GET /memory/search?q&k&kinds` | — | `{ results: MemoryHit[] }` (A3 §7의 예고된 경로) | B26 |
-| `GET /transcript/:session_id?last_n` | — | `SessionSummary` (A3 §7) | ~~B39~~ → **surfaces 계획 신규 태스크**. channels 계획의 US-B39 산출물은 `apps/local-agent/src/bridges/hermes.ts` 하나뿐이라 이 허브 라우트를 구현하지 않는다(channels 미결 2) |
+| `GET /transcript/:session_id?last_n` | — | `SessionSummary` (A3 §7) | ~~B39~~ → **surfaces 계획 Task 11**(2026-09-20 교차 리뷰 M8에서 재배정, 해당 태스크가 작성됨). channels 계획의 US-B39 산출물은 `apps/local-agent/src/bridges/hermes.ts` 하나뿐이라 이 허브 라우트를 구현하지 않는다 |
 | `GET /settings` | — | `{ settings: Record<SettingKey, unknown> }` | B33 |
 | `PUT /settings/:key` | `{ value: unknown }` | `{ key, value }` — `audit_log` 필수 | B33 |
 | `POST /items/:id/unarchive` | — | `{ id, status: "received" }` | B32 |
@@ -526,6 +526,7 @@ A4 §6.1 표가 정본인 10건 + A3 §6 인프라 6건은 **이미 `0006_kernel
 | US-B37, B38 | `…-phase-b-channels.md` | §1 어댑터 패키지 2종, §8 `outlook_delta_poll` |
 | US-B39 | 〃 | Phase A 계약 §8의 HTTP형 `[[runtime]]` 블록(`kind="hermes"`, `session_header_mode="hermes_v1"`) |
 | US-B40 | 〃 | §5 `recordAdapterHealth` |
+| US-B45 | 〃 | 신규 심볼 없음 — §3.2 `Adapter`/`AuthRef`(Phase A 계약)와 `createHubServer({adapters})`(이미 있는 선택 인자)를 실제로 채운다. `apps/hub/src/adapters.ts`가 `AdapterFactories`/`buildAdapters`/`startAdapterLoops`를 새로 export한다 |
 | US-B16, B34, B41~B44 | `…-phase-b-ops.md` | §9 Keychain·환경변수, §8 `cost_report_monthly`. **`0014_cost_report_job.sql`은 만들지 않는다** — §6 W0 번들의 `0012`가 이 seed를 이미 갖는다 |
 | (스키마 선행) | **웨이브 0 번들** — 어느 계획 문서에도 속하지 않는 단일 커밋 | §6의 `0009`·`0011`·`0012`·`0013` + §5 `packages/kernel/src/settings.ts`. B09·B11·B14·B15·B17·B33·B36·B37·B44가 전부 이것을 기다린다 |
 

@@ -45,7 +45,25 @@
 10. **§9** — `OMNIS_OPENROUTER_API_KEY`·`OMNIS_NTFY_URL`(기본 `http://127.0.0.1:2586`) 추가, Keychain에 `omnis.openrouter.api_key`·`omnis.healthchecks.<slug>`·`omnis.restic.repo_password`·`omnis.b2.app_key` 추가.
 11. **§1 루트 스크립트** — "오너 = memory-ingestion Task 1, 다른 계획은 이 블록을 다시 건드리지 않는다" 문장 강화.
 
-델타 밖이라 **내가 못 고친 것**: M12·M13·M14(각 플랜 본문과 백로그 §2·§3 수정), M8의 surfaces 신규 태스크 작성.
+~~델타 밖이라 **내가 못 고친 것**: M12·M13·M14(각 플랜 본문과 백로그 §2·§3 수정), M8의 surfaces 신규 태스크 작성.~~ → **전부 반영됨(§2b)**.
+
+---
+
+## 2b. 계획 본문·백로그 수정 (2026-09-20 후속 반영)
+
+| # | 어디 | 무엇을 했나 |
+|---|---|---|
+| **M8** | surfaces | **Task 11 신설** — `GET /transcript/:session_id?last_n` → `SessionSummary`(`apps/hub/src/transcript.ts`). durable 요약(`agent_sessions.summary`) + 그 세션 스레드의 마지막 N턴을 `items`에서 읽고, `tool_call`은 직전 턴에 접는다(A2 §3.3). 턴 텍스트는 스키마 상한 1000자로 절단, `open_questions`/`artifacts`는 근거가 없어 빈 배열(열린 질문에 기록). 델타 §7의 오너 열도 `surfaces 계획 Task 11`로 갱신 |
+| **M12** | agents | Task 14의 루트 `package.json` 스크립트 블록 삭제 + `git add`에서 `package.json` 제거. 단일 오너는 memory-ingestion Task 1(델타 §1) |
+| **M13** | memory-ingestion / surfaces | `truncateSnippet`을 **memory-ingestion Task 4**로 옮겼다(구현 + `search-snippet.test.ts` 3건 + `index.ts` re-export). surfaces Task 1은 스텝 1~4를 **선행 확인 1스텝**으로 바꾸고 `@omnis/memory`에서 import만 한다 |
+| **M14** | 백로그 / agents | 백로그 §2에서 **US-B20 의존 `B19` → `B07`**, **US-B19 의존에 `B20` 추가**. "모든 의존은 자기보다 작은 번호" 문장에 이 1건 예외를 명시. agents Task 15·17의 스토리 줄도 같은 방향으로 고쳤다(실행 순서 Task 17 → 15 → 16은 원래 맞았다) |
+| **US-B28** | surfaces | Task 3의 4상태(로딩/빈/오류/오프라인)를 YAGNI에서 빼고 **실제로 구현**했다 — 순수 함수 `screenState()`(우선순위 error → offline → loading → empty → ready, Zero의 `ResultType`과 `zero.online` 기반) + `STATE_COPY` + 배너 한 줄. 오프라인·오류에서도 캐시된 목록은 계속 보인다. 유닛 테스트 6건 추가. **백로그 행은 그대로 둔다**(요구가 충족되므로) |
+| **US-B30** | surfaces | Task 5의 "미정의 심볼" 의혹을 실측으로 닫았다 — `initialsFromName`/`pastelFromName`(`packages/ui/src/lib/row-meta.ts`)·`formatRelativeTime`(`packages/ui/src/lib/relative-time.ts`)은 **Wave 4/5에서 이미 main에 있다**. 파일·시그니처 표와 시작 전 `grep` 확인 스텝을 박아 새로 만들지 못하게 했다 |
+| **Web Push 중복** | agents / surfaces | 단일 오너 = **`packages/kernel/src/notify/webpush.ts`(agents Task 12)** — `vapidFromEnv`/`sendWebPush`/`pruneSubscription`/`WEBPUSH_GONE_CODES`/`VapidKeys`. surfaces Task 10에서 `sendPush`/`configureWebPush`/`PushSender`/`realPushSender`와 그 테스트를 **삭제**하고 라우트 3개 + `saveSubscription`/`removeSubscription`만 남겼다. `web-push` 의존은 `apps/hub`에 넣지 않는다 |
+| **US-B45(신규)** | 백로그 / channels | 허브 어댑터 레지스트리·부트스트랩 배선 스토리를 신설(백로그 §2, channels **Task 17**). `apps/hub/src/adapters.ts`가 `accounts`+`account_secrets.auth_ref` → `AuthRef` → 각 어댑터의 `connect()`(비밀 값은 허브가 안 만진다, A3-D4), `createHubServer({adapters})` 주입(US-A36 보관 write-back이 드디어 채널에 닿는다), `subscribe()` 루프 → `kernel.ingest.sink` + health. **팩토리 레지스트리를 주입받아 가짜 팩토리로 전부 픽스처 테스트**(B-D5) |
+| **Hermes SSE 스파이크(신규)** | 백로그 / channels | `gate-hermes-sse`를 Phase B 진입 스파이크에 등록(백로그 §5)하고 channels **Task 11-S**(Task 11 앞)로 넣었다. 실연결이 없으면 문서 기반 + `UNVERIFIED`. 실질 산출: `/v1/responses`가 OpenAI Responses 호환이라 `type`이 `response.output_text.delta`일 수 있으므로 **Task 13의 `#pump`는 필드명 한 벌에 고정하지 않는다**(접미사 매칭 + `text ?? delta`) |
+| **M1 후속** | channels / ops / agents | W0 스키마 번들 결정을 **플랜 본문까지** 밀어 넣었다 — channels Task 5는 `0012`를 만들지 않고 존재 확인만, ops Task 6의 `0014_cost_report_job.sql`은 **폐기**(델타 §11이 이미 그렇게 적었다), agents Task 7은 "정본 정의의 출처"로 남고 W0가 먼저 머지됐으면 스텝 1을 건너뛴다 |
+| **배선 버그(덤)** | surfaces | 화면 6개가 모듈 최상단 `const zero = initZero()`를 쓰고 있었다. `apps/desktop/src/zero-client.ts`가 "화면들이 각자 `initZero()`를 부르던 배선으로는 브라우저에서 한 화면도 뜨지 않았다"고 기록해 둔 실패 모드라, 기존 화면 3종과 같이 **컴포넌트 안에서 `useZeroClient()`**를 부르도록 6곳 전부 고쳤다 |
 
 ---
 
@@ -58,7 +76,7 @@
 - C1 memory-ingestion T1–4(B01) → T5–6(B02) → T10(B04)
 - C2 memory-ingestion T7–9(B03, kernel identity)
 - C3 channels T1–10(B37·B38 어댑터, 픽스처 전용) — **지금 바로 시작 가능**
-- C4 channels T11–13(B39 Hermes)
+- C4 channels **T11-S**(gate-hermes-sse 스파이크) → T11–13(B39 Hermes)
 - C5 ops T1·T2·T3·T5(B16/B34/B41/B43) + agents T6→T7(B14 비용 미터 — W0 settings.ts만 필요)
 
 **W2 — C1·C2 머지 후, 5체인**
@@ -80,14 +98,19 @@
 - C2 surfaces T3(B28) → T9(B35) → T10(B36)
 - C3 surfaces T4(B29), T5(B30)
 - C4 surfaces T6(B31), T7(B32)
-- C5 surfaces T8(B33 화면·허브 라우트만) + 신규 `GET /transcript` 태스크 + ops T6(B44)
+- C5 surfaces T8(B33 화면·허브 라우트만) + surfaces **T11**(`GET /transcript`, M8 신설) + ops T6(B44)
+
+**W5 — 어댑터 배선(1체인, channels T3·T8·T14 머지 후)**
+- channels **T17**(US-B45 허브 어댑터 레지스트리 + `apps/hub/src/main.ts` 배선). W2의 channels T14–16과 W1의 어댑터 팩토리가 전부 들어온 뒤라야 실 팩토리 표를 채울 수 있다. surfaces 웨이브와 병렬 가능하지만 `apps/hub/src/main.ts`를 건드리는 유일한 체인이다.
 
 **memory-ingestion T1.. 와 channels는 W0 없이도 즉시 시작할 수 있다** — 둘 다 W0 산출물(`settings`/`push_subscriptions`/잡 seed)을 코드로 import하지 않는다. 단 memory-ingestion T22의 허브 배선 3줄만 `getSetting` 대신 `[]` 리터럴로 두고 W0 머지 때 되돌린다(그 플랜 열린 항목 1이 이미 같은 말을 한다).
 
 ---
 
-## 4. Logan 결정 대기
+## 4. Logan 결정 (완료)
 
-1. 골든 세트 5종이 합성인 채로 Phase B 종료 기준(초안 채택률·오보관 precision)을 판정할지, 이 지표만 유예할지(백로그 §6-5).
-2. `apps/hub`·`apps/local-agent` 부트스트랩 배선(어댑터 인스턴스화)이 어느 계획 소관인지 — 현재 5개 플랜 전부 밖이다(channels 미결 1).
-3. Hermes SSE 이벤트 필드명 스파이크를 Phase B 진입 스파이크 목록에 새로 넣을지(channels 미결 3).
+세 건 모두 답이 나왔고 **백로그 §7**이 정본이다.
+
+1. **골든 세트 → 유예.** 초안 채택률·무수정 전송률·브리핑 커버리지 세 지표는 실계정 연결 전까지 Phase B 종료 판정에서 제외한다(측정 배선이 도는 것까지가 종료 조건). **유예 안 하는 것**: 자동 보관의 VIP·민감 0건(안전 불변식)과 memory recall@10 ≥ 0.80(정답이 소스 문서라 합성으로도 진짜 값이 나온다).
+2. **부트스트랩 배선 → channels US-B45(Task 17).** `apps/local-agent`의 런타임 어댑터 맵은 별개이고 US-B39가 닫는다.
+3. **Hermes SSE 스파이크 → 등록.** 슬러그 `gate-hermes-sse`, channels Task 11-S. 실연결이 없으면 `UNVERIFIED`로 남기고 US-B39를 막지 않는다.

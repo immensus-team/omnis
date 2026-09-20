@@ -1,6 +1,6 @@
 # Phase B 스토리 백로그 (2026-09-20)
 
-마스터 §16의 **Phase B — 컨텍스트 + 에이전트 + 폰**을 44개 스토리로 쪼갠다. 순서 = 의존성 순서(위에서 아래로, 모든 의존은 자기보다 작은 번호다). 이 백로그가 5개 계획 문서(`writing-plans` skill 입력)의 입력이고, 계획 문서는 `플랜` 열이 가리키는 파일에 들어간다.
+마스터 §16의 **Phase B — 컨텍스트 + 에이전트 + 폰**을 45개 스토리로 쪼갠다. 순서 = 의존성 순서(위에서 아래로, 모든 의존은 자기보다 작은 번호다 — **예외 1건**: US-B19가 US-B20에 의존한다. `taskLoop`이 `routeByRule`을 import하기 때문이고, 번호를 바꾸는 대신 의존 열에만 적었다. 2026-09-20 교차 리뷰 M14). 이 백로그가 5개 계획 문서(`writing-plans` skill 입력)의 입력이고, 계획 문서는 `플랜` 열이 가리키는 파일에 들어간다.
 
 - 상위: `docs/spec/00-omnis-design.md` v1.0 §10·§11·§12·§14·§16·§19, 부록 A1~A7 v1.0.
 - 계약: `2026-09-20-phase-a-interfaces.md`(Phase A) + `2026-09-20-phase-b-interfaces-delta.md`(이 Phase가 더하는 것). 식별자는 델타 문서에서 **그대로 복사**한다.
@@ -39,9 +39,11 @@
 
 ---
 
-## 2. 스토리 백로그 (44개)
+## 2. 스토리 백로그 (45개)
 
 `티어` 값은 A7 §3 모델 배정 규칙이다(`DeepSeek`는 Sonnet+ 리뷰 강제). `플랜` 값은 §3의 계획 파일 슬러그.
+
+**2026-09-20 교차 리뷰 반영(M14)**: US-B20(위임)의 의존은 `B19`가 아니라 **`B07`**이다 — `routeByRule()`은 tool palette 위에서 바로 돌고 `tasks`를 읽지 않는다. 거꾸로 US-B19(`taskLoop`)가 `routeByRule`을 import하므로 **B19의 의존에 `B20`이 더해진다**. agents 플랜의 실행 순서(Task 17 → 15 → 16)가 이 방향과 같다.
 
 | ID | 목표 | 산출물 | 검증 명령 | 티어 | 의존 | 플랜 |
 |---|---|---|---|---|---|---|
@@ -63,8 +65,8 @@
 | US-B16 | Web Push VAPID 키쌍 생성·보관: Keychain `omnis.webpush.vapid_private`/`…public`, `omnis-run-with-secrets.sh`가 env로 주입, 회전 절차 문서화(A6 §9 6단계) | `ops/scripts/gen-vapid.sh`, `ops/mini/RUNBOOK.md`(수정) | `bash ops/scripts/gen-vapid.sh --check` | Haiku | — | ops |
 | US-B17 | 알림 전달 2경로: macOS 로컬 알림(Tauri notification plugin, 클릭 → `omnis://thread/{id}` 딥링크) + Web Push 발송기(VAPID 서명, `push_subscriptions` 조회, 액션 2개 `Approve`/`Open`, 410/404 응답 시 구독 정리). 발송 실패는 조용히 삼키지 않고 `agent_runs`가 아니라 시스템 Item으로 | `apps/desktop/src-tauri/src/notify.rs`, `packages/kernel/src/notify/webpush.ts` | `pnpm --filter @omnis/kernel test` | Sonnet | B15, B16 | agents |
 | US-B18 | L8 자동 보관 루프(A4 §9) + 7일 undo: 하드 게이트 5종 먼저(민감·VIP·pending approval·injection_flags·kind), 판정 ①③④는 순수 SQL(T0), ②·④-b만 T1(`confidence ≥ 0.85`, 미달이면 보관 안 함), `items.meta.archived_by` 기록, 22:00 스윕 잡, `undoArchive()`(`archived`→`received` + `audit_log` + 해당 스레드 30일 제외). **하드 삭제 경로 없음** | `packages/agents/src/loops/auto-archive.ts`, `packages/kernel/src/archive.ts` | `pnpm --filter @omnis/agents test && pnpm eval:archive` | Opus | B06 | agents |
-| US-B19 | L3 투두 추출 + 리마인드(A4 §4): 트리거 3종(`item.labeled`/`item.sent`/cron 09·14·19), 정밀도 우선(`confidence < 0.70`은 저장조차 안 함, item당 최대 3, `duplicate_of` 코사인 > 0.82면 기존 task에 `source_item_id` 추가), `due_basis='inferred'` 표시, 리마인드 잡은 LLM 없이 순수 SQL 3그룹 | `packages/agents/src/loops/task.ts`, `packages/kernel/src/jobs/task-remind.ts` | `pnpm --filter @omnis/agents test` | Sonnet | B07 | agents |
-| US-B20 | 위임 제안 + L4 판단 + 승인 실행(A4 §4.4·§5, B-D6): `DelegationHints` 추출(정규식, LLM 아님) + `routeByRule()`(~1ms, 규칙 5종), 규칙이 가르면 그 자리에서 `propose_delegation` → 승인 카드, 못 가르면 L4(T2)를 깨운다. 폭주 방지 4종(하루 5건, 스레드당 24h 2건, `confidence < 0.70` 제외, `injection_flags` 있으면 절대 제외). 승인 1회 → `delegate.run` 실행, 완전 자율은 `settings` 규칙이 열렸을 때만이고 `est_minutes > 30`·레포 밖·egress 포함이면 여전히 승인 | `packages/agents/src/delegate/{route,brief}.ts`, `packages/agents/src/loops/delegate.ts` | `pnpm --filter @omnis/agents test` | Opus | B19 | agents |
+| US-B19 | L3 투두 추출 + 리마인드(A4 §4): 트리거 3종(`item.labeled`/`item.sent`/cron 09·14·19), 정밀도 우선(`confidence < 0.70`은 저장조차 안 함, item당 최대 3, `duplicate_of` 코사인 > 0.82면 기존 task에 `source_item_id` 추가), `due_basis='inferred'` 표시, 리마인드 잡은 LLM 없이 순수 SQL 3그룹 | `packages/agents/src/loops/task.ts`, `packages/kernel/src/jobs/task-remind.ts` | `pnpm --filter @omnis/agents test` | Sonnet | B07, B20 | agents |
+| US-B20 | 위임 제안 + L4 판단 + 승인 실행(A4 §4.4·§5, B-D6): `DelegationHints` 추출(정규식, LLM 아님) + `routeByRule()`(~1ms, 규칙 5종), 규칙이 가르면 그 자리에서 `propose_delegation` → 승인 카드, 못 가르면 L4(T2)를 깨운다. 폭주 방지 4종(하루 5건, 스레드당 24h 2건, `confidence < 0.70` 제외, `injection_flags` 있으면 절대 제외). 승인 1회 → `delegate.run` 실행, 완전 자율은 `settings` 규칙이 열렸을 때만이고 `est_minutes > 30`·레포 밖·egress 포함이면 여전히 승인 | `packages/agents/src/delegate/{route,brief}.ts`, `packages/agents/src/loops/delegate.ts` | `pnpm --filter @omnis/agents test` | Opus | B07 | agents |
 | US-B21 | L7 노트 라우팅 루프(A4 §8): `note` insert 트리거 → 후보 최대 3개(`propose_route`), 신뢰도 낮으면 제안 자체를 안 한다(수동 선택으로 수렴), 자동 라우팅 없음 — `notes.route_state`는 사람이 수락해야 `accepted` | `packages/agents/src/loops/note-route.ts` | `pnpm --filter @omnis/agents test` | Sonnet | B07 | agents |
 | US-B22 | L6 Network 팔로업 루프(A4 §7): 초면 판정(§7.2), 비활성 감지 스윕(`network_inactive_sweep`, 평일 10:00, `persons.cadence_days`/`priority_score` 기반 SQL), 출력 = 톤매칭 draft + task, `persons.relationship_state` 갱신(`closed`만 승인 필요) | `packages/agents/src/loops/followup.ts` | `pnpm --filter @omnis/agents test` | Sonnet | B03, B07 | agents |
 | US-B23 | L5 아침 브리핑(A4 §6.1~§6.3): 06:30 KST 동기 호출(배치 큐 아님), 콘텐츠 모델 6섹션 + `BriefItem`, **랭킹은 LLM이 아니라 산술 점수**(8항 가중합, 한 스레드는 브리핑 전체에서 1회), LLM은 한 줄 요약 문장만. `digests(kind='morning')` 1행 + 커버리지 지표 자동 계산 | `packages/agents/src/loops/digest-morning.ts`, `packages/agents/src/digest/rank.ts` | `pnpm --filter @omnis/agents test` | Opus | B18, B19 | agents |
@@ -89,6 +91,7 @@
 | US-B42 | 모니터링 + 로그 로테이션: healthchecks.io 체크 15종 ping 배선(성공 `/`, 실패 `/fail`), self-hosted ntfy 2토픽(`omnis-critical`/`omnis-warning`), 모든 critical/warning은 ntfy + `items(kind='system')` 이중 노출, `newsyslog`/logrotate 30일 보관 + 시크릿 마스킹 확인 | `ops/scripts/healthcheck-ping.sh`, `ops/mini/newsyslog.d/omnis.conf` | `bash ops/scripts/healthcheck-ping.sh --check` | Sonnet | B40 | ops |
 | US-B43 | 미니 부팅 체크리스트 자동화(A6 §2): FileVault 켠 채 자동 로그인 확인, `pmset` 설정(슬립 금지·전원 복구 시 자동 부팅), LaunchDaemon/Agent 로드 상태, Ollama 모델 존재, 슬롯 헬스 1회 — 한 스크립트가 전부 검사하고 실패 항목만 출력 | `ops/mini/preflight.sh`, `ops/mini/RUNBOOK.md`(수정) | `bash ops/mini/preflight.sh --check` | Haiku | — | ops |
 | US-B44 | 비용·사용량 월간 리포트 잡: `agent_runs` 집계(루프별·티어별·provider별 토큰·비용·캐시 히트율 `tokens_cached/tokens_in`), 월 1일 `digests.metrics`에 적재 + 밤 다이제스트 `cost` 필드가 매일 MTD 노출, 캐시 히트율 40% 미만 루프는 리포트에 경고 줄 | `packages/kernel/src/jobs/cost-report.ts` | `pnpm --filter @omnis/kernel test:integration` | Sonnet | B14, B24 | ops |
+| US-B45 | 허브 어댑터 레지스트리 + 부트스트랩 배선: `apps/hub/src/adapters.ts`가 `accounts`(+`account_secrets.auth_ref`) 행을 읽어 채널별 어댑터 패키지의 팩토리로 `Adapter` 인스턴스를 만들고 `connect(AuthRef)`(비밀은 각 어댑터가 Keychain에서 직접 읽는다 — 허브는 항목 이름만 넘긴다), `createHubServer({adapters})`에 주입해 보관 write-back(US-A36)과 이후 전송 경로가 실제로 동작하게 하고, `state='active'` 계정마다 `subscribe()` 루프를 띄워 health 전이를 시스템 Item으로 남긴다. 레지스트리(`AdapterFactories`)는 주입 가능해서 **가짜 팩토리로 픽스처 테스트가 된다**(B-D5) | `apps/hub/src/adapters.ts`, `apps/hub/src/main.ts`(수정) | `pnpm --filter @omnis/hub test` | Opus | B37, B38, B40 | channels |
 
 ---
 
@@ -99,7 +102,7 @@
 | `2026-09-20-phase-b-memory-ingestion.md` | `memory-ingestion` | US-B01, B02, B03, B04, B05, B08, B09, B10, B11, B12 | 10 |
 | `2026-09-20-phase-b-agents.md` | `agents` | US-B06, B07, B13, B14, B15, B17, B18, B19, B20, B21, B22, B23, B24, B25 | 14 |
 | `2026-09-20-phase-b-surfaces.md` | `surfaces` | US-B26, B27, B28, B29, B30, B31, B32, B33, B35, B36 | 10 |
-| `2026-09-20-phase-b-channels.md` | `channels` | US-B37, B38, B39, B40 | 4 |
+| `2026-09-20-phase-b-channels.md` | `channels` | US-B37, B38, B39, B40, B45 | 5 |
 | `2026-09-20-phase-b-ops.md` | `ops` | US-B16, B34, B41, B42, B43, B44 | 6 |
 
 **병렬 웨이브 제안**(worktrunk 형제 워크트리, 계획 단위 브랜치 `plan/<slug>`):
@@ -147,7 +150,7 @@ A7 §7의 Phase A 금지 4종을 그대로 상속하고 Phase B가 5종을 더�
 | 캐시 히트율 | 초안 루프 `tokens_cached/tokens_in` ≥ 40% | 주간 리포트 | US-B44 |
 | 인젝션 방어 | 테스트 세트 20건 전부 통과 | CI | US-B05 |
 
-**Phase B 진입 스파이크**(A6 §11.2 "Phase 진입 시 16개" 중 이 Phase 소유분): `A1-⑥`(Outlook Graph delta), `A1-⑦`(Telegram mtcute 페어링), `S-A4-2`(DeepSeek Batch API 유무), `S-A4-6`(GitHub App vs PAT), `S-A4-7`(검색 p95 지연), `S-A2-5`는 Phase C로 미룬다. 전부 해당 스토리 안에서 돌리고 `tools/spikes/<slug>/result.md`에 pass/fail을 남긴다.
+**Phase B 진입 스파이크**(A6 §11.2 "Phase 진입 시 16개" 중 이 Phase 소유분): `A1-⑥`(Outlook Graph delta), `A1-⑦`(Telegram mtcute 페어링), `S-A4-2`(DeepSeek Batch API 유무), `S-A4-6`(GitHub App vs PAT), `S-A4-7`(검색 p95 지연), **`gate-hermes-sse`(Hermes `/v1/responses` SSE 이벤트 필드명 — 2026-09-20 교차 리뷰에서 새로 등록, channels 플랜 Task 11-S 소유)**, `S-A2-5`는 Phase C로 미룬다. 전부 해당 스토리 안에서 돌리고 `tools/spikes/<slug>/result.md`에 pass/fail을 남긴다.
 
 ---
 
@@ -157,5 +160,15 @@ A7 §7의 Phase A 금지 4종을 그대로 상속하고 Phase B가 5종을 더�
 2. **`settings` 테이블(B-D2)은 A3에 없는 신규 테이블이다.** A3 §8의 "이 목록이 v1 테이블의 전체 목록이다"와 충돌한다 — A3에 `0009`를 추가 기재해야 한다(델타 문서 §5가 초안).
 3. **자동 보관 `undo` 창의 기준 시각**이 `items.meta.archived_by.at`(jsonb)이라 하루치 조회가 인덱스를 못 탄다(A4 §9.3이 "느려지면 컬럼으로 승격"으로 열어둠). 첫 2주 실측 후 `items.archived_at` 컬럼 승격 여부를 정한다.
 4. **Web Push의 iOS 백그라운드 신뢰성**(A5 §4.4, `13`). 배달 누락률을 US-B36에서 계측 지표로 남기고, 반복되면 v2 네이티브 셸 근거로 쓴다.
-5. **초안 골든 세트 40건**(`eval/draft.jsonl`)은 "Logan이 실제로 보낸 답장"이 정답이라 **실계정 연결 전에는 채울 수 없다**. US-B13은 톤 유사도·길이 준수 지표를 배선만 해두고 세트는 연결 후 채운다 — Phase B 종료 판정에서 이 항목만 유예 대상인지 Logan 확인 필요.
+5. **초안 골든 세트 40건**(`eval/draft.jsonl`)은 "Logan이 실제로 보낸 답장"이 정답이라 **실계정 연결 전에는 채울 수 없다**. US-B13은 톤 유사도·길이 준수 지표를 배선만 해두고 세트는 연결 후 채운다. → **결정됨(§7-1)**.
 6. **`memory_consolidate`(T2 Batch)의 Anthropic API 키**가 Keychain에 아직 없다(`omnis.anthropic.api_key`). 키가 없으면 US-B24의 통합 잡은 스킵되고 다이제스트만 돈다 — 이 폴백을 기본 동작으로 둘지 확인 필요.
+
+---
+
+## 7. Logan 결정 (2026-09-20 교차 리뷰 후)
+
+교차 리뷰(`2026-09-20-phase-b-plans-review.md` §4)가 올린 3건에 대한 답이다. 이 절이 정본이고, 위 §5·§6의 해당 항목은 여기를 가리킨다.
+
+1. **골든 세트 종료 기준은 실계정 연결 전까지 유예한다.** `eval/draft.jsonl`(B13)·`eval/task.jsonl`·`eval/route_note.jsonl`·`eval/followup.jsonl`은 합성 데이터로 **형식·하네스·하드 게이트만** 인수하고, §5 표의 **초안 채택률(≥50%)·무수정 전송률(≥20%)·브리핑 커버리지(≥80%)** 세 지표는 Phase B 종료 판정에서 **제외**한다(측정 배선이 돌아가는 것까지가 Phase B의 종료 조건이다). 유예하지 **않는** 것: `eval/auto_archive.jsonl`의 **VIP·민감 보관 0건**과 `eval/memory_recall.jsonl`의 **recall@10 ≥ 0.80** — 앞은 안전 불변식이라 합성 데이터로도 깨지면 안 되고, 뒤는 정답이 소스 문서라 합성으로도 진짜 값이 나온다.
+2. **허브·local-agent 부트스트랩 배선은 channels 플랜의 US-B45다.** 위 §2에 스토리를 신설했다(`apps/hub/src/adapters.ts` + `apps/hub/src/main.ts` 수정). 어댑터 팩토리 레지스트리를 주입 가능하게 만들어 가짜 팩토리로 픽스처 테스트한다(B-D5 유지). `apps/local-agent`의 `adapters: Map<RuntimeKind, RuntimeAdapter>` 배선은 Hermes 런타임이 붙는 US-B39 Task에서 같이 닫는다.
+3. **Hermes SSE 필드명 스파이크를 Phase B 진입 스파이크에 등록한다.** 슬러그 `gate-hermes-sse`, 소유는 channels 플랜의 US-B39 선행 태스크(Task 11-S). 미니의 Hermes `api_server`(:8642)가 떠 있지 않을 수 있으므로 **실연결이 없으면 문서 기반 + 픽스처로 진행하고 `result.md`에 `UNVERIFIED`를 명시**한다 — 스파이크 실패가 US-B39를 막지 않는다(메커니즘은 mock SSE로 완전히 검증되고 필드명만 실연결 시점 확정 대상이다).
