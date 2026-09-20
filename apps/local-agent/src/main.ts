@@ -42,6 +42,7 @@ export async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<void
   const client = new HubClient({
     url: config.hub_url,
     token,
+    host: config.host,
     logger,
     connect: (url, headers) => new WebSocket(url, { headers }) as unknown as SocketLike,
     dispatch: createDispatcher({

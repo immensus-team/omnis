@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- A6 §1·§10. 템플릿: install.sh가 __OMNIS_ROOT__·__HOME__을 치환해 ~/Library/LaunchAgents에 깐다.
+     비밀은 여기 없다 — run.sh가 env.sh를 통해 Keychain에서 읽는다(A6 §9). -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.omnis.hub</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__OMNIS_ROOT__/ops/mini/run.sh</string>
+    <string>hub</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>WorkingDirectory</key><string>__OMNIS_ROOT__</string>
+  <key>StandardOutPath</key><string>__HOME__/Library/Logs/omnis/hub.log</string>
+  <key>StandardErrorPath</key><string>__HOME__/Library/Logs/omnis/hub.err.log</string>
+</dict>
+</plist>
