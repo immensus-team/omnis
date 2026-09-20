@@ -1,0 +1,21 @@
+{
+  "scenario": "text_message",
+  "raw": {
+    "id": "evt1", "status": "confirmed", "summary": "omnis launch sync",
+    "start": { "dateTime": "2026-09-25T10:00:00+09:00" },
+    "end": { "dateTime": "2026-09-25T10:30:00+09:00" },
+    "attendees": [{ "email": "dana@example.com", "displayName": "Dana Lee", "responseStatus": "accepted" }]
+  },
+  "expected": {
+    "items": [{
+      "threadExternalId": "evt1", "externalId": "evt1", "kind": "event",
+      "author": { "kind": "system", "id": "" }, "body": "omnis launch sync",
+      "attachments": [], "sentAt": "2026-09-25T10:00:00+09:00", "status": "received", "sourceHash": "evt1",
+      "threadMeta": {
+        "externalId": "evt1", "kind": "calendar", "title": "omnis launch sync",
+        "participants": [{ "externalId": "dana@example.com", "displayName": "Dana Lee" }],
+        "lastItemAt": "2026-09-25T10:00:00+09:00", "archivedAt": null
+      }
+    }]
+  }
+}

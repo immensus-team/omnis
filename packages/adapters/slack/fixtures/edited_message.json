@@ -1,0 +1,17 @@
+{
+  "scenario": "edited_message",
+  "raw": {
+    "type": "message",
+    "subtype": "message_changed",
+    "channel": "C0123456789",
+    "ts": "1700000300.000400",
+    "message": {
+      "type": "message",
+      "user": "U0123456789",
+      "text": "edited text",
+      "ts": "1700000200.000300",
+      "edited": { "user": "U0123456789", "ts": "1700000300.000000" }
+    }
+  },
+  "expected": { "items": [] }
+}

@@ -1,0 +1,5 @@
+{
+  "scenario": "auth_error_response",
+  "raw": { "httpStatus": 401, "body": { "ok": false, "error": "invalid_auth" } },
+  "expected": { "errorKind": "auth_expired" }
+}

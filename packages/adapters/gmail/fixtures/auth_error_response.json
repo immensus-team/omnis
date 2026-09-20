@@ -1,0 +1,5 @@
+{
+  "scenario": "auth_error_response",
+  "raw": { "code": 401, "message": "Invalid Credentials" },
+  "expected": { "errorKind": "auth_expired" }
+}

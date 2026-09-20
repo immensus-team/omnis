@@ -1,0 +1,26 @@
+{
+  "scenario": "thread_reply",
+  "raw": {
+    "id": "18c2f4a1b2d3e4f6", "threadId": "18c2f4a1b2d3e4f0",
+    "payload": {
+      "headers": [
+        { "name": "From", "value": "Logan Kim <281932556+jinhologankim@users.noreply.github.com>" },
+        { "name": "Subject", "value": "Re: omnis launch sync" },
+        { "name": "Message-Id", "value": "<CAFakeMsgId002@mail.gmail.com>" },
+        { "name": "In-Reply-To", "value": "<CAFakeMsgId001@mail.gmail.com>" },
+        { "name": "Date", "value": "Tue, 14 Nov 2023 22:20:00 +0000" }
+      ],
+      "mimeType": "text/plain",
+      "body": { "data": "U291bmRzIGdvb2Qu" }
+    }
+  },
+  "expected": {
+    "items": [{
+      "threadExternalId": "18c2f4a1b2d3e4f0", "externalId": "18c2f4a1b2d3e4f6", "kind": "email",
+      "author": { "kind": "person", "id": "Logan Kim <281932556+jinhologankim@users.noreply.github.com>" },
+      "body": "Subject: Re: omnis launch sync\n\nSounds good.",
+      "attachments": [], "sentAt": "2023-11-14T22:20:00.000Z", "status": "received",
+      "sourceHash": "<CAFakeMsgId002@mail.gmail.com>"
+    }]
+  }
+}
