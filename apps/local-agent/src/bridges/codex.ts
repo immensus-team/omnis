@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import type {
   BridgeItemKind,
   HumanResponse,
@@ -161,11 +162,32 @@ export interface CodexAdapterConfig {
   version: string;
 }
 
+/** 자식 1개가 여러 턴을 나르므로, 알림을 어느 턴에 귀속시킬지 들고 있어야 한다. */
+interface ActiveTurn {
+  ctx: Ctx;
+  sink: EventSink;
+  thread_id: string | null;
+}
+
+/** 어댑터가 구독하는 app-server 알림. 여기 없는 것은 cold 전용이다. */
+const CODEX_EVENT_METHODS = [
+  "thread.started",
+  "turn.started",
+  "item/started",
+  "item/completed",
+  "turn.completed",
+  "turn.failed",
+  "item/agentMessage/delta",
+  "item/commandExecution/outputDelta",
+  ...REASONING_DELTA_METHODS,
+];
+
 /** A2-D6: 상주 app-server 자식 1개가 여러 thread/턴을 처리한다. */
 export class CodexAdapter implements RuntimeAdapter {
   readonly kind: RuntimeKind = "codex";
   #client: AppServerClient | null = null;
   #child: ReturnType<typeof spawn> | null = null;
+  readonly #turns = new Set<ActiveTurn>();
 
   constructor(private readonly cfg: CodexAdapterConfig) {}
 
@@ -181,48 +203,70 @@ export class CodexAdapter implements RuntimeAdapter {
     if (child.stdin === null || child.stdout === null)
       throw new Error("codex app-server has no stdio");
     this.#child = child;
-    this.#client = new AppServerClient({ stdin: child.stdin, stdout: child.stdout });
-    return this.#client;
+    const client = new AppServerClient({ stdin: child.stdin, stdout: child.stdout });
+    // 핸들러는 자식당 한 번만 건다. 턴마다 걸면 AppServerClient에 off()가 없어
+    // 두 번째 턴부터 지난 턴의 클로저가 같이 울리고(= 이벤트 중복) 목록이 무한히 자란다.
+    for (const m of CODEX_EVENT_METHODS) {
+      client.on(m, (params) => {
+        this.#route(m, params);
+      });
+    }
+    this.#client = client;
+    return client;
+  }
+
+  #turnFor(p: Record<string, unknown>): ActiveTurn | undefined {
+    const threadId = typeof p.threadId === "string" ? p.threadId : null;
+    if (threadId !== null) {
+      for (const t of this.#turns) if (t.thread_id === threadId) return t;
+    }
+    // ponytail: threadId 없는 알림은 활성 턴이 하나일 때만 귀속시킨다.
+    // 동시 턴이 둘 이상이면서 threadId도 없으면 귀속이 모호하므로 버린다(오배송보다 낫다).
+    return this.#turns.size === 1 ? this.#turns.values().next().value : undefined;
+  }
+
+  #route(method: string, params: unknown): void {
+    const p = (params ?? {}) as Record<string, unknown>;
+    const turn = this.#turnFor(p);
+    if (turn === undefined) return;
+
+    turn.sink.raw(JSON.stringify({ method, params }));
+    for (const e of mapAppServerEvent(method, params, turn.ctx)) {
+      if (e.method === "turn.item.delta") turn.sink.delta(e.params);
+      else if (e.method === "turn.item.started" || e.method === "session.registered")
+        turn.sink.itemStarted(e.params);
+      else if (e.method === "turn.item.completed") turn.sink.itemCompleted(e.params);
+      else if (e.method === "turn.started") turn.sink.turnStarted(e.params);
+      else turn.sink.turnCompleted(e.params);
+    }
+
+    if (method === "thread.started" && typeof p.threadId === "string") turn.thread_id = p.threadId;
+    if (method === "turn.completed" || method === "turn.failed") this.#turns.delete(turn);
   }
 
   async startTurn(s: SessionRecord, input: TurnInput, sink: EventSink): Promise<TurnHandle> {
     const client = this.#ensure();
-    const turnId = `t-${Date.now().toString(36)}`;
-    const ctx: Ctx = {
-      session_key: s.session_key,
-      turn_id: turnId,
-      seq: new Map<string, number>(),
+    const turnId = `t-${randomUUID().slice(0, 8)}`;
+    const turn: ActiveTurn = {
+      ctx: { session_key: s.session_key, turn_id: turnId, seq: new Map<string, number>() },
+      sink,
+      thread_id: s.session_id,
     };
-    for (const m of [
-      "thread.started",
-      "turn.started",
-      "item/started",
-      "item/completed",
-      "turn.completed",
-      "turn.failed",
-      "item/agentMessage/delta",
-      "item/commandExecution/outputDelta",
-      ...REASONING_DELTA_METHODS,
-    ]) {
-      client.on(m, (params) => {
-        sink.raw(JSON.stringify({ method: m, params }));
-        for (const e of mapAppServerEvent(m, params, ctx)) {
-          if (e.method === "turn.item.delta") sink.delta(e.params);
-          else if (e.method === "turn.item.started" || e.method === "session.registered")
-            sink.itemStarted(e.params);
-          else if (e.method === "turn.item.completed") sink.itemCompleted(e.params);
-          else sink.turnCompleted(e.params);
-        }
+    this.#turns.add(turn);
+    try {
+      await client.request("turn.start", {
+        threadId: s.session_id,
+        cwd: s.cwd,
+        input: input.text,
       });
+    } catch (e) {
+      this.#turns.delete(turn);
+      throw e;
     }
-    await client.request("turn.start", {
-      threadId: s.session_id,
-      cwd: s.cwd,
-      input: input.text,
-    });
     return {
       turn_id: turnId,
       cancel: async (): Promise<boolean> => {
+        this.#turns.delete(turn);
         await client.request("turn.cancel", { turnId });
         return true;
       },
@@ -234,6 +278,7 @@ export class CodexAdapter implements RuntimeAdapter {
   }
 
   async close(): Promise<void> {
+    this.#turns.clear();
     this.#client?.close();
     this.#child?.kill("SIGTERM");
     this.#client = null;

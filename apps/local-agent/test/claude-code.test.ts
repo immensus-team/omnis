@@ -196,6 +196,7 @@ const noopSink = (): EventSink => ({
   itemStarted: () => {},
   delta: () => {},
   itemCompleted: () => {},
+  turnStarted: () => {},
   turnCompleted: () => {},
   approval: async () => ({ approval_id: "a", decision: "deny" }) as never,
   raw: () => {},

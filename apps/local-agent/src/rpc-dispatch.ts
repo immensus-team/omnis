@@ -27,6 +27,7 @@ export interface EventSink {
   itemStarted(e: Record<string, unknown>): void;
   delta(e: Record<string, unknown>): void;
   itemCompleted(e: Record<string, unknown>): void;
+  turnStarted(e: Record<string, unknown>): void;
   turnCompleted(e: Record<string, unknown>): void;
   approval(i: HumanInterrupt): Promise<HumanResponse>;
   raw(line: string): void;
