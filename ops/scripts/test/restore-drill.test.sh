@@ -6,7 +6,7 @@ FAKE_BIN="$(mktemp -d)"
 BACKUP_DIR="$(mktemp -d)"
 trap 'rm -rf "$FAKE_BIN" "$BACKUP_DIR"' EXIT
 
-# 1) 덤프 파일이 하나도 없으면 --dry-run은 실패해야 한다.
+# 1) With no dump files at all, --dry-run must fail.
 export OMNIS_BACKUP_DIR="$BACKUP_DIR"
 if "$SCRIPT" --dry-run >/dev/null 2>&1; then
   echo "FAIL: --dry-run passed with no dump files" >&2; exit 1
@@ -15,7 +15,7 @@ echo "ok: --dry-run fails when no dump exists"
 
 cat > "$FAKE_BIN/pg_restore" <<'FAKEPGR'
 #!/bin/bash
-# --list 호출이면 파일 존재만 확인하고 성공한다(가짜 헤더 파싱은 하지 않는다).
+# On a --list call, only verify the file exists and succeed (no fake header parsing).
 if [ "$1" = "--list" ]; then
   [ -f "$2" ] && exit 0 || exit 1
 fi
