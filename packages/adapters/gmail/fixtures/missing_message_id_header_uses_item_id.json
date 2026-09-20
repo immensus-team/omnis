@@ -38,7 +38,7 @@
         "kind": "email",
         "author": {
           "kind": "person",
-          "id": "Dana Lee <dana@example.com>"
+          "id": "dana@example.com"
         },
         "body": "Subject: No Message-Id header\n\nDrafting artifacts sometimes lack Message-Id.",
         "attachments": [],

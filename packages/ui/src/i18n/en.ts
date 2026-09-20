@@ -132,7 +132,10 @@ export const en: Dictionary = {
       label: "Label",
       more: "More",
     },
-    draftProvenance: "omnis draft · Sources: {sources}",
+    // US-D05: same copy the card renders (draft-card.tsx). The "omnis draft · Sources:" form was
+    // the `A · B` metadata separator and a field name; {sources} is unchanged, so the ko/en
+    // placeholder-parity test still holds.
+    draftProvenance: "Drafted from {sources}",
     draftFailed: "Couldn't generate a draft — Retry",
     empty: "No messages yet",
     autoArchived: "Auto-archived {n}d ago — Restore",

@@ -51,7 +51,7 @@
         "kind": "email",
         "author": {
           "kind": "person",
-          "id": "Mail Delivery Subsystem <mailer-daemon@googlemail.com>"
+          "id": "mailer-daemon@googlemail.com"
         },
         "body": "Subject: Delivery Status Notification (Failure)\n\nAddress not found. Your message wasn't delivered to ghost@example.com.",
         "attachments": [],

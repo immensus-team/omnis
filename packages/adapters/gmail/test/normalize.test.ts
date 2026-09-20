@@ -24,7 +24,9 @@ describe("Gmail normalize()", () => {
       threadExternalId: "18c2f4a1b2d3e4f0",
       externalId: "18c2f4a1b2d3e4f5",
       kind: "email",
-      author: { kind: "person", id: "Dana Lee <dana@example.com>" },
+      // The mailbox, not the header — the same key the participants list uses, so the kernel's
+      // display-name lookup (ingest.ts: participants.find(p => p.externalId === author.id)) hits.
+      author: { kind: "person", id: "dana@example.com" },
       body: "Subject: omnis launch sync\n\nLet's sync tomorrow at 10am about the omnis launch.",
       sentAt: "2023-11-14T22:13:20.000Z",
       status: "received",

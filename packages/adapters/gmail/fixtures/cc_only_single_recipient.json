@@ -46,7 +46,7 @@
         "kind": "email",
         "author": {
           "kind": "person",
-          "id": "Priya Raman <priya@example.com>"
+          "id": "priya@example.com"
         },
         "body": "Subject: FYI: vendor renewal\n\nRenewal date moved to Dec 1.",
         "attachments": [],

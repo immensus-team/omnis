@@ -59,7 +59,7 @@
         "kind": "email",
         "author": {
           "kind": "person",
-          "id": "Dana Lee <dana@example.com>"
+          "id": "dana@example.com"
         },
         "body": "Subject: Re: omnis launch sync\n\nAdding Priya so she sees the deploy window.",
         "attachments": [],

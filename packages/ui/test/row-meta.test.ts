@@ -104,4 +104,13 @@ describe("RUNTIME_ICON / RUNTIME_LETTER (U5: an agent session's avatar is its ru
   it("Codex uses the OpenAI mark instead of the old generic lucide Bot", () => {
     expect(RUNTIME_ICON.codex).toBeDefined();
   });
+
+  // US-D05. `omnis` used to hold lucide's Sparkles. That glyph is not a brand mark and no mark set
+  // has omnis's, so the map had exactly one entry that was neither a brand nor the documented
+  // letter fallback — and it was the one entry whose subject is omnis itself. Reading the map as
+  // "every value is somebody's real logo" is the invariant; this is the test that keeps it true.
+  it("omnis falls through to the letter 'O' rather than a generic lucide glyph", () => {
+    expect(RUNTIME_ICON.omnis).toBeUndefined();
+    expect(RUNTIME_LETTER.omnis).toBe("O");
+  });
 });

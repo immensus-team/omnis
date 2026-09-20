@@ -90,13 +90,19 @@ describe("FilterChipBar (US-D02)", () => {
   // The reference's filter-popover input puts a magnifier at the far left with one hairline
   // underneath separating it from the list. Without that chrome the placeholder floats bare over
   // the list and stops reading as a field.
-  it("gives the popover input a search glyph and a rule above the list", () => {
+  //
+  // Where the glyph comes from is part of it. This was the one `react-icons/lu` import left in
+  // packages/ui, and a second icon set in one bundle draws a different stroke weight at the same
+  // 14px, beside lucide glyphs in the rail, the palette and the ask panel. The assertion is on
+  // lucide's own class rather than "an svg is in there" — the latter is what let the wrong set sit
+  // here, since every icon passes it.
+  it("gives the popover input a lucide search glyph and a rule above the list", () => {
     render(<FilterChipBar chips={[]} addOptions={addOptions()} />);
     fireEvent.click(screen.getByRole("button", { name: "Add Label filter" }));
 
     const search = screen.getByRole("dialog").querySelector(".filter-chip-popover__search");
     expect(search).not.toBeNull();
-    expect(search?.querySelector("svg")).not.toBeNull();
+    expect(search?.querySelector("svg.lucide-search")).not.toBeNull();
     expect(search?.contains(screen.getByPlaceholderText("Search Label"))).toBe(true);
   });
 

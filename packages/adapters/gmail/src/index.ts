@@ -299,7 +299,13 @@ export function normalize(raw: unknown): NormalizedItem[] {
       threadExternalId: r.threadId,
       externalId: r.id,
       kind: "email",
-      author: { kind: "person", id: from },
+      // The sender's mailbox address, not the raw `From` header. `author.id` is a person's external
+      // identity for the whole ingest path: kernel/ingest.ts resolves it with resolvePerson and
+      // takes the display name off the participants entry whose externalId matches it. Hand it
+      // "Dana Lee <dana@example.com>" and the lookup misses on both counts — the person is created
+      // under the header as their identity, named after the header, and the inbox row then prints
+      // that name in its bold first-line slot ("Dana Lee <dana@example.com>", initials "D<").
+      author: { kind: "person", id: parseAddressList(from)[0]?.externalId ?? "" },
       body: subject ? `Subject: ${subject}\n\n${bodyText}` : bodyText,
       attachments: [],
       sentAt,

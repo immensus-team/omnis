@@ -335,6 +335,68 @@ async function seedAgentSession(
   return { threadId: row.thread_id, close: () => client.stop() };
 }
 
+/** US-D05: the screenshots' row copy, layered over seed().
+ *
+ *  seed() is a replay — every string it produces comes out of an adapter fixture, and those
+ *  fixtures are the adapter contract corpus, not prose. Two of their properties are right for a
+ *  contract test and wrong on screen:
+ *
+ *  - gcal's three events are one recurring series, so the `summary` that gcal normalizes into both
+ *    thread.title and the item body is "omnis launch sync" twice and "PoC review" once. B3's
+ *    fallback (packages/agents/src/summarize.ts takes the subject, else the body's first line) then
+ *    writes that same sentence into threads.meta.summary, and Inbox.tsx prints the row's own title
+ *    underneath the row's own title.
+ *  - gmail's message bodies are headed "Subject: …\n\n", so its fallback lands on a mail header.
+ *
+ *  So the shot runs get their own copy, keyed by the fixtures' own external ids. Deliberately NOT
+ *  part of seed(): phase-a's G5 ingests a marker into the first Slack thread and asserts it reaches
+ *  that row, and the zero-row-summary guard in shots-accent (waitForSummaries) is a B3 regression
+ *  test — neither survives a seed that arrives pre-summarized. Nothing here touches the Slack
+ *  thread or anything A2/A4/A5 counts.
+ *
+ *  The calendar events keep their own titles rather than taking an organizer's name.
+ *  DESIGN-DIRECTION's row grammar is person-first because a conversation *is* the person; an
+ *  event's identity is its title, and three events that all read "Dana Lee" would hide more than
+ *  the name adds.
+ *
+ *  B3 owns threads.meta.summary until its debounce fires (30s after the last inbound item), so the
+ *  fixture waits for that write to land before making its own — otherwise the job overwrites the
+ *  copy and every row goes back to saying its title twice. */
+export async function varyInboxCopy(pool: Pool): Promise<void> {
+  const targets: [string, string][] = [
+    ["evt1", "Dana Lee accepted. Agenda is the launch checklist and the Friday cut-off."],
+    ["evt2", "PoC deck is attached — pricing is the one section left open."],
+    ["evt1_20261002", "Second occurrence of the same sync; Dana Lee has not replied yet."],
+    ["18c2f4a1b2d3e4f1", "Slides are attached; she wants comments before Thursday."],
+    ["18c2f4a1b2d3e4f0", "Agreed to sync at 10am tomorrow about the launch."],
+  ];
+  await waitFor(
+    async () => {
+      const done = await query<{ n: string }>(
+        pool,
+        `SELECT count(*) AS n FROM threads
+        WHERE external_id = ANY($1::text[]) AND meta->>'summary_at' IS NOT NULL`,
+        [targets.map(([id]) => id)],
+      );
+      return Number(done[0]?.n ?? 0) === targets.length;
+      // 120s, not waitFor's 20s default: the hub's summarize job debounces 30s behind the last
+      // inbound item, and the seed's own agent turn has to land first.
+    },
+    "B3 to summarize the seeded threads",
+    120_000,
+  );
+
+  for (const [externalId, summary] of targets) {
+    await query(
+      pool,
+      `UPDATE threads
+          SET meta = meta || jsonb_build_object('summary', $2::text, 'summary_source', 'fixture')
+        WHERE external_id = $1`,
+      [externalId, summary],
+    );
+  }
+}
+
 /** G5: push one more item through the hub's IngestSink and measure how long it takes to show up in the UI. */
 export async function ingestOneMore(pool: Pool, body: string): Promise<void> {
   const sink = createIngestSink({ pool, logger });

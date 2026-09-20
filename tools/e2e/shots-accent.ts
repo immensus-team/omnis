@@ -30,7 +30,7 @@ import { join } from "node:path";
 import { type Browser, type Page, chromium } from "@playwright/test";
 import { Pool } from "../../packages/db/src/index.js";
 import { describeOverflow, measureOverflow } from "./overflow.js";
-import { seed } from "./seed.js";
+import { seed, varyInboxCopy } from "./seed.js";
 import {
   HUB_PORT,
   REPO_ROOT,
@@ -352,6 +352,7 @@ async function main(): Promise<void> {
 
   const pool = new Pool({ connectionString: env.DATABASE_URL, max: 4 });
   const seeded = await seed(pool, env);
+  await varyInboxCopy(pool);
   try {
     mkdirSync(OUT, { recursive: true });
     const browser = await chromium.launch();

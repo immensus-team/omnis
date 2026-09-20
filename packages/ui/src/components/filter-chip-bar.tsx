@@ -1,7 +1,7 @@
 import * as Popover from "@radix-ui/react-popover";
 import { Command } from "cmdk";
+import { Search } from "lucide-react";
 import { useState } from "react";
-import { LuSearch } from "react-icons/lu";
 
 /** US-D02: the filter chip bar laid over the list (the filter-DSL chips in
  *  ref-issue-tracker-density.webp). A chip splits into a field cell and a value cell — it never
@@ -107,7 +107,7 @@ function AddFilterPopover({
                 hairline below. A bare placeholder is just grey text floating over a list and does
                 not read as a field. */}
             <div className="filter-chip-popover__search">
-              <LuSearch aria-hidden="true" />
+              <Search aria-hidden="true" />
               <Command.Input placeholder={`Search ${fieldLabel}`} autoFocus />
             </div>
             <Command.List>
