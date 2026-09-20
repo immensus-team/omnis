@@ -131,6 +131,39 @@ hub가 못 읽고, 실제 비밀만 하나 더 생긴다.
 회전하면 이전 VAPID 키로 만든 구독은 전부 무효다 — 회전 직후 `push_subscriptions`를 비우고 기기에서
 재구독시킨다(정리 로직은 US-B17).
 
+## 백업 · 복구 리허설 (US-B41)
+
+매일 03:00에 LaunchAgent `com.omnis.backup`이 `ops/scripts/omnis-backup.sh`를 돌린다:
+`pg_dump --format=custom` → `$HOME/omnis-var/backup/pg/omnis-YYYYMMDD.dump` → `restic backup` → B2,
+그다음 `restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune`와 로컬 덤프 7일 정리.
+성공/실패는 exit code로만 알린다(healthchecks.io 배선은 US-B42).
+
+처음 1회(미니, gui 세션):
+
+```bash
+brew install restic                                    # pg_dump는 postgresql@17에 이미 있다
+# Keychain 4개 — 값은 붙여넣지 말고 프롬프트로(-w 생략) 넣는다. ssh 셸에서는 거절당한다("4) 비밀" 참조).
+for s in omnis.restic.repository omnis.restic.password omnis.b2.account_id omnis.b2.account_key; do
+  security add-generic-password -U -s "$s" -a 281932556+jinhologankim@users.noreply.github.com -w
+done
+restic -r "$(security find-generic-password -s omnis.restic.repository -a 281932556+jinhologankim@users.noreply.github.com -w)" init
+bash ops/scripts/omnis-backup.sh --check               # pg_dump·restic·Keychain 4개 확인만
+ops/mini/install.sh backup                             # 03:00 예약(kickstart 안 함 — 걸기만 한다)
+```
+
+`restic init`은 스크립트가 하지 않는다 — 리포 생성은 1회성이라 매 실행 존재 확인 로직을 넣지 않는다.
+
+분기 1회 복구 리허설:
+
+```bash
+bash ops/scripts/restore-drill.sh --dry-run   # 최신 덤프가 읽히는지만(아무것도 복원하지 않는다)
+bash ops/scripts/restore-drill.sh             # 스크래치 포트 5433 omnis_restore_drill에 실복원 + row count
+```
+
+인자 없이 돌린 결과는 `backup/restore-drills.md`에 PASS/FAIL로 append된다. 스크래치 인스턴스가
+5433에 떠 있어야 하고(`OMNIS_RESTORE_PORT`로 바꿀 수 있다), 드릴이 끝나면 그 DB는 지워진다.
+FAIL이면 다음 분기로 미루지 않고 즉시 Sev1로 고친다(A6 §4).
+
 ## 상태 확인
 
 ```bash
