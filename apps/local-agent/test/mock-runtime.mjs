@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// A2-D14: fixture NDJSON을 실제 stdio로 재생한다. 실 CLI는 CI에서 부르지 않는다.
+// A2-D14: replays the fixture NDJSON over a real stdio. The real CLI is not invoked in CI.
 import { readFileSync } from "node:fs";
 
 const fixture = process.env.OMNIS_MOCK_FIXTURE;

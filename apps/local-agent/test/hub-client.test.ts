@@ -100,7 +100,7 @@ describe("HubClient", () => {
 });
 
 describe("HubClient upgrade headers", () => {
-  // 허브 handleUpgrade는 x-omnis-host가 없으면 400으로 끊는다(apps/hub/src/bridge.ts).
+  // The hub's handleUpgrade cuts the connection with a 400 without x-omnis-host (apps/hub/src/bridge.ts).
   it("sends the host header the hub's upgrade check requires", () => {
     const { sock } = fakeSocket();
     let headers: Record<string, string> = {};

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { hostProfile, phaseARuntimesFor } from "../src/host-config.js";
 
-/** 검증 명령: `pnpm --filter @omnis/local-agent test`. 두 호스트를 한 번에 단언하므로 호스트 플래그가 없다. */
+/** Verify with: `pnpm --filter @omnis/local-agent test`. It asserts both hosts at once, so there is no host flag. */
 const HOSTS = ["mini", "macbook"] as const;
 
 describe("host profile", () => {
-  it("caps active turns at 4 on both hosts (마스터 §9)", () => {
+  it("caps active turns at 4 on both hosts (master §9)", () => {
     expect(hostProfile("mini").maxActiveTurns).toBe(4);
     expect(hostProfile("macbook").maxActiveTurns).toBe(4);
   });

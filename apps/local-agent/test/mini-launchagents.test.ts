@@ -41,14 +41,14 @@ describe("mini LaunchAgents (A6 §1, §10)", () => {
     const run = readFileSync(join(OPS_MINI, "run.sh"), "utf8");
     for (const service of SERVICES) expect(run).toContain(`${service})`);
     expect(run).toContain("ops/mini/env.sh");
-    // env.sh는 생성물이라 커밋되지 않는다. 예시 파일은 Keychain 조회만 담는다.
+    // env.sh is generated and not committed. The example file contains only the Keychain lookups.
     const example = readFileSync(join(OPS_MINI, "env.sh.example"), "utf8");
     expect(example).toContain("security find-generic-password");
     expect(example).not.toMatch(/=\s*["']?[A-Za-z0-9+/]{24,}/);
   });
 
-  // run.sh가 넘기는 `--runtimes codex`는 TOML에 같은 이름의 [[runtime]] 블록이 없으면
-  // ConfigError로 죽는다(A2-D15) — launchd가 그대로 crash loop를 돈다.
+  // the `--runtimes codex` that run.sh passes dies with a ConfigError unless the TOML has a
+  // [[runtime]] block of the same name (A2-D15) — and launchd then spins in a crash loop.
   it("ships a TOML the plist's --runtimes filter can actually resolve", () => {
     const tomlText = readFileSync(join(OPS_MINI, "local-agent.toml.example"), "utf8");
     const { config } = loadConfig({
