@@ -3,8 +3,8 @@
 // 환경과 셋업(jest-dom matchers + afterEach(cleanup))을 파일 자체가 선언한다.
 import "./setup";
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { InboxRow } from "../src/components/inbox-row";
 
 const baseProps = {
@@ -182,5 +182,48 @@ describe("InboxRow 보관 액션 (US-A36)", () => {
   it("labels the action 되살리기 on an archived row (A5 §3.8)", () => {
     render(<InboxRow {...baseProps} archived={true} onArchive={vi.fn()} />);
     expect(screen.getByRole("button", { name: "되살리기" })).toBeInTheDocument();
+  });
+});
+
+describe("InboxRow 호버 카드 (US-D02)", () => {
+  // 카드는 openDelay(400ms)가 지나야 뜬다 — fake timer로 그 400ms만 실제로 흘려보낸다
+  // (command-palette.test.tsx의 닫힘 스프링 테스트와 같은 패턴).
+  afterEach(() => vi.useRealTimers());
+
+  function hoverRow(labels = baseProps.labels) {
+    vi.useFakeTimers();
+    render(<InboxRow {...baseProps} labels={labels} />);
+    // Radix HoverCard 1.1.23의 트리거는 pointer 이벤트만 듣는다 — mouseEnter로는 열리지 않는다.
+    fireEvent.pointerEnter(screen.getByRole("option"));
+    return () => document.querySelector(".row-hover-card") as HTMLElement | null;
+  }
+
+  it("호버 전에는 없고, 400ms가 지나야 참여자·라벨·마지막 활동 카드가 뜬다", () => {
+    const card = hoverRow();
+
+    // 리스트를 훑고 지나갈 때 카드가 줄줄이 번쩍이지 않는다.
+    expect(card()).toBeNull();
+
+    // 400ms 직전까지는 여전히 없다 — 이 지연이 곧 hover intent다.
+    act(() => vi.advanceTimersByTime(399));
+    expect(card()).toBeNull();
+
+    act(() => vi.advanceTimersByTime(1));
+    const meta = within(card() as HTMLElement);
+    // 제목 + 참여자 행. 지금은 둘 다 행이 아는 같은 이름 하나다(컴포넌트의 ponytail 주석 참고).
+    expect(meta.getAllByText("Sora Kim")).toHaveLength(2);
+    expect(meta.getByText("참여자")).toBeInTheDocument();
+    expect(meta.getByText("work, davich")).toBeInTheDocument(); // 라벨은 쉼표로 이어 붙인다
+    expect(meta.getByText("마지막 활동")).toBeInTheDocument();
+    expect(meta.getByText("3m")).toBeInTheDocument();
+  });
+
+  it("라벨이 없는 행은 카드에서 라벨 행을 통째로 뺀다", () => {
+    const card = hoverRow([]);
+
+    act(() => vi.advanceTimersByTime(400));
+    const meta = within(card() as HTMLElement);
+    expect(meta.queryByText("라벨")).not.toBeInTheDocument();
+    expect(meta.getByText("마지막 활동")).toBeInTheDocument();
   });
 });

@@ -1,3 +1,4 @@
+import * as HoverCard from "@radix-ui/react-hover-card";
 import { cn } from "../lib/cn.js";
 import {
   type AgentRuntimeKind,
@@ -96,78 +97,120 @@ export function InboxRow(props: InboxRowProps) {
   const { shown, more } = pickChips(props.labels);
   const summaryText = props.isDraft ? `초안: ${props.summary}` : props.summary;
   return (
-    // biome-ignore lint/a11y/useSemanticElements: A5 §3.1 listbox/option pattern — <option> is only valid inside <select> and can't hold this row's markup.
-    <div
-      role="option"
-      tabIndex={0}
-      aria-selected={props.selected}
-      className={cn("inbox-row", props.selected && "inbox-row--selected")}
-      onClick={() => props.onSelect(props.id)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          props.onSelect(props.id);
-        }
-      }}
-    >
-      <RowAvatarView avatar={props.avatar} />
-      <div className="inbox-row__meta">
-        <span className="inbox-row__name" data-unread={props.unread}>
-          {props.name}
-        </span>
-        {props.unread && <span className="inbox-row__unread-dot" aria-label="안읽음" />}
-        <span className="inbox-row__timestamp">{props.timestamp}</span>
-      </div>
-      <div className="inbox-row__side">
-        {props.agentState ? (
-          <AgentStatusBadge state={props.agentState} />
-        ) : (
-          <span
-            className="inbox-row__channel-icon"
-            aria-label={`${CHANNEL_LABEL[props.channel]} 메시지`}
-          >
-            <ChannelGlyph channel={props.channel} size={16} />
-          </span>
-        )}
-        {props.hasPendingApproval && (
-          <span className="inbox-row__approval-dot" aria-label="승인 대기" />
-        )}
-        {props.onArchive && (
-          <button
-            type="button"
-            className="inbox-row__action"
-            // 행 전체가 클릭 타깃이라 버블링을 막지 않으면 보관과 동시에 스레드가 열린다.
-            onClick={(e) => {
-              e.stopPropagation();
-              props.onArchive?.(props.id);
-            }}
-            onKeyDown={(e) => e.stopPropagation()}
-          >
-            {props.archived ? "되살리기" : "보관"}
-          </button>
-        )}
-      </div>
-      <div className="inbox-row__summary-line">
-        <span className="inbox-row__summary" data-draft={props.isDraft}>
-          {summaryText}
-        </span>
-        <div className="inbox-row__chips">
-          {shown.map((chip) => (
-            <span
-              key={`${chip.kind}:${chip.name}`}
-              className="inbox-row__chip"
-              aria-label={`${chip.kind} 라벨: ${chip.name}`}
-            >
-              {chip.name}
+    // US-D02: HoverCard.Trigger는 asChild라 이 행 div에 hover 핸들러만 얹는다 — 래퍼 엘리먼트가
+    // 생기지 않고 행의 role="option"·클릭·키보드 동작은 그대로다(Radix Slot이 기존 props에 merge).
+    // openDelay 400ms는 의도한 지연이다: 이 리스트는 행 높이가 낮아 포인터가 훑고 지나가기 쉽고,
+    // 지연이 없으면 카드가 줄줄이 번쩍인다(hover intent). closeDelay는 짧게(100ms) 둬서
+    // 행 사이를 옮겨 다닐 때는 카드가 따라오게 한다.
+    <HoverCard.Root openDelay={400} closeDelay={100}>
+      <HoverCard.Trigger asChild>
+        {/* biome-ignore lint/a11y/useSemanticElements: A5 §3.1 listbox/option pattern — <option> is only valid inside <select> and can't hold this row's markup. */}
+        <div
+          role="option"
+          tabIndex={0}
+          aria-selected={props.selected}
+          className={cn("inbox-row", props.selected && "inbox-row--selected")}
+          onClick={() => props.onSelect(props.id)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              props.onSelect(props.id);
+            }
+          }}
+        >
+          <RowAvatarView avatar={props.avatar} />
+          <div className="inbox-row__meta">
+            <span className="inbox-row__name" data-unread={props.unread}>
+              {props.name}
             </span>
-          ))}
-          {more > 0 && (
-            <span className="inbox-row__chip-more" aria-label={`라벨 ${more}개 더 보기`}>
-              +{more}
+            {props.unread && <span className="inbox-row__unread-dot" aria-label="안읽음" />}
+            <span className="inbox-row__timestamp">{props.timestamp}</span>
+          </div>
+          <div className="inbox-row__side">
+            {props.agentState ? (
+              <AgentStatusBadge state={props.agentState} />
+            ) : (
+              <span
+                className="inbox-row__channel-icon"
+                aria-label={`${CHANNEL_LABEL[props.channel]} 메시지`}
+              >
+                <ChannelGlyph channel={props.channel} size={16} />
+              </span>
+            )}
+            {props.hasPendingApproval && (
+              <span className="inbox-row__approval-dot" aria-label="승인 대기" />
+            )}
+            {props.onArchive && (
+              <button
+                type="button"
+                className="inbox-row__action"
+                // 행 전체가 클릭 타깃이라 버블링을 막지 않으면 보관과 동시에 스레드가 열린다.
+                onClick={(e) => {
+                  e.stopPropagation();
+                  props.onArchive?.(props.id);
+                }}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                {props.archived ? "되살리기" : "보관"}
+              </button>
+            )}
+          </div>
+          <div className="inbox-row__summary-line">
+            <span className="inbox-row__summary" data-draft={props.isDraft}>
+              {summaryText}
             </span>
-          )}
+            <div className="inbox-row__chips">
+              {shown.map((chip) => (
+                <span
+                  key={`${chip.kind}:${chip.name}`}
+                  className="inbox-row__chip"
+                  aria-label={`${chip.kind} 라벨: ${chip.name}`}
+                >
+                  {chip.name}
+                </span>
+              ))}
+              {more > 0 && (
+                <span className="inbox-row__chip-more" aria-label={`라벨 ${more}개 더 보기`}>
+                  +{more}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      </HoverCard.Trigger>
+      <HoverCard.Portal>
+        {/* 떠 있는 패널이라 유리다(DESIGN-DIRECTION.md "Liquid Glass는 …플로팅 패널에만").
+            밀도는 레퍼런스(ref-issue-tracker-density.webp 하단좌측 카드)를 따른다 — 제목 +
+            키-값 몇 줄짜리 컴팩트 카드지 상세 패널이 아니다. */}
+        <HoverCard.Content
+          className="glass-surface row-hover-card"
+          data-glass-slot="sheet"
+          side="right"
+          align="start"
+          sideOffset={8}
+        >
+          <p className="row-hover-card__title">{props.name}</p>
+          {/* ponytail: 아직 "참여자 목록" 데이터 모델이 없다 — 여기서 말하는 참여자는 행이 아는
+              단 하나의 이름(props.name)이고, 그래서 제목과 같은 값이 한 번 더 나온다. 스레드가
+              진짜 참여자 배열을 갖게 되면 이 한 줄만 갈아 끼우면 된다. */}
+          <dl className="row-hover-card__meta">
+            <div>
+              <dt>참여자</dt>
+              <dd>{props.name}</dd>
+            </div>
+            {props.labels.length > 0 && (
+              <div>
+                <dt>라벨</dt>
+                <dd>{props.labels.map((l) => l.name).join(", ")}</dd>
+              </div>
+            )}
+            <div>
+              <dt>마지막 활동</dt>
+              <dd>{props.timestamp}</dd>
+            </div>
+          </dl>
+        </HoverCard.Content>
+      </HoverCard.Portal>
+    </HoverCard.Root>
   );
 }
