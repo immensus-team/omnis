@@ -12,5 +12,6 @@ Follow `docs/design/DESIGN-DIRECTION.md` (kinso-style light UI, glassy, no AI-sl
 
 ## Engineering
 - Run `pnpm lint && pnpm typecheck` before committing; tests need a per-branch DB (`omnis_test_<slug>`), never the shared `omnis_test`.
+- `packages/db/migrations/*.sql` are **frozen once applied**: `packages/db/src/migrate.ts` hashes each file's bytes and refuses to run when an applied file changed, so editing one breaks `pnpm db:migrate` in every environment that already applied it — the mini's production DB included. Migrations `0001`–`0013` are applied everywhere, so their original comments stay as they are and the English-only rule does not apply to them. Add a new migration instead of editing one.
 - New packages go into the root `tsconfig.json` references.
 - Never touch the Mac mini's Hermes/omh/buzz setup or port 8642.
