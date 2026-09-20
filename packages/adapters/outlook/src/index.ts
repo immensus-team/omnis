@@ -285,8 +285,37 @@ export function createOutlookAdapter(deps: OutlookAdapterDeps): Adapter {
       return poll();
     },
 
-    async send(): Promise<never> {
-      throw new AdapterError("fatal_unsupported", CHANNEL, "send not implemented until Task 5");
+    // 승인 게이트(US-A07, Phase A에 이미 존재) 전까지 실제 sendMail은 절대 호출하지 않는다.
+    async send(thread: ThreadRef, draft: Outbound): Promise<SendResult> {
+      const sink =
+        deps.sink ??
+        (async (): Promise<SendResult> => ({
+          externalId: `mock-${now().getTime()}`,
+          sentAt: now().toISOString(),
+        }));
+      return sink(thread, draft);
+    },
+
+    async markRead(thread: ThreadRef): Promise<void> {
+      if (graphClient === undefined)
+        throw new AdapterError("fatal_protocol", CHANNEL, "markRead() called before connect()");
+      try {
+        await graphClient.api(`/me/messages/${thread.externalId}`).patch({ isRead: true });
+      } catch (cause) {
+        throw mapApiError(cause);
+      }
+    },
+
+    async archive(thread: ThreadRef): Promise<void> {
+      if (graphClient === undefined)
+        throw new AdapterError("fatal_protocol", CHANNEL, "archive() called before connect()");
+      try {
+        await graphClient
+          .api(`/me/messages/${thread.externalId}/move`)
+          .post({ destinationId: "archive" });
+      } catch (cause) {
+        throw mapApiError(cause);
+      }
     },
 
     async health(): Promise<Health> {

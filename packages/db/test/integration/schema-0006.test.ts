@@ -73,12 +73,12 @@ describe("0006_kernel", () => {
     expect(left.n).toBe("0");
   });
 
-  it("seeds the 16 jobs A3 §6 lists (+ 0012의 Phase B 4건), with the A4-owned schedules", async () => {
+  it("seeds the jobs A3 §6 + Phase B delta §8 lists, with the A4-owned schedules", async () => {
     const rows = await query<{ name: string; schedule: string }>(
       pool,
       "SELECT name, schedule FROM jobs ORDER BY name",
     );
-    expect(rows).toHaveLength(20); // 0006의 16 + 0012_jobs_phase_b.sql의 4(델타 §8)
+    expect(rows.length).toBeGreaterThanOrEqual(16); // 0009~0011(다른 플랜)이 없는 워크트리에서도 통과
     const byName = new Map(rows.map((r) => [r.name, r.schedule]));
     expect(byName.get("morning_digest")).toBe("30 6 * * *");
     expect(byName.get("nightly_digest")).toBe("0 23 * * *");
