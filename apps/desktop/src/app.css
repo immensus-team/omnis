@@ -2250,6 +2250,11 @@ body {
    pixel behind it. Deliberately not `.glass-surface`: that name means "the chrome recipe", and this
    card is content, not chrome. */
 .onboarding__card {
+  /* `border-box` is not optional here, and this is the only surface that has to say so: the card is
+     the one place D6 gives a box an explicit `width` *and* padding. Under `content-box` the 28px of
+     padding lands outside the 100% cap, so at 390px the card measured 400px wide and hung 5px past
+     the viewport — an overflow that only exists below the 460px cap. */
+  box-sizing: border-box;
   width: min(460px, 100%);
   display: flex;
   flex-direction: column;
