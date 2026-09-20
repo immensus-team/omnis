@@ -390,9 +390,9 @@ body {
   max-height: min(60vh, 420px);
   overflow-y: auto;
   transform-origin: top left;
-  /* Spring entrance (240ms, --ease-spring). No separate reduced-motion block is needed: under
-     reduce, tokens.css drops --dur-panel to 0ms, so the animation lands on its end state at
-     once. */
+  /* Spring entrance (320ms — the layer rung of DESIGN-DIRECTION's ladder, --ease-spring). Under
+     reduce the duration drops to the shared fade and the travelled transform is stripped by the
+     consolidated @media block at the end of this file (US-D04). */
   animation: ask-panel-in var(--dur-panel) var(--ease-spring);
 }
 
@@ -447,6 +447,11 @@ body {
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+  /* US-D04: tab switch. The active tab is a filled pill that moves between segments, so the fill and
+     the label colour cross-fade over the entry rung (160ms) — the darker fill arriving while the
+     previous one leaves is what makes the switch read as one pill moving. */
+  transition: background var(--dur-base) var(--ease-spring), color var(--dur-base)
+    var(--ease-spring);
 }
 
 /* Laying --bg-base (L 0.99) over glass (--bg-overlay = --gray-000 at 78%, L≈0.988) leaves a 0.15%
@@ -721,11 +726,24 @@ body {
   row-gap: 4px;
   align-items: center;
   /* U1/U2/U5: generous row height — kinso lowers density with padding well beyond 10px.
-     P1 (kinso polish): settled on a 12px vertical rhythm (DESIGN-DIRECTION P1). */
-  padding: 12px 16px;
+     P1 (kinso polish): settled on a 12px vertical rhythm (DESIGN-DIRECTION P1).
+     US-D04: the vertical half is a named value because the archive collapse has to take the padding
+     down with the height — the row is border-box, so a row at `height: 0` with 12px padding still
+     occupies 24px and the list closes over a 24px hole. Declared once here, read once in
+     @keyframes inbox-row-leave below. */
+  --row-pad-y: 12px;
+  padding: var(--row-pad-y) 16px;
   /* No hairline separators (23 §2 — kinso divides rows with padding alone). Only the selected row
      is set apart, by .inbox-row--selected's card and shadow. */
   cursor: pointer;
+  /* US-D04: the selection elevation. A row does not blink into a card — the fill, the radius and
+     the shadow travel together over the entry rung (160ms, --dur-base) so pointing at a row and
+     choosing it read as the same gesture finishing rather than two different states.
+     These three are the properties .inbox-row:hover and .inbox-row--selected already set, named
+     one per line; the shorthand `transition: all` would also sweep up the leaving row's height and
+     padding, and the two animations would fight over the property. */
+  transition: background var(--dur-base) var(--ease-spring), border-radius var(--dur-base)
+    var(--ease-spring), box-shadow var(--dur-base) var(--ease-spring);
 }
 
 .inbox-row--selected {
@@ -921,6 +939,41 @@ body {
    grey fill over it only muddies the selection. */
 .inbox-row--selected:hover {
   background: var(--bg-base);
+}
+
+/* US-D04: an archived row leaves by collapsing, not by disappearing. Without this the row is gone
+   on the frame the click lands: `pendingArchive` filters it out of the list and there is nothing
+   left to animate, so the rows below jump up by one row's height with no explanation of where the
+   row went. Inbox.tsx holds the row in the list for --dur-move (motion.ts's LEAVE_MS) while this
+   runs, then lets it go.
+   Height is a measured pixel value, not `auto`: `height: auto` cannot interpolate without
+   `interpolate-size: allow-keywords`, which macOS's WKWebView does not ship — inbox-row.tsx writes
+   --row-collapse-h from getBoundingClientRect() the moment `leaving` turns on. Padding collapses
+   with it (see the note on --row-pad-y above) and overflow clips the grid rows as they fold. */
+.inbox-row--leaving {
+  height: var(--row-collapse-h, auto);
+  overflow: hidden;
+  /* The row is still in the list but is no longer a thing to press — pointer-events is switched off
+     on the same frame the archive click lands, so a second click during the 240ms cannot re-archive
+     or re-open what is already on its way out. */
+  pointer-events: none;
+  will-change: height, opacity;
+  animation: inbox-row-leave var(--dur-move) var(--ease-spring) forwards;
+}
+
+@keyframes inbox-row-leave {
+  from {
+    opacity: 1;
+    height: var(--row-collapse-h);
+    padding-top: var(--row-pad-y);
+    padding-bottom: var(--row-pad-y);
+  }
+  to {
+    opacity: 0;
+    height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
 }
 
 .inbox-row:hover .inbox-row__action,
@@ -1218,6 +1271,11 @@ body {
   font: inherit;
   font-size: 13px;
   cursor: pointer;
+  /* US-D04: the detail pane's tab switch (Conversation / Summary / Notes). Same treatment as the ask
+     panel's tabs — the inverted pill cross-fades between segments over the entry rung (160ms)
+     rather than appearing and disappearing. */
+  transition: background var(--dur-base) var(--ease-spring), color var(--dur-base)
+    var(--ease-spring);
 }
 
 /* The active segment is the inverted black pill — the same "this one is selected" move the rail's
@@ -1340,6 +1398,12 @@ body {
   font-size: 13px;
   font-weight: 590;
   white-space: nowrap;
+  /* US-D04: a pill's tone is a state change, not a repaint. When a session goes working -> blocked
+     the tint and the dot cross-fade over the entry rung (160ms) instead of snapping between two
+     colours — the same "one state, one colour" rule the tone selectors below enforce, now with the
+     change animated. */
+  transition: background var(--dur-base) var(--ease-spring), color var(--dur-base)
+    var(--ease-spring);
 }
 
 .status-pill__dot {
@@ -1605,9 +1669,9 @@ body {
 /* The entrance is the same set the ask panel uses (@keyframes + --dur-panel + --ease-spring) —
    this repo does not grow a different grammar per floating panel. Radix Popper keeps an inline
    `animation: none` on the element until it has been placed, so this animation only starts once
-   the position is settled (Radix's own guard against a panel flying in from the wrong side). No
-   separate reduced-motion block is needed either: as with the ask panel, tokens.css drops
-   --dur-panel to 0ms under reduce. */
+   the position is settled (Radix's own guard against a panel flying in from the wrong side). Under
+   reduce both states fall back to the shared fade pair (US-D04, end of file) — and they stay two
+   *different* names, which is what Radix Presence keys its unmount on. */
 .row-hover-card[data-state="open"] {
   animation: row-hover-card-in var(--dur-panel) var(--ease-spring);
 }
@@ -1827,9 +1891,8 @@ body {
     /* The "large surface that fills the screen" radius (DESIGN-DIRECTION radius scale). */
     border-radius: 20px;
     z-index: 20;
-    /* Spring entrance (240ms, --ease-spring). No separate reduced-motion block is needed:
-       tokens.css drops --dur-panel to 0ms under reduce, so the animation lands on its end state
-       at once.
+    /* Spring entrance (320ms — the layer rung, --ease-spring). Under reduce the transform is
+       stripped by the consolidated @media block at the end of this file (US-D04).
        @keyframes rather than a transition because the sheet is rendered conditionally
        (`{detail && …}`) and therefore has no closed state — with no starting value to move from,
        a transition does nothing (a freshly mounted element's transform is already none).
@@ -2020,5 +2083,68 @@ body {
      says, so at this width the chips step off the line rather than starving it. */
   .inbox-row__chips {
     display: none;
+  }
+}
+
+/* ── US-D04: the reduced-motion half of the motion pass ────────────────────────────────────────────
+   tokens.css collapses all five durations onto the shared 80ms fade. This block strips the travel,
+   because a shortened slide is still a slide — apple-design §14 asks for "a gentler, non-vestibular
+   equivalent", not for the same movement played faster. Together they are the whole contract: fade
+   yes, movement no.
+   Why `animation-name` rather than `animation: none`: two of these exits are timed by JavaScript
+   that unmounts the node on `animationend` (the ask panel's useClosingSpring, Radix Presence on the
+   hover card). Switching the animation off entirely would delete that event and strand the node
+   mounted forever. Re-pointing the name at a fade keeps the end event and keeps the cross-fade;
+   only the movement goes.
+   fade-in/fade-out are shared across all five call sites on purpose — under reduce there is exactly
+   one entrance and one exit, which is the point. Note that in and out stay two *different* names:
+   Radix Presence decides to unmount from the name changing between the open and closed states, and
+   collapsing them into one would make the hover card vanish with no exit at all. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The ask panel: 320ms of lift-and-scale becomes a cross-fade. */
+  .ask-panel {
+    animation-name: fade-in;
+  }
+
+  .ask-panel--closing {
+    animation-name: fade-out;
+  }
+
+  /* The row hover card: 320ms in from the row's right, and back out the same way. */
+  .row-hover-card[data-state="open"] {
+    animation-name: fade-in;
+  }
+
+  .row-hover-card[data-state="closed"] {
+    animation-name: fade-out;
+  }
+
+  /* The detail sheet's 320ms slide in from the right edge. */
+  .app-shell__detail {
+    animation-name: fade-in;
+  }
+
+  /* The archived row. It keeps its height and fades: the collapse is the part with the movement in
+     it, and the list closing the gap is a one-frame change of position, not an animation. */
+  .inbox-row--leaving {
+    animation-name: fade-out;
   }
 }

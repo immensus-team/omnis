@@ -13,6 +13,7 @@ import {
   askModelLabel,
   writeAskModel,
 } from "../src/lib/ask-model";
+import { PANEL_MS } from "../src/lib/motion";
 
 /** Since US-D01 the panel's default tab is "Suggestions" — the command list sits behind "Commands". */
 const openCommandsTab = () => fireEvent.click(screen.getByRole("button", { name: "Commands" }));
@@ -219,7 +220,13 @@ describe('CommandPalette mode="inline" close spring (US-D01)', () => {
 
     expect(screen.getByRole("dialog", { name: "AI panel" })).toHaveClass("ask-panel--closing");
 
-    act(() => vi.advanceTimersByTime(240));
+    // US-D04: the hold is --dur-panel, which moved from the 240ms transition rung to the 320ms layer
+    // rung (DESIGN-DIRECTION's ladder). Asserted against the token's own mirror in lib/motion.ts
+    // rather than a literal, so the two cannot drift apart again.
+    act(() => vi.advanceTimersByTime(PANEL_MS - 1));
+    expect(screen.getByRole("dialog", { name: "AI panel" })).toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(1));
     expect(screen.queryByRole("dialog", { name: "AI panel" })).not.toBeInTheDocument();
   });
 });

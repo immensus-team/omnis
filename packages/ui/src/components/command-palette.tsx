@@ -8,6 +8,7 @@ import {
   readAskModel,
   writeAskModel,
 } from "../lib/ask-model.js";
+import { PANEL_MS, motionMs } from "../lib/motion.js";
 import { AskPanel } from "./ask-panel.js";
 import { GlassSurface } from "./glass-surface.js";
 
@@ -221,18 +222,12 @@ function InlinePalette({
   );
 }
 
-/** Closing has to run the same 240ms spring the opening does (brief: spring open/close), which
- *  means the panel has to stay in the DOM while it runs — CSS alone cannot animate an element that
- *  has already unmounted. Under reduced motion tokens.css drops --dur-panel to 0ms, so this matches
- *  it at zero. */
-const PANEL_EXIT_MS = 240;
-
+/** Closing has to run the same spring the opening does (brief: spring open/close), which means the
+ *  panel has to stay in the DOM while it runs — CSS alone cannot animate an element that has already
+ *  unmounted. US-D04: the length and the reduced-motion answer both live in lib/motion.ts, next to
+ *  the row-leave hold that needs the same arithmetic. */
 function panelExitMs(): number {
-  try {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : PANEL_EXIT_MS;
-  } catch {
-    return PANEL_EXIT_MS;
-  }
+  return motionMs(PANEL_MS);
 }
 
 function useClosingSpring(open: boolean): boolean {
