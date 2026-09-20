@@ -1,0 +1,8 @@
+{
+  "$comment": "ILLUSTRATIVE ONLY — not the file actually passed to --settings. The command path below is relative to cwd, which breaks the moment Claude Code runs with the fixture worktree as cwd (MODULE_NOT_FOUND, and the omnis hook silently never fires). run.sh regenerates this same shape with an absolute path into out/hooks-settings.json and passes THAT. Kept as the plan's literal step-5 artifact; see result.md deviation 1.",
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "node tools/spikes/gate-11-claude-bare-hooks/hook-receiver.mjs" }] }
+    ]
+  }
+}

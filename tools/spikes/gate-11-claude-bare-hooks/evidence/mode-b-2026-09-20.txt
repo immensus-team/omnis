@@ -1,0 +1,25 @@
+=== mode (b): claude -p --settings out/hooks-settings.json --permission-mode manual (cwd=same fresh fixture worktree) ===
+driver: claude (subscription/OAuth). Claude Code 2.1.274.
+
+--- mode-b.log (CLI stdout+stderr) ---
+I ran the command as instructed, but it did not produce its output. A PreToolUse hook intercepted the Bash call and returned an error before the command ran. The hook's output was:
+
+```
+GATE11_HOOK_FIRED tool=Bash
+```
+
+The hook lives at this path:
+
+```
+/Users/logankim/AI-Workspaces/omnis.plan-phase-0/tools/spikes/gate-11-claude-bare-hooks/hook-receiver.mjs
+```
+
+Because the hook exited with an error, the `echo GATE11_PROBE_MARKER` line never executed, so no `GATE11_PROBE_MARKER` output was captured. If the goal of this probe was to confirm the hook fires on Bash calls, that confirmation succeeded. If you also need the echo itself to run, the hook receiver needs to exit zero instead of erroring, and I can rerun the probe after that change.
+SessionEnd hook [/Users/logankim/.config/iterm2/cc-status] failed: /bin/sh: /Users/logankim/.config/iterm2/cc-status: No such file or directory
+
+
+--- mode-b.debug.log: every PreToolUse hook execution line (fresh per-run log: 1 occurrence each) ---
+521:2026-09-20T02:48:56.503Z [DEBUG] "Hook PreToolUse:Bash (PreToolUse) error:\n/bin/sh: /Users/logankim/.config/iterm2/cc-status: No such file or directory"
+525:2026-09-20T02:48:56.550Z [DEBUG] "Hook PreToolUse:Bash (PreToolUse) error:\nGATE11_HOOK_FIRED tool=Bash"
+527:2026-09-20T02:48:56.551Z [DEBUG] "Hook PreToolUse:Bash (PreToolUse) success:\nPROJECT_HOOK_FIRED tool=Bash"
+530:2026-09-20T02:48:56.609Z [DEBUG] "Hook PreToolUse:Bash (PreToolUse) success:\n{\n  \"continue\": true,\n  \"hookSpecificOutput\": {\n    \"hookEventName\": \"PreToolUse\",\n    \"additionalContext\": \"Use parallel execution for independent tasks. Use run_in_background for long operations (npm install, builds, tests).\"\n  }\n}"
