@@ -1,5 +1,11 @@
 export { configureAgents, getAgentsPool, AgentsNotConfiguredError } from "./pool.js";
 export { recordRun, finishRun, type RecordRunInput } from "./record-run.js";
+export {
+  SYSTEM_ACCOUNT_EXTERNAL_ID,
+  SYSTEM_THREAD_EXTERNAL_ID,
+  writeSystemItem,
+  type SystemItemInput,
+} from "./system-item.js";
 export type { ItemRow } from "./types.js";
 export { classify, ClassifyOutput, type ClassifyResult, type ClassifyCtx } from "./classify.js";
 export { applyRules, WORK_DOMAINS, DETERMINISTIC_RULES, type RuleHit } from "./classify/rules.js";
