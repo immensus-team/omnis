@@ -10,6 +10,13 @@ export {
   HEALTHCHECK_JOB_NAME,
   registerHealthcheckJob,
 } from "./jobs/healthcheck.js";
+export {
+  COST_DAILY_CRON,
+  COST_DAILY_JOB_NAME,
+  registerCostDailyJob,
+  runCostDaily,
+} from "./jobs/cost-daily.js";
+export type { CostDailyDeps } from "./jobs/cost-daily.js";
 export { KillSwitchError, createKillSwitch, killSwitchStatus } from "./kill-switch.js";
 export type { KillSwitch, KillSwitchDeps } from "./kill-switch.js";
 export { createLogger } from "./logger.js";
@@ -26,6 +33,15 @@ export { createKernel } from "./kernel.js";
 export type { Kernel, KernelDeps } from "./kernel.js";
 export { SETTING_DEFAULTS, getAllSettings, getSetting, setSetting } from "./settings.js";
 export type { SettingKey } from "./settings.js";
+
+export {
+  POLICY,
+  costState,
+  currentPolicy,
+  mtdSpendUsd,
+  reserveSpendUsd,
+} from "./cost/governor.js";
+export type { CostInput, CostState, Policy } from "./cost/governor.js";
 
 export {
   ZERO_ITEM_COLUMNS,

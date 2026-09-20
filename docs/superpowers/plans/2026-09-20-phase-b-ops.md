@@ -467,6 +467,14 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Create: `/Users/logankim/AI-Workspaces/omnis/ops/mini/LaunchDaemons/com.omnis.backup.plist`
 - Create: `/Users/logankim/AI-Workspaces/omnis/backup/restore-drills.md`
 - Test: `/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/restore-drill.test.sh`
+- **계획 수정(2026-09-20, 리뷰 반려 반영)** — Modify: `/Users/logankim/AI-Workspaces/omnis/ops/mini/install.sh`
+  (plist를 `ops/mini/` 다음으로 `ops/mini/LaunchDaemons/`에서도 찾고, 기본 서비스 목록에 `backup`을 넣는다.
+  캘린더 잡이라 `kickstart`는 건너뛴다 — 안 그러면 설치할 때마다 백업이 통째로 돈다). 백로그가 산출물 경로를
+  `ops/mini/LaunchDaemons/*.plist`로 못박았으므로 plist를 옮기는 대신 install.sh를 넓힌다.
+- **계획 수정(같은 이유)** — Modify: `/Users/logankim/AI-Workspaces/omnis/ops/mini/RUNBOOK.md`
+  (설치·`restic init`·분기 드릴 절차. 이게 없으면 산출물에 사람이 닿는 경로가 문서에 없다),
+  Test: `/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/omnis-backup.test.sh`
+  (launchd PATH에 `pg_dump`가 없어 03:00 잡이 첫 줄에서 죽던 회귀를 막는다).
 
 **Interfaces:**
 - Consumes: `pg_dump --format=custom` · `pg_restore` · `psql`(Postgres 17 클라이언트) · `restic` · Keychain `omnis.restic.repository`/`omnis.restic.password`/`omnis.b2.account_id`/`omnis.b2.account_key`(이 계획이 새로 정하는 이름, A6 §9 점 스킴을 따른다) · `$DATABASE_URL`(계약 §9).

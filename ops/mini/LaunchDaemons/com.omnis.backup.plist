@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- US-B41. 실측 원칙대로 LaunchAgent(gui 세션, sudo 없음) — Keychain 읽기가 GUI 세션을 요구한다
+     (RUNBOOK §4). 폴더명은 백로그 산출물 경로(ops/mini/LaunchDaemons/*.plist)를 그대로 따른다.
+     `ops/mini/install.sh backup`이 __OMNIS_ROOT__·__HOME__을 치환해 ~/Library/LaunchAgents에 깐다
+     (install.sh가 ops/mini/ 다음으로 이 폴더를 본다). 캘린더 잡이라 kickstart는 하지 않는다. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.omnis.backup</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__OMNIS_ROOT__/ops/scripts/omnis-backup.sh</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>0</integer></dict>
+  <key>WorkingDirectory</key><string>__OMNIS_ROOT__</string>
+  <key>StandardOutPath</key><string>__HOME__/Library/Logs/omnis/backup.log</string>
+  <key>StandardErrorPath</key><string>__HOME__/Library/Logs/omnis/backup.err.log</string>
+</dict>
+</plist>

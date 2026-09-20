@@ -91,6 +91,79 @@ zero-cache 재기동 **전에** 한 번 더 돌린다 — 안 그러면 쿼리�
 > `--delete`는 미니 쪽에만 있는 파일을 지운다. `ops/mini/env.sh`는 제외 목록에 있으니 살아남는다.
 > `--exclude dist`를 넣지 않으면 맥북에서 빌드한 산출물이 덮어써진다 — 미니에서 다시 `pnpm build`하면 된다.
 
+## Web Push VAPID 키 (US-B16)
+
+```bash
+bash ops/scripts/gen-vapid.sh --check     # 있는지만 확인, 아무것도 안 바꾼다
+bash ops/scripts/gen-vapid.sh             # 없을 때만 생성(둘 중 하나라도 있으면 거부)
+bash ops/scripts/gen-vapid.sh --force     # 회전(유출 의심 시 즉시, 정기는 분기 1회 — A6 §9)
+```
+
+**키가 사는 곳은 미니 한 대다.** 키는 hub가 쓰고 hub는 미니에서만 돈다 — 맥북 로그인 Keychain에는
+`omnis.webpush.*` 항목이 없는 게 정상이고, 맥북에서 `--check`는 `missing omnis.webpush.vapid_public`
+으로 1을 내고 끝나야 한다(그게 이 명령의 설계된 동작이다). 맥북에서 키를 만들지 말 것 — 만들어도
+hub가 못 읽고, 실제 비밀만 하나 더 생긴다.
+
+**ssh 셸에서는 생성이 안 된다** — 위 "4) 비밀" 항목과 같은 이유로 `security add-generic-password`가
+`Background` 세션에서 거절당한다. 미니에서의 생성·회전은 1회성 LaunchAgent로 gui/501에 넣어 돌린다.
+
+### 회전 절차 6단계 (A6 §9)
+
+1. **새 값 발급** — `bash ops/scripts/gen-vapid.sh --force`(gui/501 세션에서). 스크립트가 `node:crypto`
+   로 새 P-256 키쌍을 만든다. 채널 콘솔 재발급이 필요한 다른 비밀과 달리 발급처가 우리 자신이다.
+2. **저장** — 같은 명령이 Keychain `omnis.webpush.vapid_public` / `…vapid_private`를 덮어쓴다
+   (`-U`). A6 §9 원문의 `sops secrets/<host>.enc.yaml` 단계를 이 리포에서는 Keychain이 대신한다.
+3. **git commit — 해당 없음.** VAPID 키는 파일로 존재하지 않으므로 커밋할 것이 없다. 값이 diff·로그·
+   셸 히스토리에 들어가면 그 자체가 유출이다. 커밋할 것은 절차 변경(이 문서)뿐이다.
+4. **재기동** — `launchctl kickstart -k gui/$(id -u)/com.omnis.hub`. hub가 `env.sh` 경유로
+   `OMNIS_WEBPUSH_VAPID_PUBLIC`/`…PRIVATE`를 다시 읽는다(배선은 US-B17). 전체 재부팅은 불필요.
+5. **검증** — 재기동이 서비스를 깨지 않았는지 확인한다. healthchecks.io의 hub job이 다음 주기에 정상
+   ping을 보내는지 보고(잡 배선은 US-B43), 그 전에 `curl -s http://127.0.0.1:8787/health`가
+   `{"ok":true,...}`인지 확인한다. 실패하면 `~/Library/Logs/omnis/hub.log`부터 본다.
+6. **감사 기록** — `audit_log`에 회전 이벤트를 남긴다. **키 값은 절대 넣지 않는다** — 서비스 이름과
+   시각만 남긴다.
+   ```bash
+   psql -U vigor -d omnis -c "INSERT INTO audit_log (actor, action, target_table, after) \
+     VALUES ('me', 'secret.rotate', 'keychain', \
+             '{\"services\":[\"omnis.webpush.vapid_public\",\"omnis.webpush.vapid_private\"]}'::jsonb)"
+   ```
+
+회전하면 이전 VAPID 키로 만든 구독은 전부 무효다 — 회전 직후 `push_subscriptions`를 비우고 기기에서
+재구독시킨다(정리 로직은 US-B17).
+
+## 백업 · 복구 리허설 (US-B41)
+
+매일 03:00에 LaunchAgent `com.omnis.backup`이 `ops/scripts/omnis-backup.sh`를 돌린다:
+`pg_dump --format=custom` → `$HOME/omnis-var/backup/pg/omnis-YYYYMMDD.dump` → `restic backup` → B2,
+그다음 `restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune`와 로컬 덤프 7일 정리.
+성공/실패는 exit code로만 알린다(healthchecks.io 배선은 US-B42).
+
+처음 1회(미니, gui 세션):
+
+```bash
+brew install restic                                    # pg_dump는 postgresql@17에 이미 있다
+# Keychain 4개 — 값은 붙여넣지 말고 프롬프트로(-w 생략) 넣는다. ssh 셸에서는 거절당한다("4) 비밀" 참조).
+for s in omnis.restic.repository omnis.restic.password omnis.b2.account_id omnis.b2.account_key; do
+  security add-generic-password -U -s "$s" -a 281932556+jinhologankim@users.noreply.github.com -w
+done
+restic -r "$(security find-generic-password -s omnis.restic.repository -a 281932556+jinhologankim@users.noreply.github.com -w)" init
+bash ops/scripts/omnis-backup.sh --check               # pg_dump·restic·Keychain 4개 확인만
+ops/mini/install.sh backup                             # 03:00 예약(kickstart 안 함 — 걸기만 한다)
+```
+
+`restic init`은 스크립트가 하지 않는다 — 리포 생성은 1회성이라 매 실행 존재 확인 로직을 넣지 않는다.
+
+분기 1회 복구 리허설:
+
+```bash
+bash ops/scripts/restore-drill.sh --dry-run   # 최신 덤프가 읽히는지만(아무것도 복원하지 않는다)
+bash ops/scripts/restore-drill.sh             # 스크래치 포트 5433 omnis_restore_drill에 실복원 + row count
+```
+
+인자 없이 돌린 결과는 `backup/restore-drills.md`에 PASS/FAIL로 append된다. 스크래치 인스턴스가
+5433에 떠 있어야 하고(`OMNIS_RESTORE_PORT`로 바꿀 수 있다), 드릴이 끝나면 그 DB는 지워진다.
+FAIL이면 다음 분기로 미루지 않고 즉시 Sev1로 고친다(A6 §4).
+
 ## 상태 확인
 
 ```bash
@@ -103,6 +176,7 @@ curl -so /dev/null -w '%{http_code}\n' http://127.0.0.1:4848/   # zero-cache →
 grep '"bridge connected"' ~/Library/Logs/omnis/hub.log | tail -1   # local-agent 등록 확인
 psql -U vigor -d omnis -Atc \
   "SELECT slot_name, active, wal_status FROM pg_replication_slots"  # zero_0_a|t|reserved
+bash ops/mini/preflight.sh --check   # FileVault·자동로그인·pmset(슬립 금지 3종 + autorestart=1 전원복구 자동부팅)·LaunchAgent 4종·Ollama·슬롯 한 번에(US-B43)
 ```
 
 `agent_runtimes` 테이블은 **Phase A에서 아직 안 찬다** — `apps/local-agent/src/main.ts`가 어댑터 맵을
