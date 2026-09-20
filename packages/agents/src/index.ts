@@ -100,3 +100,13 @@ export {
   morningDigestLoop,
   type MorningDigestOutputT,
 } from "./loops/digest-morning.js";
+export {
+  NIGHTLY_DIGEST_CRON,
+  NightlyDigestOutput,
+  nightlyDigestLoop,
+  nightlyGroups,
+  undoTokenFor,
+  type DigestGroup,
+  type NightlyDigest,
+  type NightlyDigestOutputT,
+} from "./loops/digest-nightly.js";
