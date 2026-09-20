@@ -240,7 +240,6 @@ cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B16: g
 - Adds the rotation procedure to RUNBOOK.md
 
 Implemented-by: Claude Haiku
-
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
 
@@ -447,7 +446,6 @@ cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B34: T
 - TAILSCALE-ACL.md: rationale for keeping Postgres/Ollama out of dst + why Funnel is always OFF
 
 Implemented-by: Claude Sonnet
-
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
 
@@ -700,7 +698,6 @@ cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B41: n
 - LaunchAgent com.omnis.backup (03:00), new backup/restore-drills.md log file
 
 Implemented-by: Claude Sonnet
-
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
 
@@ -1009,7 +1006,6 @@ cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B42: 1
 - newsyslog.d/omnis.conf: 30-day retention + mode 600
 
 Implemented-by: Claude Sonnet
-
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
 
@@ -1208,7 +1204,6 @@ cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B43: m
 - Adds the command to the RUNBOOK health-checks section
 
 Implemented-by: Claude Haiku
-
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
 
@@ -1235,7 +1230,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 #### Steps
 
-- [ ] 1. Write the failing test.
+- [x] 1. Write the failing test.
 
 `/Users/logankim/AI-Workspaces/omnis/packages/kernel/test/integration/cost-report-job.test.ts`:
 ```ts
@@ -1335,14 +1330,18 @@ describe("cost_report_monthly job", () => {
 });
 ```
 
-- [ ] 2. Run the test and confirm it fails.
+- [x] 2. Run the test and confirm it fails.
+
+Implementation correction (review-driven). Two lines in the block above are stale and must not be copied:
+- `AUG` is a UTC month, but the job aggregates the **Asia/Seoul** calendar month. The test now uses the KST boundaries (`2026-07-31T15:00:00Z` .. `2026-08-31T15:00:00Z`) and derives its injected clock from `nextRunAt(COST_REPORT_CRON, ...)` rather than a hand-written instant, so the fixture cannot drift away from what the scheduler actually does. A first `it` also pins that fire time to `2026-08-31T15:10:00.000Z`.
+- `DELETE FROM jobs WHERE name = $1` is **wrong and was removed**. `cost_report_monthly` is seeded by `0012_jobs_phase_b.sql`, and deleting it breaks `packages/db`'s `schema-0006` assertion on that row. Tests must never delete migration-seeded rows. (`healthcheck-job.test.ts` still deletes its own row, and that is correct: `hub_healthcheck` is *not* seeded by any migration, so the scheduler's `register` upsert created it.)
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
 Expected failure: `does not provide an export named 'buildMonthlyCostReport'`.
 
-- [ ] 3. Write the job.
+- [x] 3. Write the job.
 
 `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/jobs/cost-report.ts`:
 ```ts
@@ -1488,7 +1487,9 @@ export function registerCostReportJob(
 }
 ```
 
-- [ ] 4. Add it to the barrel.
+- [x] 4. Add it to the barrel.
+
+Implementation correction (review-driven). The three `Date.UTC(...)`/`getUTC*` lines at the top of the handler above are **wrong** and were replaced. `cron.ts` evaluates `10 0 1 * *` on the **Asia/Seoul** calendar, so the handler actually fires at 15:10 UTC on the *last* day of the month it reports on; reading UTC calendar fields off `now()` lands a month early on every single run. The handler now shifts `now()` by `SEOUL_OFFSET_MS` — imported from `../cron.js` and exported there so the offset has one definition instead of being re-hardcoded — to read KST calendar fields, then shifts back out when forming the `[monthStart, monthEnd)` instants. `forDate` is the last KST day of the reported month, expressed as a UTC-midnight instant naming that date, which is the convention `attachReportToDigest` documents and slices with `toISOString().slice(0, 10)`.
 
 Add to `/Users/logankim/AI-Workspaces/omnis/packages/kernel/src/index.ts`:
 ```ts
@@ -1503,14 +1504,14 @@ export {
 export type { CostReportRow, MonthlyCostReport } from "./jobs/cost-report.js";
 ```
 
-- [ ] 5. Re-run the test and confirm it passes.
+- [x] 5. Re-run the test and confirm it passes.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
 Expected: all 3 `it` blocks in `cost-report-job.test.ts` pass (`buildMonthlyCostReport` ×1 + `cost_report_monthly job` ×2... in practice there are 2 `describe` blocks holding 2 `it` blocks; by the file above, 2 passing cases).
 
-- [ ] 6. **Do not create a migration** (cross-review M1). Only verify that the `cost_report_monthly` seed is present in the W0 bundle's `0012_jobs_phase_b.sql`.
+- [x] 6. **Do not create a migration** (cross-review M1). Only verify that the `cost_report_monthly` seed is present in the W0 bundle's `0012_jobs_phase_b.sql`.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && grep -n "cost_report_monthly" packages/db/migrations/0012_jobs_phase_b.sql && test ! -e packages/db/migrations/0014_cost_report_job.sql && echo "no 0014 — as expected"
@@ -1518,21 +1519,23 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "cost_report_monthly" packages
 
 Expected output: 1 line with the `cost_report_monthly` seed + `no 0014 — as expected`. If `0012` does not exist yet, the W0 bundle has not been merged — **do not create it here**, just wait, since the scheduler's `register` upserts into `jobs` and the rest of this task (job handler + test) runs without the seed.
 
-- [ ] 7. Verify that the job handler is idempotent across two runs (the `digests.metrics` merge must be idempotent).
+- [x] 7. Verify that the job handler is idempotent across two runs (the `digests.metrics` merge must be idempotent).
+
+Implementation correction: the command originally written here ran `pnpm db:migrate` twice, which only shows whether the migrations re-apply and says nothing about handler idempotence. The test file from step 1 now has an `it` that calls `attachReportToDigest` twice with the same arguments, which is what actually verifies it.
 
 ```bash
-cd /Users/logankim/AI-Workspaces/omnis && DATABASE_URL=postgres://logan@127.0.0.1:5432/omnis_test pnpm db:migrate && DATABASE_URL=postgres://logan@127.0.0.1:5432/omnis_test pnpm db:migrate
+cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration -t "merges idempotently"
 ```
-Expected: the second run's `applied` array is empty (this task adds no new migration, so both runs are identical).
+Expected: after the second merge `digests.metrics` is identical to the first, and the pre-existing `foo` key is still alive.
 
-- [ ] 8. Run the whole kernel test suite once more to confirm there are no regressions.
+- [x] 8. Run the whole kernel test suite once more to confirm there are no regressions.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && pnpm --filter @omnis/kernel test:integration
 ```
 Expected: every other file such as the existing `healthcheck-job.test.ts` still passes + `cost-report-job.test.ts` passes.
 
-- [ ] 9. Commit.
+- [x] 9. Commit.
 
 ```bash
 cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B44: monthly cost and usage report job
@@ -1544,7 +1547,6 @@ cd /Users/logankim/AI-Workspaces/omnis && git add -A && git commit -m "US-B44: m
 - No migration: the cost_report_monthly seed lives in the W0 schema bundle's 0012_jobs_phase_b.sql (cross-review M1)
 
 Implemented-by: Claude Sonnet
-
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
 

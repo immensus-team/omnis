@@ -1,7 +1,8 @@
-/** A3 §6: 5-field cron, TZ=Asia/Seoul. Asia/Seoul은 DST가 없으므로 고정 +9h로 환산한다.
- *  ponytail: 분 단위 선형 스캔(366일 상한). 잡 실행 직후 한 번만 부르므로 비용이 문제되지 않는다.
- *  DST가 있는 타임존이 필요해지면 Intl.DateTimeFormat 기반 환산으로 갈아끼운다. */
-const SEOUL_OFFSET_MS = 9 * 60 * 60 * 1000;
+/** A3 §6: 5-field cron, TZ=Asia/Seoul. Asia/Seoul has no DST, so this converts with a fixed +9h.
+ *  ponytail: minute-by-minute linear scan (366-day cap). It is called once right after a job runs,
+ *  so the cost never matters. If a DST timezone is ever needed, swap in an Intl.DateTimeFormat
+ *  based conversion. */
+export const SEOUL_OFFSET_MS = 9 * 60 * 60 * 1000;
 const MINUTE_MS = 60_000;
 
 function parseField(spec: string, min: number, max: number): Set<number> {
@@ -55,7 +56,7 @@ export function nextRunAt(cron: string, from: Date): Date {
     if (!months.has(seoul.getUTCMonth() + 1)) continue;
     const domOk = doms.has(seoul.getUTCDate());
     const dowOk = dows.has(seoul.getUTCDay());
-    // POSIX cron: dom과 dow가 둘 다 제한되면 OR, 하나만 제한되면 그것만 본다.
+    // POSIX cron: when both dom and dow are restricted, OR them; when only one is, use only that.
     const dayOk = domStar && dowStar ? true : domStar ? dowOk : dowStar ? domOk : domOk || dowOk;
     if (dayOk) return new Date(t);
   }

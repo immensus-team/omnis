@@ -21,16 +21,16 @@ The sweep is strong on per-channel feasibility and licence/metadata hygiene. It 
 
 ## 2. Contradictions
 
-1. **Kinso price.** `07` and `14` state "$59/월" as VERIFIED; `01` marks pricing UNVERIFIED and CONFLICTING ($29/$35/$59, subscription vs credits). My fetch of kinso.ai found no price anywhere. `01` is right — delete the $59 figure.
+1. **Kinso price.** `07` and `14` state "$59/month" as VERIFIED; `01` marks pricing UNVERIFIED and CONFLICTING ($29/$35/$59, subscription vs credits). My fetch of kinso.ai found no price anywhere. `01` is right — delete the $59 figure.
 2. **WhatsApp library.** `07` §4 rejects whatsapp-web.js (Chromium weight, more detection signal) for whatsmeow; `15` §3 picks whatsapp-web.js as *lower* ban risk. Opposite conclusions, neither quantified.
 3. **Who owns the channel layer.** `04` makes Beeper primary for WhatsApp/Telegram/LinkedIn/Slack/Signal/Discord; `06`/`07`/`08` each build the same channels independently. Both cannot be the plan.
 4. **Greenfield vs Hermes.** `01-definition-draft` §8/§10 (edited today) says omnis replaces the mini's Hermes/omh/buzz setup and does not share Hermes memory. The brief requires Hermes sessions on both machines to be reachable *from* omnis, and `09` §4 builds the agent bridge on Hermes's `api_server` while `11` §5 reuses its `write_approval` gates. "Replace Hermes" and "Hermes is one of four inbox agents" need reconciling.
 5. **Eve.** `11`'s rejection premise is refuted by eve.dev's own deployment docs (see gap 1).
 6. **Calendar realtime.** `08` §3/§4 default to syncToken polling because push needs Search Console domain verification; `08`'s own verification quotes Google saying that verification "is no longer required." The recommendation table was never updated.
-7. **iPhone client.** `13` §4 picks an installed PWA for MVP while its own table rates PWA Apple-native feel "낮음" — against the brief and `14`. Separately `13` calls Tailscale Serve's iOS SSL bug the biggest risk, then its verification finds the issue has 5 comments blaming a third-party DoH app.
+7. **iPhone client.** `13` §4 picks an installed PWA for MVP while its own table rates PWA Apple-native feel "Low" — against the brief and `14`. Separately `13` calls Tailscale Serve's iOS SSL bug the biggest risk, then its verification finds the issue has 5 comments blaming a third-party DoH app.
 8. **MCP version.** `09`'s body cites spec 2025-11-25; the versioning page (fetched today) says current is **2026-07-28** with mandatory `server/discover` and `_meta` negotiation. `15`'s MCP-security guidance is written against the superseded handshake model.
 9. **Where Tier-0 local inference runs.** `12` says the M4 16GB mini cannot run MLX-accelerated models (32GB+ needed) so classification belongs on the M5 MacBook — but `13`/`18` make the mini the always-on hub and the MacBook an intermittent client. "Free local classification" currently has no always-on host.
-10. **Notification Center DB.** `05` §3 rates it "거의 없음" risk, trigger-only; its own verification shows the DB held full plaintext content and is now FDA-gated. Table not corrected.
+10. **Notification Center DB.** `05` §3 rates it "Nearly none" risk, trigger-only; its own verification shows the DB held full plaintext content and is now FDA-gated. Table not corrected.
 
 ## 3. Modalities never used
 

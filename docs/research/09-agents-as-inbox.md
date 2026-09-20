@@ -2,9 +2,9 @@
 
 Researched 2026-09-20. All facts below carry a source URL and fetch date; VERIFIED = confirmed against an official doc/repo/API this session, UNVERIFIED = could not confirm a primary source.
 
-## 1. TL;DR (한국어)
+## 1. TL;DR
 
-omnis가 필요한 건 새 프로토콜이 아니라 각 에이전트(Claude Code, Codex, Hermes, DeepSeek)의 기존 headless/session 기능을 그대로 재사용하는 얇은 정규화 레이어("session bus")다. Claude Code는 `-p --output-format stream-json --resume <id>`로 세션을 재개하고, Codex는 `app-server`의 JSON-RPC thread/turn/item 이벤트와 `codex exec resume`을 쓴다. Hermes는 이미 OpenAI 호환 `api_server`(:8642)에 `X-Hermes-Session-Key`(고정 스코프)와 `X-Hermes-Session-Id`(회전하는 트랜스크립트 id)를 분리해두었는데, 이 패턴이 omnis의 세션-메모리 상관관계에 그대로 적용 가능한 가장 중요한 발견이다. ACP·A2A는 다른 벤더 간 상호운용을 위한 것으로 omnis의 1인·2대 머신·고정 에이전트 세트엔 과설계다. 대신 MCP 서버 하나로 "다른 에이전트에게 위임" 툴을 만드는 게 실질적인 agent-to-agent 경로다.
+What omnis needs is not a new protocol but a thin normalization layer ("session bus") that reuses each agent's (Claude Code, Codex, Hermes, DeepSeek) existing headless/session features as-is. Claude Code resumes a session with `-p --output-format stream-json --resume <id>`, and Codex uses `app-server`'s JSON-RPC thread/turn/item events plus `codex exec resume`. Hermes already separates `X-Hermes-Session-Key` (a stable scope) from `X-Hermes-Session-Id` (a rotating transcript id) on its OpenAI-compatible `api_server` (:8642), and this pattern is the single most important finding — it applies directly to omnis's session-to-memory correlation. ACP and A2A exist for cross-vendor interoperability and are over-engineered for omnis's one user, two machines, and fixed agent set. Instead, building a "delegate to another agent" tool as a single MCP server is the practical agent-to-agent path.
 
 ## 2. Facts
 

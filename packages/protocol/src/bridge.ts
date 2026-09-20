@@ -2,7 +2,7 @@ import { z } from "zod";
 import { Attachment, HostId, RuntimeKind, SessionId, SessionKey } from "./adapter.js";
 import { HumanInterrupt } from "./approval.js";
 
-/** A2-D3: initialize 핸드셰이크 없음. 모든 요청의 params._meta에 이 버전을 싣는다. */
+/** A2-D3: no initialize handshake. Every request carries this version in params._meta. */
 export const PROTOCOL_VERSION = "2026-09-20" as const;
 
 export const META_KEYS = {
@@ -11,7 +11,7 @@ export const META_KEYS = {
   origin: "ai.omnis/origin",
 } as const;
 
-/** A2 §7.1. profile은 origin과 purpose에서만 결정되고 프롬프트로 바뀌지 않는다. */
+/** A2 §7.1. profile is decided only by origin and purpose — a prompt never changes it. */
 export const PermissionProfile = z.enum(["observe", "workspace", "trusted"]);
 export type PermissionProfile = z.infer<typeof PermissionProfile>;
 
@@ -24,7 +24,7 @@ export type SessionState = z.infer<typeof SessionState>;
 export const RuntimeState = z.enum(["online", "degraded", "offline"]);
 export type RuntimeState = z.infer<typeof RuntimeState>;
 
-/** A2 §1.2. features는 런타임 원문을 손대지 않고 그대로 싣는다. */
+/** A2 §1.2. features carries the runtime's raw strings through untouched. */
 export const RuntimeCapabilities = z.object({
   resume: z.boolean(),
   cross_project_resume: z.boolean(),
@@ -38,7 +38,7 @@ export const RuntimeCapabilities = z.object({
 });
 export type RuntimeCapabilities = z.infer<typeof RuntimeCapabilities>;
 
-/** A2 §1.1. transport='http'면 binary_path=null, allowed_roots=[]. */
+/** A2 §1.1. transport='http' means binary_path=null and allowed_roots=[]. */
 export const AgentRuntime = z.object({
   id: z.string().uuid(),
   runtime: RuntimeKind,
@@ -99,7 +99,7 @@ export const BridgeDiscoverResult = z.object({
   runtimes: z.array(AgentRuntime),
 });
 
-/** A2 §5.2. 5필드 고정, verify 없는 위임은 만들지 않는다. */
+/** A2 §5.2. Fixed at 5 fields; a delegation without verify is never created. */
 export const DelegationBrief = z
   .object({
     approval_id: z.string().uuid(),
@@ -118,7 +118,7 @@ export const DelegationBrief = z
   });
 
 // --- bridge → hub (A2 §3.3) ---
-/** reasoning은 item이 아니다. kind는 이 둘뿐이다. */
+/** reasoning is not an item. kind is only ever these two. */
 export const BridgeItemKind = z.enum(["agent_turn", "tool_call"]);
 export type BridgeItemKind = z.infer<typeof BridgeItemKind>;
 
@@ -190,7 +190,7 @@ export const HealthNotification = z.object({
   at: z.string().datetime(),
 });
 
-/** A2 §6. raw 델타·reasoning 원문은 여기에 담기지 않는다(A2-D13). */
+/** A2 §6. Raw deltas and verbatim reasoning text never land here (A2-D13). */
 export const SessionSummary = z.object({
   session_key: SessionKey,
   runtime: RuntimeKind,
@@ -217,9 +217,10 @@ export const SessionSummary = z.object({
     )
     .max(10),
 });
+export type SessionSummary = z.infer<typeof SessionSummary>;
 
-// --- 메서드 목록과 에러 코드 (A2 §3.2~3.4) ---
-/** hub → bridge 요청 (A2 §3.2) */
+// --- method list and error codes (A2 §3.2~3.4) ---
+/** hub → bridge requests (A2 §3.2) */
 export const HUB_METHODS = [
   "bridge/discover",
   "session.create",
@@ -232,7 +233,7 @@ export const HUB_METHODS = [
   "ingest.scan",
   "ingest.read",
 ] as const;
-/** bridge → hub (A2 §3.3). approval.requested만 요청, 나머지는 알림 */
+/** bridge → hub (A2 §3.3). Only approval.requested is a request; the rest are notifications. */
 export const BRIDGE_METHODS = [
   "runtime.registered",
   "session.registered",
@@ -247,7 +248,7 @@ export const BRIDGE_METHODS = [
 export type HubMethod = (typeof HUB_METHODS)[number];
 export type BridgeMethod = (typeof BRIDGE_METHODS)[number];
 
-/** JSON-RPC 2.0 표준 코드. A2 §3.4가 omnis 범위를 이 위에 얹는다. */
+/** Standard JSON-RPC 2.0 codes. A2 §3.4 layers the omnis range on top of them. */
 export const JSONRPC_ERRORS = {
   PARSE: -32700,
   INVALID_REQUEST: -32600,
@@ -286,7 +287,7 @@ export class BridgeError extends Error {
   }
 }
 
-/** 표에 없는 상황은 -32603 internal로 접는다(A2 §3.4). */
+/** Any situation not in the table folds to -32603 internal (A2 §3.4). */
 export function toJsonRpcError(e: unknown): { code: number; message: string; data?: unknown } {
   if (e instanceof BridgeError) {
     return e.data === undefined
@@ -296,7 +297,7 @@ export function toJsonRpcError(e: unknown): { code: number; message: string; dat
   return { code: JSONRPC_ERRORS.INTERNAL, message: e instanceof Error ? e.message : String(e) };
 }
 
-// --- per-request 버전 협상 (A2-D3, §3.1) ---
+// --- per-request version negotiation (A2-D3, §3.1) ---
 export const SUPPORTED_PROTOCOL_VERSIONS = [PROTOCOL_VERSION] as const;
 
 export const RpcMeta = z
@@ -318,7 +319,7 @@ export function withMeta<P extends Record<string, unknown>>(
   return { ...params, _meta };
 }
 
-/** A2-D3: 불일치는 연결을 끊지 않고 이 요청만 -32010으로 거절한다. */
+/** A2-D3: a mismatch rejects just this request with -32010 instead of dropping the connection. */
 export function assertProtocolVersion(params: unknown): void {
   const meta = (params as { _meta?: unknown } | null | undefined)?._meta;
   const parsed = RpcMeta.safeParse(meta);

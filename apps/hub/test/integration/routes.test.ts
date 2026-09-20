@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { createPool } from "@omnis/db";
-import { type Kernel, createKernel, createLogger } from "@omnis/kernel";
+import { type Kernel, SETTING_DEFAULTS, createKernel, createLogger } from "@omnis/kernel";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { HUB_VERSION } from "../../src/config.js";
 import { createHubServer } from "../../src/http.js";
@@ -149,8 +149,10 @@ describe("kill switch routes", () => {
 });
 
 describe("unknown routes", () => {
-  it("404s the paths other appendices own and anything else", async () => {
-    for (const p of ["/search", "/memory/search", "/transcript/abc", "/nope"]) {
+  it("404s anything no route owns", async () => {
+    // /search, /memory/search and /transcript/:id are live now, so the only 404s left are
+    // paths nobody claims — including /transcript without a trailing id.
+    for (const p of ["/nope", "/transcript"]) {
       expect((await fetch(`${base}${p}`)).status).toBe(404);
     }
   });
@@ -175,7 +177,7 @@ describe("GET /api/zero-token (US-A21b)", () => {
       exp: number;
     };
     expect(claims.sub).toBe("logan");
-    // 7일 ±1분
+    // 7 days ±1 minute
     expect(claims.exp * 1000 - Date.now()).toBeGreaterThan(7 * 86_400_000 - 60_000);
     expect(claims.exp * 1000 - Date.now()).toBeLessThanOrEqual(7 * 86_400_000);
     expect(createHmac("sha256", "test-zero-secret").update(`${h}.${p}`).digest("base64url")).toBe(
@@ -185,5 +187,137 @@ describe("GET /api/zero-token (US-A21b)", () => {
 
   it("405s a non-GET", async () => {
     expect((await fetch(`${base}/api/zero-token`, { method: "POST" })).status).toBe(405);
+  });
+});
+
+// US-B26 (A4 §14). The ranking math is unit-tested in src/search.test.ts; this covers the
+// HTTP contract and the real SQL fan-out against an empty database.
+describe("GET /search", () => {
+  it("returns the four groups in the fixed order", async () => {
+    const res = await fetch(`${base}/search?q=contract`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      q: string;
+      took_ms: number;
+      truncated: boolean;
+      groups: { kind: string; total: number; results: unknown[] }[];
+    };
+    expect(body.q).toBe("contract");
+    expect(body.groups.map((g) => g.kind)).toEqual(["people", "threads", "items", "memories"]);
+    expect(body.truncated).toBe(false);
+    expect(typeof body.took_ms).toBe("number");
+  });
+
+  it("400s a missing or blank q", async () => {
+    expect((await fetch(`${base}/search`)).status).toBe(400);
+    expect((await fetch(`${base}/search?q=%20`)).status).toBe(400);
+  });
+
+  it("400s a non-positive-integer k", async () => {
+    expect((await fetch(`${base}/search?q=x&k=0`)).status).toBe(400);
+    expect((await fetch(`${base}/search?q=x&k=abc`)).status).toBe(400);
+  });
+
+  it("405s a non-GET", async () => {
+    expect((await fetch(`${base}/search?q=x`, { method: "POST" })).status).toBe(405);
+  });
+});
+
+describe("GET /memory/search", () => {
+  it("returns the raw memory hits", async () => {
+    const res = await fetch(`${base}/memory/search?q=contract`);
+    expect(res.status).toBe(200);
+    expect((await res.json()) as { results: unknown[] }).toEqual({ results: [] });
+  });
+
+  it("400s a missing q", async () => {
+    expect((await fetch(`${base}/memory/search`)).status).toBe(400);
+  });
+});
+
+// The PUT block below writes cost.cap_usd, so these read-only assertions never pin an exact
+// value — this suite shares one DB connection and a fixed cap would be order-dependent.
+describe("GET /settings", () => {
+  it("returns every setting key, stored value or default", async () => {
+    const res = await fetch(`${base}/settings`);
+    expect(res.status).toBe(200);
+    const { settings } = (await res.json()) as { settings: Record<string, unknown> };
+    expect(Object.keys(settings).sort()).toEqual(Object.keys(SETTING_DEFAULTS).sort());
+    expect(typeof settings["cost.cap_usd"]).toBe("number");
+  });
+
+  it("405s a non-GET", async () => {
+    expect((await fetch(`${base}/settings`, { method: "POST" })).status).toBe(405);
+  });
+});
+
+describe("PUT /settings/:key", () => {
+  it("writes a value that GET /settings reads back", async () => {
+    const res = await fetch(`${base}/settings/cost.cap_usd`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ value: 42 }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ key: "cost.cap_usd", value: 42 });
+
+    const { settings } = (await (await fetch(`${base}/settings`)).json()) as {
+      settings: Record<string, unknown>;
+    };
+    expect(settings["cost.cap_usd"]).toBe(42);
+  });
+
+  it("404s an unknown key before it reads the body", async () => {
+    const res = await fetch(`${base}/settings/not.a.real.key`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ value: 1 }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("400s a body without a value property", async () => {
+    const res = await fetch(`${base}/settings/cost.cap_usd`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("400s a body that is not JSON", async () => {
+    const res = await fetch(`${base}/settings/cost.cap_usd`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: "not json",
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("405s a non-PUT", async () => {
+    expect((await fetch(`${base}/settings/cost.cap_usd`)).status).toBe(405);
+  });
+});
+
+describe("GET /cost", () => {
+  it("reports the budget state, month-to-date spend and policy", async () => {
+    const res = await fetch(`${base}/cost`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      state: string;
+      mtdUsd: unknown;
+      capUsd: unknown;
+      reserveUsd: unknown;
+      policy: { allowT2NonSensitive: boolean };
+    };
+    expect(["normal", "warn", "degraded", "reserve_only", "frozen"]).toContain(body.state);
+    expect(typeof body.mtdUsd).toBe("number");
+    expect(typeof body.capUsd).toBe("number");
+    expect(typeof body.reserveUsd).toBe("number");
+    expect(typeof body.policy.allowT2NonSensitive).toBe("boolean");
+  });
+
+  it("405s a non-GET", async () => {
+    expect((await fetch(`${base}/cost`, { method: "POST" })).status).toBe(405);
   });
 });

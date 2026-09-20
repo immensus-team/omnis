@@ -1,8 +1,8 @@
 # Anatomy of "Wow" READMEs: 6 Hot Agent Repos (2026-09-20)
 
-## TL;DR (Korean)
+## TL;DR
 
-6개 핫한 AI agent repo(hermes-agent, openclaw, goose, swarms, crewai, dify)의 README 구조 분석. 공통 패턴: 배너 이미지 + 배지 + 즉시 설치 명령어 + 기능 표 + 아키텍처 설명 + 커뮤니티 링크. 실제 비디오/데모는 드물고(YouTube 썸네일 링크만), 대신 텍스트 기반 명확한 가치 제안과 빠른 퀵스타트. Omnis는 개인용 inbox 특성상 더 감정적인 tone(자동화의 해방감) + motion GIF/asciinema 데모 + 실제 사용 사례로 차별화 권고.
+Structural analysis of the READMEs of 6 hot AI agent repos (hermes-agent, openclaw, goose, swarms, crewai, dify). Common patterns: banner image + badges + immediate install command + feature table + architecture description + community links. Real video/demo assets are rare (YouTube thumbnail links only); instead, text-based clear value propositions and fast quickstarts. For Omnis, the recommendation is to differentiate on a more emotional tone (the sense of liberation from automation) given its personal-inbox nature + motion GIF/asciinema demos + real usage cases.
 
 ---
 
