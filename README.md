@@ -4,6 +4,8 @@
 
 # omnis 📯
 
+**Inbox that works with you.**
+
 <p align="center">
   <a href="docs/spec/00-omnis-design.md">Docs</a> | <a href="docs/design/DESIGN-DIRECTION.md">Design</a>
 </p>
@@ -17,20 +19,21 @@
   <img alt="Self-hosted: Mac mini over Tailscale" src="https://img.shields.io/badge/SELF--HOSTED-Mac%20mini%20%C2%B7%20Tailscale-57606A?style=flat-square">
 </p>
 
-**Inbox that works with you.** omnis is a personal, self-hosted inbox that puts every channel — Slack,
-Gmail, Outlook, Google Calendar, Telegram, WhatsApp, KakaoTalk, LinkedIn — and every AI agent — Claude
-Code, Codex, DeepSeek, Hermes — into one real-time stream, then works alongside you. It reads and
-summarizes each thread, drafts replies in your voice, labels and archives what does not need you, turns
-messages into tasks, briefs you every night, remembers everything across sessions, and asks before
-anything leaves. Today it runs on a Mac mini over Tailscale with a macOS app and an iPhone PWA; later it
-runs standalone on a MacBook + iPhone. You self-host it, you own the database, and nothing is sent
-anywhere without your approval.
+**omnis is the inbox where all communication between people and agents happens.** Human-to-human
+messages, human-to-agent requests, agent-to-human questions and approvals, agent-to-agent handoffs —
+one real-time stream, one memory, one place to decide.
 
-**Use the model you want.** omnis routes each unit of work through a 4-tier cascade — local models
+An inbox that works with you reads everything before you do and leaves a one-line summary on every
+thread. It drafts in your voice, files what does not need you, turns messages into tasks, and briefs you
+every night. It remembers across sessions and machines, and nothing leaves without your approval.
+
+It runs on your own machine, over your own network, with any model you choose.
+
+**Use any model you want.** omnis routes each unit of work through a four-tier cascade — local models
 (Ollama) → DeepSeek → Claude → your own subscription CLIs — so the cheap tier absorbs the bulk of the
 volume and the expensive tier only sees what needs it. The cascade reserves capacity for VIP and
-sensitive items even when the monthly cap is reached. Both are rows in the `settings` table
-(`cost.cap_usd`, `cost.reserve_ratio`), not code: switch per task, no lock-in.
+sensitive items even when the monthly cap is reached. The cap and the reserve are rows in the `settings`
+table (`cost.cap_usd`, `cost.reserve_ratio`), not code: switch per task, no code changes, no lock-in.
 
 Three theses drive every decision:
 
@@ -43,7 +46,7 @@ Three theses drive every decision:
 ## What omnis does
 
 | Feature | What it gives you |
-|---|---|
+| --- | --- |
 | **Unified real-time inbox** | Every channel in one stream, each row carrying a one-line AI summary instead of a subject line. New items reach the screen in well under two seconds. |
 | **Work / personal filter** | One click narrows the list; the channel rail filters it too, and the Inbox tile restores it. |
 | **Agent sessions as inbox threads** | A delegated run is a thread with turns, tool calls, cost, pending approvals and a kill switch — the same row grammar as a person. A blocked run floats to the top. |
@@ -62,8 +65,8 @@ flowchart LR
   subgraph mini["Mac mini hub — Tailscale only"]
     PG[("Postgres 17 + pgvector")]
     K["kernel: events · scheduler · approvals · kill switch · audit"]
-    Z["zero-cache — Zero sync"]
-    H["hub — HTTP :8787 · WS /bridge"]
+    Z["zero-cache :4848"]
+    H["hub :8787 — HTTP · WS /bridge"]
     PG --- K
     K --- Z
     K --- H
@@ -85,15 +88,20 @@ flowchart LR
     A["adapters: Slack · Gmail · Outlook · Google Calendar · Telegram"]
   end
 
-  H -->|"Zero sync over WS"| M
+  Z -->|"Zero sync over WS"| M
+  Z -->|"Zero sync over WS"| P
   H -->|"HTTPS via Tailscale Serve"| P
+  M -->|"token · approvals · writes"| H
   agents -->|"bridge JSON-RPC over WS /bridge"| H
   A -->|"normalize() → kernel IngestSink"| K
 ```
 
 Everything above the clients is one process group on one machine you own: the hub owns the database and
-the state machine, the clients are views, and the agents are local processes the hub talks to. The hub
-binds to `127.0.0.1:8787` — the only way in is Tailscale, and there is no cloud control plane.
+the state machine, the clients are views, and the agents are local processes the hub talks to. Clients
+read through zero-cache and write through the hub, so a change is one round trip from every device. The
+hub binds to `127.0.0.1:8787` — the only way in is Tailscale, and there is no cloud control plane. That
+machine is a Mac mini today; the same repo is meant to run standalone on a MacBook + iPhone later, which
+is why the hub takes its host and user from configuration rather than assuming the mini.
 
 **Design principles**
 
@@ -105,13 +113,12 @@ binds to `127.0.0.1:8787` — the only way in is Tailscale, and there is no clou
 
 ## Channels & agents
 
-Channels are adapters in `packages/adapters/`. Each one ships with a normalization contract and a fixture
-corpus that its contract tests replay — **but real accounts are not connected yet.** Live OAuth, tokens
-and webhooks are the remaining Logan-assisted gates, so every run today is replayed fixtures and seeded
-e2e data.
+Channels are adapters in `packages/adapters/`. Each ships a normalization contract and a fixture corpus
+its contract tests replay — **but real accounts are not connected yet.** Live OAuth, tokens and webhooks
+are the remaining Logan-assisted gates, so every run today is fixtures and seeded e2e data.
 
 | Channel | Adapter | Status |
-|---|---|---|
+| --- | --- | --- |
 | Slack | `packages/adapters/slack` | Adapter + fixtures ready; live Socket Mode token pending |
 | Gmail | `packages/adapters/gmail` | Adapter + fixtures ready; live watch + Pub/Sub pending |
 | Google Calendar | `packages/adapters/google-calendar` | Adapter + fixtures ready; live `events.watch` pending |
@@ -123,7 +130,7 @@ Agent runtimes connect outward from your machine: a small `local-agent` process 
 WS `/bridge` and runs work on the CLI you already pay for.
 
 | Runtime | How it connects |
-|---|---|
+| --- | --- |
 | Claude Code | `apps/local-agent/src/bridges/claude-code.ts` — stream-json turns over the bridge |
 | Codex | `apps/local-agent/src/bridges/codex.ts` — Codex app-server client |
 | claude-ds | The same Claude Code bridge pointed at the DeepSeek CLI |
@@ -142,8 +149,10 @@ rsync -az --delete --exclude node_modules --exclude target --exclude .git --excl
 
 # on the mini
 export PATH=/opt/homebrew/bin:$PATH
+brew install pgvector             # 0001 does CREATE EXTENSION vector
 pnpm install --prod=false --frozen-lockfile && pnpm build
-createdb -U vigor omnis
+createdb -U vigor omnis && psql -U vigor -d omnis -c "CREATE SCHEMA IF NOT EXISTS zero_cvr"
+psql -U vigor -d postgres -c "ALTER SYSTEM SET wal_level='logical'" && brew services restart postgresql@17
 DATABASE_URL="postgres://vigor@127.0.0.1:5432/omnis" pnpm db:migrate
 bash ops/mini/install.sh          # installs the hub / zero-cache / local-agent LaunchAgents
 ```
