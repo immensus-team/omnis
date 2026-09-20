@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readConfig } from "../src/config.js";
 
 describe("readConfig", () => {
-  it("binds the loopback address and port 8787 by default (마스터 §4.2)", () => {
+  it("binds the loopback address and port 8787 by default (master §4.2)", () => {
     const c = readConfig({ DATABASE_URL: "postgres://x/y" });
     expect(c.host).toBe("127.0.0.1");
     expect(c.port).toBe(8787);

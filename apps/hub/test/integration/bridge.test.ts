@@ -30,7 +30,7 @@ beforeAll(async () => {
   server = createHubServer({
     kernel,
     pool,
-    // 포트는 아래 listen(0)이 정한다. readConfig는 1~65535만 받으므로 유효값을 준다.
+    // The port is chosen by listen(0) below. readConfig accepts only 1-65535, so give it a valid value.
     config: readConfig({ DATABASE_URL: "postgres://x/y", OMNIS_HUB_PORT: "8788" }),
     logger: createLogger("@omnis/hub"),
     startedAt: Date.now(),
@@ -51,7 +51,7 @@ afterAll(async () => {
   await pool.end();
 });
 
-/** 테스트용 미니 브리지 클라이언트: 알림을 보내고, 허브의 요청에는 handlers로 답한다. */
+/** A mini bridge client for tests: sends notifications and answers hub requests via handlers. */
 function connect(handlers: Record<string, (params: Record<string, unknown>) => unknown>): Promise<{
   ws: WebSocket;
   notify(method: string, params: Record<string, unknown>): void;
@@ -208,8 +208,8 @@ describe("approval.requested", () => {
           turn_id: "t-1",
           interrupt: {
             action: "send",
-            args: { text: "보냅니다" },
-            description: "슬랙 답장 1건",
+            args: { text: "Sending it" },
+            description: "1 Slack reply",
             config: {
               allow_accept: true,
               allow_edit: true,
@@ -224,7 +224,7 @@ describe("approval.requested", () => {
 
     const id = await until(async () => {
       const rows = await kernel.approvals.list({ state: "pending", limit: 50 });
-      return rows.find((a) => a.description === "슬랙 답장 1건")?.id ?? null;
+      return rows.find((a) => a.description === "1 Slack reply")?.id ?? null;
     });
     await kernel.approvals.decide(id, { decision: "accept" });
 
