@@ -744,16 +744,6 @@ body {
   white-space: nowrap;
 }
 
-/* U5: ChannelGlyph의 타일 배경 변형(현재 KakaoTalk만) — 브랜드 옐로 위 검정 글리프.
-   고정 크기 대신 padding으로 감싸 레일(18px 아이콘)·행(16px 아이콘) 어디서든 맞는다. */
-.channel-glyph--tiled {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 3px;
-  border-radius: 30%;
-}
-
 .app-shell__detail {
   flex: 1 1 auto;
   min-width: 0;

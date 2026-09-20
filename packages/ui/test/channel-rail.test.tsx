@@ -42,17 +42,21 @@ describe("ChannelRail (U1 kinso 좌측 레일)", () => {
   });
 });
 
-describe("ChannelRail 브랜드 컬러 (P1: kinso polish)", () => {
-  it("colors each channel tile's glyph with its brand hex", () => {
+// US-D02b: 레일 타일의 마크는 브랜드 hex로 틴트한 react-icons가 아니라 실제 브랜드 PNG다.
+describe("ChannelRail brand marks (US-D02b: official brand PNGs)", () => {
+  it("renders each channel tile's real brand PNG at the 18px rail size", () => {
     render(<ChannelRail channels={["gmail", "slack"]} selected={null} onSelect={vi.fn()} />);
-    const slackSvg = screen.getByRole("button", { name: "Slack" }).querySelector("svg");
-    expect(slackSvg).toHaveStyle({ color: "#4A154B" });
+    const img = screen.getByRole("button", { name: "Slack" }).querySelector("img");
+    expect(img?.getAttribute("src")).toMatch(/slack@1x\.png$/);
+    expect(img?.getAttribute("srcSet")).toMatch(/slack@1x\.png 1x, .*slack@2x\.png 2x$/);
+    expect(img).toHaveAttribute("width", "18");
+    expect(img).toHaveAttribute("height", "18");
   });
 
-  it("colors the Agents tile's sparkle with the accent token", () => {
+  it("renders the agent silhouette on the Agents tile", () => {
     render(<ChannelRail channels={["gmail"]} selected={null} onSelect={vi.fn()} />);
-    const agentSvg = screen.getByRole("button", { name: "Agent" }).querySelector("svg");
-    expect(agentSvg).toHaveStyle({ color: "var(--accent)" });
+    const img = screen.getByRole("button", { name: "Agent" }).querySelector("img");
+    expect(img?.getAttribute("src")).toMatch(/agent@1x\.png$/);
   });
 });
 

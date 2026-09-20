@@ -5,9 +5,9 @@ import type { UiChannel } from "../types.js";
 import { ChannelGlyph } from "./channel-glyph.js";
 import { GlassSurface } from "./glass-surface.js";
 
-// U2: 브랜드 아이콘 맵(CHANNEL_ICON)과 한글 라벨(CHANNEL_LABEL)은 이제 lib/row-meta.ts 공용이다
-// (inbox-row.tsx도 U2에서 같은 아이콘이 필요해져 여기 두면 순환 import가 생긴다). U5: 실제 색은
-// ChannelGlyph(channel-glyph.tsx)가 CHANNEL_COLOR에서 입힌다 — inbox-row.tsx와 공유.
+// U2: the channel labels (CHANNEL_LABEL) live in lib/row-meta.ts — shared with inbox-row.tsx
+// (keeping them here made a circular import). US-D02b: the mark itself is ChannelGlyph's job
+// (lib/row-meta.ts CHANNEL_BRAND_ASSET), so both files render it the same way.
 
 /** null = "Inbox" 타일(전체 보기). Agents 타일도 다른 채널 타일과 같은 필터 문법
  *  (레일 선택 = channelFilter)을 쓰되, 계정 연결 여부와 무관한 레일 고정 요소다. */

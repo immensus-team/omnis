@@ -71,26 +71,32 @@ describe("InboxRow (U2 kinso 대화 행 — 스레드 단위)", () => {
   });
 });
 
-describe("InboxRow 채널 아이콘 (react-icons/si — US-A26 폴백에서 진짜 브랜드 아이콘으로)", () => {
-  it("renders an actual icon element, not just an accessible name", () => {
+// US-D02b: 채널 마크는 react-icons 단색 SVG가 아니라 실제 브랜드 PNG다. 해시된 에셋 URL은
+// Vite가 다시 쓸 수 있으므로 파일명·1x/2x 접미사만 본다.
+describe("InboxRow channel mark (US-D02b: official brand PNGs)", () => {
+  it("renders the channel's real brand PNG in the 16px slot", () => {
     render(<InboxRow {...baseProps} channel="gmail" />);
-    const icon = screen.getByLabelText("Gmail 메시지");
-    expect(icon.querySelector("svg")).toBeInTheDocument();
+    const img = screen.getByLabelText("Gmail 메시지").querySelector("img");
+    expect(img).toBeInTheDocument();
+    expect(img?.getAttribute("src")).toMatch(/gmail@1x\.png$/);
+    expect(img?.getAttribute("srcSet")).toMatch(/gmail@1x\.png 1x, .*gmail@2x\.png 2x$/);
+    expect(img).toHaveAttribute("width", "16");
+    expect(img).toHaveAttribute("height", "16");
   });
-});
 
-describe("InboxRow 채널 아이콘 브랜드 컬러 (P1: kinso polish — 회색 아이콘 대신 브랜드 컬러)", () => {
-  it("colors the channel icon with the channel's brand hex, not the default grey", () => {
+  it("keeps the mark decorative — the row's label carries the accessible name", () => {
     render(<InboxRow {...baseProps} channel="slack" />);
-    const svg = screen.getByLabelText("Slack 메시지").querySelector("svg");
-    expect(svg).toHaveStyle({ color: "#4A154B" });
+    const img = screen.getByLabelText("Slack 메시지").querySelector("img");
+    expect(img).toHaveAttribute("alt", "");
+    expect(img).toHaveAttribute("aria-hidden", "true");
   });
 
-  it("gives KakaoTalk a brand-yellow tile behind the (black) glyph", () => {
+  // KakaoTalk의 노란 타일은 이제 CSS 배경이 아니라 PNG 안에 들어 있다 — 한 번 더 감싸면 이중 프레임.
+  it("does not wrap KakaoTalk in a CSS tile on top of the baked-in one", () => {
     render(<InboxRow {...baseProps} channel="kakaotalk" />);
     const wrap = screen.getByLabelText("KakaoTalk 메시지");
-    expect(wrap.querySelector(".channel-glyph--tiled")).toHaveStyle({ background: "#FFE812" });
-    expect(wrap.querySelector("svg")).toHaveStyle({ color: "#000000" });
+    expect(wrap.querySelector(".channel-glyph--tiled")).toBeNull();
+    expect(wrap.querySelector("img")?.getAttribute("src")).toMatch(/kakaotalk@1x\.png$/);
   });
 });
 

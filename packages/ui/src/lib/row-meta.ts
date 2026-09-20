@@ -1,16 +1,27 @@
-import { Bot, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import type { ElementType } from "react";
-import { FaLinkedin, FaSlack } from "react-icons/fa6";
-import { PiMicrosoftOutlookLogo } from "react-icons/pi";
-import {
-  SiAnthropic,
-  SiDeepseek,
-  SiGmail,
-  SiGooglecalendar,
-  SiKakaotalk,
-  SiTelegram,
-  SiWhatsapp,
-} from "react-icons/si";
+import { PiOpenAiLogo } from "react-icons/pi";
+import { SiAnthropic, SiDeepseek } from "react-icons/si";
+import agent1x from "../assets/brands/agent@1x.png";
+import agent2x from "../assets/brands/agent@2x.png";
+import gcal1x from "../assets/brands/gcal@1x.png";
+import gcal2x from "../assets/brands/gcal@2x.png";
+import gmail1x from "../assets/brands/gmail@1x.png";
+import gmail2x from "../assets/brands/gmail@2x.png";
+import kakaotalk1x from "../assets/brands/kakaotalk@1x.png";
+import kakaotalk2x from "../assets/brands/kakaotalk@2x.png";
+import linkedin1x from "../assets/brands/linkedin@1x.png";
+import linkedin2x from "../assets/brands/linkedin@2x.png";
+import outlook1x from "../assets/brands/outlook@1x.png";
+import outlook2x from "../assets/brands/outlook@2x.png";
+import slack1x from "../assets/brands/slack@1x.png";
+import slack2x from "../assets/brands/slack@2x.png";
+import system1x from "../assets/brands/system@1x.png";
+import system2x from "../assets/brands/system@2x.png";
+import telegram1x from "../assets/brands/telegram@1x.png";
+import telegram2x from "../assets/brands/telegram@2x.png";
+import whatsapp1x from "../assets/brands/whatsapp@1x.png";
+import whatsapp2x from "../assets/brands/whatsapp@2x.png";
 import type { UiChannel } from "../types.js";
 
 /** channel-rail.tsx(U1)와 inbox-row.tsx(U2)가 둘 다 필요한 채널 한글 라벨 + 브랜드 아이콘.
@@ -29,42 +40,22 @@ export const CHANNEL_LABEL: Record<UiChannel, string> = {
   system: "System",
 };
 
-/** simple-icons(react-icons/si)에 Slack/LinkedIn/Outlook 로고가 없어(상표 정책) fa6/pi에서 채운다. */
-export const CHANNEL_ICON: Record<UiChannel, ElementType> = {
-  gmail: SiGmail,
-  slack: FaSlack,
-  linkedin: FaLinkedin,
-  whatsapp: SiWhatsapp,
-  telegram: SiTelegram,
-  kakaotalk: SiKakaotalk,
-  outlook: PiMicrosoftOutlookLogo,
-  gcal: SiGooglecalendar,
-  agent: Sparkles,
-  system: Sparkles,
-};
-
-/** U5 kinso polish: 레일 타일·행 아이콘에 실제 브랜드 컬러를 입힌다(DESIGN-DIRECTION.md, P1).
- * react-icons 아이콘은 currentColor를 쓰므로 이 값을 아이콘의 CSS color로 넣으면 된다.
- * simple-icons가 진짜 멀티톤 마크를 안 주므로(단색 path 1개) 대부분 브랜드 hex 단색이다 —
- * 태스크가 명시한 hex는 그대로(Slack/LinkedIn/WhatsApp/Telegram/Outlook/KakaoTalk), Gmail·GCal은
- * 태스크에 지정이 없어 구글 공개 브랜드 팔레트로 근사(ponytail: 정확한 값이 필요해지면 여기만 바꾼다). */
-export const CHANNEL_COLOR: Record<UiChannel, string> = {
-  gmail: "#EA4335",
-  slack: "#4A154B",
-  linkedin: "#0A66C2",
-  whatsapp: "#25D366",
-  telegram: "#26A5E4",
-  kakaotalk: "#000000",
-  outlook: "#0078D4",
-  gcal: "#4285F4",
-  agent: "var(--accent)",
-  system: "var(--accent)",
-};
-
-/** KakaoTalk만 예외: 브랜드 옐로가 아이콘 자체가 아니라 뒤판(타일) 색이다(글리프는 검정) —
- * 다른 채널은 타일 없이 컬러 아이콘만 띄운다(kinso 실측, 23 §2). */
-export const CHANNEL_TILE_BG: Partial<Record<UiChannel, string>> = {
-  kakaotalk: "#FFE812",
+/** US-D02b: 채널 마크는 react-icons 단색 SVG가 아니라 실제 브랜드 PNG다(Logan 제공, 64px/128px).
+ * react-icons는 멀티톤 마크를 못 주고(Slack/LinkedIn/Outlook은 상표 정책으로 simple-icons에 아예
+ * 없다) 그래서 U5는 단색 아이콘에 브랜드 hex를 *근사*해 칠하고 KakaoTalk만 CSS로 노란 타일을
+ * 덧씌웠다 — 이제 그 근사 레이어가 통째로 필요 없다(KakaoTalk의 노란 타일도 PNG 안에 있다).
+ * 파일명 = UiChannel 값이라 채널이 늘면 여기 한 항목 + assets/brands PNG 2장만 추가하면 된다. */
+export const CHANNEL_BRAND_ASSET: Record<UiChannel, { at1x: string; at2x: string }> = {
+  slack: { at1x: slack1x, at2x: slack2x },
+  gmail: { at1x: gmail1x, at2x: gmail2x },
+  gcal: { at1x: gcal1x, at2x: gcal2x },
+  outlook: { at1x: outlook1x, at2x: outlook2x },
+  telegram: { at1x: telegram1x, at2x: telegram2x },
+  whatsapp: { at1x: whatsapp1x, at2x: whatsapp2x },
+  kakaotalk: { at1x: kakaotalk1x, at2x: kakaotalk2x },
+  linkedin: { at1x: linkedin1x, at2x: linkedin2x },
+  agent: { at1x: agent1x, at2x: agent2x },
+  system: { at1x: system1x, at2x: system2x },
 };
 
 /** A3 agent_runtimes_runtime_ck의 실제 enum(0002_core_inbox.sql). */
@@ -78,15 +69,20 @@ export const RUNTIME_LABEL: Record<AgentRuntimeKind, string> = {
   omnis: "omnis",
 };
 
-// ponytail: 이 react-icons/simple-icons 버전에 OpenAI(Codex)·Hermes 전용 로고가 없다 — 있는 것
-// (Anthropic/DeepSeek)만 실제 브랜드 마크를 쓴다. hermes는 RUNTIME_ICON에서 아예 빼고(undefined)
-// row-meta.test.ts + inbox-row.tsx가 RUNTIME_LETTER["H"]로 폴백한다(태스크 스펙 그대로). codex는
-// 마크가 없어도 "글자만" 폴백보다는 lucide Bot이 읽기 쉬워 그대로 둔다 — OpenAI 마크가 이 패키지에
-// 들어오면 여기만 바꾼다.
+// 런타임 배지는 채널 마크와 별개다 — 여기는 react-icons/lucide 그대로 간다(에이전트 런타임은
+// 공식 PNG 세트에 없고, 없는 마크를 손으로 그리지 않는다).
+// hermes는 RUNTIME_ICON에서 아예 뺀다(undefined) — simple-icons의 SiHermes는 명품 브랜드
+// 에르메스 마크지 이 런타임의 마크가 아니므로 그걸 갖다 붙이는 건 "아무 아이콘이나 브랜드 자리에
+// 넣기" 슬롭이다. inbox-row.tsx가 RUNTIME_LETTER["H"]로 폴백한다.
+// ponytail: codex는 PiOpenAiLogo(react-icons/pi — 이 파일이 Outlook에 이미 쓰는 세트)로 간다.
+// 스펙은 react-icons/si의 SiOpenai를 지목했지만 simple-icons는 OpenAI 로고를 상표 정책으로 뺐다
+// (5.7.0에는 SiOpenaigym만 남아 있다 — 이름이 SiOpenai로 "보이는" 건 접두 매치다). OpenAI 마크가
+// 실제로 있는 세트 중 pi를 골랐다. 이전 lucide Bot은 OpenAI 마크가 없던 시절의 대체물이었다.
+// hermes용 진짜 마크는 생기면 여기 한 줄 추가.
 export const RUNTIME_ICON: Partial<Record<AgentRuntimeKind, ElementType>> = {
   claude_code: SiAnthropic,
   claude_ds: SiDeepseek,
-  codex: Bot,
+  codex: PiOpenAiLogo,
   omnis: Sparkles,
 };
 
