@@ -174,13 +174,13 @@ test("Phase A seeded smoke", async ({ page }) => {
   await check("A4b channel rail tile filters the list, Inbox tile restores it", async () => {
     const all = await rows.count();
     await page
-      .getByRole("navigation", { name: "채널" })
+      .getByRole("navigation", { name: "Channels" })
       .getByRole("button", { name: "Gmail" })
       .click();
     await expect.poll(() => rows.count()).toBeLessThan(all);
     const gmail = await rows.count();
     await page
-      .getByRole("navigation", { name: "채널" })
+      .getByRole("navigation", { name: "Channels" })
       .getByRole("button", { name: "Inbox" })
       .click();
     await expect.poll(() => rows.count()).toBe(all);
@@ -241,7 +241,7 @@ test("Phase A seeded smoke", async ({ page }) => {
     const panel = page.getByRole("dialog", { name: "AI 패널" });
     await expect(panel).toBeVisible();
     await page.keyboard.type("Inbox");
-    await expect(panel.getByText("Inbox로 이동")).toBeVisible();
+    await expect(panel.getByText("Go to Inbox")).toBeVisible();
     return "panel + cmdk list reachable by typing";
   });
   await shot(page, "06-command-palette.png");
