@@ -1,11 +1,11 @@
-# herdr, 그리고 kinso 룩을 빌려올 OSS 후보들 (fetched 2026-09-20)
+# herdr, and the OSS candidates for borrowing the kinso look (fetched 2026-09-20)
 
-## TL;DR (한국어)
+## TL;DR
 
-- **"herdr"는 통합 인박스가 아니다.** `herdrdev/herdr` (Rust, Apache-2.0, ⭐39.7k, 2026-09-20 기준 활발히 커밋 중, 2026-09 Bessemer/YC/E2 시드 $6M 유치)는 **코딩 에이전트(Claude Code/Codex/Cursor 등)가 사는 터미널 멀티플렉서**다 — tmux 스타일 prefix key + 마우스, 세션 detach/restore, 여러 머신 통합, 각 pane을 idle/working/blocked/done으로 표시, 순수 Rust 바이너리(Electron 없음). 메시징 인박스가 아니라서 채널 레일·인박스 row·스레드뷰·compose 같은 kinso UI 컴포넌트를 herdr 코어에서 그대로 가져올 건 없다.
-- **하지만 omnis에 실제로 쓸모 있는 부분은 herdr의 생태계(플러그인/클라이언트)다.** 특히 `AltanS/collie`(MIT, React Router+Vite+TS+**Tailwind+shadcn**, PWA — omnis 스택과 거의 동일)는 "내 응답이 필요한 에이전트가 위로 온다"는 상태 대시보드 + row 리스트 + AskUserQuestion을 탭 가능한 버튼으로 끌어올리는 패턴을 갖고 있어서, omnis의 "AI agent sessions" 패널(Slack/Gmail과 나란히 놓이는 채널 중 하나)에 거의 그대로 참고할 수 있다. `hhdebb/herdr-radar`(MIT, JS)는 "프로젝트별로 묶고, 각 에이전트를 벤더 로고/컬러로, row는 활동순 정렬, idle은 페이드, 라이트/다크"라는 설명 자체가 kinso row 스펙(아바타+이름+상대시간+요약+우측 고정 브랜드 아이콘)과 구조적으로 가장 가깝다.
-- **herdr 밖에서 kinso 룩에 맞는 것들**: `langchain-ai/agent-inbox`(MIT, human-in-the-loop 검토 UI), `cloudflare/agentic-inbox`(Apache-2.0, React19+RR7+Tailwind+TipTap, 3-pane 메일 클라이언트 + AI 사이드패널 — compose/thread/AI 요약 borrow 대상으로 제일 유력), `Mail-0/Zero`(MIT, 프라이버시 중심 오픈소스 메일 앱), `assistant-ui/assistant-ui`(MIT, React AI 채팅 컴포넌트 — compose/스트리밍 답변), `shadcnblocks/kibo`(MIT, shadcn 호환 컴포넌트 레지스트리), `simple-icons`(CC0)+`react-icons`(MIT류) 브랜드 아이콘 세트(카카오톡 포함). Chatwoot은 프론트가 Vue라 제외, originui는 AGPL인 `cosscom/coss`로 흡수돼 제외.
-- 마지막 표에 "kinso 요소 → 빌려올 OSS → 구체 경로 → 공수(S/M/L)" 매핑 정리함.
+- **"herdr" is not a unified inbox.** `herdrdev/herdr` (Rust, Apache-2.0, ⭐39.7k, committing actively as of 2026-09-20, $6M seed raised 2026-09 from Bessemer/YC/E2) is **the terminal multiplexer your coding agents (Claude Code/Codex/Cursor, etc.) live in** — tmux-style prefix key + mouse, session detach/restore, multiple machines unified, every pane tagged idle/working/blocked/done, a pure Rust binary (no Electron). Since it is not a messaging inbox, there is nothing to lift verbatim from herdr's core for kinso UI components like the channel rail, inbox row, thread view, or compose.
+- **What is actually useful for omnis, though, is herdr's ecosystem (plugins/clients).** In particular, `AltanS/collie` (MIT, React Router+Vite+TS+**Tailwind+shadcn**, PWA — nearly identical to omnis's stack) has a status dashboard where "agents that need my answer rise to the top," a row list, and a pattern that lifts `AskUserQuestion` into tappable buttons, so it can be referenced almost as-is for omnis's "AI agent sessions" panel (one of the channels sitting alongside Slack/Gmail). For `hhdebb/herdr-radar` (MIT, JS), the description itself — "grouped by project, each agent in its vendor's logo/color, rows ordered by activity, idle sessions fade, light and dark" — is structurally the closest match to the kinso row spec (avatar + name + relative time + summary + right-fixed brand icon).
+- **Things outside herdr that fit the kinso look**: `langchain-ai/agent-inbox` (MIT, human-in-the-loop review UI), `cloudflare/agentic-inbox` (Apache-2.0, React 19 + RR7 + Tailwind + TipTap, 3-pane mail client + AI side panel — the strongest candidate for borrowing compose/thread/AI summary), `Mail-0/Zero` (MIT, privacy-first open-source mail app), `assistant-ui/assistant-ui` (MIT, React AI chat components — compose/streaming replies), `shadcnblocks/kibo` (MIT, shadcn-compatible component registry), `simple-icons` (CC0) + `react-icons` (MIT-style) brand icon sets (KakaoTalk included). Chatwoot is excluded because its frontend is Vue, and originui is excluded because it has been absorbed into the AGPL `cosscom/coss`.
+- The final table lays out the mapping: "kinso element → OSS to borrow → concrete path → effort (S/M/L)."
 
 ---
 
@@ -60,7 +60,7 @@ Net: treat herdr itself as an **architecture/interaction reference** (idle/worki
 
 ### Alternative "herdr" candidates considered
 
-Searched GitHub (`gh api search/repositories -f q=herdr`) and the web; every result is part of the same `herdrdev/herdr` ecosystem (30+ plugin/client repos: reviewr, file-viewer, sidebar, browser, mobile-relay, board, navigator, nvim, worktrunk, agent-quota, projects, etc.) or an unrelated tiny repo. No second, unrelated "herdr" project surfaced. Confidence: high that `herdrdev/herdr` is the one Logan means, given "최신 오픈소스" (very recent — daily commits, 2026 seed round) and his general habit of tracking hot dev-tool launches.
+Searched GitHub (`gh api search/repositories -f q=herdr`) and the web; every result is part of the same `herdrdev/herdr` ecosystem (30+ plugin/client repos: reviewr, file-viewer, sidebar, browser, mobile-relay, board, navigator, nvim, worktrunk, agent-quota, projects, etc.) or an unrelated tiny repo. No second, unrelated "herdr" project surfaced. Confidence: high that `herdrdev/herdr` is the one Logan means, given "최신 오픈소스" ("latest open source" — very recent, with daily commits and a 2026 seed round) and his general habit of tracking hot dev-tool launches.
 
 ---
 
