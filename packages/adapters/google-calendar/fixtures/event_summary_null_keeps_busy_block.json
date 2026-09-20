@@ -1,0 +1,43 @@
+{
+  "scenario": "event_summary_null_keeps_busy_block",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_null_summary",
+    "status": "tentative",
+    "summary": null,
+    "start": {
+      "dateTime": "2026-10-17T08:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-10-17T09:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_null_summary",
+        "externalId": "evt_null_summary",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "",
+        "attachments": [],
+        "sentAt": "2026-10-17T08:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_null_summary",
+        "threadMeta": {
+          "externalId": "evt_null_summary",
+          "kind": "calendar",
+          "title": null,
+          "participants": [],
+          "lastItemAt": "2026-10-17T08:00:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

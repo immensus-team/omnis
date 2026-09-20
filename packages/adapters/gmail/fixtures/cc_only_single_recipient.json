@@ -1,0 +1,76 @@
+{
+  "scenario": "cc_only_single_recipient",
+  "note": "No To header at all — only Cc. Participants come out as From then Cc.",
+  "raw": {
+    "id": "18c2f4a1b2d3f505",
+    "threadId": "18c2f4a1b2d3f505",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Priya Raman <priya@example.com>"
+        },
+        {
+          "name": "Cc",
+          "value": "281932556+jinhologankim@users.noreply.github.com"
+        },
+        {
+          "name": "Subject",
+          "value": "FYI: vendor renewal"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId015@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 14:20:00 +0000"
+        }
+      ],
+      "body": {
+        "data": "UmVuZXdhbCBkYXRlIG1vdmVkIHRvIERlYyAxLg"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f505",
+        "externalId": "18c2f4a1b2d3f505",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Priya Raman <priya@example.com>"
+        },
+        "body": "Subject: FYI: vendor renewal\n\nRenewal date moved to Dec 1.",
+        "attachments": [],
+        "sentAt": "2023-11-15T14:20:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId015@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f505",
+          "kind": "email",
+          "title": "FYI: vendor renewal",
+          "participants": [
+            {
+              "externalId": "priya@example.com",
+              "displayName": "Priya Raman"
+            },
+            {
+              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "displayName": "281932556+jinhologankim@users.noreply.github.com"
+            }
+          ],
+          "lastItemAt": "2023-11-15T14:20:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

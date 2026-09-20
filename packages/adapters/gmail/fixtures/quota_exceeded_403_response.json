@@ -1,0 +1,18 @@
+{
+  "scenario": "quota_exceeded_403_response",
+  "note": "Gmail returns HTTP 403 with reason dailyLimitExceeded / userRateLimitExceeded for quota exhaustion. mapApiError() only special-cases 429, so a 403 quota error is classified retryable_network (still retryable, but no retryAfterMs). Pinned as-is.",
+  "raw": {
+    "code": 403,
+    "message": "User-rate limit exceeded.  Retry after 2023-11-15T20:00:00.000Z",
+    "errors": [
+      {
+        "message": "User-rate limit exceeded.",
+        "domain": "usageLimits",
+        "reason": "userRateLimitExceeded"
+      }
+    ]
+  },
+  "expected": {
+    "errorKind": "retryable_network"
+  }
+}

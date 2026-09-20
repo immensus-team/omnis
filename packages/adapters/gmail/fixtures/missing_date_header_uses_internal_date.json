@@ -1,0 +1,65 @@
+{
+  "scenario": "missing_date_header_uses_internal_date",
+  "note": "No Date header at all → internalDate fallback keeps sentAt deterministic instead of 'now'.",
+  "raw": {
+    "id": "18c2f4a1b2d3f513",
+    "threadId": "18c2f4a1b2d3f513",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "internalDate": "1700100000000",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "alerts@example.com"
+        },
+        {
+          "name": "Subject",
+          "value": "Heartbeat"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId024@example.com>"
+        }
+      ],
+      "body": {
+        "data": "U3RpbGwgYWxpdmUu"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f513",
+        "externalId": "18c2f4a1b2d3f513",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "alerts@example.com"
+        },
+        "body": "Subject: Heartbeat\n\nStill alive.",
+        "attachments": [],
+        "sentAt": "2023-11-16T02:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId024@example.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f513",
+          "kind": "email",
+          "title": "Heartbeat",
+          "participants": [
+            {
+              "externalId": "alerts@example.com",
+              "displayName": "alerts@example.com"
+            }
+          ],
+          "lastItemAt": "2023-11-16T02:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

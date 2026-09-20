@@ -467,6 +467,14 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Create: `/Users/logankim/AI-Workspaces/omnis/ops/mini/LaunchDaemons/com.omnis.backup.plist`
 - Create: `/Users/logankim/AI-Workspaces/omnis/backup/restore-drills.md`
 - Test: `/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/restore-drill.test.sh`
+- **계획 수정(2026-09-20, 리뷰 반려 반영)** — Modify: `/Users/logankim/AI-Workspaces/omnis/ops/mini/install.sh`
+  (plist를 `ops/mini/` 다음으로 `ops/mini/LaunchDaemons/`에서도 찾고, 기본 서비스 목록에 `backup`을 넣는다.
+  캘린더 잡이라 `kickstart`는 건너뛴다 — 안 그러면 설치할 때마다 백업이 통째로 돈다). 백로그가 산출물 경로를
+  `ops/mini/LaunchDaemons/*.plist`로 못박았으므로 plist를 옮기는 대신 install.sh를 넓힌다.
+- **계획 수정(같은 이유)** — Modify: `/Users/logankim/AI-Workspaces/omnis/ops/mini/RUNBOOK.md`
+  (설치·`restic init`·분기 드릴 절차. 이게 없으면 산출물에 사람이 닿는 경로가 문서에 없다),
+  Test: `/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/omnis-backup.test.sh`
+  (launchd PATH에 `pg_dump`가 없어 03:00 잡이 첫 줄에서 죽던 회귀를 막는다).
 
 **Interfaces:**
 - Consumes: `pg_dump --format=custom` · `pg_restore` · `psql`(Postgres 17 클라이언트) · `restic` · Keychain `omnis.restic.repository`/`omnis.restic.password`/`omnis.b2.account_id`/`omnis.b2.account_key`(이 계획이 새로 정하는 이름, A6 §9 점 스킴을 따른다) · `$DATABASE_URL`(계약 §9).
@@ -700,7 +708,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Task 4: Healthcheck Ping and Dual Alerting (US-B42, tier: Sonnet)
 
-**스토리 US-B42** — 목표: healthchecks.io 체크 15종 배선(성공 `/`, 실패 `/fail`), self-hosted ntfy 2토픽(`omnis-critical`/`omnis-warning`), critical/warning은 ntfy + `items(kind='system')` 이중 노출, `newsyslog` 30일 보관 + 시크릿 마스킹 확인. 산출물: `ops/scripts/healthcheck-ping.sh`, `ops/mini/newsyslog.d/omnis.conf`. 검증: `bash ops/scripts/healthcheck-ping.sh --check`. 티어: Sonnet. 의존: US-B40(어댑터 헬스 — 단, 이 태스크는 B40의 TS 코드를 import하지 않는다. `accounts.state`/`last_health_at`는 이미 Phase A 스키마(0002_core_inbox.sql)에 고정돼 있으므로 SQL로 직접 읽는다 — B40이 그 컬럼을 채우는 건 이 태스크가 실행되는 시점의 전제일 뿐, 코드 의존은 아니다).
+**스토리 US-B42** — 목표: healthchecks.io 체크 15종 배선(성공 `/`, 실패 `/fail`), self-hosted ntfy 2토픽(`omnis-critical`/`omnis-warning`), critical/warning은 ntfy + `items(kind='system')` 이중 노출, `newsyslog` 30일 보관 + 시크릿 마스킹 확인. 산출물: `ops/scripts/healthcheck-ping.sh`, `ops/mini/newsyslog.d/omnis.conf`. 검증: `bash ops/scripts/healthcheck-ping.sh --check` + `bash ops/scripts/test/healthcheck-ping.test.sh`(백로그의 인수 커맨드는 `--check`뿐이지만 `--check`는 프로덕션 경로를 한 줄도 돌리지 않는다 — job 파싱과 `--run`의 실패 집계·exit code는 테스트가 단언한다). 티어: Sonnet. 의존: US-B40(어댑터 헬스 — 단, 이 태스크는 B40의 TS 코드를 import하지 않는다. `accounts.state`/`last_health_at`는 이미 Phase A 스키마(0002_core_inbox.sql)에 고정돼 있으므로 SQL로 직접 읽는다 — B40이 그 컬럼을 채우는 건 이 태스크가 실행되는 시점의 전제일 뿐, 코드 의존은 아니다).
 
 **읽을 곳**: A6 §8(15개 job 표, ntfy 2토픽, `items(kind='system')` 이중 노출, newsyslog 30일), Phase A 계약 §4(`accounts.state`/`last_health_at`/`last_error` 컬럼), `packages/db/migrations/0002_core_inbox.sql`(`accounts_channel_ck`에 `'system'`이 이미 있다 — 새 마이그레이션 불필요).
 
@@ -765,6 +773,7 @@ NTFY_URL="${OMNIS_NTFY_URL:-http://127.0.0.1:2586}"
 DATABASE_URL="${DATABASE_URL:-postgres://vigor@127.0.0.1:5432/omnis}"
 
 # slug|check_cmd|tier(critical|warning) — A6 §8 표 그대로. check_cmd는 성공하면 exit 0.
+# check_cmd 자체가 '|'(파이프)를 품으므로 `IFS='|' read`로 자르면 안 된다 — 양 끝에서 깎는다(parse_job).
 JOBS=(
   "omnis-hub|curl -fsS -m 5 http://127.0.0.1:8787/health|critical"
   "omnis-postgres|psql \"\$DATABASE_URL\" -Atc 'select 1' | grep -q 1|critical"
@@ -782,6 +791,13 @@ JOBS=(
   "omnis-backup-restic|true|critical"
   "omnis-tailscale-serve|bash \"\$(dirname \"\$0\")/../mini/tailscale-serve.sh\" --check|critical"
 )
+
+# slug는 첫 필드, tier는 마지막 필드, 나머지 전부가 cmd다(cmd 안의 파이프를 보존한다).
+parse_job() {
+  job_slug="${1%%|*}"
+  job_tier="${1##*|}"
+  job_cmd="${1#*|}"; job_cmd="${job_cmd%|*}"
+}
 
 post_ntfy() {
   local topic="$1" title="$2" msg="$3"
@@ -819,12 +835,13 @@ run_check() {
   post_ntfy "omnis-$tier" "$slug failed" "check failed: $cmd"
   post_system_item "$slug 실패" "healthcheck '$slug' 실패 ($tier)"
   echo "FAIL: $slug" >&2
+  return 1
 }
 
 do_check() {
   local missing=0
   for job in "${JOBS[@]}"; do
-    IFS='|' read -r slug _cmd _tier <<< "$job"
+    parse_job "$job"; local slug="$job_slug"
     kc "omnis.healthchecks.$slug" >/dev/null 2>&1 || { echo "no healthchecks uuid for $slug (will run check but skip ping)"; missing=$((missing+1)); }
   done
   echo "ok: ${#JOBS[@]} jobs configured, $missing missing a healthchecks.io uuid"
@@ -833,17 +850,25 @@ do_check() {
 do_run() {
   local failures=0
   for job in "${JOBS[@]}"; do
-    IFS='|' read -r slug cmd tier <<< "$job"
-    run_check "$slug" "$cmd" "$tier" || failures=$((failures+1))
+    parse_job "$job"
+    run_check "$job_slug" "$job_cmd" "$job_tier" || failures=$((failures+1))
   done
   echo "ran ${#JOBS[@]} checks, $failures failed"
   [ "$failures" -eq 0 ]
 }
 
+do_list() {
+  for job in "${JOBS[@]}"; do
+    parse_job "$job"
+    printf '%s\t%s\n' "$job_slug" "$job_tier"
+  done
+}
+
 case "${1:---check}" in
   --check) do_check ;;
   --run) do_run ;;
-  *) echo "usage: healthcheck-ping.sh [--check|--run]" >&2; exit 64 ;;
+  --list) do_list ;;
+  *) echo "usage: healthcheck-ping.sh [--check|--run|--list]" >&2; exit 64 ;;
 esac
 ```
 
@@ -854,14 +879,92 @@ cd /Users/logankim/AI-Workspaces/omnis && chmod +x ops/scripts/healthcheck-ping.
 ```
 기대: `ok: --check succeeds even with zero configured jobs (reports, does not ping)`.
 
-- [ ] 5. `--check`가 job 개수를 정확히 세는지 검증하는 assert를 추가한다.
+- [ ] 5. 테스트를 완성한다 — `--check`만으로는 프로덕션 경로(launchd가 실제로 부르는 `--run`)가 한 줄도 안 돌기 때문에,
+job 파싱(`check_cmd`가 파이프를 품고 있다)과 실패 집계/exit code까지 단언한다.
 
-`/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/healthcheck-ping.test.sh`(파일 끝에 추가):
+`/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/healthcheck-ping.test.sh`(전문):
 ```bash
+#!/bin/bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+SCRIPT="$ROOT/ops/scripts/healthcheck-ping.sh"
+FAKE_BIN="$(mktemp -d)"
+trap 'rm -rf "$FAKE_BIN"' EXIT
+
+# 가짜 security: 매 서비스마다 "not found"(healthchecks uuid 미설정 상태를 흉내낸다).
+cat > "$FAKE_BIN/security" <<'FAKESEC'
+#!/bin/bash
+echo "no such keychain item" >&2
+exit 44
+FAKESEC
+chmod +x "$FAKE_BIN/security"
+export PATH="$FAKE_BIN:$PATH"
+
+# 1) healthchecks uuid가 하나도 없어도 --check는 "설정 없음"을 경고만 하고 exit 0이어야 한다
+#    (신규 설치 직후에도 스크립트 자체는 안전하게 돌아야 한다 — 실제 핑 실패와는 다른 상태).
+"$SCRIPT" --check
+echo "ok: --check succeeds even with zero configured jobs (reports, does not ping)"
 
 out="$("$SCRIPT" --check)"
 echo "$out" | grep -q "15 jobs configured" || { echo "FAIL: expected 15 jobs, got: $out" >&2; exit 1; }
 echo "ok: --check reports exactly 15 configured jobs"
+
+# 2) --list: 15행 전부 slug + tier(critical|warning)로 정확히 갈라져야 한다.
+#    check_cmd가 파이프를 품고 있어서 `IFS='|' read`로 자르면 tier에 명령 꼬리가 섞여 들어간다.
+list_out="$("$SCRIPT" --list)"
+[ "$(echo "$list_out" | wc -l | tr -d ' ')" = "15" ] || { echo "FAIL: --list should print 15 rows" >&2; exit 1; }
+while IFS=$'\t' read -r slug tier; do
+  case "$slug" in omnis-*) ;; *) echo "FAIL: bad slug [$slug]" >&2; exit 1;; esac
+  case "$tier" in critical|warning) ;; *) echo "FAIL: slug $slug parsed tier [$tier], want critical|warning" >&2; exit 1;; esac
+done <<< "$list_out"
+echo "ok: all 15 jobs parse to a slug + exactly critical|warning"
+
+# 3) --run: 체크가 죄다 실패하면 실패 개수를 정확히 세고 non-zero로 끝나야 한다(launchd가 이 exit code를 본다).
+CURL_LOG="$FAKE_BIN/curl.log"
+cat > "$FAKE_BIN/curl" <<FAKECURL
+#!/bin/bash
+printf '%s\n' "\$*" >> "$CURL_LOG"
+exit 1
+FAKECURL
+cat > "$FAKE_BIN/psql" <<'FAKEPSQL'
+#!/bin/bash
+cat >/dev/null 2>&1 || true
+exit 1
+FAKEPSQL
+chmod +x "$FAKE_BIN/curl" "$FAKE_BIN/psql"
+
+set +e
+run_out="$(OMNIS_NTFY_URL="http://ntfy.test" "$SCRIPT" --run </dev/null 2>"$FAKE_BIN/run.err")"
+run_rc=$?
+set -e
+fail_lines="$(grep -c '^FAIL: ' "$FAKE_BIN/run.err" || true)"
+counted="$(echo "$run_out" | sed -n 's/^ran 15 checks, \([0-9]*\) failed$/\1/p')"
+[ "$run_rc" -ne 0 ] || { echo "FAIL: --run exited 0 while checks failed" >&2; exit 1; }
+[ -n "$counted" ] && [ "$counted" -gt 0 ] || { echo "FAIL: --run reported '$run_out' with $fail_lines failing checks" >&2; exit 1; }
+[ "$counted" = "$fail_lines" ] || { echo "FAIL: --run counted $counted failures but printed $fail_lines" >&2; exit 1; }
+echo "ok: --run counts $counted failures and exits non-zero"
+
+# 4) 경보는 omnis-critical / omnis-warning 두 토픽으로만 가야 한다(tier 파싱이 깨지면 여기로 샌다).
+grep -o 'http://ntfy\.test/[^ ]*' "$CURL_LOG" | sort -u > "$FAKE_BIN/topics"
+[ -s "$FAKE_BIN/topics" ] || { echo "FAIL: no ntfy post captured" >&2; exit 1; }
+while read -r url; do
+  case "$url" in
+    http://ntfy.test/omnis-critical|http://ntfy.test/omnis-warning) ;;
+    *) echo "FAIL: alert posted to [$url]" >&2; exit 1;;
+  esac
+done < "$FAKE_BIN/topics"
+echo "ok: alerts route only to omnis-critical / omnis-warning"
+
+# 5) check_cmd도 온전해야 한다 — 파이프 뒤 grep이 잘려 나가면 결과를 검사하지 않고 통과해 버린다.
+grep -q 'check failed: psql .* | grep -qx t' "$CURL_LOG" || { echo "FAIL: check_cmd lost its trailing pipe" >&2; exit 1; }
+echo "ok: check_cmd keeps the pipeline that turns a query result into pass/fail"
+
+# 6) 시크릿처럼 보이는 값(sk-, xoxb-, 40자+ 토큰)이 샘플 로그 라인에 없는지 확인한다(계약 §9).
+sample_log='{"ts":"2026-09-20T00:00:00Z","level":"info","pkg":"@omnis/kernel","msg":"job ok","trace_id":null}'
+if echo "$sample_log" | grep -qE 'sk-[A-Za-z0-9]{20,}|xox[bp]-[A-Za-z0-9-]{10,}'; then
+  echo "FAIL: sample log line looks like it leaks a secret" >&2; exit 1
+fi
+echo "ok: sample log line has no secret-shaped value"
 echo "PASS"
 ```
 
@@ -882,17 +985,10 @@ cd /Users/logankim/AI-Workspaces/omnis && bash ops/scripts/test/healthcheck-ping
 /Users/vigor/Library/Logs/omnis/*.err.log    vigor:staff  600  30  *  $D0  J
 ```
 
-- [ ] 8. 시크릿 마스킹을 확인하는 grep 자체검사를 테스트 파일에 추가한다(`createLogger`의 로그 포맷 규약 — 계약 §9 "시크릿 값은 어떤 키에도 넣지 않는다" — 을 로그 샘플 한 줄로 재확인).
+- [ ] 8. 셸 문법을 확인한다(이 리포에 shellcheck는 안 물려 있다 — Global Constraints).
 
-`/Users/logankim/AI-Workspaces/omnis/ops/scripts/test/healthcheck-ping.test.sh`(마지막 `echo "PASS"` 앞에 삽입):
 ```bash
-
-# 4) 시크릿처럼 보이는 값(sk-, xoxb-, 40자+ 토큰)이 샘플 로그 라인에 없는지 확인한다(계약 §9).
-sample_log='{"ts":"2026-09-20T00:00:00Z","level":"info","pkg":"@omnis/kernel","msg":"job ok","trace_id":null}'
-if echo "$sample_log" | grep -qE 'sk-[A-Za-z0-9]{20,}|xox[bp]-[A-Za-z0-9-]{10,}'; then
-  echo "FAIL: sample log line looks like it leaks a secret" >&2; exit 1
-fi
-echo "ok: sample log line has no secret-shaped value"
+cd /Users/logankim/AI-Workspaces/omnis && bash -n ops/scripts/healthcheck-ping.sh && bash -n ops/scripts/test/healthcheck-ping.test.sh
 ```
 
 - [ ] 9. 전체 테스트를 다시 돌려 통과를 확인한다.

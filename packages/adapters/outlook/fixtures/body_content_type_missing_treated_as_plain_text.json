@@ -1,0 +1,64 @@
+{
+  "scenario": "body_content_type_missing_treated_as_plain_text",
+  "note": "body.contentType missing (partial select or a proxy that dropped it). Only contentType === 'html' is stripped, so the markup reaches the body verbatim — pinned as-is, since guessing HTML from the content itself is out of scope for v1.",
+  "raw": {
+    "id": "AAMkAGI1msg113",
+    "conversationId": "AAQkAGI1conv113",
+    "internetMessageId": "<msg-113@outlook.com>",
+    "subject": "Untyped body",
+    "body": {
+      "content": "<p>No contentType on this body object.</p>"
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Dana Lee",
+        "address": "dana@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-15T15:00:00Z",
+    "sentDateTime": "2023-11-15T15:00:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv113",
+        "externalId": "AAMkAGI1msg113",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "dana@example.com"
+        },
+        "body": "Subject: Untyped body\n\n<p>No contentType on this body object.</p>",
+        "attachments": [],
+        "sentAt": "2023-11-15T15:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-113@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv113",
+          "kind": "email",
+          "title": "Untyped body",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T15:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

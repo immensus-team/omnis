@@ -2,12 +2,14 @@ import { one, query, tx } from "@omnis/db";
 import type { PoolClient } from "@omnis/db";
 import type {
   AdapterEvent,
+  Channel,
   IngestSink,
   NormalizedItem,
   NormalizedThread,
   ThreadKind,
 } from "@omnis/protocol";
 import type { Pool } from "pg";
+import { resolvePerson } from "./identity.js";
 import type { Logger } from "./logger.js";
 
 function isItem(e: NormalizedItem | AdapterEvent): e is NormalizedItem {
@@ -22,6 +24,21 @@ const ITEM_KIND_TO_THREAD_KIND: Record<NormalizedItem["kind"], ThreadKind> = {
   tool_call: "agent_session",
   system: "system",
 };
+
+/** accounts.channel은 계정당 불변이다. 메시지마다 조회하지 않는다. */
+async function channelOf(
+  c: PoolClient,
+  cache: Map<string, Channel>,
+  accountId: string,
+): Promise<Channel> {
+  const hit = cache.get(accountId);
+  if (hit !== undefined) return hit;
+  const row = await one<{ channel: Channel }>(c, "SELECT channel FROM accounts WHERE id = $1", [
+    accountId,
+  ]);
+  cache.set(accountId, row.channel);
+  return row.channel;
+}
 
 /** 어댑터가 threadMeta 없이 첫 아이템을 보냈을 때의 최후 수단(root fix, 이전엔 여기서 throw했다) —
  *  아이템 자체가 들고 있는 정보만으로 스레드를 합성한다. NormalizedItem에는 subject도 채널명도
@@ -69,10 +86,11 @@ async function upsertThread(
 }
 
 /** 어댑터가 밀어넣는 유일한 입구(계약 §3.3 IngestSink).
- *  Phase A는 thread/item upsert까지만 한다 — person 신원 해석(A3 §10)은 Phase A 스토리가 아니므로
- *  author_person_id를 채우지 않는다. 어댑터가 person author를 줘도 NULL로 남는다. */
+ *  US-B03: author_person_id와 threads.participants를 채운다. author_is_me는 아직 커널이 내
+ *  identity 목록을 갖고 있지 않아 false로 남는다(US-B34 온보딩이 채운다). */
 export function createIngestSink(deps: { pool: Pool; logger: Logger }): IngestSink {
   const { pool, logger } = deps;
+  const channelCache = new Map<string, Channel>();
   return async (accountId, e) => {
     if (!isItem(e)) {
       await query(
@@ -97,7 +115,6 @@ export function createIngestSink(deps: { pool: Pool; logger: Logger }): IngestSi
         threadId = rows[0]?.id ?? (await upsertThread(c, accountId, deriveThreadMeta(e)));
       }
 
-      // author_agent_id만 해석한다. person은 Phase B(A3 §10).
       const agentId =
         e.author.kind === "agent"
           ? ((
@@ -107,17 +124,38 @@ export function createIngestSink(deps: { pool: Pool; logger: Logger }): IngestSi
             )[0]?.id ?? null)
           : null;
 
+      // US-B03: 해석이 실패해도 아이템은 반드시 저장한다 — 인박스에 안 뜨는 메시지가
+      // 잘못된 author보다 나쁘다.
+      let personId: string | null = null;
+      if (e.author.kind === "person") {
+        const channel = await channelOf(c, channelCache, accountId);
+        const display =
+          e.threadMeta?.participants.find((p) => p.externalId === e.author.id)?.displayName ??
+          e.author.id;
+        try {
+          const r = await resolvePerson(c, channel, e.author.id, display, e.threadExternalId);
+          personId = r.person_id;
+        } catch (err) {
+          logger.warn("person resolution failed", {
+            accountId,
+            channel,
+            err: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
       await query(
         c,
-        `INSERT INTO items (thread_id, account_id, external_id, kind, status, author_agent_id,
-                            subject, body, body_html, attachments, sent_at, source_hash)
-           VALUES ($1,$2,$3,$4,'received',$5,$6,$7,$8,$9::jsonb,$10,$11)
+        `INSERT INTO items (thread_id, account_id, external_id, kind, status, author_person_id,
+                            author_agent_id, subject, body, body_html, attachments, sent_at, source_hash)
+           VALUES ($1,$2,$3,$4,'received',$5,$6,$7,$8,$9,$10::jsonb,$11,$12)
            ON CONFLICT (account_id, source_hash) WHERE source_hash IS NOT NULL DO NOTHING`,
         [
           threadId,
           accountId,
           e.externalId,
           e.kind,
+          personId,
           agentId,
           null,
           e.body,
@@ -127,6 +165,16 @@ export function createIngestSink(deps: { pool: Pool; logger: Logger }): IngestSi
           e.sourceHash,
         ],
       );
+
+      if (personId !== null) {
+        await query(
+          c,
+          `UPDATE threads
+              SET participants = ARRAY(SELECT DISTINCT unnest(participants || $2::uuid[]))
+            WHERE id = $1`,
+          [threadId, [personId]],
+        );
+      }
 
       await query(
         c,

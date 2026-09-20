@@ -1,0 +1,12 @@
+{
+  "scenario": "network_error_connection_reset",
+  "raw": {
+    "code": "ECONNRESET",
+    "message": "socket hang up",
+    "errno": -54,
+    "syscall": "read"
+  },
+  "expected": {
+    "errorKind": "retryable_network"
+  }
+}

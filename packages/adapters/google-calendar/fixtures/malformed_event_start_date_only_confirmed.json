@@ -1,0 +1,18 @@
+{
+  "scenario": "malformed_event_start_date_only_confirmed",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_start_date_only",
+    "status": "confirmed",
+    "summary": "Confirmed event with only a date",
+    "start": {
+      "date": "2026-10-15"
+    },
+    "end": {
+      "date": "2026-10-16"
+    }
+  },
+  "expected": {
+    "items": []
+  }
+}

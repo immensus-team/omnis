@@ -1,0 +1,108 @@
+{
+  "scenario": "inline_cid_html_image",
+  "note": "multipart/related: HTML body referencing an inline cid: image. normalize() never reads nested parts, so the cid reference survives only inside the (unread) HTML part — the item body is the Subject line.",
+  "raw": {
+    "id": "18c2f4a1b2d3f501",
+    "threadId": "18c2f4a1b2d3f501",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "multipart/related",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "\"Brand, Omnis\" <brand@example.com>"
+        },
+        {
+          "name": "To",
+          "value": "281932556+jinhologankim@users.noreply.github.com"
+        },
+        {
+          "name": "Subject",
+          "value": "Launch banner preview"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId011@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 12:30:00 +0000"
+        }
+      ],
+      "body": {
+        "size": 0
+      },
+      "parts": [
+        {
+          "partId": "0",
+          "mimeType": "text/html",
+          "filename": "",
+          "headers": [
+            {
+              "name": "Content-Type",
+              "value": "text/html; charset=\"UTF-8\""
+            }
+          ],
+          "body": {
+            "size": 118,
+            "data": "PGRpdj5CYW5uZXIgdjM6PGJyPjxpbWcgc3JjPSJjaWQ6bGF1bmNoLWJhbm5lckBvbW5pcyIgYWx0PSJiYW5uZXIiPjwvZGl2Pg"
+          }
+        },
+        {
+          "partId": "1",
+          "mimeType": "image/png",
+          "filename": "launch-banner.png",
+          "headers": [
+            {
+              "name": "Content-ID",
+              "value": "<launch-banner@omnis>"
+            }
+          ],
+          "body": {
+            "size": 204800,
+            "attachmentId": "att-img-1"
+          }
+        }
+      ]
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f501",
+        "externalId": "18c2f4a1b2d3f501",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "\"Brand, Omnis\" <brand@example.com>"
+        },
+        "body": "Subject: Launch banner preview\n\n",
+        "attachments": [],
+        "sentAt": "2023-11-15T12:30:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId011@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f501",
+          "kind": "email",
+          "title": "Launch banner preview",
+          "participants": [
+            {
+              "externalId": "brand@example.com",
+              "displayName": "Brand, Omnis"
+            },
+            {
+              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "displayName": "281932556+jinhologankim@users.noreply.github.com"
+            }
+          ],
+          "lastItemAt": "2023-11-15T12:30:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

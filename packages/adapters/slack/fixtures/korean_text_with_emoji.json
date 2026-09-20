@@ -1,0 +1,35 @@
+{
+  "scenario": "korean_text_with_emoji",
+  "raw": {
+    "type": "message",
+    "channel": "C07OMNISLA",
+    "channel_name": "omnis-launch",
+    "user": "U07DANA001",
+    "text": "런칭 준비 거의 끝났어요 🎉 가족들과 저녁 먹고 오겠습니다 👨‍👩‍👧‍👦 내일 아침에 최종 확인 부탁드려요 🙏🏻",
+    "ts": "1715678650.001800",
+    "team": "T07OMNISTM"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISLA",
+        "externalId": "1715678650.001800",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U07DANA001" },
+        "body": "런칭 준비 거의 끝났어요 🎉 가족들과 저녁 먹고 오겠습니다 👨‍👩‍👧‍👦 내일 아침에 최종 확인 부탁드려요 🙏🏻",
+        "attachments": [],
+        "sentAt": "2024-05-14T09:24:10.001Z",
+        "status": "received",
+        "sourceHash": "1715678650.001800",
+        "threadMeta": {
+          "externalId": "C07OMNISLA",
+          "kind": "group",
+          "title": "#omnis-launch",
+          "participants": [{ "externalId": "U07DANA001", "displayName": "U07DANA001" }],
+          "lastItemAt": "2024-05-14T09:24:10.001Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

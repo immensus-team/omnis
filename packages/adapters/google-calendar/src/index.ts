@@ -191,6 +191,7 @@ interface GCalEvent {
   id?: string;
   status?: string;
   summary?: string;
+  description?: string;
   start?: { dateTime?: string };
   end?: { dateTime?: string };
   attendees?: { email?: string; displayName?: string }[];
@@ -199,13 +200,19 @@ interface GCalEvent {
 export function normalize(raw: unknown): NormalizedItem[] {
   const e = raw as GCalEvent;
   if (!e.id || !e.start?.dateTime) return [];
+  // summary is optional in the API: a title-less busy block pushed in by another system has no summary
+  // at all, while its description carries the real content. Use description as the body in that case
+  // (threadMeta.title stays null — an already supported state).
+  // Unlike a message, an event is never contentless: its time span is the content. A title-less busy
+  // block still occupies the user's calendar, so it reaches the kernel with an empty body rather than
+  // being dropped the way Slack/Telegram drop a text-less, file-less message.
   return [
     {
       threadExternalId: e.id,
       externalId: e.id,
       kind: "event",
       author: { kind: "system", id: "" },
-      body: e.summary ?? "",
+      body: e.summary ?? e.description ?? "",
       attachments: [],
       sentAt: e.start.dateTime,
       status: "received",

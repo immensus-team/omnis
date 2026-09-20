@@ -1,0 +1,5 @@
+{
+  "scenario": "rate_limited_response",
+  "raw": { "statusCode": 429, "headers": { "retry-after": "30" } },
+  "expected": { "errorKind": "retryable_rate_limit" }
+}

@@ -1,0 +1,20 @@
+{
+  "scenario": "malformed_event_missing_id_yields_nothing",
+  "raw": {
+    "kind": "calendar#event",
+    "status": "confirmed",
+    "summary": "Fragment with no id",
+    "updated": "2026-09-13T00:00:00.000Z",
+    "start": {
+      "dateTime": "2026-10-14T09:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-10-14T10:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    }
+  },
+  "expected": {
+    "items": []
+  }
+}

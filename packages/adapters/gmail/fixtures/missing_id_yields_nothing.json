@@ -1,0 +1,30 @@
+{
+  "scenario": "missing_id_yields_nothing",
+  "note": "threadId present, id absent — normalize() returns [].",
+  "raw": {
+    "threadId": "18c2f4a1b2d3f510",
+    "payload": {
+      "mimeType": "text/plain",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Dana Lee <dana@example.com>"
+        },
+        {
+          "name": "Subject",
+          "value": "Partial resource"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 18:50:00 +0000"
+        }
+      ],
+      "body": {
+        "data": "VHJ1bmNhdGVkIGhpc3RvcnkgcmVjb3JkLg"
+      }
+    }
+  },
+  "expected": {
+    "items": []
+  }
+}

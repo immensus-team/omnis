@@ -1,0 +1,64 @@
+{
+  "scenario": "missing_internet_message_id_source_hash_falls_back_to_id",
+  "note": "No internetMessageId, so sourceHash falls back to the Graph id (src: `m.internetMessageId || m.id`).",
+  "raw": {
+    "id": "AAMkAGI1msg102",
+    "conversationId": "AAQkAGI1conv102",
+    "subject": "No message-id header",
+    "body": {
+      "contentType": "text",
+      "content": "Relayed without a Message-Id header."
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Relay",
+        "address": "relay@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-15T13:00:00Z",
+    "sentDateTime": "2023-11-15T13:00:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv102",
+        "externalId": "AAMkAGI1msg102",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "relay@example.com"
+        },
+        "body": "Subject: No message-id header\n\nRelayed without a Message-Id header.",
+        "attachments": [],
+        "sentAt": "2023-11-15T13:00:00.000Z",
+        "status": "received",
+        "sourceHash": "AAMkAGI1msg102",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv102",
+          "kind": "email",
+          "title": "No message-id header",
+          "participants": [
+            {
+              "externalId": "relay@example.com",
+              "displayName": "Relay"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T13:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

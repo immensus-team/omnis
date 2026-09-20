@@ -1,0 +1,64 @@
+{
+  "scenario": "missing_received_datetime_uses_sent_datetime",
+  "note": "Only sentDateTime present (partial $select). Before the fallback this fell through to Date.now() — a non-deterministic timestamp — instead of the server's own send time.",
+  "raw": {
+    "id": "AAMkAGI1msg111",
+    "conversationId": "AAQkAGI1conv111",
+    "internetMessageId": "<msg-111@outlook.com>",
+    "subject": "Sent-time only payload",
+    "body": {
+      "contentType": "text",
+      "content": "Only sentDateTime came back."
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Dana Lee",
+        "address": "dana@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "sentDateTime": "2023-11-15T14:20:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv111",
+        "externalId": "AAMkAGI1msg111",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "dana@example.com"
+        },
+        "body": "Subject: Sent-time only payload\n\nOnly sentDateTime came back.",
+        "attachments": [],
+        "sentAt": "2023-11-15T14:20:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-111@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv111",
+          "kind": "email",
+          "title": "Sent-time only payload",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T14:20:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

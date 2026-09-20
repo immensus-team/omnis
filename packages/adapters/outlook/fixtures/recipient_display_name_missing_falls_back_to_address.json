@@ -1,0 +1,75 @@
+{
+  "scenario": "recipient_display_name_missing_falls_back_to_address",
+  "note": "Recipients whose emailAddress carries no name fall back to the address as displayName (addr() in src).",
+  "raw": {
+    "id": "AAMkAGI1msg062",
+    "conversationId": "AAQkAGI1conv062",
+    "internetMessageId": "<msg-062@outlook.com>",
+    "subject": "Calendar invite: infra review",
+    "body": {
+      "contentType": "text",
+      "content": "Invite forwarded as mail."
+    },
+    "from": {
+      "emailAddress": {
+        "address": "calendar@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "ccRecipients": [
+      {
+        "emailAddress": {
+          "name": "",
+          "address": "priya@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-15T09:40:00Z",
+    "sentDateTime": "2023-11-15T09:40:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv062",
+        "externalId": "AAMkAGI1msg062",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "calendar@example.com"
+        },
+        "body": "Subject: Calendar invite: infra review\n\nInvite forwarded as mail.",
+        "attachments": [],
+        "sentAt": "2023-11-15T09:40:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-062@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv062",
+          "kind": "email",
+          "title": "Calendar invite: infra review",
+          "participants": [
+            {
+              "externalId": "calendar@example.com",
+              "displayName": "calendar@example.com"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "logan@example.com"
+            },
+            {
+              "externalId": "priya@example.com",
+              "displayName": "priya@example.com"
+            }
+          ],
+          "lastItemAt": "2023-11-15T09:40:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

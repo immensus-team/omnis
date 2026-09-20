@@ -1,0 +1,35 @@
+{
+  "scenario": "microsecond_ts_precision",
+  "raw": {
+    "type": "message",
+    "channel": "C07OMNISLA",
+    "channel_name": "omnis-launch",
+    "user": "U07JIN0001",
+    "text": "This is the real ts format: microseconds, not just whole seconds",
+    "ts": "1715678690.123456",
+    "team": "T07OMNISTM"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISLA",
+        "externalId": "1715678690.123456",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U07JIN0001" },
+        "body": "This is the real ts format: microseconds, not just whole seconds",
+        "attachments": [],
+        "sentAt": "2024-05-14T09:24:50.123Z",
+        "status": "received",
+        "sourceHash": "1715678690.123456",
+        "threadMeta": {
+          "externalId": "C07OMNISLA",
+          "kind": "group",
+          "title": "#omnis-launch",
+          "participants": [{ "externalId": "U07JIN0001", "displayName": "U07JIN0001" }],
+          "lastItemAt": "2024-05-14T09:24:50.123Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

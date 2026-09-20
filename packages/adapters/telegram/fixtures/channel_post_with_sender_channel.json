@@ -1,0 +1,50 @@
+{
+  "scenario": "channel_post_with_sender_channel",
+  "raw": {
+    "id": 8601,
+    "chat": {
+      "id": -1009876543210,
+      "type": "channel",
+      "title": "omnis news"
+    },
+    "sender": {
+      "id": -1009876543210,
+      "firstName": "omnis news",
+      "username": "omnis_news"
+    },
+    "text": "Posted the v0.2 release notes.",
+    "date": 1700008000,
+    "views": 128
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "-1009876543210",
+        "externalId": "8601",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "-1009876543210"
+        },
+        "body": "Posted the v0.2 release notes.",
+        "attachments": [],
+        "sentAt": "2023-11-15T00:26:40.000Z",
+        "status": "received",
+        "sourceHash": "-1009876543210:8601",
+        "threadMeta": {
+          "externalId": "-1009876543210",
+          "kind": "group",
+          "title": "omnis news",
+          "participants": [
+            {
+              "externalId": "-1009876543210",
+              "displayName": "omnis news"
+            }
+          ],
+          "lastItemAt": "2023-11-15T00:26:40.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

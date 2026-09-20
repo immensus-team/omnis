@@ -1,0 +1,56 @@
+{
+  "scenario": "image_file_upload_no_caption",
+  "raw": {
+    "type": "message",
+    "subtype": "file_share",
+    "channel": "C07OMNISLA",
+    "channel_name": "omnis-launch",
+    "user": "U07DANA001",
+    "text": "",
+    "ts": "1715678560.000900",
+    "team": "T07OMNISTM",
+    "upload": true,
+    "files": [
+      {
+        "id": "F07SCREEN1",
+        "name": "dashboard-may.png",
+        "mimetype": "image/png",
+        "filetype": "png",
+        "size": 184320,
+        "url_private": "https://files.slack.com/files-pri/T07OMNISTM-F07SCREEN1/dashboard-may.png",
+        "url_private_download": "https://files.slack.com/files-pri/T07OMNISTM-F07SCREEN1/download/dashboard-may.png",
+        "mode": "hosted"
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISLA",
+        "externalId": "1715678560.000900",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U07DANA001" },
+        "body": "",
+        "attachments": [
+          {
+            "kind": "image",
+            "mimeType": "image/png",
+            "sizeBytes": 184320,
+            "caption": "dashboard-may.png"
+          }
+        ],
+        "sentAt": "2024-05-14T09:22:40.000Z",
+        "status": "received",
+        "sourceHash": "1715678560.000900",
+        "threadMeta": {
+          "externalId": "C07OMNISLA",
+          "kind": "group",
+          "title": "#omnis-launch",
+          "participants": [{ "externalId": "U07DANA001", "displayName": "U07DANA001" }],
+          "lastItemAt": "2024-05-14T09:22:40.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

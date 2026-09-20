@@ -1,18 +1,35 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  // .claude/skills/** 는 벤더링한 OSS 스킬(템플릿/픽스처 포함)이다 — 우리 코드가 아니고
-  // 그 안의 tsconfig 템플릿·픽스처가 `pnpm lint`를 136개 에러로 막고 있었다(353f0a7부터).
+  // .claude/** is vendored (skills, templates, fixtures) — not our code; the skills tsconfig
+  // templates/fixtures were blocking `pnpm lint` with 136 errors (since 353f0a7).
   "files": {
-    "ignore": [
-      "**/dist/**",
-      "**/node_modules/**",
-      ".omc/**",
-      "tools/spikes/**",
-      ".claude/skills/**"
-    ]
+    "ignore": ["**/dist/**", "**/node_modules/**", ".claude/**", ".omc/**", "tools/spikes/**"]
   },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
   "linter": { "enabled": true, "rules": { "recommended": true } },
-  "javascript": { "formatter": { "quoteStyle": "double", "semicolons": "always" } }
+  "javascript": { "formatter": { "quoteStyle": "double", "semicolons": "always" } },
+  "overrides": [
+    {
+      // US-B07 / A4 §1.1: @omnis/agents는 커널(특히 egress)을 import하지 않는다(계약 §1).
+      "include": ["packages/agents/**"],
+      "linter": {
+        "rules": {
+          "nursery": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@omnis/kernel": "packages/agents는 @omnis/kernel을 의존하지 않는다(계약 §1). LoopKernel 구조적 타입을 쓴다.",
+                  "@omnis/kernel/egress": "egress는 커널 소유다(A4 §1.1).",
+                  "../../kernel/src/egress.js": "egress는 커널 소유다(A4 §1.1).",
+                  "../../../kernel/src/egress.js": "egress는 커널 소유다(A4 §1.1)."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

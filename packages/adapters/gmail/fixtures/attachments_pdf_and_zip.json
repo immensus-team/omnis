@@ -1,0 +1,123 @@
+{
+  "scenario": "attachments_pdf_and_zip",
+  "note": "multipart/mixed with two attachments. normalize() reads only the top-level payload.body and hardcodes attachments: [], so the parts are invisible — body is the Subject line only. Pinned by the existing attachment.json fixture.",
+  "raw": {
+    "id": "18c2f4a1b2d3f500",
+    "threadId": "18c2f4a1b2d3e4f1",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "multipart/mixed",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Dana Lee <dana@example.com>"
+        },
+        {
+          "name": "To",
+          "value": "Logan Kim <281932556+jinhologankim@users.noreply.github.com>"
+        },
+        {
+          "name": "Subject",
+          "value": "Q4 handoff bundle"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId010@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 11:00:00 +0000"
+        }
+      ],
+      "body": {
+        "size": 0
+      },
+      "parts": [
+        {
+          "partId": "0",
+          "mimeType": "text/plain",
+          "filename": "",
+          "headers": [
+            {
+              "name": "Content-Type",
+              "value": "text/plain; charset=\"UTF-8\""
+            }
+          ],
+          "body": {
+            "size": 41,
+            "data": "QnVuZGxlIGF0dGFjaGVkIOKAlCBjaGVja2xpc3QgaW5zaWRlLg"
+          }
+        },
+        {
+          "partId": "1",
+          "mimeType": "application/pdf",
+          "filename": "2024_handoff_checklist.pdf",
+          "headers": [
+            {
+              "name": "Content-Disposition",
+              "value": "attachment; filename=\"checklist.pdf\""
+            }
+          ],
+          "body": {
+            "size": 184320,
+            "attachmentId": "att-pdf-1"
+          }
+        },
+        {
+          "partId": "2",
+          "mimeType": "application/zip",
+          "filename": "logs-2024-11.zip",
+          "headers": [
+            {
+              "name": "Content-Disposition",
+              "value": "attachment; filename=\"logs.zip\""
+            }
+          ],
+          "body": {
+            "size": 4718592,
+            "attachmentId": "att-zip-1"
+          }
+        }
+      ]
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3e4f1",
+        "externalId": "18c2f4a1b2d3f500",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Dana Lee <dana@example.com>"
+        },
+        "body": "Subject: Q4 handoff bundle\n\n",
+        "attachments": [],
+        "sentAt": "2023-11-15T11:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId010@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3e4f1",
+          "kind": "email",
+          "title": "Q4 handoff bundle",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T11:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

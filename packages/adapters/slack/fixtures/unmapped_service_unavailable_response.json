@@ -1,0 +1,10 @@
+{
+  "scenario": "unmapped_service_unavailable_response",
+  "raw": {
+    "httpStatus": 503,
+    "headers": { "content-type": "text/html", "retry-after": "120" },
+    "body": { "ok": false, "error": "service_unavailable" },
+    "statusText": "Service Unavailable"
+  },
+  "expected": { "errorKind": "fatal_protocol" }
+}

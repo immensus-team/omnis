@@ -1,10 +1,11 @@
-import { configureAgents, summarizeThread } from "@omnis/agents";
+import { configureAgents, startLoops, summarizeThread } from "@omnis/agents";
 import { createPool } from "@omnis/db";
 import {
   type Logger,
   assertZeroPublication,
   createKernel,
   createLogger,
+  registerCostDailyJob,
   registerHealthcheckJob,
 } from "@omnis/kernel";
 import { createBridgeHub } from "./bridge.js";
@@ -27,6 +28,7 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
   await assertZeroPublication(pool);
 
   registerHealthcheckJob(kernel.scheduler, { pool, events: kernel.events });
+  registerCostDailyJob(kernel.scheduler, { pool, audit: kernel.audit, logger });
   await kernel.scheduler.start();
 
   // B3: kinso 인박스 행의 AI 한 줄 요약 — @omnis/agents는 모듈 싱글톤 pool을 쓴다(pool.ts).
@@ -36,6 +38,8 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
     logger,
     summarizeThread,
   });
+  // 등록된 루프를 커널 이벤트/스케줄러에 건다(A4 §1.2).
+  const stopLoops = startLoops({ kernel, logger });
 
   const bridge = createBridgeHub({ kernel, pool, logger, token: config.bridgeToken });
   if (config.bridgeToken === "") {
@@ -72,6 +76,7 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
         });
         await bridge.close();
         stopSummaryJob();
+        stopLoops();
         // 2) 스케줄러를 멈추고 진행 중 틱이 claimed_at을 풀고 끝나기를 기다린다(Task 14의 stop()).
         // 3) LISTEN 커넥션을 버린다.
         await kernel.close();

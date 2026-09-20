@@ -3,15 +3,19 @@
   "references": [
     { "path": "./packages/protocol" },
     { "path": "./packages/db" },
+    { "path": "./packages/memory" },
     { "path": "./packages/kernel" },
     { "path": "./apps/hub" },
     { "path": "./packages/agents" },
     { "path": "./packages/adapters/slack" },
     { "path": "./packages/adapters/gmail" },
     { "path": "./packages/adapters/google-calendar" },
+    { "path": "./packages/adapters/outlook" },
+    { "path": "./packages/adapters/telegram" },
     { "path": "./apps/local-agent" },
     { "path": "./packages/ui" },
     { "path": "./apps/desktop" },
+    { "path": "./apps/gallery" },
     { "path": "./tools/auth-kit" }
   ]
 }

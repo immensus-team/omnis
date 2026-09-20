@@ -1,0 +1,67 @@
+{
+  "scenario": "spam_labeled_message",
+  "raw": {
+    "id": "18c2f4a1b2d3e4ff",
+    "threadId": "18c2f4a1b2d3e4ff",
+    "labelIds": ["SPAM", "UNREAD"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Promo <promo@deals.example.net>"
+        },
+        {
+          "name": "Subject",
+          "value": "You have won a free audit!!!"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId009@deals.example.net>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 03:22:47 +0000"
+        }
+      ],
+      "body": {
+        "data": "Q2xhaW0geW91ciBwcml6ZSB3aXRoaW4gMjQgaG91cnMu"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3e4ff",
+        "externalId": "18c2f4a1b2d3e4ff",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Promo <promo@deals.example.net>"
+        },
+        "body": "Subject: You have won a free audit!!!\n\nClaim your prize within 24 hours.",
+        "attachments": [],
+        "sentAt": "2023-11-15T03:22:47.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId009@deals.example.net>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3e4ff",
+          "kind": "email",
+          "title": "You have won a free audit!!!",
+          "participants": [
+            {
+              "externalId": "promo@deals.example.net",
+              "displayName": "Promo"
+            }
+          ],
+          "lastItemAt": "2023-11-15T03:22:47.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

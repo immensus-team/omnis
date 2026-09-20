@@ -1,0 +1,566 @@
+/* Vendored verbatim from apps/desktop/src/app.css — do not hand-edit.
+   apps/gallery/** may only depend on @omnis/ui, never on apps/desktop (separate workspace
+   package), so the real component classes (.channel-rail, .inbox-row, .draft-card,
+   .approval-card, .tool-call-badge, .status-badge, cmdk's [cmdk-dialog]/[cmdk-item]/…)
+   have to be copied here for the demos to render styled. If apps/desktop/src/app.css
+   changes, re-copy the whole file below this comment — verbatim, do not hand-pick a
+   subset, or demos composing an unlisted selector will silently lose their styling. */
+/* 셸 레이아웃만. 색·타이포는 @omnis/ui/tokens.css의 토큰을 그대로 쓴다(A5 §1).
+   react-virtuoso는 스크롤러가 실제 높이를 가져야 한 행도 그리므로 여기서 높이 사슬을 잇는다. */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  /* U1: 따뜻한 오프화이트 캔버스 + 옅은 그리드/그라데이션 배경(DESIGN-DIRECTION.md, 23 §2 실측 근사).
+     다크 테마(data-theme="dark")에서는 tokens.css가 --canvas-grid를 none으로 지워 평범한 단색이 된다. */
+  background-color: var(--bg-canvas);
+  background-image: var(--canvas-grid);
+  background-size: var(--canvas-grid-size);
+  background-repeat: repeat, repeat, no-repeat, no-repeat;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.app-shell {
+  display: grid;
+  /* kinso: 레일 + 메인 컬럼. 상세 패널은 열렸을 때만 세 번째 칼럼으로 붙는다(App.tsx). */
+  grid-template-columns: 76px minmax(0, 1fr);
+  align-items: stretch;
+  height: 100%;
+  gap: 16px;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.app-shell--with-detail {
+  grid-template-columns: 76px minmax(0, 1fr) minmax(360px, 34%);
+}
+
+.channel-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+}
+
+/* kinso의 레일 타일은 캔버스가 아니라 흰 레일 플레이트 위에 얹혀 있다 — 이 플레이트가 없으면
+   --bg-elevated와 --bg-canvas의 명도차(1%)가 너무 작아 타일이 그냥 안 보인다. */
+.channel-rail__plate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px;
+  border-radius: 22px;
+  background: var(--bg-base);
+  box-shadow: var(--shadow-row-selected);
+}
+
+.channel-rail__tile,
+.channel-rail__icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 30%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.channel-rail__plate .channel-rail__tile:hover {
+  background: var(--bg-elevated);
+}
+
+.channel-rail__tile--inbox {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 4px;
+  background: var(--gray-950, #14141a);
+  color: var(--gray-000, #fff);
+  box-shadow: var(--shadow-row-selected);
+}
+
+.channel-rail__tile--active {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.channel-rail__more,
+.channel-rail__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.channel-rail__avatar {
+  width: 44px;
+  height: 44px;
+  background: var(--gray-950, #14141a);
+  color: var(--gray-000, #fff);
+  border-radius: 30%;
+}
+
+.channel-rail__spacer {
+  flex: 1 1 auto;
+}
+
+.app-shell__main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+/* U1 ask/search pill — CommandPalette mode="inline"이 렌더한다.
+   .glass-surface의 기본 hairline 보더 대신 흰 pill + 포커스 시 그라데이션 스트로크. */
+.ask-bar {
+  position: relative;
+}
+
+.ask-bar__pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  background: linear-gradient(var(--bg-base), var(--bg-base)) padding-box,
+    linear-gradient(var(--border-hairline), var(--border-hairline)) border-box;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 1px 2px oklch(0 0 0 / 0.04);
+}
+
+.ask-bar__pill:focus-within {
+  background: linear-gradient(var(--bg-base), var(--bg-base)) padding-box, var(--ask-gradient)
+    border-box;
+}
+
+.ask-bar__orb {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--ask-gradient);
+}
+
+.ask-bar__pill [cmdk-input] {
+  padding: 0;
+}
+
+.ask-bar__dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  border-radius: 12px;
+  padding: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.inbox-card {
+  display: flex;
+  background: var(--bg-base);
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: 20px;
+  box-shadow: var(--shadow-row-selected);
+  overflow: hidden;
+}
+
+.inbox-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 8px;
+}
+
+.inbox-card__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.inbox-card__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.inbox-card__pills button {
+  border: var(--hairline);
+  border-radius: 999px;
+  padding: 1px 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.inbox-card__pills button[aria-checked="true"] {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+
+.inbox-card__archived-pill {
+  border: var(--hairline);
+  border-radius: 999px;
+  padding: 1px 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.inbox-card__archived-pill[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+
+/* U2: kinso 대화 행 — 아바타 | (이름·시간 / 요약·칩) | (채널아이콘 또는 상태배지). 3칼럼×2행 그리드,
+   우측 슬롯은 두 행에 걸쳐 세로 중앙 정렬(kinso 실측 — 행 전체 기준 우측 끝 고정, 23 §2). */
+.inbox-row {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  row-gap: 4px;
+  align-items: center;
+  /* U1/U2/U5: 넉넉한 행 높이 — kinso는 10px보다 훨씬 여유 있는 패딩으로 밀도를 낮춘다.
+     P1(kinso polish): 12px 세로 리듬으로 맞춘다(DESIGN-DIRECTION P1). */
+  padding: 12px 16px;
+  /* 헤어라인 구분선을 뺀다(23 §2 — kinso는 padding만으로 행을 나눈다).
+     선택된 행만 .inbox-row--selected의 카드+그림자로 구분된다. */
+  cursor: pointer;
+}
+
+.inbox-row--selected {
+  background: var(--bg-base);
+  /* P1: kinso는 선택 카드 라운드가 얕다(8px) — 이전 14px은 다른 카드류(inbox-card 20px,
+     channel-rail__plate 22px)에 맞춰 너무 컸다. */
+  border-radius: 8px;
+  box-shadow: var(--shadow-row-selected);
+}
+
+.inbox-row__avatar {
+  grid-row: 1 / span 2;
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 590;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  flex: 0 0 auto;
+}
+
+.inbox-row__avatar--runtime {
+  background: var(--gray-950, #14141a);
+  color: var(--gray-000, #fff);
+  /* P1: 사람 아바타(원)와 구분되는 "런타임 로고 타일" — channel-rail 타일과 같은 스쿼클. */
+  border-radius: 30%;
+}
+
+.inbox-row__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.inbox-row__meta {
+  grid-row: 1;
+  grid-column: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.inbox-row__name {
+  /* P1: kinso 이름은 15px semibold(DESIGN-DIRECTION P1) — unread는 그보다 한 단계 더 굵게
+     구분한다(U2 결정 유지, kinso 자체엔 안읽음 개념이 없어 omnis가 얹은 것). */
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.inbox-row__name[data-unread="true"] {
+  font-weight: 700;
+}
+
+.inbox-row__unread-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: 0 0 auto;
+}
+
+.inbox-row__timestamp {
+  /* P1: kinso는 시간을 이름 바로 뒤에 붙인다("Natasha Corwin 3m") — 행 끝까지 미는
+     margin-left:auto는 예전(U2) 추정이었고 실측(kinso-inbox.webp)과 달랐다. */
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.inbox-row__summary-line {
+  grid-row: 2;
+  grid-column: 2 / span 2;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.inbox-row__summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-row__summary[data-draft="true"] {
+  color: var(--accent);
+}
+
+.inbox-row__chips {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+}
+
+.inbox-row__side {
+  grid-row: 1 / span 2;
+  grid-column: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: end;
+}
+
+.inbox-row__channel-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--text-secondary);
+}
+
+/* US-A36: 보관/되살리기는 hover(와 키보드 포커스) 때만 나타난다 — 행이 늘 버튼을 이고 있지 않는다. */
+.inbox-row__action {
+  border: var(--hairline);
+  border-radius: 999px;
+  padding: 1px 8px;
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.inbox-row:hover .inbox-row__action,
+.inbox-row:focus-within .inbox-row__action {
+  opacity: 1;
+}
+
+.inbox-row__approval-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warn-500);
+}
+
+.inbox-row__chip,
+.inbox-row__chip-more {
+  border: var(--hairline);
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* P1: 상태 배지는 라벨 칩(outline)과 달리 "soft pill" — 테두리 대신 은은한 채운 배경
+   (DESIGN-DIRECTION P1). blocked만 accent 톤으로 눈에 띄게(herdr "내가 봐야 함" 신호). */
+.status-badge {
+  border: 0;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  white-space: nowrap;
+}
+
+.status-badge--agent[data-agent-state="blocked"] {
+  color: var(--accent);
+  background: color-mix(in oklch, var(--accent) 16%, var(--bg-elevated));
+}
+
+/* U5: ChannelGlyph의 타일 배경 변형(현재 KakaoTalk만) — 브랜드 옐로 위 검정 글리프.
+   고정 크기 대신 padding으로 감싸 레일(18px 아이콘)·행(16px 아이콘) 어디서든 맞는다. */
+.channel-glyph--tiled {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: 30%;
+}
+
+.app-shell__detail {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.thread-screen__item,
+.agent-session-screen__turn,
+.agent-session-screen__system-log,
+.tool-call-badge,
+.approval-card,
+.draft-card {
+  margin-bottom: 12px;
+}
+
+/* US-A36 / A5 §3.8: 오프라인 배너와 같은 톤의 상단 고정 바. */
+.thread-screen__archived-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.thread-screen__archived-banner button {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.thread-screen__item p {
+  margin: 4px 0 0;
+}
+
+.agent-session-screen__system-log {
+  color: var(--text-secondary);
+}
+
+.tool-call-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: var(--hairline);
+  border-radius: 8px;
+  padding: 4px 10px;
+}
+
+.approval-card {
+  border: 1px solid var(--border-hairline-strong);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.approval-card__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.approval-card__actions button {
+  border: var(--hairline);
+  border-radius: 8px;
+  padding: 4px 12px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* cmdk의 Command.Dialog는 스타일이 없는 채로 문서 끝에 붙는다 — 셸이 띄우는 오버레이이므로
+   위치만 여기서 잡는다(칩·유리 표면 등 시각 토큰은 @omnis/ui가 계속 소유한다). */
+[cmdk-overlay] {
+  position: fixed;
+  inset: 0;
+  background: oklch(0 0 0 / 0.4);
+}
+
+[cmdk-dialog] {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: start center;
+  padding-top: 15vh;
+}
+
+[cmdk-dialog] .glass-surface {
+  width: min(560px, 90vw);
+  border-radius: 12px;
+  padding: 8px;
+}
+
+[cmdk-input] {
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  outline: none;
+}
+
+[cmdk-group-heading] {
+  padding: 6px 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+[cmdk-item] {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+[cmdk-item][data-selected="true"] {
+  background: var(--bg-elevated);
+}

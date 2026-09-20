@@ -1,0 +1,66 @@
+{
+  "scenario": "attachment_pdf_metadata_with_text_body",
+  "note": "Message flagged hasAttachments with a text body. attachments stays [] by design: v1 downloads through the per-message /attachments call (A1 §2.4) and the Gmail adapter behaves identically.",
+  "raw": {
+    "id": "AAMkAGI1msg040",
+    "conversationId": "AAQkAGI1conv040",
+    "internetMessageId": "<msg-040@outlook.com>",
+    "subject": "Q4 handoff bundle",
+    "body": {
+      "contentType": "text",
+      "content": "Bundle attached — see the rollback plan on page 4."
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Priya Raman",
+        "address": "priya@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "hasAttachments": true,
+    "receivedDateTime": "2023-11-15T06:30:00Z",
+    "sentDateTime": "2023-11-15T06:30:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv040",
+        "externalId": "AAMkAGI1msg040",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "priya@example.com"
+        },
+        "body": "Subject: Q4 handoff bundle\n\nBundle attached — see the rollback plan on page 4.",
+        "attachments": [],
+        "sentAt": "2023-11-15T06:30:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-040@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv040",
+          "kind": "email",
+          "title": "Q4 handoff bundle",
+          "participants": [
+            {
+              "externalId": "priya@example.com",
+              "displayName": "Priya Raman"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T06:30:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

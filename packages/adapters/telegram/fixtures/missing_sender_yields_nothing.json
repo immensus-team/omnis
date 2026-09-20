@@ -1,0 +1,15 @@
+{
+  "scenario": "missing_sender_yields_nothing",
+  "raw": {
+    "id": 9002,
+    "chat": {
+      "id": 1001,
+      "type": "private"
+    },
+    "text": "partial update with no sender",
+    "date": 1700012000
+  },
+  "expected": {
+    "items": []
+  }
+}

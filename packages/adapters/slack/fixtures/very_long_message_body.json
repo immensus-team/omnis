@@ -1,0 +1,44 @@
+{
+  "scenario": "very_long_message_body",
+  "raw": {
+    "type": "message",
+    "channel": "C07OMNISEN",
+    "channel_name": "omnis-eng",
+    "user": "U07JIN0001",
+    "text": "[2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. To prevent a repeat we tuned the alert threshold and added the procedure to the runbook. That is everything. Leave any questions in the thread.",
+    "ts": "1715678680.002100",
+    "team": "T07OMNISTM",
+    "reply_count": 0
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISEN",
+        "externalId": "1715678680.002100",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "U07JIN0001"
+        },
+        "body": "[2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. [2024-05-14 09:12 KST] the api-gateway 5xx rate climbed to 4.8%. We did not roll back; raising the connection pool cap from 200 to 400 brought it back to normal within 12 minutes. To prevent a repeat we tuned the alert threshold and added the procedure to the runbook. That is everything. Leave any questions in the thread.",
+        "attachments": [],
+        "sentAt": "2024-05-14T09:24:40.002Z",
+        "status": "received",
+        "sourceHash": "1715678680.002100",
+        "threadMeta": {
+          "externalId": "C07OMNISEN",
+          "kind": "group",
+          "title": "#omnis-eng",
+          "participants": [
+            {
+              "externalId": "U07JIN0001",
+              "displayName": "U07JIN0001"
+            }
+          ],
+          "lastItemAt": "2024-05-14T09:24:40.002Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

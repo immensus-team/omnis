@@ -212,6 +212,14 @@ interface SlackFile {
   url_private?: string;
   name?: string;
 }
+/** Legacy rich attachments (what bot alerts like PagerDuty use). For clients that cannot
+ *  render rich content, Slack puts the same text into `fallback` — and when text/files are
+ *  empty, that is exactly where the readable content remains. */
+interface SlackLegacyAttachment {
+  fallback?: string;
+  title?: string;
+  text?: string;
+}
 interface SlackMessageEvent {
   type?: string;
   subtype?: string;
@@ -224,6 +232,7 @@ interface SlackMessageEvent {
   ts?: string;
   thread_ts?: string;
   files?: SlackFile[];
+  attachments?: SlackLegacyAttachment[];
 }
 
 function mimeToAttachmentKind(mimetype: string | undefined): Attachment["kind"] {
@@ -234,6 +243,15 @@ function mimeToAttachmentKind(mimetype: string | undefined): Attachment["kind"] 
   return "file";
 }
 
+/** Pull the human-readable text out of legacy attachments: fallback → title → text. When Slack
+ *  sends all three, fallback is the most complete single line (it already merges title + body). */
+function legacyAttachmentText(attachments: SlackLegacyAttachment[] | undefined): string {
+  return (attachments ?? [])
+    .map((a) => a.fallback || a.title || a.text || "")
+    .filter((text) => text.length > 0)
+    .join("\n");
+}
+
 export function normalize(raw: unknown): NormalizedItem[] {
   const m = raw as SlackMessageEvent;
   // channel is intentionally NOT required here (deviation from plan text): real
@@ -242,6 +260,12 @@ export function normalize(raw: unknown): NormalizedItem[] {
   // events (Events API / Socket Mode) do carry `channel`, which is used when present.
   if (m.type !== "message" || !m.ts) return [];
   if (m.subtype === "message_changed" || m.subtype === "message_deleted") return [];
+  // With neither text nor files, legacy `attachments` plain text is all that is left: even bot
+  // messages carrying only legacy fields (PagerDuty, etc.) get real content in `fallback` for
+  // clients that cannot render, so dropping it loses the alert entirely (data loss). Only drop
+  // when there is truly nothing to read — same as message_changed/message_deleted.
+  const body = m.text || legacyAttachmentText(m.attachments);
+  if (!body && !m.files?.length) return [];
 
   const attachments: Attachment[] = (m.files ?? []).map((f) => ({
     kind: mimeToAttachmentKind(f.mimetype),
@@ -260,7 +284,7 @@ export function normalize(raw: unknown): NormalizedItem[] {
       externalId: m.ts,
       kind: "message",
       author: { kind: "person", id: m.user ?? "" },
-      body: m.text ?? "",
+      body,
       attachments,
       sentAt,
       status: "received",

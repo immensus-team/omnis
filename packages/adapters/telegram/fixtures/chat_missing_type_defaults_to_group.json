@@ -1,0 +1,48 @@
+{
+  "scenario": "chat_missing_type_defaults_to_group",
+  "raw": {
+    "id": 8604,
+    "chat": {
+      "id": 555
+    },
+    "sender": {
+      "id": 42,
+      "firstName": "Dana",
+      "lastName": "Lee",
+      "username": "danalee"
+    },
+    "text": "partial update, so chat.type is missing",
+    "date": 1700008300
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "555",
+        "externalId": "8604",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "42"
+        },
+        "body": "partial update, so chat.type is missing",
+        "attachments": [],
+        "sentAt": "2023-11-15T00:31:40.000Z",
+        "status": "received",
+        "sourceHash": "555:8604",
+        "threadMeta": {
+          "externalId": "555",
+          "kind": "group",
+          "title": null,
+          "participants": [
+            {
+              "externalId": "42",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2023-11-15T00:31:40.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

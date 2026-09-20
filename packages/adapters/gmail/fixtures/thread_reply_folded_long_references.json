@@ -1,0 +1,72 @@
+{
+  "scenario": "thread_reply_folded_long_references",
+  "note": "Real msgs often fold the long References header across lines (CRLF + space). Gmail returns it unfolded in payload.headers, but the folded form shows the adapter does no header unfolding of its own.",
+  "raw": {
+    "id": "18c2f4a1b2d3e4fb",
+    "threadId": "18c2f4a1b2d3e4f0",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Logan Kim <281932556+jinhologankim@users.noreply.github.com>"
+        },
+        {
+          "name": "Subject",
+          "value": "Re: omnis launch sync"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId005@mail.gmail.com>"
+        },
+        {
+          "name": "References",
+          "value": "<CAFakeMsgId000@mail.gmail.com>\r\n <CAFakeMsgId001@mail.gmail.com>\r\n <CAFakeMsgId004@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Tue, 14 Nov 2023 23:02:11 +0000"
+        }
+      ],
+      "body": {
+        "data": "RGVwbG95IHdpbmRvdyBjb25maXJtZWQgZm9yIFRodXJzZGF5Lg"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3e4f0",
+        "externalId": "18c2f4a1b2d3e4fb",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Logan Kim <281932556+jinhologankim@users.noreply.github.com>"
+        },
+        "body": "Subject: Re: omnis launch sync\n\nDeploy window confirmed for Thursday.",
+        "attachments": [],
+        "sentAt": "2023-11-14T23:02:11.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId005@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3e4f0",
+          "kind": "email",
+          "title": "Re: omnis launch sync",
+          "participants": [
+            {
+              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-14T23:02:11.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

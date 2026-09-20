@@ -1,0 +1,71 @@
+{
+  "scenario": "timezone_event_in_utc_z_suffix",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_tz_utc_standup",
+    "status": "confirmed",
+    "summary": "Global sync (UTC)",
+    "creator": {
+      "email": "us@example.com"
+    },
+    "organizer": {
+      "email": "us@example.com",
+      "displayName": "US Team"
+    },
+    "start": {
+      "dateTime": "2026-09-24T23:00:00Z",
+      "timeZone": "UTC"
+    },
+    "end": {
+      "dateTime": "2026-09-24T23:45:00Z",
+      "timeZone": "UTC"
+    },
+    "attendees": [
+      {
+        "email": "us@example.com",
+        "displayName": "US Team",
+        "responseStatus": "accepted"
+      },
+      {
+        "email": "dana@example.com",
+        "displayName": "Dana Lee",
+        "responseStatus": "needsAction"
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_tz_utc_standup",
+        "externalId": "evt_tz_utc_standup",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "Global sync (UTC)",
+        "attachments": [],
+        "sentAt": "2026-09-24T23:00:00Z",
+        "status": "received",
+        "sourceHash": "evt_tz_utc_standup",
+        "threadMeta": {
+          "externalId": "evt_tz_utc_standup",
+          "kind": "calendar",
+          "title": "Global sync (UTC)",
+          "participants": [
+            {
+              "externalId": "us@example.com",
+              "displayName": "US Team"
+            },
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2026-09-24T23:00:00Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

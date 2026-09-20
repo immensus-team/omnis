@@ -1,0 +1,14 @@
+{
+  "name": "@omnis/adapter-telegram",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": { "build": "tsc --build", "test": "vitest run" },
+  "dependencies": {
+    "@omnis/protocol": "workspace:*",
+    "@mtcute/node": "0.29.1"
+  },
+  "devDependencies": { "typescript": "5.6.3", "vitest": "2.1.9" }
+}

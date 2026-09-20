@@ -1,0 +1,79 @@
+{
+  "scenario": "noreply_automated_sender_github",
+  "raw": {
+    "id": "18c2f4a1b2d3f507",
+    "threadId": "18c2f4a1b2d3f507",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "GitHub <noreply@github.com>"
+        },
+        {
+          "name": "To",
+          "value": "Logan Kim <281932556+jinhologankim@users.noreply.github.com>"
+        },
+        {
+          "name": "Subject",
+          "value": "[omnis/omnis] Run failed: ci (main)"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<omnis/omnis/run/7788@github.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 15:31:12 +0000"
+        },
+        {
+          "name": "Precedence",
+          "value": "list"
+        }
+      ],
+      "body": {
+        "data": "V29ya2Zsb3cgcnVuICM3Nzg4IGZhaWxlZCBvbiBtYWluLg"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f507",
+        "externalId": "18c2f4a1b2d3f507",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "GitHub <noreply@github.com>"
+        },
+        "body": "Subject: [omnis/omnis] Run failed: ci (main)\n\nWorkflow run #7788 failed on main.",
+        "attachments": [],
+        "sentAt": "2023-11-15T15:31:12.000Z",
+        "status": "received",
+        "sourceHash": "<omnis/omnis/run/7788@github.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f507",
+          "kind": "email",
+          "title": "[omnis/omnis] Run failed: ci (main)",
+          "participants": [
+            {
+              "externalId": "noreply@github.com",
+              "displayName": "GitHub"
+            },
+            {
+              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T15:31:12.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

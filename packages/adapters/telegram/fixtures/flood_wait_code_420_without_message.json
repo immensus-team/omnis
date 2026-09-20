@@ -1,0 +1,9 @@
+{
+  "scenario": "flood_wait_code_420_without_message",
+  "raw": {
+    "code": 420
+  },
+  "expected": {
+    "errorKind": "retryable_rate_limit"
+  }
+}

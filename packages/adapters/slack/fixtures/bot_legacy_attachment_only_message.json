@@ -1,0 +1,52 @@
+{
+  "scenario": "bot_legacy_attachment_only_message",
+  "raw": {
+    "type": "message",
+    "subtype": "bot_message",
+    "channel": "C07OMNISEN",
+    "channel_name": "omnis-eng",
+    "bot_id": "B07PAGERDUTY",
+    "username": "PagerDuty",
+    "ts": "1715678540.000700",
+    "team": "T07OMNISTM",
+    "attachments": [
+      {
+        "id": 1,
+        "fallback": "Triggered: HIGH api-gateway 5xx rate",
+        "color": "danger",
+        "title": "Triggered: HIGH — api-gateway 5xx rate",
+        "title_link": "https://omnis.pagerduty.com/incidents/Q1ABCDEF",
+        "text": "5xx rate 4.8% over 5m (threshold 1%)",
+        "fields": [
+          { "title": "Service", "value": "api-gateway", "short": true },
+          { "title": "Priority", "value": "P1", "short": true }
+        ],
+        "footer": "PagerDuty",
+        "ts": 1715678540
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISEN",
+        "externalId": "1715678540.000700",
+        "kind": "message",
+        "author": { "kind": "person", "id": "" },
+        "body": "Triggered: HIGH api-gateway 5xx rate",
+        "attachments": [],
+        "sentAt": "2024-05-14T09:22:20.000Z",
+        "status": "received",
+        "sourceHash": "1715678540.000700",
+        "threadMeta": {
+          "externalId": "C07OMNISEN",
+          "kind": "group",
+          "title": "#omnis-eng",
+          "participants": [],
+          "lastItemAt": "2024-05-14T09:22:20.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

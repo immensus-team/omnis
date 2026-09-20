@@ -1,0 +1,48 @@
+{
+  "scenario": "group_chat_without_title",
+  "raw": {
+    "id": 8603,
+    "chat": {
+      "id": 2002,
+      "type": "group"
+    },
+    "sender": {
+      "id": 43,
+      "firstName": "Logan",
+      "username": "logankim"
+    },
+    "text": "Group message with no title",
+    "date": 1700008200
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "2002",
+        "externalId": "8603",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "43"
+        },
+        "body": "Group message with no title",
+        "attachments": [],
+        "sentAt": "2023-11-15T00:30:00.000Z",
+        "status": "received",
+        "sourceHash": "2002:8603",
+        "threadMeta": {
+          "externalId": "2002",
+          "kind": "group",
+          "title": null,
+          "participants": [
+            {
+              "externalId": "43",
+              "displayName": "Logan"
+            }
+          ],
+          "lastItemAt": "2023-11-15T00:30:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

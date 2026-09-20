@@ -1,0 +1,60 @@
+{
+  "scenario": "long_photo_caption_without_text",
+  "raw": {
+    "id": 8902,
+    "chat": {
+      "id": 1001,
+      "type": "private"
+    },
+    "sender": {
+      "id": 42,
+      "firstName": "Dana",
+      "lastName": "Lee",
+      "username": "danalee"
+    },
+    "caption": "Screenshot description: This screen shows the deploy pipeline status. This screen shows the deploy pipeline status. This screen shows the deploy pipeline status. This screen shows the deploy pipeline status. This screen shows the deploy pipeline status. This screen shows the deploy pipeline status. This screen shows the deploy pipeline status. This screen shows the deploy pipeline status. This screen shows the deploy pipeline status. This screen shows the deploy pipeline status. This screen shows the deploy pipeline status. This screen shows the deploy pipeline status. This screen shows the deploy pipeline status. This screen shows the deploy pipeline status. This screen shows the deploy pipeline status. This screen shows the deploy pipeline status. This screen shows the deploy ",
+    "date": 1700011100,
+    "media": {
+      "type": "photo",
+      "mimeType": "image/png",
+      "fileSize": 655360
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "1001",
+        "externalId": "8902",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "42"
+        },
+        "body": "",
+        "attachments": [
+          {
+            "kind": "image",
+            "mimeType": "image/png",
+            "sizeBytes": 655360
+          }
+        ],
+        "sentAt": "2023-11-15T01:18:20.000Z",
+        "status": "received",
+        "sourceHash": "1001:8902",
+        "threadMeta": {
+          "externalId": "1001",
+          "kind": "dm",
+          "title": null,
+          "participants": [
+            {
+              "externalId": "42",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2023-11-15T01:18:20.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

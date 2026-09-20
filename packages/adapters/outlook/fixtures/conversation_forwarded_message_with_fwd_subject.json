@@ -1,0 +1,65 @@
+{
+  "scenario": "conversation_forwarded_message_with_fwd_subject",
+  "note": "Forward keeps the conversationId of the original thread, so the Fwd: copy is a third item in the same thread rather than a new one.",
+  "raw": {
+    "id": "AAMkAGI1msg013",
+    "conversationId": "AAQkAGI1conv010",
+    "internetMessageId": "<msg-013@outlook.com>",
+    "subject": "FW: omnis launch sync",
+    "body": {
+      "contentType": "text",
+      "content": "FYI - forwarding to the release channel."
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Dana Lee",
+        "address": "dana@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Release Channel",
+          "address": "release@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-15T02:05:30Z",
+    "sentDateTime": "2023-11-15T02:05:30Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv010",
+        "externalId": "AAMkAGI1msg013",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "dana@example.com"
+        },
+        "body": "Subject: FW: omnis launch sync\n\nFYI - forwarding to the release channel.",
+        "attachments": [],
+        "sentAt": "2023-11-15T02:05:30.000Z",
+        "status": "received",
+        "sourceHash": "<msg-013@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv010",
+          "kind": "email",
+          "title": "FW: omnis launch sync",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "release@example.com",
+              "displayName": "Release Channel"
+            }
+          ],
+          "lastItemAt": "2023-11-15T02:05:30.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

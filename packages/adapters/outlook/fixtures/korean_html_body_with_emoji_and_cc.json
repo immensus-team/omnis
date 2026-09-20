@@ -1,0 +1,77 @@
+{
+  "scenario": "korean_html_body_with_emoji_and_cc",
+  "note": "Korean HTML mail with emoji and a cc list; entity-free Korean text survives stripHtml intact.",
+  "raw": {
+    "id": "AAMkAGI1msg081",
+    "conversationId": "AAQkAGI1conv081",
+    "internetMessageId": "<msg-081@outlook.com>",
+    "subject": "🎉 분기 목표 달성 공유",
+    "body": {
+      "contentType": "html",
+      "content": "<div>팀 여러분, 분기 목표를 달성했습니다. 👏</div><div>다음 스프린트 우선순위는 <b>백필 안정화</b>입니다.</div>"
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Priya Raman",
+        "address": "priya@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "김진호",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "ccRecipients": [
+      {
+        "emailAddress": {
+          "name": "김다나",
+          "address": "dana@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-15T11:30:00Z",
+    "sentDateTime": "2023-11-15T11:30:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv081",
+        "externalId": "AAMkAGI1msg081",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "priya@example.com"
+        },
+        "body": "Subject: 🎉 분기 목표 달성 공유\n\n팀 여러분, 분기 목표를 달성했습니다. 👏 다음 스프린트 우선순위는 백필 안정화 입니다.",
+        "attachments": [],
+        "sentAt": "2023-11-15T11:30:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-081@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv081",
+          "kind": "email",
+          "title": "🎉 분기 목표 달성 공유",
+          "participants": [
+            {
+              "externalId": "priya@example.com",
+              "displayName": "Priya Raman"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "김진호"
+            },
+            {
+              "externalId": "dana@example.com",
+              "displayName": "김다나"
+            }
+          ],
+          "lastItemAt": "2023-11-15T11:30:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

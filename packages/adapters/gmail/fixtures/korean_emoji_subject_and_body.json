@@ -1,0 +1,75 @@
+{
+  "scenario": "korean_emoji_subject_and_body",
+  "raw": {
+    "id": "18c2f4a1b2d3f509",
+    "threadId": "18c2f4a1b2d3f509",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "정하늘 <haneul@example.com>"
+        },
+        {
+          "name": "To",
+          "value": "281932556+jinhologankim@users.noreply.github.com"
+        },
+        {
+          "name": "Subject",
+          "value": "🎉 배포 완료! 🚀 다음 단계는?"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId018@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 16:30:00 +0900"
+        }
+      ],
+      "body": {
+        "data": "67Cw7Y-sIOyEseqzte2WiOyWtOyalCDwn5mMIOuCtOydvCDtmozqs6Dsl5DshJwg67Ss7JqUIPCfkYs"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f509",
+        "externalId": "18c2f4a1b2d3f509",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "정하늘 <haneul@example.com>"
+        },
+        "body": "Subject: 🎉 배포 완료! 🚀 다음 단계는?\n\n배포 성공했어요 🙌 내일 회고에서 봬요 👋",
+        "attachments": [],
+        "sentAt": "2023-11-15T07:30:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId018@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f509",
+          "kind": "email",
+          "title": "🎉 배포 완료! 🚀 다음 단계는?",
+          "participants": [
+            {
+              "externalId": "haneul@example.com",
+              "displayName": "정하늘"
+            },
+            {
+              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "displayName": "281932556+jinhologankim@users.noreply.github.com"
+            }
+          ],
+          "lastItemAt": "2023-11-15T07:30:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

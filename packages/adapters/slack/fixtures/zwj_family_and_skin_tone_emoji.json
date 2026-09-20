@@ -1,0 +1,36 @@
+{
+  "scenario": "zwj_family_and_skin_tone_emoji",
+  "raw": {
+    "type": "message",
+    "channel": "C07OMNISEN",
+    "channel_name": "omnis-eng",
+    "user": "U07MIN0001",
+    "text": "👍🏽 Looks good / 🏳️‍🌈 adding the pride banner / 🧑🏽‍🚀 pilot test / 👩‍💻 waiting on code review / 🇰🇷 region deploy complete",
+    "ts": "1715678660.001900",
+    "team": "T07OMNISTM",
+    "reactions": [{ "name": "thumbsup", "users": ["U07DANA001", "U07JIN0001"], "count": 2 }]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISEN",
+        "externalId": "1715678660.001900",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U07MIN0001" },
+        "body": "👍🏽 Looks good / 🏳️‍🌈 adding the pride banner / 🧑🏽‍🚀 pilot test / 👩‍💻 waiting on code review / 🇰🇷 region deploy complete",
+        "attachments": [],
+        "sentAt": "2024-05-14T09:24:20.001Z",
+        "status": "received",
+        "sourceHash": "1715678660.001900",
+        "threadMeta": {
+          "externalId": "C07OMNISEN",
+          "kind": "group",
+          "title": "#omnis-eng",
+          "participants": [{ "externalId": "U07MIN0001", "displayName": "U07MIN0001" }],
+          "lastItemAt": "2024-05-14T09:24:20.001Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

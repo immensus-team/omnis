@@ -1,0 +1,13 @@
+{
+  "scenario": "rate_limited_without_retry_after_header",
+  "raw": {
+    "httpStatus": 429,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-slack-req-id": "req-9f2c1a"
+    },
+    "body": { "ok": false, "error": "ratelimited" },
+    "statusText": "Too Many Requests"
+  },
+  "expected": { "errorKind": "retryable_rate_limit" }
+}

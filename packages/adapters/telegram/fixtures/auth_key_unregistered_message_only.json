@@ -1,0 +1,9 @@
+{
+  "scenario": "auth_key_unregistered_message_only",
+  "raw": {
+    "message": "AUTH_KEY_UNREGISTERED"
+  },
+  "expected": {
+    "errorKind": "auth_revoked"
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "scenario": "conversation_root_message_original",
+  "note": "Root message of a conversation. threadExternalId is the Graph conversationId, so every reply below lands in the same thread.",
+  "raw": {
+    "@odata.etag": "W/\"CQAAABYAAAB1\"",
+    "id": "AAMkAGI1msg010",
+    "conversationId": "AAQkAGI1conv010",
+    "conversationIndex": "HQAAAAAQ",
+    "internetMessageId": "<msg-010@outlook.com>",
+    "subject": "omnis launch sync",
+    "body": {
+      "contentType": "text",
+      "content": "Sync tomorrow at 10am about the launch checklist."
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Dana Lee",
+        "address": "dana@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-14T22:13:20Z",
+    "sentDateTime": "2023-11-14T22:13:18Z",
+    "isRead": true,
+    "webLink": "https://outlook.office365.com/owa/?ItemID=AAMkAGI1msg010"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv010",
+        "externalId": "AAMkAGI1msg010",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "dana@example.com"
+        },
+        "body": "Subject: omnis launch sync\n\nSync tomorrow at 10am about the launch checklist.",
+        "attachments": [],
+        "sentAt": "2023-11-14T22:13:20.000Z",
+        "status": "received",
+        "sourceHash": "<msg-010@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv010",
+          "kind": "email",
+          "title": "omnis launch sync",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-14T22:13:20.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

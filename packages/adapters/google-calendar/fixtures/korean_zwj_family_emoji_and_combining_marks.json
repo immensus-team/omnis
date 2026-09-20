@@ -1,0 +1,45 @@
+{
+  "scenario": "korean_zwj_family_emoji_and_combining_marks",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_korean_zwj_emoji",
+    "status": "confirmed",
+    "summary": "👨👩👧👦 가족 모임 🇰🇷 (참석자: 김씨 댁 👋🏽)",
+    "description": "ZWJ 결합 이모지와 피부톤 modifier, 지역 지시자(🇰🇷), 결합 문자(é, 각)가 섞인 텍스트.",
+    "location": "경기도 성남시 분당구",
+    "start": {
+      "dateTime": "2026-10-04T18:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-10-04T20:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_korean_zwj_emoji",
+        "externalId": "evt_korean_zwj_emoji",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "👨👩👧👦 가족 모임 🇰🇷 (참석자: 김씨 댁 👋🏽)",
+        "attachments": [],
+        "sentAt": "2026-10-04T18:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_korean_zwj_emoji",
+        "threadMeta": {
+          "externalId": "evt_korean_zwj_emoji",
+          "kind": "calendar",
+          "title": "👨👩👧👦 가족 모임 🇰🇷 (참석자: 김씨 댁 👋🏽)",
+          "participants": [],
+          "lastItemAt": "2026-10-04T18:00:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

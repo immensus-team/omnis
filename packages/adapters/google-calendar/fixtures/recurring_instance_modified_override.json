@@ -1,0 +1,74 @@
+{
+  "scenario": "recurring_instance_modified_override",
+  "raw": {
+    "kind": "calendar#event",
+    "etag": "\"3421999999999000\"",
+    "id": "evt_rec_weekly_instance_20261009",
+    "status": "confirmed",
+    "summary": "Weekly Sprint Review (time changed)",
+    "description": "Moved to 17:00 for this occurrence only.",
+    "created": "2026-07-01T00:12:33.000Z",
+    "updated": "2026-10-01T08:00:00.000Z",
+    "creator": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "organizer": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "start": {
+      "dateTime": "2026-10-09T17:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-10-09T17:30:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "recurringEventId": "evt_rec_weekly_base",
+    "originalStartTime": {
+      "dateTime": "2026-10-07T10:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "attendees": [
+      {
+        "email": "dana@example.com",
+        "displayName": "Dana Lee",
+        "responseStatus": "accepted"
+      }
+    ],
+    "sequence": 1,
+    "iCalUID": "recweekly@google.com"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_rec_weekly_instance_20261009",
+        "externalId": "evt_rec_weekly_instance_20261009",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "Weekly Sprint Review (time changed)",
+        "attachments": [],
+        "sentAt": "2026-10-09T17:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_rec_weekly_instance_20261009",
+        "threadMeta": {
+          "externalId": "evt_rec_weekly_instance_20261009",
+          "kind": "calendar",
+          "title": "Weekly Sprint Review (time changed)",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2026-10-09T17:00:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

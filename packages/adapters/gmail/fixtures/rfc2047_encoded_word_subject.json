@@ -1,0 +1,68 @@
+{
+  "scenario": "rfc2047_encoded_word_subject",
+  "note": "MIME encoded-word Subject. normalize() does not decode RFC 2047, so the raw encoded-word is kept. Pinned as-is (decoding would need an RFC 2047 decoder dependency).",
+  "raw": {
+    "id": "18c2f4a1b2d3f517",
+    "threadId": "18c2f4a1b2d3f517",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Dana Lee <dana@example.com>"
+        },
+        {
+          "name": "Subject",
+          "value": "=?ISO-8859-1?Q?Caf=E9_meeting?="
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId028@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 19:30:00 +0000"
+        }
+      ],
+      "body": {
+        "data": "U2VlIHlvdSB0aGVyZS4"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f517",
+        "externalId": "18c2f4a1b2d3f517",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Dana Lee <dana@example.com>"
+        },
+        "body": "Subject: =?ISO-8859-1?Q?Caf=E9_meeting?=\n\nSee you there.",
+        "attachments": [],
+        "sentAt": "2023-11-15T19:30:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId028@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f517",
+          "kind": "email",
+          "title": "=?ISO-8859-1?Q?Caf=E9_meeting?=",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2023-11-15T19:30:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

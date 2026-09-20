@@ -1,0 +1,53 @@
+{
+  "scenario": "event_without_summary_falls_back_to_description",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_no_summary",
+    "status": "confirmed",
+    "description": "Busy block pushed in by another system — no summary at all.",
+    "creator": {
+      "email": "scheduler@example.com"
+    },
+    "organizer": {
+      "email": "scheduler@example.com"
+    },
+    "start": {
+      "dateTime": "2026-10-16T08:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-10-16T09:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "attendees": [
+      {
+        "email": "dana@example.com",
+        "displayName": "Dana Lee",
+        "responseStatus": "accepted"
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_no_summary",
+        "externalId": "evt_no_summary",
+        "kind": "event",
+        "author": { "kind": "system", "id": "" },
+        "body": "Busy block pushed in by another system — no summary at all.",
+        "attachments": [],
+        "sentAt": "2026-10-16T08:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_no_summary",
+        "threadMeta": {
+          "externalId": "evt_no_summary",
+          "kind": "calendar",
+          "title": null,
+          "participants": [{ "externalId": "dana@example.com", "displayName": "Dana Lee" }],
+          "lastItemAt": "2026-10-16T08:00:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

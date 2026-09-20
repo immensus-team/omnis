@@ -1,0 +1,87 @@
+{
+  "scenario": "group_recipients_distribution_list_to_and_cc",
+  "note": "Distribution list plus two individual cc recipients — the group is one participant entry keyed by its address, not expanded.",
+  "raw": {
+    "id": "AAMkAGI1msg060",
+    "conversationId": "AAQkAGI1conv060",
+    "internetMessageId": "<msg-060@outlook.com>",
+    "subject": "All-hands notes",
+    "body": {
+      "contentType": "text",
+      "content": "Notes from today's all-hands."
+    },
+    "from": {
+      "emailAddress": {
+        "name": "People Ops",
+        "address": "people@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Engineering All",
+          "address": "eng-all@example.com"
+        }
+      }
+    ],
+    "ccRecipients": [
+      {
+        "emailAddress": {
+          "name": "Dana Lee",
+          "address": "dana@example.com"
+        }
+      },
+      {
+        "emailAddress": {
+          "name": "Priya Raman",
+          "address": "priya@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-15T09:00:00Z",
+    "sentDateTime": "2023-11-15T09:00:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv060",
+        "externalId": "AAMkAGI1msg060",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "people@example.com"
+        },
+        "body": "Subject: All-hands notes\n\nNotes from today's all-hands.",
+        "attachments": [],
+        "sentAt": "2023-11-15T09:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-060@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv060",
+          "kind": "email",
+          "title": "All-hands notes",
+          "participants": [
+            {
+              "externalId": "people@example.com",
+              "displayName": "People Ops"
+            },
+            {
+              "externalId": "eng-all@example.com",
+              "displayName": "Engineering All"
+            },
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "priya@example.com",
+              "displayName": "Priya Raman"
+            }
+          ],
+          "lastItemAt": "2023-11-15T09:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

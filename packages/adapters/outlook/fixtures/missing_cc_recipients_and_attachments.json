@@ -1,0 +1,64 @@
+{
+  "scenario": "missing_cc_recipients_and_attachments",
+  "note": "ccRecipients, bccRecipients, hasAttachments and attachments all omitted — every one of them is optional to normalize().",
+  "raw": {
+    "id": "AAMkAGI1msg100",
+    "conversationId": "AAQkAGI1conv100",
+    "internetMessageId": "<msg-100@outlook.com>",
+    "subject": "Ping",
+    "body": {
+      "contentType": "text",
+      "content": "Quick ping — no rush."
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Dana Lee",
+        "address": "dana@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-15T12:30:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv100",
+        "externalId": "AAMkAGI1msg100",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "dana@example.com"
+        },
+        "body": "Subject: Ping\n\nQuick ping — no rush.",
+        "attachments": [],
+        "sentAt": "2023-11-15T12:30:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-100@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv100",
+          "kind": "email",
+          "title": "Ping",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T12:30:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

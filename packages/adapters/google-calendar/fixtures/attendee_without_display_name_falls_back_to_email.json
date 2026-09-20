@@ -1,0 +1,71 @@
+{
+  "scenario": "attendee_without_display_name_falls_back_to_email",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_attendees_no_displayname",
+    "status": "confirmed",
+    "summary": "External Vendor Meeting",
+    "creator": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "organizer": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "start": {
+      "dateTime": "2026-12-03T11:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-12-03T12:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "attendees": [
+      {
+        "email": "vendor@partner.example.com",
+        "responseStatus": "accepted"
+      },
+      {
+        "email": "meeting-room-a@resource.calendar.google.com",
+        "responseStatus": "accepted",
+        "resource": true
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_attendees_no_displayname",
+        "externalId": "evt_attendees_no_displayname",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "External Vendor Meeting",
+        "attachments": [],
+        "sentAt": "2026-12-03T11:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_attendees_no_displayname",
+        "threadMeta": {
+          "externalId": "evt_attendees_no_displayname",
+          "kind": "calendar",
+          "title": "External Vendor Meeting",
+          "participants": [
+            {
+              "externalId": "vendor@partner.example.com",
+              "displayName": "vendor@partner.example.com"
+            },
+            {
+              "externalId": "meeting-room-a@resource.calendar.google.com",
+              "displayName": "meeting-room-a@resource.calendar.google.com"
+            }
+          ],
+          "lastItemAt": "2026-12-03T11:00:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

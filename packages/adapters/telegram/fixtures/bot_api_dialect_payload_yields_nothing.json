@@ -1,0 +1,25 @@
+{
+  "scenario": "bot_api_dialect_payload_yields_nothing",
+  "raw": {
+    "update_id": 9910001,
+    "message": {
+      "message_id": 9001,
+      "from": {
+        "id": 42,
+        "is_bot": false,
+        "first_name": "Dana",
+        "language_code": "ko"
+      },
+      "chat": {
+        "id": 1001,
+        "type": "private",
+        "first_name": "Dana"
+      },
+      "date": 1700000000,
+      "text": "sync tomorrow at 10am"
+    }
+  },
+  "expected": {
+    "items": []
+  }
+}

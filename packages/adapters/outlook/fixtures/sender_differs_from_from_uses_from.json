@@ -1,0 +1,79 @@
+{
+  "scenario": "sender_differs_from_from_uses_from",
+  "note": "Delegate/shared-mailbox shape: `sender` is the assistant who actually pushed send, `from` is the mailbox identity the recipient sees. author.id follows `from`; `sender` and `replyTo` are ignored by v1.",
+  "raw": {
+    "id": "AAMkAGI1msg022",
+    "conversationId": "AAQkAGI1conv022",
+    "internetMessageId": "<msg-022@outlook.com>",
+    "subject": "Invoice approval",
+    "body": {
+      "contentType": "text",
+      "content": "Approved and queued for payment."
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Dana Lee",
+        "address": "dana@example.com"
+      }
+    },
+    "sender": {
+      "emailAddress": {
+        "name": "Dana's Assistant",
+        "address": "assistant@example.com"
+      }
+    },
+    "replyTo": [
+      {
+        "emailAddress": {
+          "name": "Do Not Reply",
+          "address": "no-reply@example.com"
+        }
+      }
+    ],
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Accounts Payable",
+          "address": "ap@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-15T05:30:00Z",
+    "sentDateTime": "2023-11-15T05:29:58Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv022",
+        "externalId": "AAMkAGI1msg022",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "dana@example.com"
+        },
+        "body": "Subject: Invoice approval\n\nApproved and queued for payment.",
+        "attachments": [],
+        "sentAt": "2023-11-15T05:30:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-022@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv022",
+          "kind": "email",
+          "title": "Invoice approval",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "ap@example.com",
+              "displayName": "Accounts Payable"
+            }
+          ],
+          "lastItemAt": "2023-11-15T05:30:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

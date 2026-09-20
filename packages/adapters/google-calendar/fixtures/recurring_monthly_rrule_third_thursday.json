@@ -1,0 +1,77 @@
+{
+  "scenario": "recurring_monthly_rrule_third_thursday",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_rec_monthly_instance_20261015",
+    "status": "confirmed",
+    "summary": "Company Town Hall (third Thursday of each month)",
+    "created": "2026-01-05T01:00:00.000Z",
+    "updated": "2026-01-05T01:00:00.000Z",
+    "creator": {
+      "email": "hr@example.com"
+    },
+    "organizer": {
+      "email": "hr@example.com",
+      "displayName": "People Team"
+    },
+    "start": {
+      "dateTime": "2026-10-15T16:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-10-15T17:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "recurringEventId": "evt_rec_monthly_base",
+    "originalStartTime": {
+      "dateTime": "2026-10-15T16:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "recurrence": ["RRULE:FREQ=MONTHLY;BYDAY=3TH"],
+    "attendees": [
+      {
+        "email": "allcompany@example.com",
+        "displayName": "Everyone",
+        "responseStatus": "accepted"
+      }
+    ],
+    "hangoutLink": "https://meet.google.com/abc-defg-hij",
+    "conferenceData": {
+      "conferenceId": "abc-defg-hij",
+      "conferenceSolution": {
+        "name": "Google Meet"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_rec_monthly_instance_20261015",
+        "externalId": "evt_rec_monthly_instance_20261015",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "Company Town Hall (third Thursday of each month)",
+        "attachments": [],
+        "sentAt": "2026-10-15T16:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_rec_monthly_instance_20261015",
+        "threadMeta": {
+          "externalId": "evt_rec_monthly_instance_20261015",
+          "kind": "calendar",
+          "title": "Company Town Hall (third Thursday of each month)",
+          "participants": [
+            {
+              "externalId": "allcompany@example.com",
+              "displayName": "Everyone"
+            }
+          ],
+          "lastItemAt": "2026-10-15T16:00:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

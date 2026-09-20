@@ -1,0 +1,61 @@
+{
+  "scenario": "edited_photo_caption_only",
+  "raw": {
+    "id": 8202,
+    "chat": {
+      "id": 1001,
+      "type": "private"
+    },
+    "sender": {
+      "id": 42,
+      "firstName": "Dana",
+      "lastName": "Lee",
+      "username": "danalee"
+    },
+    "caption": "Meeting room photo (caption edited)",
+    "date": 1700004000,
+    "editDate": 1700004400,
+    "media": {
+      "type": "photo",
+      "mimeType": "image/jpeg",
+      "fileSize": 51200
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "1001",
+        "externalId": "8202",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "42"
+        },
+        "body": "",
+        "attachments": [
+          {
+            "kind": "image",
+            "mimeType": "image/jpeg",
+            "sizeBytes": 51200
+          }
+        ],
+        "sentAt": "2023-11-14T23:20:00.000Z",
+        "status": "received",
+        "sourceHash": "1001:8202",
+        "threadMeta": {
+          "externalId": "1001",
+          "kind": "dm",
+          "title": null,
+          "participants": [
+            {
+              "externalId": "42",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2023-11-14T23:20:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

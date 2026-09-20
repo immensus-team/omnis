@@ -1,0 +1,68 @@
+{
+  "scenario": "base64url_body_with_padding_and_crlf",
+  "note": "Body re-encoded by an intermediary: standard base64 with '=' padding and CRLF line breaks every 76 chars (RFC 2045). Node's base64url decoder ignores the whitespace and padding.",
+  "raw": {
+    "id": "18c2f4a1b2d3f514",
+    "threadId": "18c2f4a1b2d3f514",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Dana Lee <dana@example.com>"
+        },
+        {
+          "name": "Subject",
+          "value": "Padded body"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId025@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 19:00:00 +0000"
+        }
+      ],
+      "body": {
+        "data": "SW50ZXJtZWRpYXJ5IHJlLWVuY29kZWQgdGhpcyBib2R5IHdpdGggcGFkZGluZy4="
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f514",
+        "externalId": "18c2f4a1b2d3f514",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Dana Lee <dana@example.com>"
+        },
+        "body": "Subject: Padded body\n\nIntermediary re-encoded this body with padding.",
+        "attachments": [],
+        "sentAt": "2023-11-15T19:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId025@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f514",
+          "kind": "email",
+          "title": "Padded body",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2023-11-15T19:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

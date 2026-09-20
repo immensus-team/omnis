@@ -1,0 +1,39 @@
+{
+  "scenario": "thread_reply",
+  "raw": {
+    "id": "AAMkAGI1msg002",
+    "conversationId": "AAQkAGI1conv001",
+    "internetMessageId": "<msg-002@outlook.com>",
+    "subject": "RE: omnis launch sync",
+    "body": { "contentType": "text", "content": "10am works for me." },
+    "from": { "emailAddress": { "name": "Logan", "address": "logan@example.com" } },
+    "toRecipients": [{ "emailAddress": { "name": "Dana Lee", "address": "dana@example.com" } }],
+    "receivedDateTime": "2023-11-14T23:00:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv001",
+        "externalId": "AAMkAGI1msg002",
+        "kind": "email",
+        "author": { "kind": "person", "id": "logan@example.com" },
+        "body": "Subject: RE: omnis launch sync\n\n10am works for me.",
+        "attachments": [],
+        "sentAt": "2023-11-14T23:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-002@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv001",
+          "kind": "email",
+          "title": "RE: omnis launch sync",
+          "participants": [
+            { "externalId": "logan@example.com", "displayName": "Logan" },
+            { "externalId": "dana@example.com", "displayName": "Dana Lee" }
+          ],
+          "lastItemAt": "2023-11-14T23:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

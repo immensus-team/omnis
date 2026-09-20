@@ -1,0 +1,42 @@
+{
+  "scenario": "timezone_floating_datetime_without_offset",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_tz_floating_reminder",
+    "status": "confirmed",
+    "summary": "Floating-Time Event (no offset)",
+    "description": "A dateTime with no timezone — interpreted in the calendar's default timezone.",
+    "start": {
+      "dateTime": "2026-06-15T09:00:00"
+    },
+    "end": {
+      "dateTime": "2026-06-15T09:30:00"
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_tz_floating_reminder",
+        "externalId": "evt_tz_floating_reminder",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "Floating-Time Event (no offset)",
+        "attachments": [],
+        "sentAt": "2026-06-15T09:00:00",
+        "status": "received",
+        "sourceHash": "evt_tz_floating_reminder",
+        "threadMeta": {
+          "externalId": "evt_tz_floating_reminder",
+          "kind": "calendar",
+          "title": "Floating-Time Event (no offset)",
+          "participants": [],
+          "lastItemAt": "2026-06-15T09:00:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

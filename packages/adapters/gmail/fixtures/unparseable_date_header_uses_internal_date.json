@@ -1,0 +1,69 @@
+{
+  "scenario": "unparseable_date_header_uses_internal_date",
+  "note": "Garbage Date header (seen on spam/proxied mail). Gmail's internalDate is authoritative and always present, so it is the fallback rather than 'now'.",
+  "raw": {
+    "id": "18c2f4a1b2d3f512",
+    "threadId": "18c2f4a1b2d3f512",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "internalDate": "1700000000000",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "bounce@mailer.example.net"
+        },
+        {
+          "name": "Subject",
+          "value": "Malformed date header"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId023@mailer.example.net>"
+        },
+        {
+          "name": "Date",
+          "value": "Thu, 32 Nov 2023 25:99:00 +0000"
+        }
+      ],
+      "body": {
+        "data": "RGF0ZSBoZWFkZXIgZnJvbSBhIGJyb2tlbiBnYXRld2F5Lg"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f512",
+        "externalId": "18c2f4a1b2d3f512",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "bounce@mailer.example.net"
+        },
+        "body": "Subject: Malformed date header\n\nDate header from a broken gateway.",
+        "attachments": [],
+        "sentAt": "2023-11-14T22:13:20.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId023@mailer.example.net>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f512",
+          "kind": "email",
+          "title": "Malformed date header",
+          "participants": [
+            {
+              "externalId": "bounce@mailer.example.net",
+              "displayName": "bounce@mailer.example.net"
+            }
+          ],
+          "lastItemAt": "2023-11-14T22:13:20.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

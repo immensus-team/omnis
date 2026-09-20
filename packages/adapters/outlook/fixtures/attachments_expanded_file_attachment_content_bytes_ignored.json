@@ -1,0 +1,87 @@
+{
+  "scenario": "attachments_expanded_file_attachment_content_bytes_ignored",
+  "note": "$expand=attachments shape: full fileAttachment entities with contentBytes/contentId. v1 ignores the expanded array (attachments stays []) — no regression pin exists for media yet; the inline/base64 payload is the part a later revision would map.",
+  "raw": {
+    "id": "AAMkAGI1msg042",
+    "conversationId": "AAQkAGI1conv042",
+    "internetMessageId": "<msg-042@outlook.com>",
+    "subject": "Signed contract + logo",
+    "body": {
+      "contentType": "text",
+      "content": "Both files are attached."
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Legal Ops",
+        "address": "legal@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "hasAttachments": true,
+    "attachments": [
+      {
+        "@odata.type": "#microsoft.graph.fileAttachment",
+        "id": "AAMkAGI1att001",
+        "name": "contract-signed.pdf",
+        "contentType": "application/pdf",
+        "size": 184320,
+        "isInline": false,
+        "contentBytes": "JVBERi0xLjQKJcOkw7zDtsOfCg=="
+      },
+      {
+        "@odata.type": "#microsoft.graph.fileAttachment",
+        "id": "AAMkAGI1att002",
+        "name": "omnis-logo.png",
+        "contentType": "image/png",
+        "size": 20480,
+        "isInline": true,
+        "contentId": "omnis-logo@omnis",
+        "contentBytes": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg=="
+      }
+    ],
+    "receivedDateTime": "2023-11-15T07:20:00Z",
+    "sentDateTime": "2023-11-15T07:20:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv042",
+        "externalId": "AAMkAGI1msg042",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "legal@example.com"
+        },
+        "body": "Subject: Signed contract + logo\n\nBoth files are attached.",
+        "attachments": [],
+        "sentAt": "2023-11-15T07:20:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-042@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv042",
+          "kind": "email",
+          "title": "Signed contract + logo",
+          "participants": [
+            {
+              "externalId": "legal@example.com",
+              "displayName": "Legal Ops"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T07:20:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

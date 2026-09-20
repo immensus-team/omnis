@@ -1,0 +1,30 @@
+{
+  "scenario": "all_day_event_single_date",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_allday_childrens_day",
+    "status": "confirmed",
+    "summary": "Children's Day 🎈",
+    "created": "2026-01-02T00:00:00.000Z",
+    "updated": "2026-01-02T00:00:00.000Z",
+    "creator": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "organizer": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "start": {
+      "date": "2026-05-05"
+    },
+    "end": {
+      "date": "2026-05-06"
+    },
+    "transparency": "transparent",
+    "eventType": "default"
+  },
+  "expected": {
+    "items": []
+  }
+}

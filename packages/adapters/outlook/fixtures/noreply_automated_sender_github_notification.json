@@ -1,0 +1,65 @@
+{
+  "scenario": "noreply_automated_sender_github_notification",
+  "note": "Automated no-reply sender. The adapter has no bot detection: author.kind stays 'person' and the address is the only bot signal downstream.",
+  "raw": {
+    "id": "AAMkAGI1msg070",
+    "conversationId": "AAQkAGI1conv070",
+    "internetMessageId": "<omnis/omnis/run/7788@github.com>",
+    "subject": "[omnis/omnis] Run failed: ci (main)",
+    "body": {
+      "contentType": "text",
+      "content": "Workflow run #7788 failed on main."
+    },
+    "from": {
+      "emailAddress": {
+        "name": "GitHub",
+        "address": "noreply@github.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-15T10:00:00Z",
+    "sentDateTime": "2023-11-15T10:00:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv070",
+        "externalId": "AAMkAGI1msg070",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "noreply@github.com"
+        },
+        "body": "Subject: [omnis/omnis] Run failed: ci (main)\n\nWorkflow run #7788 failed on main.",
+        "attachments": [],
+        "sentAt": "2023-11-15T10:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<omnis/omnis/run/7788@github.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv070",
+          "kind": "email",
+          "title": "[omnis/omnis] Run failed: ci (main)",
+          "participants": [
+            {
+              "externalId": "noreply@github.com",
+              "displayName": "GitHub"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T10:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

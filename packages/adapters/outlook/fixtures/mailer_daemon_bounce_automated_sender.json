@@ -1,0 +1,64 @@
+{
+  "scenario": "mailer_daemon_bounce_automated_sender",
+  "note": "Bounce notification from a mailer daemon with a null display name in a different shape (name absent).",
+  "raw": {
+    "id": "AAMkAGI1msg071",
+    "conversationId": "AAQkAGI1conv071",
+    "internetMessageId": "<bounce-71@mailer.example.net>",
+    "subject": "Undeliverable: Invoice approval",
+    "body": {
+      "contentType": "text",
+      "content": "Delivery to ap@example.com failed permanently (550 5.1.1)."
+    },
+    "from": {
+      "emailAddress": {
+        "address": "MAILER-DAEMON@mailer.example.net"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-15T10:15:00Z",
+    "sentDateTime": "2023-11-15T10:15:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv071",
+        "externalId": "AAMkAGI1msg071",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "MAILER-DAEMON@mailer.example.net"
+        },
+        "body": "Subject: Undeliverable: Invoice approval\n\nDelivery to ap@example.com failed permanently (550 5.1.1).",
+        "attachments": [],
+        "sentAt": "2023-11-15T10:15:00.000Z",
+        "status": "received",
+        "sourceHash": "<bounce-71@mailer.example.net>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv071",
+          "kind": "email",
+          "title": "Undeliverable: Invoice approval",
+          "participants": [
+            {
+              "externalId": "MAILER-DAEMON@mailer.example.net",
+              "displayName": "MAILER-DAEMON@mailer.example.net"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T10:15:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

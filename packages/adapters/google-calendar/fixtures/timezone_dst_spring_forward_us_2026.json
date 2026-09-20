@@ -1,0 +1,50 @@
+{
+  "scenario": "timezone_dst_spring_forward_us_2026",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_tz_dst_spring_2026",
+    "status": "confirmed",
+    "summary": "DST spring-forward check (America/New_York)",
+    "creator": {
+      "email": "us@example.com"
+    },
+    "organizer": {
+      "email": "us@example.com"
+    },
+    "start": {
+      "dateTime": "2026-03-08T03:00:00-04:00",
+      "timeZone": "America/New_York"
+    },
+    "end": {
+      "dateTime": "2026-03-08T03:30:00-04:00",
+      "timeZone": "America/New_York"
+    },
+    "description": "The day that jumps from 02:00 EST to 03:00 EDT on 2026-03-08."
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_tz_dst_spring_2026",
+        "externalId": "evt_tz_dst_spring_2026",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "DST spring-forward check (America/New_York)",
+        "attachments": [],
+        "sentAt": "2026-03-08T03:00:00-04:00",
+        "status": "received",
+        "sourceHash": "evt_tz_dst_spring_2026",
+        "threadMeta": {
+          "externalId": "evt_tz_dst_spring_2026",
+          "kind": "calendar",
+          "title": "DST spring-forward check (America/New_York)",
+          "participants": [],
+          "lastItemAt": "2026-03-08T03:00:00-04:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}
