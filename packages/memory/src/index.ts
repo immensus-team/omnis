@@ -20,3 +20,4 @@ export {
   type SelfModelFile,
   type SelfModelSnapshot,
 } from "./self-model.js";
+export { ensureSelfModelRepo, applySelfModelPatch, SelfModelPatchError } from "./self-model-git.js";
