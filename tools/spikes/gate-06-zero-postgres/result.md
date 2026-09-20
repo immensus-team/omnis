@@ -7,7 +7,8 @@
 - **실행일**: 2026-09-20
 - **결과(Pass/Fail)**: **PASS**
 - **측정치/근거**:
-  - `npx tsx measure.ts` 2회 실행: `latency_ms=68.9` (exit 0), `latency_ms=46.0` (exit 0). 둘 다 Pass 기준(≤2000ms)의 3% 미만.
+  - `npx tsx measure.ts` 3회 실행: `latency_ms=68.9` (exit 0), `latency_ms=46.0` (exit 0), `latency_ms=65.1` (exit 0). 셋 다 Pass 기준(≤2000ms)의 4% 미만.
+  - 3회차는 zero-cache를 완전히 내렸다가 이 문서의 재현 절차(아래 **비고** 마지막 줄)로만 다시 올려서 측정했다 — 새 `ZERO_REPLICA_FILE`로 replica를 처음부터 다시 만든 상태에서도 동일한 수준이므로, 측정치는 따뜻한 캐시에 의존하지 않는다.
   - `wal_level`을 `replica`→`logical`로 변경(`ALTER SYSTEM SET wal_level = 'logical';` + `brew services restart postgresql@17`), 재시작 후 `SHOW wal_level;` → `logical` 확인. **로컬 Homebrew postgresql@17의 영구 설정 변경**(이 맥북에서 돌아가는 다른 프로젝트의 Postgres에도 적용됨 — 인스턴스가 하나뿐이라 격리 불가. 되돌리려면 `ALTER SYSTEM SET wal_level = 'replica'` 후 재시작).
   - `omnis_spike_zero` DB(pgvector는 불필요해 미설치, `pgcrypto`만 `CREATE EXTENSION`)에 `probe_events` 스크래치 테이블 생성, `zero-cache-dev`(포트 4848)를 붙이고 Zero 클라이언트로 `probe_events` 구독을 연 뒤, 별도 `psql` INSERT 시각(`performance.now()` 기준 t0)부터 클라이언트 리스너가 새 row를 받은 시각(t1)까지를 측정.
 - **decided_by**: agent
