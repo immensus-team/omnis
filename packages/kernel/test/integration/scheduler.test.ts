@@ -22,7 +22,8 @@ afterEach(async () => {
   for (const s of started.splice(0)) await s.stop();
 });
 afterAll(async () => {
-  // 공유 omnis_test DB: 등록한 test_* 잡을 지우지 않으면 0006의 seed 개수 단언이 깨진다.
+  // Shared omnis_test DB: leaving the registered test_* jobs behind breaks 0006's seed-count
+  // assertion.
   await query(pool, `DELETE FROM jobs WHERE name LIKE 'test\\_%'`);
   await events.close();
   await pool.end();

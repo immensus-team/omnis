@@ -1,4 +1,5 @@
-// 델타 §5/§6 (US-B33). 유닛 모킹 대신 실제 DB를 탄다 — 0009의 seed·트리거·jsonb 왕복까지 한 번에 본다.
+// delta §5/§6 (US-B33). Goes through the real DB, not unit mocks — the 0009 seed, its triggers
+// and the jsonb round-trip all come out in one pass.
 import { createPool, query } from "@omnis/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { SETTING_DEFAULTS, getAllSettings, getSetting, setSetting } from "../../src/settings.js";
@@ -6,7 +7,8 @@ import { SETTING_DEFAULTS, getAllSettings, getSetting, setSetting } from "../../
 const pool = createPool();
 afterAll(() => pool.end());
 
-// audit_log는 append-only 트리거가 DELETE를 막는다(0006 §6.1) — 워터마크로 이 테스트의 행만 본다.
+// An append-only trigger blocks DELETE on audit_log (0006 §6.1) — a watermark narrows the view
+// to this test's own rows.
 let auditFrom = 0;
 
 beforeEach(async () => {
@@ -20,7 +22,7 @@ beforeEach(async () => {
 });
 
 describe("SETTING_DEFAULTS", () => {
-  it("has every allowlist key defaulting to an empty array (계약 §5)", () => {
+  it("has every allowlist key defaulting to an empty array (contract §5)", () => {
     expect(SETTING_DEFAULTS["ingest.local_roots.mini"]).toEqual([]);
     expect(SETTING_DEFAULTS["ingest.local_roots.macbook"]).toEqual([]);
     expect(SETTING_DEFAULTS["ingest.drive_folders"]).toEqual([]);
@@ -109,7 +111,7 @@ describe("getAllSettings", () => {
   });
 });
 
-// 델타 §6: 새 NOTIFY 채널은 없다 — settings 변경은 기존 omnis_control에 얹어 탄다.
+// delta §6: there is no new NOTIFY channel — settings changes ride on the existing omnis_control.
 describe("settings_notify trigger", () => {
   it('publishes {"settings":"<key>"} on omnis_control', async () => {
     const c = await pool.connect();
