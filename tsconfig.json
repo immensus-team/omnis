@@ -11,6 +11,7 @@
     { "path": "./packages/adapters/google-calendar" },
     { "path": "./apps/local-agent" },
     { "path": "./packages/ui" },
-    { "path": "./apps/desktop" }
+    { "path": "./apps/desktop" },
+    { "path": "./tools/auth-kit" }
   ]
 }

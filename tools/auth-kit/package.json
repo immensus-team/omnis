@@ -1,0 +1,19 @@
+{
+  "name": "@omnis/auth-kit",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify": "tsx verify.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@slack/web-api": "^7.9.3",
+    "googleapis": "^161.0.0"
+  },
+  "devDependencies": {
+    "tsx": "4.19.2",
+    "typescript": "5.6.3",
+    "vitest": "2.1.9"
+  }
+}

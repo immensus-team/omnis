@@ -17,6 +17,7 @@
     "tauri:build": "pnpm --filter @omnis/desktop tauri build",
     "zero:deploy-permissions": "pnpm --filter @omnis/kernel exec zero-deploy-permissions -p src/zero-schema.ts",
     "e2e:phase-a": "tsx tools/e2e/run.ts",
+    "auth:verify": "tsx tools/auth-kit/verify.ts",
     "db:migrate": "pnpm --filter @omnis/db migrate",
     "db:migrate:create": "pnpm --filter @omnis/db migrate:create",
     "db:seed": "echo 'no seed files in Phase A — v1 seed rows live in 0002/0006 migrations (A3 §4, §6)'"

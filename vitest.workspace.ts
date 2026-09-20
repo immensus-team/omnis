@@ -15,6 +15,7 @@ export default defineWorkspace([
         "packages/adapters/*/test/**/*.test.{ts,tsx}",
         "apps/*/src/**/*.test.{ts,tsx}",
         "apps/*/test/**/*.test.{ts,tsx}",
+        "tools/auth-kit/*.test.{ts,tsx}",
       ],
       exclude: [
         "**/test/integration/**",
