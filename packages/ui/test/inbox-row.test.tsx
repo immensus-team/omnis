@@ -137,3 +137,24 @@ describe("InboxRow 리스트 (U2: 스레드 하나당 행 하나)", () => {
     expect(screen.getByLabelText("Codex 세션")).toBeInTheDocument();
   });
 });
+
+describe("InboxRow 보관 액션 (US-A36)", () => {
+  it("renders no action button unless onArchive is given", () => {
+    render(<InboxRow {...baseProps} />);
+    expect(screen.queryByRole("button", { name: "보관" })).not.toBeInTheDocument();
+  });
+
+  it("calls onArchive with the thread id without selecting the row", () => {
+    const onArchive = vi.fn();
+    const onSelect = vi.fn();
+    render(<InboxRow {...baseProps} onSelect={onSelect} onArchive={onArchive} />);
+    fireEvent.click(screen.getByRole("button", { name: "보관" }));
+    expect(onArchive).toHaveBeenCalledWith("thread-1");
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("labels the action 되살리기 on an archived row (A5 §3.8)", () => {
+    render(<InboxRow {...baseProps} archived={true} onArchive={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "되살리기" })).toBeInTheDocument();
+  });
+});

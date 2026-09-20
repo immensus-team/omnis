@@ -45,6 +45,10 @@ export interface InboxRowProps {
   hasPendingApproval: boolean;
   labels: LabelChip[];
   onSelect: (id: string) => void;
+  /** US-A36 행 hover 액션. 없으면 버튼을 그리지 않는다(A5 §3.1 "hover 시 우측에 아이콘 버튼"). */
+  onArchive?: (id: string) => void;
+  /** 보관된 행이면 액션이 "되살리기"가 된다(A5 §3.8). */
+  archived?: boolean;
 }
 
 function pickChips(labels: LabelChip[]): { shown: LabelChip[]; more: number } {
@@ -129,6 +133,20 @@ export function InboxRow(props: InboxRowProps) {
         )}
         {props.hasPendingApproval && (
           <span className="inbox-row__approval-dot" aria-label="승인 대기" />
+        )}
+        {props.onArchive && (
+          <button
+            type="button"
+            className="inbox-row__action"
+            // 행 전체가 클릭 타깃이라 버블링을 막지 않으면 보관과 동시에 스레드가 열린다.
+            onClick={(e) => {
+              e.stopPropagation();
+              props.onArchive?.(props.id);
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            {props.archived ? "되살리기" : "보관"}
+          </button>
         )}
       </div>
       <div className="inbox-row__summary-line">

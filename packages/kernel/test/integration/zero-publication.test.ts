@@ -36,3 +36,15 @@ describe("zero_omnis publication", () => {
     }
   });
 });
+
+// US-A36: 수동 보관은 threads.archived_at 하나를 바꾼다 — 그 컬럼이 복제되지 않으면
+// 데스크톱의 Inbox/Archived 뷰가 영영 갱신되지 않는다(A3 §7).
+describe("threads.archived_at 복제 (US-A36)", () => {
+  it("is part of the zero_omnis publication", async () => {
+    const rows = await query<{ attnames: string[] }>(
+      pool,
+      "SELECT attnames::text[] AS attnames FROM pg_publication_tables WHERE pubname = 'zero_omnis' AND tablename = 'threads'",
+    );
+    expect(rows[0]?.attnames).toContain("archived_at");
+  });
+});
