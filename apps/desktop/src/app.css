@@ -243,8 +243,9 @@ body {
   column-gap: 12px;
   row-gap: 4px;
   align-items: center;
-  /* U1/U2: 넉넉한 행 높이 — kinso는 10px보다 훨씬 여유 있는 패딩으로 밀도를 낮춘다. */
-  padding: 14px 16px;
+  /* U1/U2/U5: 넉넉한 행 높이 — kinso는 10px보다 훨씬 여유 있는 패딩으로 밀도를 낮춘다.
+     P1(kinso polish): 12px 세로 리듬으로 맞춘다(DESIGN-DIRECTION P1). */
+  padding: 12px 16px;
   /* 헤어라인 구분선을 뺀다(23 §2 — kinso는 padding만으로 행을 나눈다).
      선택된 행만 .inbox-row--selected의 카드+그림자로 구분된다. */
   cursor: pointer;
@@ -252,7 +253,9 @@ body {
 
 .inbox-row--selected {
   background: var(--bg-base);
-  border-radius: 14px;
+  /* P1: kinso는 선택 카드 라운드가 얕다(8px) — 이전 14px은 다른 카드류(inbox-card 20px,
+     channel-rail__plate 22px)에 맞춰 너무 컸다. */
+  border-radius: 8px;
   box-shadow: var(--shadow-row-selected);
 }
 
@@ -276,6 +279,8 @@ body {
 .inbox-row__avatar--runtime {
   background: var(--gray-950, #14141a);
   color: var(--gray-000, #fff);
+  /* P1: 사람 아바타(원)와 구분되는 "런타임 로고 타일" — channel-rail 타일과 같은 스쿼클. */
+  border-radius: 30%;
 }
 
 .inbox-row__avatar-img {
@@ -293,12 +298,14 @@ body {
 }
 
 .inbox-row__name {
-  font-weight: 400;
-  /* U2: unread는 이름을 볼드로 — 읽은 행은 일반 굵기(kinso, DESIGN-DIRECTION U2). */
+  /* P1: kinso 이름은 15px semibold(DESIGN-DIRECTION P1) — unread는 그보다 한 단계 더 굵게
+     구분한다(U2 결정 유지, kinso 자체엔 안읽음 개념이 없어 omnis가 얹은 것). */
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .inbox-row__name[data-unread="true"] {
-  font-weight: 590;
+  font-weight: 700;
 }
 
 .inbox-row__unread-dot {
@@ -310,7 +317,8 @@ body {
 }
 
 .inbox-row__timestamp {
-  margin-left: auto;
+  /* P1: kinso는 시간을 이름 바로 뒤에 붙인다("Natasha Corwin 3m") — 행 끝까지 미는
+     margin-left:auto는 예전(U2) 추정이었고 실측(kinso-inbox.webp)과 달랐다. */
   color: var(--text-secondary);
   font-size: 12px;
 }
@@ -387,8 +395,7 @@ body {
 }
 
 .inbox-row__chip,
-.inbox-row__chip-more,
-.status-badge {
+.inbox-row__chip-more {
   border: var(--hairline);
   border-radius: 999px;
   padding: 0 8px;
@@ -397,9 +404,31 @@ body {
   white-space: nowrap;
 }
 
+/* P1: 상태 배지는 라벨 칩(outline)과 달리 "soft pill" — 테두리 대신 은은한 채운 배경
+   (DESIGN-DIRECTION P1). blocked만 accent 톤으로 눈에 띄게(herdr "내가 봐야 함" 신호). */
+.status-badge {
+  border: 0;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  white-space: nowrap;
+}
+
 .status-badge--agent[data-agent-state="blocked"] {
-  border-color: var(--warn-500);
-  color: var(--warn-500);
+  color: var(--accent);
+  background: color-mix(in oklch, var(--accent) 16%, var(--bg-elevated));
+}
+
+/* U5: ChannelGlyph의 타일 배경 변형(현재 KakaoTalk만) — 브랜드 옐로 위 검정 글리프.
+   고정 크기 대신 padding으로 감싸 레일(18px 아이콘)·행(16px 아이콘) 어디서든 맞는다. */
+.channel-glyph--tiled {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: 30%;
 }
 
 .app-shell__detail {

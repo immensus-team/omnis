@@ -1,10 +1,12 @@
 import { ChevronDown, Inbox as InboxGlyph, Settings, User } from "lucide-react";
 import { cn } from "../lib/cn.js";
-import { CHANNEL_ICON, CHANNEL_LABEL } from "../lib/row-meta.js";
+import { CHANNEL_LABEL } from "../lib/row-meta.js";
 import type { UiChannel } from "../types.js";
+import { ChannelGlyph } from "./channel-glyph.js";
 
 // U2: 브랜드 아이콘 맵(CHANNEL_ICON)과 한글 라벨(CHANNEL_LABEL)은 이제 lib/row-meta.ts 공용이다
-// (inbox-row.tsx도 U2에서 같은 아이콘이 필요해져 여기 두면 순환 import가 생긴다).
+// (inbox-row.tsx도 U2에서 같은 아이콘이 필요해져 여기 두면 순환 import가 생긴다). U5: 실제 색은
+// ChannelGlyph(channel-glyph.tsx)가 CHANNEL_COLOR에서 입힌다 — inbox-row.tsx와 공유.
 
 /** null = "Inbox" 타일(전체 보기). Agents 타일도 다른 채널 타일과 같은 필터 문법
  *  (레일 선택 = channelFilter)을 쓰되, 계정 연결 여부와 무관한 레일 고정 요소다. */
@@ -32,24 +34,21 @@ export function ChannelRail({ channels, selected, onSelect }: ChannelRailProps) 
         <InboxGlyph size={18} aria-hidden="true" />
       </button>
       <div className="channel-rail__plate">
-        {tiles.map((channel) => {
-          const Icon = CHANNEL_ICON[channel];
-          return (
-            <button
-              key={channel}
-              type="button"
-              className={cn(
-                "channel-rail__tile",
-                selected === channel && "channel-rail__tile--active",
-              )}
-              aria-pressed={selected === channel}
-              aria-label={CHANNEL_LABEL[channel]}
-              onClick={() => onSelect(channel)}
-            >
-              <Icon size={18} aria-hidden="true" />
-            </button>
-          );
-        })}
+        {tiles.map((channel) => (
+          <button
+            key={channel}
+            type="button"
+            className={cn(
+              "channel-rail__tile",
+              selected === channel && "channel-rail__tile--active",
+            )}
+            aria-pressed={selected === channel}
+            aria-label={CHANNEL_LABEL[channel]}
+            onClick={() => onSelect(channel)}
+          >
+            <ChannelGlyph channel={channel} size={18} />
+          </button>
+        ))}
         {/* ponytail: 더보기 chevron은 kinso 레일의 시각 요소일 뿐 — 채널이 늘어나 접어야 할 때까지
             동작 없음(오버플로 메뉴는 그 시점에 추가). */}
         <button type="button" className="channel-rail__more" aria-label="더 보기">
