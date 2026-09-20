@@ -1,4 +1,5 @@
 import { GALLERY_COMPONENTS } from "./registry.js";
+import { GALLERY_DEMOS } from "./demos/index.js";
 
 export function App() {
   return (
@@ -11,19 +12,24 @@ export function App() {
         ))}
       </nav>
       <main className="gallery-main">
-        {GALLERY_COMPONENTS.map(({ id, label }) => (
-          <section id={id} className="gallery-section" key={id}>
-            <h2>{label}</h2>
-            <div className="gallery-panes">
-              <div className="gallery-pane">
-                <h3>Light</h3>TODO
+        {GALLERY_COMPONENTS.map(({ id, label }) => {
+          const Demo = GALLERY_DEMOS[id];
+          return (
+            <section id={id} className="gallery-section" key={id}>
+              <h2>{label}</h2>
+              <div className="gallery-panes">
+                <div className="gallery-pane">
+                  <h3>Light</h3>
+                  {Demo ? <Demo /> : "TODO"}
+                </div>
+                <div className="gallery-pane" data-theme="dark">
+                  <h3>Dark</h3>
+                  {Demo ? <Demo /> : "TODO"}
+                </div>
               </div>
-              <div className="gallery-pane" data-theme="dark">
-                <h3>Dark</h3>TODO
-              </div>
-            </div>
-          </section>
-        ))}
+            </section>
+          );
+        })}
       </main>
     </div>
   );
