@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { createPool } from "@omnis/db";
-import { type Kernel, createKernel, createLogger } from "@omnis/kernel";
+import { type Kernel, SETTING_DEFAULTS, createKernel, createLogger } from "@omnis/kernel";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { HUB_VERSION } from "../../src/config.js";
 import { createHubServer } from "../../src/http.js";
@@ -232,5 +232,92 @@ describe("GET /memory/search", () => {
 
   it("400s a missing q", async () => {
     expect((await fetch(`${base}/memory/search`)).status).toBe(400);
+  });
+});
+
+// The PUT block below writes cost.cap_usd, so these read-only assertions never pin an exact
+// value — this suite shares one DB connection and a fixed cap would be order-dependent.
+describe("GET /settings", () => {
+  it("returns every setting key, stored value or default", async () => {
+    const res = await fetch(`${base}/settings`);
+    expect(res.status).toBe(200);
+    const { settings } = (await res.json()) as { settings: Record<string, unknown> };
+    expect(Object.keys(settings).sort()).toEqual(Object.keys(SETTING_DEFAULTS).sort());
+    expect(typeof settings["cost.cap_usd"]).toBe("number");
+  });
+
+  it("405s a non-GET", async () => {
+    expect((await fetch(`${base}/settings`, { method: "POST" })).status).toBe(405);
+  });
+});
+
+describe("PUT /settings/:key", () => {
+  it("writes a value that GET /settings reads back", async () => {
+    const res = await fetch(`${base}/settings/cost.cap_usd`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ value: 42 }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ key: "cost.cap_usd", value: 42 });
+
+    const { settings } = (await (await fetch(`${base}/settings`)).json()) as {
+      settings: Record<string, unknown>;
+    };
+    expect(settings["cost.cap_usd"]).toBe(42);
+  });
+
+  it("404s an unknown key before it reads the body", async () => {
+    const res = await fetch(`${base}/settings/not.a.real.key`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ value: 1 }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("400s a body without a value property", async () => {
+    const res = await fetch(`${base}/settings/cost.cap_usd`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("400s a body that is not JSON", async () => {
+    const res = await fetch(`${base}/settings/cost.cap_usd`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: "not json",
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("405s a non-PUT", async () => {
+    expect((await fetch(`${base}/settings/cost.cap_usd`)).status).toBe(405);
+  });
+});
+
+describe("GET /cost", () => {
+  it("reports the budget state, month-to-date spend and policy", async () => {
+    const res = await fetch(`${base}/cost`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      state: string;
+      mtdUsd: unknown;
+      capUsd: unknown;
+      reserveUsd: unknown;
+      policy: { allowT2NonSensitive: boolean };
+    };
+    expect(["normal", "warn", "degraded", "reserve_only", "frozen"]).toContain(body.state);
+    expect(typeof body.mtdUsd).toBe("number");
+    expect(typeof body.capUsd).toBe("number");
+    expect(typeof body.reserveUsd).toBe("number");
+    expect(typeof body.policy.allowT2NonSensitive).toBe("boolean");
+  });
+
+  it("405s a non-GET", async () => {
+    expect((await fetch(`${base}/cost`, { method: "POST" })).status).toBe(405);
   });
 });
