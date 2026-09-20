@@ -177,7 +177,7 @@ describe("GET /api/zero-token (US-A21b)", () => {
       exp: number;
     };
     expect(claims.sub).toBe("logan");
-    // 7일 ±1분
+    // 7 days ±1 minute
     expect(claims.exp * 1000 - Date.now()).toBeGreaterThan(7 * 86_400_000 - 60_000);
     expect(claims.exp * 1000 - Date.now()).toBeLessThanOrEqual(7 * 86_400_000);
     expect(createHmac("sha256", "test-zero-secret").update(`${h}.${p}`).digest("base64url")).toBe(

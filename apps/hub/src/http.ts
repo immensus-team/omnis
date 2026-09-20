@@ -32,8 +32,9 @@ const APPROVAL_STATES = [
 const MAX_BODY_BYTES = 64 * 1024;
 const ZERO_TOKEN_TTL_SEC = 7 * 24 * 60 * 60;
 
-// US-A21b: HS256 한 줄짜리라 jose를 새로 끌어오지 않는다. 서명 대상은 허브가 방금 만든
-// 헤더/페이로드뿐이고 검증은 zero-cache가 한다 — 여기서 남의 토큰을 파싱할 일은 없다.
+// US-A21b: HS256 is a one-liner, so jose is not pulled in for it. The only thing signed is the
+// header/payload the hub just built, and zero-cache does the verifying — nothing here ever parses
+// a token this process did not mint.
 const b64url = (v: object): string => Buffer.from(JSON.stringify(v)).toString("base64url");
 
 function signZeroToken(sub: string, secret: string, nowSec: number): string {
@@ -47,9 +48,9 @@ export interface HubServerDeps {
   config: HubConfig;
   logger: Logger;
   startedAt: number;
-  /** 보관 write-back용 채널 어댑터(US-A36). 없으면 로컬 보관만 한다 — archive.ts 참조. */
+  /** Channel adapter for archive write-back (US-A36). Without one, archiving stays local — see archive.ts. */
   adapters?: ReadonlyMap<string, Adapter>;
-  /** Task 26(hub-bridge-ws)이 WS /bridge를 여기에 꽂는다. 주입 안 되면 업그레이드는 501이다. */
+  /** Task 26 (hub-bridge-ws) plugs WS /bridge in here. Without it, upgrades get a 501. */
   onUpgrade?: (req: IncomingMessage, socket: Duplex, head: Buffer) => void;
 }
 
@@ -149,10 +150,12 @@ export function createHubServer(deps: HubServerDeps): Server {
       return send(res, 200, { id, state: "decided" });
     }
 
-    // US-A36 수동 보관/되살리기. 다른 라우트와 같은 경계(127.0.0.1 bind)이고, 마스터 §7의 승인
-    // 게이트 대상이 아니다(send/delete/delegate/calendar_write만 승인을 탄다) — archive.ts 주석 참조.
-    // `/api` 접두는 선택이다: Tailscale Serve가 /api → 8787에서 접두를 떼고 넘기므로 미니에서는
-    // /threads/…로 도착하고, 데스크톱이 직접 127.0.0.1:8787로 부를 때는 /api/threads/…로 온다.
+    // US-A36 manual archive/unarchive. Same boundary as the other routes (bound to 127.0.0.1), and
+    // not behind the master §7 approval gate (only send/delete/delegate/calendar_write are) — see
+    // the comment in archive.ts.
+    // The `/api` prefix is optional: Tailscale Serve strips it when forwarding /api → 8787, so on
+    // the mini this arrives as /threads/…, while the desktop calling 127.0.0.1:8787 directly uses
+    // /api/threads/….
     const archiveRoute = /^(?:\/api)?\/threads\/([0-9a-fA-F-]{36})\/(archive|unarchive)$/.exec(
       path,
     );
@@ -169,7 +172,8 @@ export function createHubServer(deps: HubServerDeps): Server {
       return send(res, 200, result);
     }
 
-    // 데스크톱이 zero-cache에 붙을 때 쓰는 토큰. 다른 허브 라우트와 같은 경계(127.0.0.1 bind)다.
+    // The token the desktop uses to attach to zero-cache. Same boundary as the other hub routes
+    // (bound to 127.0.0.1).
     if (path === "/api/zero-token") {
       if (method !== "GET") return send(res, 405, { error: "method not allowed" });
       if (config.zeroAuthSecret === "") {
@@ -281,7 +285,7 @@ export function createHubServer(deps: HubServerDeps): Server {
       deps.onUpgrade(req, socket, head as Buffer);
       return;
     }
-    // WS /bridge는 Task 26이 붙인다.
+    // WS /bridge is wired up by Task 26.
     socket.write("HTTP/1.1 501 Not Implemented\r\n\r\n");
     socket.destroy();
   });
