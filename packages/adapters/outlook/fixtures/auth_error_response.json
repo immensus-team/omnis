@@ -1,0 +1,5 @@
+{
+  "scenario": "auth_error_response",
+  "raw": { "statusCode": 401 },
+  "expected": { "errorKind": "auth_expired" }
+}

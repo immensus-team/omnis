@@ -1,4 +1,4 @@
-import type { Attachment, NormalizedItem } from "@omnis/protocol";
+import { AdapterError, type Attachment, type NormalizedItem } from "@omnis/protocol";
 
 export const CHANNEL = "outlook" as const;
 
@@ -76,4 +76,29 @@ export function normalize(raw: unknown): NormalizedItem[] {
       },
     },
   ];
+}
+
+export function mapApiError(cause: unknown): AdapterError {
+  const err = cause as { statusCode?: number; headers?: Record<string, string> };
+  if (err.statusCode === 429) {
+    const retryAfterSec = Number(err.headers?.["retry-after"] ?? "60");
+    return new AdapterError(
+      "retryable_rate_limit",
+      CHANNEL,
+      "Graph API rate limited",
+      retryAfterSec * 1000,
+      cause,
+    );
+  }
+  if (err.statusCode === 401)
+    return new AdapterError("auth_expired", CHANNEL, "Graph API auth expired", undefined, cause);
+  if (err.statusCode === 403)
+    return new AdapterError(
+      "auth_revoked",
+      CHANNEL,
+      "Graph API access forbidden",
+      undefined,
+      cause,
+    );
+  return new AdapterError("retryable_network", CHANNEL, "Graph API call failed", undefined, cause);
 }
