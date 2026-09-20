@@ -101,13 +101,11 @@ describe("Google Calendar contract: NormalizedItem invariants", () => {
         expect(item.author?.kind, `${fixture.scenario}: author.kind`).toBeTypeOf("string");
         expect(item.author?.kind, `${fixture.scenario}: author.kind`).not.toBe("");
 
-        // Never emit an item with nothing to express: it must have a body or an attachment.
-        const body = typeof item.body === "string" ? item.body : "";
-        const attachments = Array.isArray(item.attachments) ? item.attachments : [];
-        expect(
-          body.length > 0 || attachments.length > 0,
-          `${fixture.scenario}: contentless item ${String(item.externalId)}`,
-        ).toBe(true);
+        // An event is exempt from the "must have a body or an attachment" rule that applies to messages:
+        // its time span is the content, so a title-less busy block legitimately carries an empty body.
+        // What must hold is that body is a string at all (never null/undefined).
+        expect(item.body, `${fixture.scenario}: body`).toBeTypeOf("string");
+        expect(Array.isArray(item.attachments), `${fixture.scenario}: attachments`).toBe(true);
 
         // When threadMeta is present, externalId is required (without it, thread merging breaks).
         if (item.threadMeta !== undefined) {
