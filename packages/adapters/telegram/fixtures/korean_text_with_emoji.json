@@ -1,5 +1,6 @@
 {
   "scenario": "korean_text_with_emoji",
+  "note": "Korean chat title and message text with emoji — the non-ASCII input under test, kept verbatim.",
   "raw": {
     "id": 8801,
     "chat": {
