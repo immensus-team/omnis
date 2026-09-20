@@ -176,7 +176,7 @@ curl -so /dev/null -w '%{http_code}\n' http://127.0.0.1:4848/   # zero-cache →
 grep '"bridge connected"' ~/Library/Logs/omnis/hub.log | tail -1   # local-agent 등록 확인
 psql -U vigor -d omnis -Atc \
   "SELECT slot_name, active, wal_status FROM pg_replication_slots"  # zero_0_a|t|reserved
-bash ops/mini/preflight.sh --check   # FileVault·자동로그인·pmset·LaunchAgent 4종·Ollama·슬롯 한 번에(US-B43)
+bash ops/mini/preflight.sh --check   # FileVault·자동로그인·pmset(슬립 금지 3종 + autorestart=1 전원복구 자동부팅)·LaunchAgent 4종·Ollama·슬롯 한 번에(US-B43)
 ```
 
 `agent_runtimes` 테이블은 **Phase A에서 아직 안 찬다** — `apps/local-agent/src/main.ts`가 어댑터 맵을
