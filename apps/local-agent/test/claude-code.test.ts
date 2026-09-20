@@ -235,3 +235,67 @@ describe("ClaudeCodeAdapter run mode defaults", () => {
     expect(captured[0]).toContain("--bare");
   });
 });
+
+// --- 승인 표면은 실행 모드를 따라간다 (게이트 ⑪ FAIL mode a) ---
+
+function fakeVersionSpawn(version: string): typeof spawn {
+  return ((_bin: string, _args: readonly string[]) => {
+    const child = new EventEmitter() as EventEmitter & Record<string, unknown>;
+    const stdout = Readable.from([Buffer.from(`${version}\n`)]);
+    stdout.on("end", () => child.emit("close", 0));
+    child.stdout = stdout;
+    child.stderr = null;
+    child.kill = (): boolean => true;
+    return child;
+  }) as unknown as typeof spawn;
+}
+
+describe("probe reports the approval surface the run mode actually has", () => {
+  it("claude-ds (--bare) has no approval surface, non-bare claude_code keeps hooks", async () => {
+    const ds = createClaudeDsAdapter({
+      binary: "claude-ds",
+      apiKey: "k",
+      spawnFn: fakeVersionSpawn("2.1.274 (Claude Code)"),
+    });
+    // --bare는 --settings의 hook 선언도 --permission-mode도 무시한다 → 승인 경로 없음
+    expect((await ds.probe()).capabilities.approvals).toBe("none");
+
+    const cc = new ClaudeCodeAdapter({
+      kind: "claude_code",
+      binary: "claude",
+      defaultModel: "sonnet",
+      spawnFn: fakeVersionSpawn("2.1.274 (Claude Code)"),
+    });
+    expect((await cc.probe()).capabilities.approvals).toBe("hook");
+
+    // 파서 자체는 그대로다(플랜 계약)
+    expect(parseClaudeCapabilities("2.1.274 (Claude Code)").capabilities.approvals).toBe("hook");
+  });
+});
+
+describe("startTurn drains the child's stderr", () => {
+  it("forwards stderr to the cold tier instead of letting the pipe fill up", async () => {
+    const stderr = Readable.from([Buffer.from("warn: something\n")]);
+    const spawnFn = ((_bin: string, _args: readonly string[]) => {
+      const child = new EventEmitter() as EventEmitter & Record<string, unknown>;
+      child.stdout = Readable.from([]);
+      child.stderr = stderr;
+      child.kill = (): boolean => true;
+      return child;
+    }) as unknown as typeof spawn;
+
+    const rawLines: string[] = [];
+    const sink: EventSink = { ...noopSink(), raw: (l) => rawLines.push(l) };
+    const adapter = new ClaudeCodeAdapter({
+      kind: "claude_code",
+      binary: "claude",
+      defaultModel: "sonnet",
+      spawnFn,
+    });
+    await adapter.startTurn(record("workspace", "delegation"), { text: "hi" }, sink);
+    await new Promise<void>((r) => stderr.on("end", () => setImmediate(r)));
+
+    expect(rawLines).toContain("[stderr] warn: something");
+    expect(stderr.readableEnded).toBe(true);
+  });
+});

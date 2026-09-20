@@ -118,13 +118,27 @@ export interface ClaudeAdapterConfig {
 /** A2-D5: 턴당 서브프로세스. 상주시키지 않는다. A2-D8: claude-ds는 이 클래스의 설정 변형이다. */
 export class ClaudeCodeAdapter implements RuntimeAdapter {
   readonly kind: RuntimeKind;
+  /**
+   * 이 어댑터가 실제로 `--bare`로 도는지. probe()와 startTurn()이 갈라지면 안 되므로
+   * 한 곳에서만 계산한다(계약 §8 / 마스터 §19 Q13):
+   * claude_code=false(구독 인증 + `--settings` omnis hook), claude_ds=true(API 키 전용).
+   */
+  readonly #bare: boolean;
   constructor(private readonly cfg: ClaudeAdapterConfig) {
     this.kind = cfg.kind;
+    this.#bare = cfg.bare ?? cfg.kind === "claude_ds";
   }
 
   async probe(): Promise<{ version: string; capabilities: RuntimeCapabilities }> {
     const line = await this.#capture(["--version"]);
-    return parseClaudeCapabilities(line);
+    const parsed = parseClaudeCapabilities(line);
+    // 게이트 ⑪ FAIL(mode a): `--bare` 아래에서는 `--settings`의 hook 선언도 `--permission-mode`도
+    // 통째로 무시된다 — 승인 표면이 아예 없다. 허브에 "hook 승인이 있다"고 말하면
+    // 영영 오지 않을 승인을 기다리게 되므로 실행 모드에 맞춰 내려 적는다.
+    return {
+      ...parsed,
+      capabilities: { ...parsed.capabilities, approvals: this.#bare ? "none" : "hook" },
+    };
   }
 
   async startTurn(s: SessionRecord, input: TurnInput, sink: EventSink): Promise<TurnHandle> {
@@ -134,7 +148,7 @@ export class ClaudeCodeAdapter implements RuntimeAdapter {
       profile: s.permission_profile,
       origin: s.origin,
       sessionId: s.session_id,
-      bare: this.cfg.bare ?? this.cfg.kind === "claude_ds",
+      bare: this.#bare,
       ...(this.cfg.strictMcpConfig === true ? { strictMcpConfig: true } : {}),
     });
     const turnId = `t-${Date.now().toString(36)}`;
@@ -148,6 +162,15 @@ export class ClaudeCodeAdapter implements RuntimeAdapter {
         BRIDGE_ERRORS.RUNTIME_UNAVAILABLE,
         `${this.cfg.binary} produced no stdout`,
       );
+
+    // stdio에서 stderr를 pipe로 열어 두고 아무도 읽지 않으면, 실제 바이너리가 OS 파이프 버퍼(~64KB)
+    // 넘게 경고를 뱉는 순간 child가 write에서 막혀 턴이 이벤트도 타임아웃도 없이 영원히 멈춘다.
+    // cold 티어로 흘려보내 파이프를 비운다(진단도 같이 남는다).
+    if (child.stderr !== null && child.stderr !== undefined) {
+      createInterface({ input: child.stderr }).on("line", (l) => {
+        sink.raw(`[stderr] ${l}`);
+      });
+    }
 
     const state = newStreamJsonState();
     const debounced = createDurableDebouncer((e) => {
