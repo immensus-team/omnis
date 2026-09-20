@@ -143,8 +143,28 @@ export function createTelegramAdapter(deps: TelegramAdapterDeps = {}): Adapter {
       return queue;
     },
 
-    async send(): Promise<never> {
-      throw new AdapterError("fatal_unsupported", CHANNEL, "send not implemented until Task 10");
+    // 승인 게이트(US-A07) 전까지 실제 client.sendText는 deps.sink가 없을 때만 호출한다(테스트 기본값은
+    // mock sink). client가 주입돼 있고 deps.sink가 없으면 실제 전송처럼 보이는 경로를 열게 되므로,
+    // 기본값은 항상 mock — 실제 전송이 필요해지면 승인 실행 경로(runEgress)가 deps.sink로 client.sendText를
+    // 명시적으로 주입한다.
+    async send(thread: ThreadRef, draft: Outbound): Promise<SendResult> {
+      const sink =
+        deps.sink ??
+        (async (): Promise<SendResult> => ({
+          externalId: `mock-${now().getTime()}`,
+          sentAt: now().toISOString(),
+        }));
+      return sink(thread, draft);
+    },
+
+    async markRead(thread: ThreadRef): Promise<void> {
+      if (client === undefined)
+        throw new AdapterError("fatal_protocol", CHANNEL, "markRead() called before connect()");
+      try {
+        await client.readHistory(thread.externalId);
+      } catch (cause) {
+        throw mapApiError(cause);
+      }
     },
 
     async health(): Promise<Health> {
