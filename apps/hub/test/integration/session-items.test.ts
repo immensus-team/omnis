@@ -172,7 +172,7 @@ describe("bridge session → inbox (US-A34)", () => {
     expect(tool?.tool).toMatchObject({ name: "read", label: "Bash", state: "done" });
     expect(tool?.body).toContain("index.ts");
 
-    expect(rows.find((r) => r.kind === "system")?.body).toBe("✓ 턴 완료");
+    expect(rows.find((r) => r.kind === "system")?.body).toBe("✓ Turn completed");
   });
 
   it("stores no delta: one row per item plus the turn line (A2-D4)", async () => {

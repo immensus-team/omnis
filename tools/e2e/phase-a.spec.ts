@@ -196,7 +196,7 @@ test("Phase A seeded smoke", async ({ page }) => {
   await shot(page, "03-thread.png");
 
   await check("A6 Agent Session screen shows turns and a ToolCallBadge", async () => {
-    await rows.filter({ hasText: "✓ 턴 완료" }).first().click();
+    await rows.filter({ hasText: "✓ Turn completed" }).first().click();
     const detail = page.getByTestId("detail-pane");
     await expect(detail.locator(".tool-call-badge").first()).toBeVisible({ timeout: 20_000 });
     await expect(detail.locator(".agent-session-screen__turn").first()).toBeVisible();

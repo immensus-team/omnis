@@ -36,7 +36,7 @@ import {
 
 const BRIDGE_PATH = "/bridge";
 
-/** 계약 §3.5 SessionState → A3 §4 agent_sessions.state. 두 enum의 이름이 다르다. */
+/** Contract §3.5 SessionState → A3 §4 agent_sessions.state. The two enums use different names. */
 const SESSION_STATE: Readonly<Record<string, SessionStateValue>> = {
   idle: "idle",
   running: "running",
@@ -57,7 +57,7 @@ export interface BridgeDeps {
   kernel: Kernel;
   pool: Pool;
   logger: Logger;
-  /** Keychain omnis.bridge.token.<host>의 값(A6 래퍼가 OMNIS_BRIDGE_TOKEN으로 주입). 빈 문자열이면 브리지를 닫는다. */
+  /** Value of Keychain omnis.bridge.token.<host> (injected as OMNIS_BRIDGE_TOKEN by the A6 wrapper). Empty closes the bridge. */
   token: string;
   heartbeatMs?: number;
   callTimeoutMs?: number;
@@ -74,9 +74,10 @@ interface Conn {
   ws: WebSocket;
   host: HostId;
   alive: boolean;
-  /** 알림은 도착 순서대로 처리한다 — session.registered가 turn.item.*보다 늦게 커밋되면
-   *  같은 세션을 두 번 만들거나 item이 없는 스레드에 붙는다. 요청(approval.requested)은
-   *  사람의 결정까지 막혀 있으므로 이 큐에 넣지 않는다. */
+  /** Notifications are processed in arrival order — if session.registered committed after
+   *  turn.item.*, we would create the same session twice or attach items to a thread that does not
+   *  exist yet. Requests (approval.requested) are not put on this queue because they stay blocked
+   *  until a human decides. */
   queue: Promise<void>;
 }
 
@@ -122,7 +123,7 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     await query(pool, "UPDATE agent_runtimes SET state = 'offline' WHERE host = $1", [host]);
   }
 
-  // ---- bridge → hub 알림 ----
+  // ---- bridge → hub notifications ----
 
   async function onRegister(host: HostId, params: Record<string, unknown>): Promise<void> {
     const runtime = RuntimeKind.parse(params.runtime);
@@ -152,14 +153,14 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     );
   }
 
-  /** 세션 1개당 thread/account/runtime id는 안 바뀐다 — 매 item마다 4번 조회하지 않는다.
-   *  state를 같이 들고 있는 것은 item 하나마다 같은 값으로 UPDATE를 쏴서 sessions_notify가
-   *  Zero에 의미 없는 변경을 흘리지 않게 하기 위해서다. */
+  /** Within one session the thread/account/runtime ids never change — so we do not look them up
+   *  four times per item. Holding `state` here is what keeps us from firing an UPDATE with the
+   *  same value for every item and leaking meaningless changes to Zero through sessions_notify. */
   interface CachedSession extends SessionRow {
     state: SessionStateValue | null;
-    /** turn.started ~ turn.completed 사이. 승인 결정 뒤에 working으로 돌아갈지 가르는 값이다. */
+    /** Between turn.started and turn.completed. Decides whether we go back to working after an approval decision. */
     turnOpen: boolean;
-    /** 마지막 turn.completed가 정한 종착 상태(done/failed). 턴이 없었으면 idle. */
+    /** The terminal state the last turn.completed settled on (done/failed). idle when there was no turn. */
     settled: SessionStateValue;
   }
   const sessions = new Map<string, CachedSession>();
@@ -174,9 +175,11 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     session.state = value;
   }
 
-  /** 승인 왕복과 턴이 겹칠 때 상태를 정하는 유일한 자리(A2 §1.3): blocked > working > 마지막 턴의 결과.
-   *  turn.completed도, 승인 결정도 여기를 거친다 — 한쪽만 고치면 "승인 요청 → 턴 종료 → 결정"
-   *  순서에서 세션이 영원히 running으로 남는다. */
+  /** The single place that decides state when an approval round-trip overlaps a turn (A2 §1.3):
+   *  blocked > working > the last turn's outcome.
+   *  Both turn.completed and an approval decision go through here — fixing only one of them leaves
+   *  the session stuck in running forever on the "approval requested → turn ended → decision"
+   *  ordering. */
   async function settleState(session: CachedSession, sessionKey: string): Promise<void> {
     if (await hasPendingApproval(pool, session.threadId)) {
       await applyState(session, sessionKey, HERDR_STATE.blocked);
@@ -217,8 +220,9 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     const sessionKey = String(params.session_key);
     const sessionId = typeof params.session_id === "string" ? params.session_id : null;
     const mapped = typeof params.state === "string" ? SESSION_STATE[params.state] : undefined;
-    // 브리지가 자기 쪽에서 연 세션도 인박스에 나타나야 한다 — 없으면 여기서 만든다(0007의
-    // sessions_notify 트리거가 NOTIFY를 쏘므로 여기서 emit하면 두 번 나간다).
+    // A session the bridge opened on its own side must show up in the inbox too — create it here
+    // if missing (0007's sessions_notify trigger fires the NOTIFY, so emitting here would send it
+    // twice).
     const session = await sessionFor(host, sessionKey, {
       ...(typeof params.runtime === "string" ? { runtime: params.runtime } : {}),
       sessionId,
@@ -236,7 +240,7 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     params: Record<string, unknown>,
   ): Promise<void> {
     await kernel.events.emit("ephemeral", method, { ...params, host });
-    if (method === "turn.item.delta") return; // A2-D4: 델타는 절대 저장하지 않는다
+    if (method === "turn.item.delta") return; // A2-D4: deltas are never persisted
     const sessionKey = typeof params.session_key === "string" ? params.session_key : "";
     if (sessionKey === "") return;
     const session = await sessionFor(host, sessionKey);
@@ -249,12 +253,12 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     }
     if (method === "turn.completed") {
       const ok = params.status === "ok";
-      // master §11: 실행은 kind='system' 한 줄로만 보인다.
+      // master §11: execution surfaces as a single kind='system' line.
       await writeAgentItem(pool, {
         session,
         externalId: `${sessionKey}|${turnId}|turn`,
         kind: "system",
-        body: ok ? "✓ 턴 완료" : "⚠ 턴 실패",
+        body: ok ? "✓ Turn completed" : "⚠ Turn failed",
         tool: null,
       });
       session.turnOpen = false;
@@ -323,7 +327,7 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
         }, reject);
       });
       waiters.add(waiter);
-      // propose와 subscribe 사이에 결정이 났을 수 있다 — 한 번 직접 읽는다.
+      // A decision may have landed between propose and subscribe — read it once directly.
       void readDecision(id).then((r) => {
         if (r !== null) settle(r);
       }, reject);
@@ -336,10 +340,12 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
   ): Promise<HumanResponse> {
     const interrupt = HumanInterrupt.parse(params.interrupt);
     const sessionKey = typeof params.session_key === "string" ? params.session_key : "";
-    // 승인을 세션 스레드에 건다: ApprovalCard가 그 스레드에서 보이고, turn.completed가
-    // blocked인지 done인지 판정하는 근거도 이 thread_id 하나다(A2 §1.3).
-    // 세션을 못 찾아도 승인 자체는 반드시 올라간다 — 사람에게 물어야 할 것을 런타임 등록
-    // 순서 때문에 삼키면 안 된다. 링크와 blocked 표시만 포기한다.
+    // Attach the approval to the session's thread: the ApprovalCard shows up in that thread, and
+    // that same thread_id is the sole basis for judging whether turn.completed means blocked or
+    // done (A2 §1.3).
+    // Even when the session cannot be resolved, the approval itself always goes up — something we
+    // must ask a human about cannot be swallowed just because of runtime registration ordering. We
+    // give up only the link and the blocked indicator.
     const session =
       sessionKey === ""
         ? null
@@ -362,13 +368,14 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     try {
       return await waitForDecision(id);
     } finally {
-      // 결정이 났으니 다시 계산한다. 무조건 working으로 되돌리면 승인이 턴보다 늦게 끝난
-      // 경우(A2 §1.3 "승인 요청 → 턴 종료 → 결정")에 done으로 내려갈 기회가 영영 없다.
+      // A decision landed, so recompute. Unconditionally forcing working back would mean that
+      // when an approval finishes after its turn (A2 §1.3, "approval requested → turn ended →
+      // decision") there is never another chance to settle on done.
       if (session !== null) await settleState(session, sessionKey);
     }
   }
 
-  // ---- 디스패치 ----
+  // ---- dispatch ----
 
   async function dispatch(
     conn: Conn,
@@ -416,7 +423,7 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
       return;
     }
 
-    // hub → bridge 요청에 대한 응답
+    // response to a hub → bridge request
     if (msg.method === undefined) {
       if (msg.id === undefined || msg.id === null) return;
       const waiting = pending.get(String(msg.id));
@@ -454,10 +461,10 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     else conn.queue = conn.queue.then(run);
   }
 
-  // ---- 업그레이드 ----
+  // ---- upgrade ----
 
   function handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
-    // deviation(lint/correctness/noVoidTypeReturn): `return refuse(...)` 대신 호출 후 return.
+    // deviation(lint/correctness/noVoidTypeReturn): call then return, rather than `return refuse(...)`.
     const path = (req.url ?? "/").split("?")[0];
     if (path !== BRIDGE_PATH) {
       refuse(socket, 404, "Not Found");
@@ -519,9 +526,13 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
       throw new BridgeError(JSONRPC_ERRORS.METHOD_NOT_FOUND, `not a hub method: ${method}`);
     }
     if (method === "ingest.scan" || method === "ingest.read") {
-      throw new BridgeError(BRIDGE_ERRORS.CAPABILITY_UNSUPPORTED, `${method} is Phase B (계약 §8)`);
+      throw new BridgeError(
+        BRIDGE_ERRORS.CAPABILITY_UNSUPPORTED,
+        `${method} is Phase B (contract §8)`,
+      );
     }
-    // 연결부터 본다 — 붙어 있지도 않은 호스트 때문에 세션 row를 만들거나 파라미터로 먼저 던지지 않는다.
+    // Check connectivity first — do not create session rows or throw on parameters for a host that
+    // is not even attached.
     if (!conns.has(host)) {
       throw new BridgeError(
         BRIDGE_ERRORS.RUNTIME_UNAVAILABLE,
@@ -530,11 +541,12 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     }
     if (method === "session.create") {
       const p = SessionCreateParams.parse(params);
-      // 브리지가 먼저 cwd를 재검증한다(A2-D12) — 거절당한 세션의 row를 남기지 않는다.
+      // The bridge re-validates cwd first (A2-D12) — so we never leave a row behind for a session
+      // it rejected.
       await rpc<unknown>(host, method, params);
       const session = await sessionFor(host, p.session_key, { runtime: p.runtime, cwd: p.cwd });
       await applyState(session, p.session_key, HERDR_STATE.idle);
-      // 브리지가 돌려준 thread_id는 버린다: 스레드는 허브의 것이다(A3 §4).
+      // Discard the thread_id the bridge returned: the thread belongs to the hub (A3 §4).
       return { session_id: null, thread_id: session.threadId } as T;
     }
     if (method === "session.resume") {
