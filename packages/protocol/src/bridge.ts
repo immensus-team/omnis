@@ -295,3 +295,42 @@ export function toJsonRpcError(e: unknown): { code: number; message: string; dat
   }
   return { code: JSONRPC_ERRORS.INTERNAL, message: e instanceof Error ? e.message : String(e) };
 }
+
+// --- per-request 버전 협상 (A2-D3, §3.1) ---
+export const SUPPORTED_PROTOCOL_VERSIONS = [PROTOCOL_VERSION] as const;
+
+export const RpcMeta = z
+  .object({
+    [META_KEYS.protocolVersion]: z.string(),
+    [META_KEYS.traceId]: z.string().optional(),
+    [META_KEYS.origin]: SessionOrigin.optional(),
+  })
+  .passthrough();
+export type RpcMeta = z.infer<typeof RpcMeta>;
+
+export function withMeta<P extends Record<string, unknown>>(
+  params: P,
+  meta?: { traceId?: string; origin?: SessionOrigin },
+): P & { _meta: Record<string, string> } {
+  const _meta: Record<string, string> = { [META_KEYS.protocolVersion]: PROTOCOL_VERSION };
+  if (meta?.traceId !== undefined) _meta[META_KEYS.traceId] = meta.traceId;
+  if (meta?.origin !== undefined) _meta[META_KEYS.origin] = meta.origin;
+  return { ...params, _meta };
+}
+
+/** A2-D3: 불일치는 연결을 끊지 않고 이 요청만 -32010으로 거절한다. */
+export function assertProtocolVersion(params: unknown): void {
+  const meta = (params as { _meta?: unknown } | null | undefined)?._meta;
+  const parsed = RpcMeta.safeParse(meta);
+  const version = parsed.success ? parsed.data[META_KEYS.protocolVersion] : undefined;
+  if (
+    version === undefined ||
+    !SUPPORTED_PROTOCOL_VERSIONS.includes(version as typeof PROTOCOL_VERSION)
+  ) {
+    throw new BridgeError(
+      BRIDGE_ERRORS.VERSION_UNSUPPORTED,
+      `unsupported protocol version: ${version ?? "<missing>"}`,
+      { supported: [...SUPPORTED_PROTOCOL_VERSIONS] },
+    );
+  }
+}
