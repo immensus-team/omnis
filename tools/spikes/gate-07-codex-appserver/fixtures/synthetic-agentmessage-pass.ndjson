@@ -1,0 +1,10 @@
+# SYNTHETIC FIXTURE — 실제 측정 증거가 아니다(실측 로그는 evidence/ 에 있다).
+# 목적: 사용량 한도가 풀린 뒤(2026-09-23+) 도달해야 할 "정상 턴" 이벤트 시퀀스를 못박아,
+# run.ts의 판정기가 agentMessage 아이템과 turn.status="completed"를 실제로 구별하는지 검사한다.
+<< {"method":"thread/started","params":{"threadId":"t-synth-1"},"emittedAtMs":1}
+<< {"method":"turn/started","params":{"threadId":"t-synth-1","turnId":"u-synth-1"},"emittedAtMs":2}
+<< {"method":"item/started","params":{"item":{"type":"userMessage","id":"i-1","content":[{"type":"text","text":"reply with exactly the word: pong"}]},"threadId":"t-synth-1","turnId":"u-synth-1"},"emittedAtMs":3}
+<< {"method":"item/completed","params":{"item":{"type":"userMessage","id":"i-1","content":[{"type":"text","text":"reply with exactly the word: pong"}]},"threadId":"t-synth-1","turnId":"u-synth-1"},"emittedAtMs":4}
+<< {"method":"item/started","params":{"item":{"type":"agentMessage","id":"i-2","text":""},"threadId":"t-synth-1","turnId":"u-synth-1"},"emittedAtMs":5}
+<< {"method":"item/completed","params":{"item":{"type":"agentMessage","id":"i-2","text":"pong"},"threadId":"t-synth-1","turnId":"u-synth-1"},"emittedAtMs":6}
+<< {"method":"turn/completed","params":{"threadId":"t-synth-1","turn":{"id":"u-synth-1","items":[],"itemsView":"notLoaded","status":"completed","error":null,"startedAt":1,"completedAt":2,"durationMs":1000}},"emittedAtMs":7}
