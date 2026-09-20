@@ -1,7 +1,7 @@
 import { DraftCard, StatusBadge } from "@omnis/ui";
 import type { UiItemStatus } from "@omnis/ui";
 import { useQuery } from "@rocicorp/zero/react";
-import { useMemo } from "react";
+import { setThreadArchived } from "../api/threads.js";
 import { useZeroClient } from "../zero-client.js";
 
 export interface ThreadQueryItem {
@@ -25,9 +25,21 @@ export function Thread({ threadId }: { threadId: string }) {
   );
   const typedItems = items as unknown as ThreadQueryItem[];
   const draft = findDraftItem(typedItems);
+  // A5 §3.8: 보관된 스레드는 헤더 아래 인라인 배너로 상태와 되살리기를 노출한다.
+  const [threads] = useQuery(zero.query.threads.where("id", "=", threadId));
+  const archived =
+    (threads as unknown as { archived_at?: number | null }[])[0]?.archived_at ?? null;
 
   return (
     <div className="thread-screen">
+      {archived !== null && (
+        <div className="thread-screen__archived-banner">
+          <span>보관됨</span>
+          <button type="button" onClick={() => void setThreadArchived(threadId, false)}>
+            되살리기
+          </button>
+        </div>
+      )}
       {typedItems.map((item) => (
         <div key={item.id} className="thread-screen__item">
           <StatusBadge status={item.status} />

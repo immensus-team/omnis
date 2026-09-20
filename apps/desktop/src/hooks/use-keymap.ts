@@ -4,6 +4,7 @@ const DIRECT_KEYS: Record<string, string> = {
   j: "next-row",
   k: "prev-row",
   e: "archive",
+  u: "unarchive",
   r: "reply",
   a: "approve",
   s: "snooze",
@@ -49,11 +50,23 @@ export function reduceKeySequence(
     : { pending: null, at: atMs };
 }
 
+/** ask 바·Composer·팔레트에 타이핑하는 동안 단일 키가 액션으로 새면 안 된다("e"를 치면 보관됐다). */
+export function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.isContentEditable ||
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.tagName === "SELECT"
+  );
+}
+
 export function useKeymap(onResolve: (action: string) => void) {
   const [state, setState] = useState<KeySeqState | null>(null);
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isEditableTarget(e.target)) return;
       const next = reduceKeySequence(state, e.key, Date.now());
       setState(next.resolved ? null : next);
       if (next.resolved) onResolve(next.resolved);

@@ -3,7 +3,9 @@ import { type IncomingMessage, type Server, type ServerResponse, createServer } 
 import type { Duplex } from "node:stream";
 import { query } from "@omnis/db";
 import { ApprovalStateError, type Kernel, type Logger, killSwitchStatus } from "@omnis/kernel";
+import type { Adapter } from "@omnis/protocol";
 import type { Pool } from "pg";
+import { setThreadArchived } from "./archive.js";
 import type { HubConfig } from "./config.js";
 
 const APPROVAL_STATES = [
@@ -32,6 +34,8 @@ export interface HubServerDeps {
   config: HubConfig;
   logger: Logger;
   startedAt: number;
+  /** 보관 write-back용 채널 어댑터(US-A36). 없으면 로컬 보관만 한다 — archive.ts 참조. */
+  adapters?: ReadonlyMap<string, Adapter>;
   /** Task 26(hub-bridge-ws)이 WS /bridge를 여기에 꽂는다. 주입 안 되면 업그레이드는 501이다. */
   onUpgrade?: (req: IncomingMessage, socket: Duplex, head: Buffer) => void;
 }
@@ -129,6 +133,26 @@ export function createHubServer(deps: HubServerDeps): Server {
         return send(res, 400, { error: e instanceof Error ? e.message : "bad request" });
       }
       return send(res, 200, { id, state: "decided" });
+    }
+
+    // US-A36 수동 보관/되살리기. 다른 라우트와 같은 경계(127.0.0.1 bind)이고, 마스터 §7의 승인
+    // 게이트 대상이 아니다(send/delete/delegate/calendar_write만 승인을 탄다) — archive.ts 주석 참조.
+    // `/api` 접두는 선택이다: Tailscale Serve가 /api → 8787에서 접두를 떼고 넘기므로 미니에서는
+    // /threads/…로 도착하고, 데스크톱이 직접 127.0.0.1:8787로 부를 때는 /api/threads/…로 온다.
+    const archiveRoute = /^(?:\/api)?\/threads\/([0-9a-fA-F-]{36})\/(archive|unarchive)$/.exec(
+      path,
+    );
+    if (archiveRoute !== null) {
+      if (method !== "POST") return send(res, 405, { error: "method not allowed" });
+      const id = archiveRoute[1];
+      if (id === undefined) return send(res, 400, { error: "bad id" });
+      const result = await setThreadArchived(
+        { pool, kernel, logger, ...(deps.adapters ? { adapters: deps.adapters } : {}) },
+        id,
+        archiveRoute[2] === "archive",
+      );
+      if (result === null) return send(res, 404, { error: "thread not found" });
+      return send(res, 200, result);
     }
 
     // 데스크톱이 zero-cache에 붙을 때 쓰는 토큰. 다른 허브 라우트와 같은 경계(127.0.0.1 bind)다.

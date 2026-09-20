@@ -1,6 +1,6 @@
 # Phase A 종단 스모크 리포트
 
-생성: 2026-09-20T10:59:46.214Z · `pnpm e2e:phase-a` (tools/e2e/run.ts)
+생성: 2026-09-20T11:15:45.525Z · `pnpm e2e:phase-a` (tools/e2e/run.ts)
 
 스택: PostgreSQL `omnis_e2e` (마이그레이션 0001–0008 + Zero permissions) → zero-cache :4848
 → 허브 :8787 (HTTP + WS /bridge) → 로컬 에이전트 브리지(mock 런타임 픽스처, host=macbook)
@@ -10,48 +10,50 @@
 커널 `approvals.propose`, `@omnis/agents`의 `classify()`(T0 규칙 경로, 네트워크 호출 없음),
 `ClaudeCodeAdapter` + `apps/local-agent/test` 픽스처 재생.
 
-## Pass 1 (7.7s, items=13)
+## Pass 1 (7.8s, items=13)
 
 | 결과 | 검증 | 소요 | 비고 |
 | --- | --- | --- | --- |
-| PASS | A1 Inbox lists one row per seeded thread (U2: 행이 item이 아니라 thread 단위) | 115ms | 7 thread rows (item count was 13) |
-| PASS | A2 Inbox rows show a visible channel icon for all three channels | 24ms | Slack 메시지 / Gmail 메시지 / Google Calendar 메시지 |
+| PASS | A1 Inbox lists one row per seeded thread (U2: 행이 item이 아니라 thread 단위) | 116ms | 7 thread rows (item count was 13) |
+| PASS | A2 Inbox rows show a visible channel icon for all three channels | 22ms | Slack 메시지 / Gmail 메시지 / Google Calendar 메시지 |
 | PASS | A2b Inbox rows show the seeded thread titles | 2ms | #omnis-launch / omnis launch sync |
 | PASS | A3 Inbox rows carry label chips | 2ms |  |
-| PASS | A2c kinso shell: channel rail tiles + ask/search bar | 7ms | rail: Inbox/Slack/Gmail/Google Calendar/Agent + ask bar |
+| PASS | A2c kinso shell: channel rail tiles + ask/search bar | 8ms | rail: Inbox/Slack/Gmail/Google Calendar/Agent + ask bar |
 | PASS | A2d a conversation row has avatar + name + relative time + summary | 3ms | time="now" summary="초안: 네, 오늘 중으로 리뷰할게요.…" |
-| PASS | A4 work/personal filter pills change the list | 93ms | all=7 work=[#omnis-launch] personal=[PoC slides] |
-| PASS | A4b channel rail tile filters the list, Inbox tile restores it | 69ms | all=7 gmail=2 |
+| PASS | A4 work/personal filter pills change the list | 95ms | all=7 work=[#omnis-launch] personal=[PoC slides] |
+| PASS | A4b channel rail tile filters the list, Inbox tile restores it | 68ms | all=7 gmail=2 |
 | PASS | A5 Thread screen renders seeded items with status badges | 40ms | 4 status badges |
-| PASS | A6 Agent Session screen shows turns and a ToolCallBadge | 30ms |  |
-| PASS | A7 Approval card shows the pending approval | 11ms |  |
-| PASS | A8 Approve → hub moves the approval to decided | 41ms | pending → decided |
-| PASS | A9 ⌘K opens the command palette | 11ms |  |
-| PASS | G5 a new item reaches the UI in ≤2s | 66ms | 28ms ingest → 화면 (목표 ≤2000ms) |
-| PASS | A8b hub recorded audit_log(approval.decided) | 2ms | 1 row(s) |
+| PASS | A6 Agent Session screen shows turns and a ToolCallBadge | 31ms |  |
+| PASS | A7 Approval card shows the pending approval | 10ms |  |
+| PASS | A8 Approve → hub moves the approval to decided | 39ms | pending → decided |
+| PASS | A9 ⌘K opens the command palette | 12ms |  |
+| PASS | A-archive 행 보관 → 목록에서 사라지고, 되살리면 돌아온다 | 311ms | "omnis launch sync" archived → restored (7 rows), audit_log 2종 기록 |
+| PASS | G5 a new item reaches the UI in ≤2s | 62ms | 18ms ingest → 화면 (목표 ≤2000ms) |
+| PASS | A8b hub recorded audit_log(approval.decided) | 1ms | 1 row(s) |
 | PASS | A8c pending_approvals.state moved to decided(accept) | 0ms | state=decided decision=accept |
 | PASS | A10 classify() recorded a T0 run in agent_runs (no network) | 0ms | 1 run(s), tier=T0 |
 | PASS | A11 local-agent registered over WS /bridge | 0ms | agent_runtimes state=online |
 
-## Pass 2 (7.4s, items=13)
+## Pass 2 (7.8s, items=13)
 
 | 결과 | 검증 | 소요 | 비고 |
 | --- | --- | --- | --- |
-| PASS | A1 Inbox lists one row per seeded thread (U2: 행이 item이 아니라 thread 단위) | 11ms | 7 thread rows (item count was 13) |
-| PASS | A2 Inbox rows show a visible channel icon for all three channels | 22ms | Slack 메시지 / Gmail 메시지 / Google Calendar 메시지 |
+| PASS | A1 Inbox lists one row per seeded thread (U2: 행이 item이 아니라 thread 단위) | 10ms | 7 thread rows (item count was 13) |
+| PASS | A2 Inbox rows show a visible channel icon for all three channels | 26ms | Slack 메시지 / Gmail 메시지 / Google Calendar 메시지 |
 | PASS | A2b Inbox rows show the seeded thread titles | 2ms | #omnis-launch / omnis launch sync |
-| PASS | A3 Inbox rows carry label chips | 1ms |  |
+| PASS | A3 Inbox rows carry label chips | 2ms |  |
 | PASS | A2c kinso shell: channel rail tiles + ask/search bar | 8ms | rail: Inbox/Slack/Gmail/Google Calendar/Agent + ask bar |
 | PASS | A2d a conversation row has avatar + name + relative time + summary | 4ms | time="now" summary="초안: 네, 오늘 중으로 리뷰할게요.…" |
-| PASS | A4 work/personal filter pills change the list | 96ms | all=7 work=[#omnis-launch] personal=[PoC slides] |
+| PASS | A4 work/personal filter pills change the list | 92ms | all=7 work=[#omnis-launch] personal=[PoC slides] |
 | PASS | A4b channel rail tile filters the list, Inbox tile restores it | 68ms | all=7 gmail=2 |
-| PASS | A5 Thread screen renders seeded items with status badges | 39ms | 4 status badges |
+| PASS | A5 Thread screen renders seeded items with status badges | 40ms | 4 status badges |
 | PASS | A6 Agent Session screen shows turns and a ToolCallBadge | 31ms |  |
 | PASS | A7 Approval card shows the pending approval | 11ms |  |
-| PASS | A8 Approve → hub moves the approval to decided | 41ms | pending → decided |
-| PASS | A9 ⌘K opens the command palette | 13ms |  |
-| PASS | G5 a new item reaches the UI in ≤2s | 62ms | 26ms ingest → 화면 (목표 ≤2000ms) |
-| PASS | A8b hub recorded audit_log(approval.decided) | 1ms | 1 row(s) |
+| PASS | A8 Approve → hub moves the approval to decided | 40ms | pending → decided |
+| PASS | A9 ⌘K opens the command palette | 14ms |  |
+| PASS | A-archive 행 보관 → 목록에서 사라지고, 되살리면 돌아온다 | 310ms | "omnis launch sync" archived → restored (7 rows), audit_log 2종 기록 |
+| PASS | G5 a new item reaches the UI in ≤2s | 70ms | 28ms ingest → 화면 (목표 ≤2000ms) |
+| PASS | A8b hub recorded audit_log(approval.decided) | 2ms | 1 row(s) |
 | PASS | A8c pending_approvals.state moved to decided(accept) | 0ms | state=decided decision=accept |
 | PASS | A10 classify() recorded a T0 run in agent_runs (no network) | 0ms | 1 run(s), tier=T0 |
 | PASS | A11 local-agent registered over WS /bridge | 0ms | agent_runtimes state=online |
@@ -86,8 +88,9 @@
 
 ## 증거
 
-`tools/e2e/evidence/`의 PNG 7장 (01-inbox / 02-inbox-filter-work / 03-thread /
-04-agent-session / 05-approval-card / 06-command-palette / 07-g5-live-item).
+`tools/e2e/evidence/`의 PNG 8장 (01-inbox / 02-inbox-filter-work / 03-thread /
+04-agent-session / 05-approval-card / 06-command-palette / 07-g5-live-item /
+08-archived — "보관됨" pill을 켠 Archived 뷰, US-A36).
 05는 승인 카드 요소만 잘라 찍는다 — 전체 화면으로 찍으면 04와 완전히 같은 그림이 된다
 (셸이 승인 카드를 상세 패널 위에 고정해 두기 때문에 04에도 이미 떠 있다).
 

@@ -217,6 +217,23 @@ body {
   border-color: transparent;
 }
 
+.inbox-card__archived-pill {
+  border: var(--hairline);
+  border-radius: 999px;
+  padding: 1px 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.inbox-card__archived-pill[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+
 /* U2: kinso 대화 행 — 아바타 | (이름·시간 / 요약·칩) | (채널아이콘 또는 상태배지). 3칼럼×2행 그리드,
    우측 슬롯은 두 행에 걸쳐 세로 중앙 정렬(kinso 실측 — 행 전체 기준 우측 끝 고정, 23 §2). */
 .inbox-row {
@@ -344,6 +361,24 @@ body {
   color: var(--text-secondary);
 }
 
+/* US-A36: 보관/되살리기는 hover(와 키보드 포커스) 때만 나타난다 — 행이 늘 버튼을 이고 있지 않는다. */
+.inbox-row__action {
+  border: var(--hairline);
+  border-radius: 999px;
+  padding: 1px 8px;
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.inbox-row:hover .inbox-row__action,
+.inbox-row:focus-within .inbox-row__action {
+  opacity: 1;
+}
+
 .inbox-row__approval-dot {
   width: 6px;
   height: 6px;
@@ -381,6 +416,28 @@ body {
 .approval-card,
 .draft-card {
   margin-bottom: 12px;
+}
+
+/* US-A36 / A5 §3.8: 오프라인 배너와 같은 톤의 상단 고정 바. */
+.thread-screen__archived-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.thread-screen__archived-banner button {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
 }
 
 .thread-screen__item p {

@@ -1,5 +1,6 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { reduceKeySequence } from "../src/hooks/use-keymap";
+import { isEditableTarget, reduceKeySequence } from "../src/hooks/use-keymap";
 
 describe("reduceKeySequence (A5 §2.4 go-to 접두 g+letter, 300ms 창)", () => {
   it("g then i within 300ms resolves to 'go-inbox'", () => {
@@ -16,5 +17,18 @@ describe("reduceKeySequence (A5 §2.4 go-to 접두 g+letter, 300ms 창)", () => 
   it("a single non-prefix key resolves directly (e.g. 'e' = archive)", () => {
     const r = reduceKeySequence(null, "e", 1000);
     expect(r.resolved).toBe("archive");
+  });
+});
+
+describe("US-A36 보관 키", () => {
+  it("'u' resolves to 'unarchive' (보관 취소, A5 §2.4 표의 'e' 짝)", () => {
+    expect(reduceKeySequence(null, "u", 1000).resolved).toBe("unarchive");
+  });
+
+  it("ignores keys typed into the ask bar / Composer — 'e'가 보관으로 새면 안 된다", () => {
+    const input = document.createElement("input");
+    expect(isEditableTarget(input)).toBe(true);
+    expect(isEditableTarget(document.createElement("div"))).toBe(false);
+    expect(isEditableTarget(null)).toBe(false);
   });
 });

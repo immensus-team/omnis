@@ -232,6 +232,45 @@ test("Phase A seeded smoke", async ({ page }) => {
   await shot(page, "06-command-palette.png");
   await page.keyboard.press("Escape");
 
+  // US-A36: 보관은 승인 게이트를 타지 않는 로컬 상태 전이다 — UI에서 사라지는 것과 허브가
+  // 실제로 threads.archived_at + audit_log를 쓴 것을 둘 다 본다(UI만 보면 낙관적 갱신에 속는다).
+  await check("A-archive 행 보관 → 목록에서 사라지고, 되살리면 돌아온다", async () => {
+    await page.getByRole("radio", { name: "all", exact: true }).click();
+    const before = await rows.count();
+    const target = rows.first();
+    const name = ((await target.locator(".inbox-row__name").textContent()) ?? "").trim();
+    await target.hover();
+    await target.getByRole("button", { name: "보관", exact: true }).click();
+    await expect.poll(() => rows.count(), { timeout: 20_000 }).toBe(before - 1);
+
+    const archivedPill = page.getByRole("button", { name: "보관됨", exact: true });
+    await archivedPill.click();
+    const archivedRow = rows.filter({ hasText: name }).first();
+    await expect(archivedRow).toBeVisible({ timeout: 20_000 });
+    await shot(page, "08-archived.png");
+
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+    try {
+      const { count } = await one<{ count: string }>(
+        pool,
+        "SELECT count(*) AS count FROM threads WHERE archived_at IS NOT NULL",
+      );
+      expect(Number(count)).toBeGreaterThanOrEqual(1);
+      await archivedRow.hover();
+      await archivedRow.getByRole("button", { name: "되살리기", exact: true }).click();
+      await archivedPill.click(); // Inbox 뷰로 복귀
+      await expect.poll(() => rows.count(), { timeout: 20_000 }).toBe(before);
+      const { actions } = await one<{ actions: string }>(
+        pool,
+        "SELECT string_agg(DISTINCT action, ',' ORDER BY action) AS actions FROM audit_log WHERE action LIKE 'thread.%archived'",
+      );
+      expect(actions).toBe("thread.archived,thread.unarchived");
+    } finally {
+      await pool.end();
+    }
+    return `"${name}" archived → restored (${before} rows), audit_log 2종 기록`;
+  });
+
   await check("G5 a new item reaches the UI in ≤2s", async () => {
     await page.getByRole("radio", { name: "all", exact: true }).click();
     const marker = `G5 latency probe ${Date.now()}`;

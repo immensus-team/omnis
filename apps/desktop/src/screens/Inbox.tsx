@@ -7,8 +7,10 @@ import {
   agentSessionKinsoState,
 } from "@omnis/ui/lib/row-meta";
 import { useQuery } from "@rocicorp/zero/react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
+import { setThreadArchived } from "../api/threads.js";
+import { useKeymap } from "../hooks/use-keymap.js";
 import { useZeroClient } from "../zero-client.js";
 
 export const FILTERS = ["all", "work", "personal", "agents", "needs-approval"] as const;
@@ -89,6 +91,29 @@ export function threadSummary(row: {
   return "";
 }
 
+export interface ArchivableRow {
+  threadId: string;
+  /** threads.archived_at (ms). null이면 인박스에 남는다(A5 §3.1의 기본 쿼리). */
+  archivedAt: number | null;
+}
+
+/** US-A36: Inbox는 보관된 스레드를 빼고, Archived 뷰는 보관된 것만 보관 시각 역순으로 보여준다.
+ *  `pending`은 HTTP 왕복 + Zero 복제가 도착하기 전까지의 낙관적 오버라이드(id → 보관 여부)다. */
+export function applyArchiveView<T extends ArchivableRow>(
+  rows: T[],
+  view: "inbox" | "archived",
+  pending: Record<string, boolean>,
+): T[] {
+  const isArchived = (r: T): boolean => pending[r.threadId] ?? r.archivedAt !== null;
+  if (view === "inbox") return rows.filter((r) => !isArchived(r));
+  return rows
+    .filter(isArchived)
+    .sort(
+      (a, b) =>
+        (b.archivedAt ?? Number.MAX_SAFE_INTEGER) - (a.archivedAt ?? Number.MAX_SAFE_INTEGER),
+    );
+}
+
 export interface SortableInboxRow {
   hasPendingApproval: boolean;
   agentState: AgentSessionKinsoState | null;
@@ -113,6 +138,9 @@ export function Inbox({
   const zero = useZeroClient();
   const [filter, setFilter] = useState<InboxFilter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = useState<"inbox" | "archived">("inbox");
+  // 낙관적 오버라이드: 허브 왕복 + Zero 복제가 도착하기 전까지 행이 그 자리에 남아 있지 않게 한다.
+  const [pendingArchive, setPendingArchive] = useState<Record<string, boolean>>({});
 
   // 편차(계획 A26 step 7 대비, 인터페이스 계약 §7 zeroSchema 기준): zeroSchema(A21, packages/kernel/src/zero-schema.ts)는
   // Inbox/Thread가 실제로 쓰는 관계 3개(threads.items, items.thread, items.author)만 정의한다 —
@@ -196,6 +224,7 @@ export function Inbox({
       labels: LabelChip[];
       avatar: RowAvatar;
       agentState: AgentSessionKinsoState | null;
+      archivedAt: number | null;
     }> = [];
     for (const item of items) {
       if (seen.has(item.thread_id)) continue;
@@ -238,10 +267,47 @@ export function Inbox({
         avatar:
           runtime !== undefined ? { kind: "runtime", runtime } : { kind: "initials", name: title },
         agentState,
+        archivedAt: item.thread?.archived_at ?? null,
       });
     }
     return rows;
   }, [items, pendingThreadIds, channelByAccount, chipsByThread, sessionByThread, runtimeById]);
+
+  // 서버 상태가 오버라이드를 따라잡으면 오버라이드를 버린다 — 그래야 이후의 자동 보관(A4 §9)이나
+  // 다른 기기에서 한 되살리기가 이 화면에서 무시되지 않는다.
+  useEffect(() => {
+    setPendingArchive((prev) => {
+      const settled = threadRows.filter((r) => prev[r.threadId] === (r.archivedAt !== null));
+      if (settled.length === 0) return prev;
+      const next = { ...prev };
+      for (const r of settled) delete next[r.threadId];
+      return next;
+    });
+  }, [threadRows]);
+
+  const toggleArchive = useCallback((threadId: string, archived: boolean) => {
+    setPendingArchive((p) => ({ ...p, [threadId]: archived }));
+    setThreadArchived(threadId, archived).catch((e: unknown) => {
+      // 허브가 거절하면 낙관적 상태를 되돌린다 — 화면이 서버보다 앞서 거짓말하지 않는다.
+      setPendingArchive((p) => {
+        const next = { ...p };
+        delete next[threadId];
+        return next;
+      });
+      console.error("archive failed", e);
+    });
+  }, []);
+
+  useKeymap(
+    useCallback(
+      (action: string) => {
+        if (selectedId === null) return;
+        if (action === "archive") toggleArchive(selectedId, true);
+        if (action === "unarchive") toggleArchive(selectedId, false);
+      },
+      [selectedId, toggleArchive],
+    ),
+  );
 
   const channelFiltered = useMemo(
     () => (channelFilter ? threadRows.filter((r) => r.channel === channelFilter) : threadRows),
@@ -251,12 +317,20 @@ export function Inbox({
     () => filterInboxItems(channelFiltered, filter),
     [channelFiltered, filter],
   );
-  const filtered = useMemo(() => sortInboxRows(pillFiltered), [pillFiltered]);
+  const viewFiltered = useMemo(
+    () => applyArchiveView(pillFiltered, view, pendingArchive),
+    [pillFiltered, view, pendingArchive],
+  );
+  // Archived는 "보관 시각 역순"이 정렬 기준이다 — needs-attention을 위로 끌어올리지 않는다.
+  const filtered = useMemo(
+    () => (view === "archived" ? viewFiltered : sortInboxRows(viewFiltered)),
+    [viewFiltered, view],
+  );
 
   return (
     <OpaqueSurface className="inbox-card">
       <div className="inbox-card__header">
-        <h2 className="inbox-card__title">Inbox</h2>
+        <h2 className="inbox-card__title">{view === "archived" ? "Archived" : "Inbox"}</h2>
         <div role="radiogroup" aria-label="Inbox 필터" className="inbox-card__pills">
           {FILTERS.map((f) => (
             <button
@@ -271,6 +345,15 @@ export function Inbox({
             </button>
           ))}
         </div>
+        {/* US-A36: 보관함 pill. 필터 pill(라디오)과 달리 토글이라 radiogroup 밖에 둔다. */}
+        <button
+          type="button"
+          className="inbox-card__archived-pill"
+          aria-pressed={view === "archived"}
+          onClick={() => setView((v) => (v === "archived" ? "inbox" : "archived"))}
+        >
+          보관됨
+        </button>
       </div>
       <Virtuoso
         role="listbox"
@@ -290,6 +373,8 @@ export function Inbox({
             selected={item.id === selectedId}
             hasPendingApproval={item.hasPendingApproval}
             labels={item.labels}
+            archived={view === "archived"}
+            onArchive={(id) => toggleArchive(id, view !== "archived")}
             onSelect={(id) => {
               setSelectedId(id);
               onOpen?.({ threadId: item.threadId, agentSession: item.agentSession });
