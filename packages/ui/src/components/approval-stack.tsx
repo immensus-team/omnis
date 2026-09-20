@@ -74,6 +74,9 @@ export function ApprovalStack<T extends ApprovalStackItem>({
   // overrides it — one card is expanded at a time, whichever way it was chosen.
   const [pickedId, setPickedId] = useState<string | null>(null);
   const { primary, collapsed } = scopeApprovalStack(approvals, openThreadId);
+  // An empty stack draws nothing at all: a landmark with nothing in it is a heading without a list
+  // under it. Guarded here so no caller has to remember.
+  if (approvals.length === 0) return null;
   const activeId = pickedId ?? primary?.id ?? null;
   const active = approvals.find((a) => a.id === activeId) ?? null;
   // Picking a collapsed row promotes it — so it leaves the collapsed list. Without this it would

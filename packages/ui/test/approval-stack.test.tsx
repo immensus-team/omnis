@@ -90,6 +90,13 @@ describe("ApprovalStack (US-D03)", () => {
     expect(screen.getByText("Approve")).toBeInTheDocument();
   });
 
+  it("draws nothing at all when the queue is empty", () => {
+    const { container } = render(
+      <ApprovalStack approvals={[]} openThreadId={null} onDecide={vi.fn()} />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("decides by the approval's id, not by the card's", () => {
     const onDecide = vi.fn();
     render(<ApprovalStack approvals={ALL} openThreadId="t1" onDecide={onDecide} />);

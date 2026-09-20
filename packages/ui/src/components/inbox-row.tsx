@@ -12,6 +12,8 @@ import {
 } from "../lib/row-meta.js";
 import type { UiChannel } from "../types.js";
 import { ChannelGlyph } from "./channel-glyph.js";
+import { KeyValueTable } from "./key-value-table.js";
+import { PersonCard, type RelationshipState } from "./person-card.js";
 import { AgentStatusBadge } from "./status-badge.js";
 
 export interface LabelChip {
@@ -65,6 +67,10 @@ export interface InboxRowProps {
   onArchive?: (id: string) => void;
   /** On an archived row the action becomes "Restore" (A5 §3.8). */
   archived?: boolean;
+  /** US-D03: the person behind this row (items.author), for the hover card's PersonCard. Absent on
+   *  an agent session, which has no person — the card then omits those rows rather than inventing
+   *  them. */
+  person?: { vip?: boolean; relationshipState?: RelationshipState | null } | null;
 }
 
 function pickChips(labels: LabelChip[]): { shown: LabelChip[]; more: number } {
@@ -112,6 +118,12 @@ function RowAvatarView({ avatar }: { avatar: RowAvatar }) {
 export function InboxRow(props: InboxRowProps) {
   const { shown, more } = pickChips(props.labels);
   const summaryText = props.isDraft ? `Draft: ${props.summary}` : props.summary;
+  // US-D03: a runtime avatar is the one row shape with nobody behind it.
+  const isPerson = props.avatar.kind !== "runtime";
+  const unreadRows =
+    props.unreadCount !== undefined && props.unreadCount > 0
+      ? [{ label: "Unread", value: props.unreadCount, numeric: true }]
+      : [];
   return (
     // US-D02: HoverCard.Trigger is asChild, so it only adds hover handlers to this row div — no
     // wrapper element appears and the row's role="option", click and keyboard behaviour are
@@ -200,7 +212,13 @@ export function InboxRow(props: InboxRowProps) {
         {/* A floating panel, so it is glass (DESIGN-DIRECTION.md: Liquid Glass on floating panels
             only). Its density follows the reference (the lower-left card in
             ref-issue-tracker-density.webp) — a compact card of a title plus a few key-value lines,
-            not a detail pane. */}
+            not a detail pane.
+            US-D03: the body is the shared PersonCard (initials/photo + badge row + KeyValueTable)
+            rather than a private <dl>, so the inbox and the future Network screen draw an identity
+            the same way. The card still says only what the row had to cut — the summary the row
+            clamped, and the labels it clipped to two chips plus "+N".
+            An agent_session row has no person behind it (its avatar slot holds the runtime logo),
+            so it keeps the plain title + table form instead of claiming to be somebody. */}
         <HoverCard.Content
           className="glass-surface row-hover-card"
           data-glass-slot="sheet"
@@ -208,36 +226,32 @@ export function InboxRow(props: InboxRowProps) {
           align="start"
           sideOffset={8}
         >
-          <p className="row-hover-card__title">{props.name}</p>
-          {/* The card says only what the row had to cut — it never repeats a value the row is
-              already showing in full. The summary is clamped to two lines in the row
-              (.inbox-row__summary's line-clamp), so this is the only place it appears complete,
-              and the labels line shows up only once the chips clipped it to two plus "+N". */}
-          {summaryText && <p className="row-hover-card__summary">{summaryText}</p>}
-          <dl className="row-hover-card__meta">
-            {more > 0 && (
-              <div>
-                <dt>Labels</dt>
-                <dd>{props.labels.map((l) => l.name).join(", ")}</dd>
-              </div>
-            )}
-            {props.agentState === null && (
-              <div>
-                <dt>Channel</dt>
-                <dd>{CHANNEL_LABEL[props.channel]}</dd>
-              </div>
-            )}
-            {props.unreadCount !== undefined && props.unreadCount > 0 && (
-              <div>
-                <dt>Unread</dt>
-                <dd>{props.unreadCount}</dd>
-              </div>
-            )}
-            <div>
-              <dt>Last activity</dt>
-              <dd>{props.timestamp}</dd>
-            </div>
-          </dl>
+          {isPerson ? (
+            <PersonCard
+              person={{
+                name: props.name,
+                vip: props.person?.vip ?? false,
+                relationshipState: props.person?.relationshipState ?? null,
+                channels: [props.channel],
+                labels: more > 0 ? props.labels.map((l) => l.name) : [],
+                lastContact: props.timestamp,
+              }}
+              extraRows={unreadRows}
+            >
+              {summaryText && <p className="row-hover-card__summary">{summaryText}</p>}
+            </PersonCard>
+          ) : (
+            <>
+              <p className="row-hover-card__title">{props.name}</p>
+              {summaryText && <p className="row-hover-card__summary">{summaryText}</p>}
+              <KeyValueTable
+                rows={[
+                  { label: "Last activity", value: props.timestamp, numeric: true },
+                  ...unreadRows,
+                ]}
+              />
+            </>
+          )}
         </HoverCard.Content>
       </HoverCard.Portal>
     </HoverCard.Root>

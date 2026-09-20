@@ -9,6 +9,7 @@ import {
 import { groupBy } from "@omnis/ui/components/command-palette";
 import { GroupHeader } from "@omnis/ui/components/group-header";
 import { InboxRow, type LabelChip, type RowAvatar } from "@omnis/ui/components/inbox-row";
+import type { RelationshipState } from "@omnis/ui/components/person-card";
 import { type AgentPillState, AgentStatusPill } from "@omnis/ui/components/status-pill";
 import { formatRelativeTime } from "@omnis/ui/lib/relative-time";
 import {
@@ -186,6 +187,8 @@ interface ThreadRow extends InboxQueryItem, ArchivableRow, SortableInboxRow {
   unreadCount: number;
   labels: LabelChip[];
   avatar: RowAvatar;
+  /** US-D03: the author's person row (items.author), for the hover card's PersonCard. */
+  person: { vip: boolean; relationshipState: RelationshipState } | null;
 }
 
 /** Virtuoso only takes a flat array — this folds group headers and rows into one stream. */
@@ -345,6 +348,14 @@ export function Inbox({
         labels: chipsByThread.get(item.thread_id) ?? [],
         avatar:
           runtime !== undefined ? { kind: "runtime", runtime } : { kind: "initials", name: title },
+        // The persons row travels with items.author, so the hover card's relationship state and
+        // VIP chip are read, not guessed. Authorless rows (agent sessions, system) have none.
+        person: item.author
+          ? {
+              vip: item.author.vip,
+              relationshipState: item.author.relationship_state as RelationshipState,
+            }
+          : null,
         agentState,
         archivedAt: item.thread?.archived_at ?? null,
       });
@@ -578,6 +589,7 @@ export function Inbox({
               // repeated below).
               hasPendingApproval={filter !== "needs-approval" && item.row.hasPendingApproval}
               labels={item.row.labels}
+              person={item.row.person}
               archived={view === "archived"}
               onArchive={(id) => toggleArchive(id, view !== "archived")}
               onSelect={(id) => {

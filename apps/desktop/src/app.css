@@ -1046,6 +1046,219 @@ body {
   cursor: pointer;
 }
 
+/* US-D03 — the approval stack. It used to be a wall: every pending approval drew the identical
+   12px-radius card with the identical four buttons, so three of them read as one object repeated
+   and the eye had nowhere to land. Now one approval is the expanded card (elevated, so it is
+   visibly the surface you are working on) and the rest are one-line rows under a count. */
+.approval-stack {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+}
+
+/* The elevation is the same decision the selected inbox row makes (only the selected thing
+   elevates) — the card lifts off the pane, the rows stay flat on it. */
+.approval-stack__card {
+  border-radius: 12px;
+  box-shadow: var(--shadow-row-selected);
+}
+
+.approval-stack__header {
+  margin: 14px 0 6px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  /* The caption scale of the typography pass, and the one place a letterfit is doing real work:
+     12px is where an untracked label starts to close up. */
+  letter-spacing: 0.02em;
+}
+
+.approval-stack__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* A collapsed row is still a button — it promotes itself to the expanded card — but it does not
+   wear a card's clothes until it is the one being looked at. */
+.approval-stack__row:hover {
+  background: var(--state-hover);
+}
+
+.approval-stack__row-action {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.approval-stack__row-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.approval-stack__risk {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 1px 7px;
+  background: color-mix(in oklch, var(--danger-500) 18%, transparent);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+/* ---- the thread detail header (ref-dashboard-detail-card.webp's title + subline + toggles) ---- */
+.thread-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.thread-header__main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.thread-header__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  /* A title that is a sentence (a mail subject) is clipped, not wrapped to four lines — the
+     subline and the segments below it are what the header is for. */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.thread-header__subline {
+  margin: 3px 0 0;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  /* The channel · people · time line. It can get long at a narrow width, so it wraps rather than
+     forcing the pane to scroll sideways. */
+  overflow-wrap: anywhere;
+}
+
+/* The right-aligned icon actions. Ghost buttons: they are secondary to the title, and an outlined
+   row of three at the top of the pane would read as a toolbar rather than as actions on this
+   thread. */
+.thread-header__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+}
+
+.thread-header__action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.thread-header__action:hover {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}
+
+.thread-header__action[aria-pressed="true"] {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+/* The panel the Label and More actions disclose: the thread's labels and the thread's own facts,
+   inline under the header rather than in a popover floating over the thing being described. Two
+   closures of the same kind, so one container with a gap between them. */
+.thread-header__labels {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+/* The segments sit under the title/subline as their own row (the reference puts "Price | PPSF" on
+   the line below the title, not beside it). */
+.thread-header__segments {
+  margin-bottom: 14px;
+}
+
+.segmented-control {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+}
+
+.segmented-control__segment {
+  border: none;
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* The active segment is the inverted black pill — the same "this one is selected" move the rail's
+   Inbox tile makes (--gray-950 tile, --gray-000 mark), so selection looks the same wherever it
+   appears. */
+.segmented-control__segment[aria-checked="true"] {
+  background: var(--gray-950, #14141a);
+  color: var(--gray-000, #fff);
+  font-weight: 600;
+}
+
+/* The Summary and Notes panels: prose, at the body size of the 15/13/12 scale, on the pane's own
+   background — no card, because a card here would be a container around a paragraph. */
+.thread-panel {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.thread-panel__empty {
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.thread-panel__note {
+  margin-bottom: 12px;
+}
+
+.thread-panel__note-time {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+/* The thread's own facts (the "More details" disclosure) are the same KeyValueTable as everything
+   else rather than a second way of printing a fact list — the disclosure is inline under the
+   header, so it needs no surface of its own. */
+
 /* cmdk's Command.Dialog attaches unstyled at the end of the document — it is an overlay the shell
    raises, so only its position is set here (@omnis/ui keeps owning the visual tokens: chips, glass
    surfaces and the rest). */
@@ -1375,8 +1588,11 @@ body {
    ref-issue-tracker-density.webp): a compact card of a title plus a few key-value lines, not a
    detail pane. */
 .row-hover-card {
-  min-width: 220px;
-  max-width: 280px;
+  /* US-D03: the card's body is a PersonCard now (avatar + badge row + key-value table), so it is
+     a little wider than the four-line <dl> it used to hold — at 220px the table's label and value
+     columns had nowhere to sit. */
+  min-width: 240px;
+  max-width: 300px;
   padding: 12px 14px;
   border-radius: 12px;
   /* The card appears to the row's right, so it grows from the corner nearest its trigger and
@@ -1451,25 +1667,127 @@ body {
   line-clamp: 5;
   overflow: hidden;
 }
-.row-hover-card__meta {
-  display: grid;
-  gap: 6px;
+/* ==========================================================================================
+   US-D03 — the detail pane's pieces, taken from ref-dashboard-detail-card.webp
+   (the right-hand card: title + subline, a photo with a badge row, then a hairline key-value
+   table). The typography here is the reference's scale — 15 / 13 / 12 — and it is the scale the
+   detail pane and the person card share.
+   ========================================================================================== */
+
+/* The one place in the product where hairlines are allowed (DESIGN-DIRECTION: list rows carry
+   none; only the selected row elevates as a card). A table of facts is not a list of things, and
+   the reference draws exactly this rule under each row. */
+.key-value-table {
   margin: 0;
+  font-size: 13px;
 }
-.row-hover-card__meta > div {
+
+.key-value-table__row {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
-  font-size: 12px;
+  gap: 16px;
+  padding: 7px 0;
+  border-top: var(--hairline);
 }
-.row-hover-card__meta dt {
+
+/* The first row has nothing above it to be separated from — a hairline there is a rule with no
+   content on one side. */
+.key-value-table__row:first-child {
+  border-top: none;
+}
+
+.key-value-table__label {
+  /* The reference's labels are the palest thing in the card; the values carry the ink. */
   color: var(--text-tertiary);
-  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
-.row-hover-card__meta dd {
+
+.key-value-table__value {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--text-primary);
+  font-weight: 500;
   text-align: right;
+  /* A long value (a full label list, a contract name) wraps instead of pushing the row past the
+     card's edge — nothing overflows horizontally at any width. */
+  overflow-wrap: anywhere;
+}
+
+/* Times and counts. Tabular figures are what make a column of them line up ("3m" over "11m" over
+   "4 Aug" is ragged in a proportional face). */
+.key-value-table__row[data-numeric] .key-value-table__value {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The person card — the hover card's body today, the Network screen's block later. One card for
+   both, so it is a self-contained column: head (avatar + name), badge row, then the table. */
+.person-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.person-card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.person-card__avatar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  /* Circles are avatars (DESIGN-DIRECTION radius scale) — a person's photo is round, a runtime's
+     logo tile is the 30% squircle. */
+  border-radius: 50%;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.person-card__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.person-card__name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  /* The reference's name sits tight against its own line height rather than the body's 1.5. */
+  line-height: 1.3;
+}
+
+.person-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.person-card__badge {
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  /* Captions take a little tracking (the typography pass) — they are the smallest type on the
+     surface and the letterfit is what keeps them from smudging. */
+  letter-spacing: 0.02em;
+}
+
+/* VIP is the one badge with weight behind it: persons.vip is a decision somebody made, not a
+   classification the system guessed. */
+.person-card__badge[data-tone="vip"] {
+  background: color-mix(in oklch, var(--warn-500) 22%, transparent);
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 /* ==========================================================================================

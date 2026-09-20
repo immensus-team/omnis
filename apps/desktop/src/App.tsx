@@ -1,5 +1,7 @@
 import {
-  type ApprovalCardInterrupt,
+  type ApprovalCardDecision,
+  ApprovalStack,
+  type ApprovalStackItem,
   ChannelRail,
   CommandPalette,
   type PaletteAction,
@@ -7,8 +9,8 @@ import {
   type UiChannel,
 } from "@omnis/ui";
 import { ZeroProvider, useQuery } from "@rocicorp/zero/react";
-import { useEffect, useMemo, useState } from "react";
-import { ApprovalCard } from "./components/ApprovalCard.js";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { decideApproval } from "./api/approvals.js";
 import { AgentSession } from "./screens/AgentSession.js";
 import { Inbox, type OpenTarget } from "./screens/Inbox.js";
 import { Thread } from "./screens/Thread.js";
@@ -91,6 +93,15 @@ function Shell() {
     return list;
   }, [accounts]);
 
+  // The stack hands back the id it decided on (it renders one card per approval, so the card
+  // itself no longer knows which one it is).
+  const onDecide = useCallback(
+    (id: string, decision: ApprovalCardDecision, decidedArgs?: Record<string, unknown>) => {
+      void decideApproval(id, decision, decidedArgs);
+    },
+    [],
+  );
+
   const actions: PaletteAction[] = [
     {
       id: "go-inbox",
@@ -142,9 +153,16 @@ function Shell() {
           className="app-shell__detail glass-surface"
           data-glass-slot="sheet"
         >
-          {approvals.map((a) => (
-            <ApprovalCard key={a.id} id={a.id} interrupt={a as unknown as ApprovalCardInterrupt} />
-          ))}
+          {/* US-D03: one approval is the expanded card, the rest are one-line rows under a count.
+              The scope is the open thread — an approval that belongs to the conversation in front
+              of you is the one you are working on; with nothing open the whole queue is the scope.
+              The decision still goes to the hub over HTTP (contract §5) — Zero only carries the
+              read. */}
+          <ApprovalStack
+            approvals={approvals as unknown as ApprovalStackItem[]}
+            openThreadId={open?.threadId ?? null}
+            onDecide={onDecide}
+          />
           {open === null ? null : open.agentSession ? (
             <AgentSession sessionThreadId={open.threadId} />
           ) : (

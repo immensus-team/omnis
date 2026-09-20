@@ -261,12 +261,26 @@ describe("InboxRow hover card (US-D02)", () => {
     const meta = within(card() as HTMLElement);
 
     expect(meta.getByText(long)).toBeInTheDocument();
-    expect(meta.getByText("Channel")).toBeInTheDocument();
+    expect(meta.getByText("Channels")).toBeInTheDocument();
     expect(meta.getByText("Slack")).toBeInTheDocument();
     expect(meta.getByText("Unread")).toBeInTheDocument();
     expect(meta.getByText("3")).toBeInTheDocument();
-    expect(meta.getByText("Last activity")).toBeInTheDocument();
+    expect(meta.getByText("Last contact")).toBeInTheDocument();
     expect(meta.getByText("3m")).toBeInTheDocument();
+  });
+
+  // US-D03: the hover card's body is the shared PersonCard — the same avatar/badge/table block the
+  // Network screen will draw. The person facts the row cannot show (relationship state, VIP) come
+  // through it.
+  it("carries the person's relationship state and VIP badge", () => {
+    const card = hoverRow({
+      person: { vip: true, relationshipState: "active" as const },
+    });
+    act(() => vi.advanceTimersByTime(400));
+    const meta = within(card() as HTMLElement);
+    expect(meta.getByText("Relationship")).toBeInTheDocument();
+    expect(meta.getByText("Active")).toBeInTheDocument();
+    expect(meta.getByText("VIP")).toBeInTheDocument();
   });
 
   // The card does not repeat the row. The title (the name) appears once, and labels the row
@@ -281,7 +295,9 @@ describe("InboxRow hover card (US-D02)", () => {
     expect(meta.queryByText("Unread")).not.toBeInTheDocument();
   });
 
-  // The full label list only adds value when the row clipped it to two chips plus "+N".
+  // The full label list only adds value when the row clipped it to two chips plus "+N". The card
+  // shows them as the person card's badge row — a label the row already drew in full as a chip
+  // does not come back as a second chip here.
   it("lists every label once the chips have clipped some away", () => {
     const card = hoverRow({
       labels: [
@@ -292,15 +308,24 @@ describe("InboxRow hover card (US-D02)", () => {
     });
     act(() => vi.advanceTimersByTime(400));
     const meta = within(card() as HTMLElement);
-    expect(meta.getByText("Labels")).toBeInTheDocument();
-    expect(meta.getByText("work, davich, contract")).toBeInTheDocument();
+    const badgeList = (card() as HTMLElement).querySelector(".person-card__badges");
+    const badges = within(badgeList as HTMLElement);
+    expect(badges.getByText("work")).toBeInTheDocument();
+    expect(badges.getByText("davich")).toBeInTheDocument();
+    expect(badges.getByText("contract")).toBeInTheDocument();
+    // The unscoped row shows one chip, the card shows all three — nothing is repeated twice
+    // inside the card itself.
+    expect(meta.queryByText("Labels")).not.toBeInTheDocument();
   });
 
-  // An agent_session row's right slot is a status badge rather than a channel mark, so a
-  // "Channel" line would mean nothing.
+  // An agent_session row's right slot is a status badge rather than a channel mark, and the row
+  // has no person behind it — so a "Channels" line would mean nothing.
   it("omits the channel line on an agent session row", () => {
-    const card = hoverRow({ agentState: "working" as const });
+    const card = hoverRow({
+      agentState: "working" as const,
+      avatar: { kind: "runtime" as const, runtime: "claude_code" as const },
+    });
     act(() => vi.advanceTimersByTime(400));
-    expect(within(card() as HTMLElement).queryByText("Channel")).not.toBeInTheDocument();
+    expect(within(card() as HTMLElement).queryByText("Channels")).not.toBeInTheDocument();
   });
 });
