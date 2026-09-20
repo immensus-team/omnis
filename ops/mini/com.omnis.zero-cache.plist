@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- A6 §1·§10. 템플릿: install.sh가 __OMNIS_ROOT__·__HOME__을 치환해 ~/Library/LaunchAgents에 깐다.
-     비밀은 여기 없다 — run.sh가 env.sh를 통해 Keychain에서 읽는다(A6 §9). -->
+<!-- A6 §1·§10. Template: install.sh substitutes __OMNIS_ROOT__ and __HOME__ and installs it into ~/Library/LaunchAgents.
+     No secrets here — run.sh reads them from the Keychain via env.sh (A6 §9). -->
 <plist version="1.0">
 <dict>
   <key>Label</key><string>com.omnis.zero-cache</string>
