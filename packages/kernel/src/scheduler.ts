@@ -17,7 +17,8 @@ export interface SchedulerDeps {
   now?: () => Date;
   /** 기본 10초(계약 §5). 테스트만 줄인다. */
   tickMs?: number;
-  /** Task 20이 kill switch를 물린다. 없으면 항상 꺼진 것으로 본다. */
+  /** 마스터 §7: kill switch 하나로 모든 자율 루프가 멈춘다. 스케줄러 틱이 Phase A의 유일한 자율 루프다.
+   *  이미 claim된 잡은 끝까지 돌고, 다음 틱부터 멈춘다. 없으면 항상 꺼진 것으로 본다. */
   isKillSwitchOn?: () => Promise<boolean>;
 }
 
