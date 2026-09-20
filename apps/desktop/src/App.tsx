@@ -124,8 +124,16 @@ function Shell() {
           onChannelFilterChange={setRailChannel}
         />
       </div>
+      {/* US-D02b: 상세 패널은 폭과 무관하게 시트 유리를 달고 나온다 — 좁은 셸(≤1279.98px)에서는
+          이게 실제 모습이고(리스트 위에 뜬 유리 시트), 넓은 셸에서는 app.css의
+          `@container shell (min-width: 1280px)`가 유리를 벗겨 지금의 불투명 칼럼으로 되돌린다.
+          폭에 따라 JS가 분기하지 않으면 고칠 곳이 한 군데뿐이다. */}
       {detail && (
-        <section data-testid="detail-pane" className="app-shell__detail">
+        <section
+          data-testid="detail-pane"
+          className="app-shell__detail glass-surface"
+          data-glass-slot="sheet"
+        >
           {approvals.map((a) => (
             <ApprovalCard key={a.id} id={a.id} interrupt={a as unknown as ApprovalCardInterrupt} />
           ))}
