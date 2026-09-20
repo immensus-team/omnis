@@ -194,6 +194,14 @@ ${rows(p)}
 - **A2는 접근성 이름이 아니라 눈에 보이는 아이콘을 본다.** 채널 아이콘은 react-icons/si
   SVG다(U2 이전엔 모노그램 텍스트였다) — A2가 svg 자식 노드와 non-zero bounding box로
   "정말 뭔가 그려져 있다"를 확인한다.
+- **A2c/A2d가 kinso 셸과 행 해부를 본다.** A2c는 왼쪽 채널 레일 타일(Inbox/Slack/Gmail/
+  Google Calendar/Agent)과 상단 "Start typing to ask or search" 필바가 떠 있는지, A2d는 한
+  행 안에 아바타 · 이름 · **상대시간 문법**(now/3m/2w/4 Aug — ISO 타임스탬프가 아님) · 비어
+  있지 않은 요약 줄이 다 있는지 본다. 이 둘이 없으면 A1/A2/A2b는 요약 줄이 통째로 빠져도 통과한다.
+- **A4는 개수가 아니라 신원을 본다.** 행이 thread 단위가 된 U2 이후로 시드의 work 스레드와
+  personal 스레드는 각각 1개다 — "개수가 다르다"는 더 이상 성립하지 않아(U2 머지에서 실제로
+  깨졌다) 두 필터의 행 집합이 서로 겹치지 않고 둘 다 all의 진부분집합인지로 바꿨다.
+  A4b는 레일 타일 클릭이 목록을 좁히고 Inbox 타일이 되돌리는지를 따로 본다.
 - **T1(DeepSeek/OpenRouter) 호출은 강제로 막혀 있다.** 시드가 classify()를 부르기 전에
   OMNIS_OPENROUTER_API_KEY를 비운다 — 규칙 1단이 안 맞아 3단까지 흘러내려도 t1Model()이
   fetch 전에 던진다. A10은 그와 별개로 기록된 run이 tier=T0인지 본다.

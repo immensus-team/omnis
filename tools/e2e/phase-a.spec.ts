@@ -112,18 +112,72 @@ test("Phase A seeded smoke", async ({ page }) => {
     await expect(page.getByLabel("scope 라벨: work").first()).toBeVisible();
     await expect(page.getByLabel("topic 라벨: launch").first()).toBeVisible();
   });
+
+  // U1/U2 셸 크롬: kinso 레퍼런스의 두 고정 요소(왼쪽 채널 레일, 상단 ask/search 필바)가
+  // 실제로 떠 있는지 본다 — 01-inbox.png가 "kinso처럼 보인다"는 주장의 절반이 이 둘이다.
+  await check("A2c kinso shell: channel rail tiles + ask/search bar", async () => {
+    const rail = page.getByRole("navigation", { name: "채널" });
+    await expect(rail).toBeVisible();
+    for (const tile of ["Inbox", "Slack", "Gmail", "Google Calendar", "Agent"]) {
+      await expect(rail.getByRole("button", { name: tile, exact: true })).toBeVisible();
+    }
+    await expect(page.getByPlaceholder("Start typing to ask or search")).toBeVisible();
+    return "rail: Inbox/Slack/Gmail/Google Calendar/Agent + ask bar";
+  });
+
+  // 행 해부(U2): 아바타 · 이름 · 상대시간 · AI 한 줄 요약이 한 행 안에 다 있는지.
+  // A1/A2/A2b는 각각 개수·아이콘·제목만 보므로, 요약 줄이 통째로 빠져도 전부 통과한다.
+  await check("A2d a conversation row has avatar + name + relative time + summary", async () => {
+    const row = rows.first();
+    await expect(row.locator(".inbox-row__avatar")).toHaveCount(1);
+    await expect(row.locator(".inbox-row__name")).not.toBeEmpty();
+    const time = (await row.locator(".inbox-row__timestamp").textContent()) ?? "";
+    // formatRelativeTime의 출력 문법: now / 3m / 2w / 4 Aug (절대 ISO 타임스탬프가 아니다).
+    if (!/^(now|\d+[mhdw]|\d{1,2} [A-Za-z]{3}( \d{4})?)$/.test(time.trim())) {
+      throw new Error(`timestamp "${time}" is not a kinso relative time`);
+    }
+    const summary = (await row.locator(".inbox-row__summary").textContent()) ?? "";
+    if (summary.trim().length === 0) throw new Error("row summary line is empty");
+    return `time="${time.trim()}" summary="${summary.trim().slice(0, 40)}…"`;
+  });
   await shot(page, "01-inbox.png");
 
+  // U2부터 행이 item이 아니라 thread 단위라 "work와 personal의 개수가 다르다"는 더 이상
+  // 보장되지 않는다(시드는 work 스레드 1개 · personal 스레드 1개다) — 개수 대신 신원을 본다:
+  // 두 필터의 행 집합은 겹치지 않고, 둘 다 all의 진부분집합이다.
   await check("A4 work/personal filter pills change the list", async () => {
-    const all = await rows.count();
+    const names = async (): Promise<string[]> =>
+      (await rows.locator(".inbox-row__name").allTextContents()).map((n) => n.trim()).sort();
+    const all = await names();
     await page.getByRole("radio", { name: "work", exact: true }).click();
-    await expect.poll(() => rows.count()).toBeLessThan(all);
-    const work = await rows.count();
+    await expect.poll(() => rows.count()).toBeLessThan(all.length);
+    const work = await names();
     await page.getByRole("radio", { name: "personal", exact: true }).click();
-    await expect.poll(() => rows.count()).not.toBe(work);
-    const personal = await rows.count();
+    await expect.poll(async () => (await names()).join("|")).not.toBe(work.join("|"));
+    const personal = await names();
+    expect(work.length).toBeGreaterThan(0);
+    expect(personal.length).toBeGreaterThan(0);
+    expect(work.filter((n) => personal.includes(n))).toEqual([]);
+    for (const name of [...work, ...personal]) expect(all).toContain(name);
     await page.getByRole("radio", { name: "all", exact: true }).click();
-    return `all=${all} work=${work} personal=${personal}`;
+    return `all=${all.length} work=[${work.join(", ")}] personal=[${personal.join(", ")}]`;
+  });
+
+  // 레일 타일도 필터다(U1: 레일 선택 AND pill 필터) — 클릭 한 번이 실제로 목록을 좁히는지.
+  await check("A4b channel rail tile filters the list, Inbox tile restores it", async () => {
+    const all = await rows.count();
+    await page
+      .getByRole("navigation", { name: "채널" })
+      .getByRole("button", { name: "Gmail" })
+      .click();
+    await expect.poll(() => rows.count()).toBeLessThan(all);
+    const gmail = await rows.count();
+    await page
+      .getByRole("navigation", { name: "채널" })
+      .getByRole("button", { name: "Inbox" })
+      .click();
+    await expect.poll(() => rows.count()).toBe(all);
+    return `all=${all} gmail=${gmail}`;
   });
   await page.getByRole("radio", { name: "work", exact: true }).click();
   await shot(page, "02-inbox-filter-work.png");
