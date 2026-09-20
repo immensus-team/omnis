@@ -1106,6 +1106,13 @@ body {
   min-width: 0;
   overflow-y: auto;
   padding: 16px;
+  /* There is no global border-box reset (US-D02b's shell carries its own), and this box is the one
+     place where that mattered. As a grid column it is sized by its track, so box-sizing had nothing
+     to act on and the narrow tiers below could set `width: calc(100% - 32px)` and get a sheet that
+     was exactly the viewport wide *plus* its own 32px padding and 2px border — 392px of box in a
+     390px window, hanging 18px past the left edge, which clips the sheet's own header and text at
+     x=0. The two 16px margins in that rule only add up under border-box. */
+  box-sizing: border-box;
 }
 
 .thread-screen__item,
