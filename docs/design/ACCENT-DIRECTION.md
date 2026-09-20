@@ -22,12 +22,10 @@ One sentence for the whole thing: **the app is grey; colour happens in three pla
 
 ## 0. This supersedes one line of DESIGN-DIRECTION.md — amend it in the same commit
 
-`docs/design/DESIGN-DIRECTION.md` line 6 currently prescribes the tinted canvas ("따뜻한 오프화이트 캔버스, 은은한 그리드/그라데이션 배경"), and §1.3 below deletes the peach and mint radials it refers to. Logan's 2026-09-21 monotone directive supersedes it. Do not leave the SSOT contradicting the implementation — in the **same commit** as §1.3, replace that bullet's first sentence with:
+`docs/design/DESIGN-DIRECTION.md` line 6 prescribed the tinted canvas ("warm off-white canvas, faint grid/gradient background"), and §1.3 below deletes the peach and mint radials it refers to. Logan's 2026-09-21 monotone directive supersedes it. Do not leave the SSOT contradicting the implementation — in the **same commit** as §1.3, replace that bullet's first sentence with:
 
 ```
-- **라이트 테마 기본**(따뜻한 오프화이트 캔버스 + 옅은 그리드 + 필름 그레인; 피치/민트 그라데이션 워시는
-  2026-09-21 모노톤 지시로 폐기 — 색은 ACCENT-DIRECTION.md의 aurora 표면 3곳에만). 다크는 옵션이며
-  A5의 "다크 우선"은 폐기한다.
+- **Light theme by default** (warm off-white canvas + faint grid + film grain; the peach/mint gradient wash is retired by the 2026-09-21 monotone directive — colour lives only on the three aurora surfaces in `ACCENT-DIRECTION.md`). Dark is an option, and A5's "dark-first" is dropped.
 ```
 
 Nothing else in DESIGN-DIRECTION.md changes. The kinso row grammar, the radius scale, the glass rules and the spring timings all still stand.
@@ -530,7 +528,7 @@ The aurora must not extend past the plate's footprint — same 22px radius, no p
     slot="palette"
     className="ask-panel__glass"
     role="dialog"
-    aria-label="AI 패널"
+    aria-label="AI panel"
   >
     {/* head + branches, unchanged */}
   </GlassSurface>
@@ -688,7 +686,7 @@ If the answer to "why is there colour here" is "it looked flat", the answer is n
 
 ### 5.1 Screenshots
 
-Capture with `chrome-devtools-mcp` against the Vite dev server (per `docs/design/SKILLS.md`, "UI 태스크 표준 프롬프트 프리앰블" item 6 — that file has no numbered sections), light theme, then repeat 1 and 2 with `data-theme="dark"`:
+Capture with `chrome-devtools-mcp` against the Vite dev server (per `docs/design/SKILLS.md`, "Standard prompt preamble for UI tasks" item 6 — that file has no numbered sections), light theme, then repeat 1 and 2 with `data-theme="dark"`:
 
 1. Inbox, default state, nothing selected — rail aurora behind glass, monotone list.
 2. Inbox with the ask bar focused and the ask panel open (`dawn`), a thread selected.
