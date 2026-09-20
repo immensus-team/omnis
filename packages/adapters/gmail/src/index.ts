@@ -260,10 +260,22 @@ function parseAddressList(headerValue: string): { externalId: string; displayNam
   return out;
 }
 
+/** Date 헤더가 깨진 메일(스팸, 게이트웨이 경유)은 흔하다. toISOString()이 RangeError를 던지면
+ *  normalize()를 부른 backfill 스트림 전체가 그 메일 하나 때문에 죽으므로, Gmail이 항상 함께 주는
+ *  internalDate(epoch ms)로, 그것도 없으면 now()로 물러난다. */
+function parseSentAt(dateHeader: string, internalDate: string | undefined): string {
+  const parsed = [
+    dateHeader ? new Date(dateHeader) : null,
+    internalDate ? new Date(Number(internalDate)) : null,
+  ].find((d): d is Date => d !== null && !Number.isNaN(d.getTime()));
+  return (parsed ?? new Date()).toISOString();
+}
+
 export function normalize(raw: unknown): NormalizedItem[] {
   const r = raw as {
     id?: string;
     threadId?: string;
+    internalDate?: string;
     payload?: { headers?: { name?: string; value?: string }[]; body?: { data?: string } };
   };
   if (!r.id || !r.threadId) return [];
@@ -273,9 +285,8 @@ export function normalize(raw: unknown): NormalizedItem[] {
   const subject = header("Subject");
   const from = header("From");
   const messageId = header("Message-Id");
-  const dateHeader = header("Date");
   const bodyText = decodeGmailBody(r.payload?.body?.data);
-  const sentAt = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString();
+  const sentAt = parseSentAt(header("Date"), r.internalDate);
 
   const participants = [
     ...parseAddressList(from),
