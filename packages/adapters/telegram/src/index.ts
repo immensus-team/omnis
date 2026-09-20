@@ -229,6 +229,10 @@ export function normalize(raw: unknown): NormalizedItem[] {
   const m = raw as TgMessage;
   if (m.deletedMessageIds !== undefined) return []; // 삭제 업데이트는 콘텐츠가 없다 — 아이템을 만들지 않는다
   if (m.id === undefined || m.chat?.id === undefined || m.sender?.id === undefined) return [];
+  // text도 media도 없으면 이 어댑터가 표현할 수 있는 내용이 없다: new_chat_members 같은 서비스
+  // 메시지가 액션만 싣고 오는 경우다(액션은 매핑하지 않는다). 빈 body/attachments 아이템을 내보내는
+  // 대신 삭제 업데이트와 같은 방식으로 버린다 — Slack 어댑터도 같은 이유로 같은 가드를 둔다.
+  if (!m.text && !m.media) return [];
 
   const chatId = String(m.chat.id);
   const senderId = String(m.sender.id);
