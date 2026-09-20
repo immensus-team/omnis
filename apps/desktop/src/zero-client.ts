@@ -1,5 +1,6 @@
 import { zeroSchema } from "@omnis/kernel/zero";
 import { Zero } from "@rocicorp/zero";
+import { useZero } from "@rocicorp/zero/react";
 
 // OMNIS_HUB_HTTP_URL: 인터페이스 계약 §9 환경변수 목록(계약 리뷰 M11) — api/approvals.ts와 같은 기본값.
 const HUB_HTTP_URL = import.meta.env.OMNIS_HUB_HTTP_URL ?? "http://127.0.0.1:8787";
@@ -47,4 +48,15 @@ export function initZero(opts?: { server?: string; userID?: string; auth?: strin
     schema: zeroSchema,
     auth,
   });
+}
+
+export type ZeroClient = ReturnType<typeof initZero>;
+
+/**
+ * 셸(App.tsx)이 ZeroProvider에 실어 준 클라이언트를 꺼낸다. @rocicorp/zero/react의 useQuery는
+ * 내부적으로 useZero()를 부르므로 provider 없이는 "useZero must be used within a ZeroProvider"로
+ * 죽는다 — 화면들이 각자 initZero()를 부르던 A26~A31 배선으로는 브라우저에서 한 화면도 뜨지 않았다.
+ */
+export function useZeroClient(): ZeroClient {
+  return useZero() as unknown as ZeroClient;
 }

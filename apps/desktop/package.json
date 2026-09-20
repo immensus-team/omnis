@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "vite:dev": "vite",
+    "dev": "vite",
     "vite:build": "tsc --build && vite build",
     "tauri": "tauri",
     "test": "vitest run",

@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "@omnis/ui/tokens.css";
+import "./app.css";
 import { App } from "./App.js";
 import { loadZeroToken } from "./zero-client.js";
 

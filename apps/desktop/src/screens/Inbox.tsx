@@ -8,10 +8,17 @@ import {
 import { useQuery } from "@rocicorp/zero/react";
 import { useMemo, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
-import { initZero } from "../zero-client.js";
+import { useZeroClient } from "../zero-client.js";
 
 export const FILTERS = ["all", "work", "personal", "agents", "needs-approval"] as const;
 export type InboxFilter = (typeof FILTERS)[number];
+
+/** 셸(App.tsx)이 어떤 화면을 열지 고르는 데 필요한 최소 정보. Thread와 AgentSession은 같은
+ *  threads row를 보지만 kind='agent_session'일 때만 세션 화면이다(A5 §3.3). */
+export interface OpenTarget {
+  threadId: string;
+  agentSession: boolean;
+}
 
 export interface InboxQueryItem {
   id: string;
@@ -42,16 +49,8 @@ const HHMM = new Intl.DateTimeFormat("ko-KR", {
   hour12: false,
 });
 
-// 모듈 스코프에서 Zero를 만들면 filterInboxItems만 import해도 WebSocket이 열린다(테스트가 zero-cache에
-// 붙으려다 끊긴다). 화면이 처음 마운트될 때까지 미룬다.
-let zeroClient: ReturnType<typeof initZero> | undefined;
-function getZero() {
-  zeroClient ??= initZero();
-  return zeroClient;
-}
-
-export function Inbox() {
-  const zero = useMemo(getZero, []);
+export function Inbox({ onOpen }: { onOpen?: (target: OpenTarget) => void }) {
+  const zero = useZeroClient();
   const [filter, setFilter] = useState<InboxFilter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -109,6 +108,8 @@ export function Inbox() {
             : "system";
         return {
           id: item.id,
+          threadId: item.thread_id,
+          agentSession: item.thread?.kind === "agent_session",
           scope: item.scope as InboxQueryItem["scope"],
           authorKind,
           hasPendingApproval: pendingThreadIds.has(item.thread_id),
@@ -146,7 +147,7 @@ export function Inbox() {
       </GlassSurface>
       <Virtuoso
         role="listbox"
-        style={{ height: "100%" }}
+        style={{ flex: "1 1 0", minHeight: 0 }}
         data={filtered}
         itemContent={(_, item) => (
           <InboxRow
@@ -160,7 +161,10 @@ export function Inbox() {
             selected={item.id === selectedId}
             hasPendingApproval={item.hasPendingApproval}
             labels={item.labels}
-            onSelect={setSelectedId}
+            onSelect={(id) => {
+              setSelectedId(id);
+              onOpen?.({ threadId: item.threadId, agentSession: item.agentSession });
+            }}
           />
         )}
       />

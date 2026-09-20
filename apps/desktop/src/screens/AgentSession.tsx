@@ -1,7 +1,7 @@
 import { ToolCallBadge, type ToolCallState } from "@omnis/ui";
 import { useQuery } from "@rocicorp/zero/react";
 import { useMemo } from "react";
-import { initZero } from "../zero-client.js";
+import { useZeroClient } from "../zero-client.js";
 
 /** items.tool(jsonb, kind='tool_call'일 때만 값)의 실제 shape(0002_core_inbox.sql:151,
  * packages/kernel/src/zero-schema.ts `tool: json().optional()`) — 계획의 `tool: string | null`은
@@ -28,16 +28,8 @@ export function isSystemExecutionLog(item: SessionQueryItem): boolean {
   return item.kind === "system";
 }
 
-// Inbox.tsx/Thread.tsx(Task 4/5)와 같은 이유로 지연 생성: 모듈 스코프에서 만들면
-// isSystemExecutionLog만 import해도 WebSocket이 열린다.
-let zeroClient: ReturnType<typeof initZero> | undefined;
-function getZero() {
-  zeroClient ??= initZero();
-  return zeroClient;
-}
-
 export function AgentSession({ sessionThreadId }: { sessionThreadId: string }) {
-  const zero = useMemo(getZero, []);
+  const zero = useZeroClient();
   // 편차(계획 step 7 대비, packages/kernel/src/zero-schema.ts 기준): items 컬럼은 camelCase
   // `sentAt`이 아니라 snake_case `sent_at`이다 — Thread.tsx(Task 5)가 같은 이유로 이미 고쳤다.
   const [items] = useQuery(
