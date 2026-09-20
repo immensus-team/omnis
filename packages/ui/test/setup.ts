@@ -9,3 +9,19 @@ import { afterEach } from "vitest";
 afterEach(() => {
   cleanup();
 });
+
+// deviation: jsdom 25 doesn't implement ResizeObserver or Element.scrollIntoView, which
+// cmdk (Task 7 CommandPalette) calls on mount/select to track list height and scroll the
+// active item into view. Not spec'd anywhere — jsdom's own known gaps.
+// Minimal no-op stubs, ponytail: no resize/scroll behavior simulated, add real ones if a
+// test ever asserts on cmdk's height- or scroll-driven behavior.
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+if (typeof Element.prototype.scrollIntoView === "undefined") {
+  Element.prototype.scrollIntoView = () => {};
+}
