@@ -58,16 +58,20 @@ export function createGoogleCalendarAdapter(deps: GoogleCalendarAdapterDeps): Ad
     capabilities: () => CAPABILITIES,
 
     async connect(auth: AuthRef): Promise<void> {
-      // A1 §2.3: Calendar는 Gmail과 같은 Cloud 프로젝트/client를 쓰므로
-      // auth.keychainService는 호출자가 omnis.gmail.<email>을 그대로 넘긴다(재사용).
-      const refreshToken = await readKeychainSecret(
-        auth.keychainService,
-        auth.keychainAccount,
-        CHANNEL,
-      );
-      oauth =
-        deps.oauthClient ?? new google.auth.OAuth2(deps.oauthClientId, deps.oauthClientSecret);
-      oauth.setCredentials({ refresh_token: refreshToken });
+      if (deps.oauthClient) {
+        // 테스트 주입 경로: 이미 자격증명이 설정된 클라이언트를 그대로 쓴다(Keychain 조회 없음).
+        oauth = deps.oauthClient;
+      } else {
+        // A1 §2.3: Calendar는 Gmail과 같은 Cloud 프로젝트/client를 쓰므로
+        // auth.keychainService는 호출자가 omnis.gmail.<email>을 그대로 넘긴다(재사용).
+        const refreshToken = await readKeychainSecret(
+          auth.keychainService,
+          auth.keychainAccount,
+          CHANNEL,
+        );
+        oauth = new google.auth.OAuth2(deps.oauthClientId, deps.oauthClientSecret);
+        oauth.setCredentials({ refresh_token: refreshToken });
+      }
       try {
         await oauth.getAccessToken();
       } catch (cause) {
