@@ -445,7 +445,10 @@ and zero chip/side-slot overlaps across all 12 rows at each of 390/768/1024/1280
 
 Baseline: `Skill(avoid-ai-design)` in `detect` mode and `Skill(hallmark) audit` over `apps/desktop`
 and `packages/ui`, plus SKILLS.md's 12-line checklist and frontend-design's five clichés. Evidence:
-the five screens `shots.ts` writes, re-shot; `screens/inbox-kinso.png` refreshed in place.
+the twenty-two frames the two shot scripts write, all re-shot after the last source edit in this
+story — the five `screens/*.png` `shots.ts` writes, the fifteen `screens/accent/*.png`
+`shots-accent.ts` writes, and the two it also writes into `screens/` (`inbox-kinso.png`,
+`ai-panel.png`). See Evidence for what the earlier attempt got wrong here.
 
 ### What changed
 
@@ -487,8 +490,13 @@ the five screens `shots.ts` writes, re-shot; `screens/inbox-kinso.png` refreshed
    while the other five `packages/ui` files use lucide-react's `Search`; it now matches, with the
    regression test asserting `svg.lucide-search`. And the filter-chip description in this log still
    described the old single-string chip — it is the split `[field][value][×]` chip.
-6. **`densify()`'s approval strings and the calendar rows** now carry one sentence per thread and
-   one-line summaries respectively, so no screenshot shows the same string twice.
+6. **The calendar and mail rows had no summary line of their own.** This half is new here, and the
+   neighbouring half is not: `densify()`'s approval strings became one sentence per thread in
+   US-D03 (`e27ba4c`, which replaced the `i % 3` rotation with the per-thread fallback), and the
+   six `asks` strings themselves predate that (`21523f0`, US-D02b). Neither is this round's work.
+   What this round adds is the row *summary*: `varyInboxCopy()` (item 2) gives the five seeded
+   calendar and mail threads a line of their own, so a frame shows a summary sentence under the
+   title rather than the title printed twice.
 
 ### Checked and clean
 
@@ -529,6 +537,25 @@ the five screens `shots.ts` writes, re-shot; `screens/inbox-kinso.png` refreshed
 
 ### Evidence
 
-`pnpm lint` and `pnpm typecheck` exit 0. `@omnis/ui` and `@omnis/adapters/gmail` green, including the
-25 updated fixtures. `pnpm tsx tools/e2e/shots.ts` and `pnpm tsx tools/e2e/shots-accent.ts` both
-complete, with the overflow assertions quoted above.
+`pnpm lint` and `pnpm typecheck` exit 0. The full suite against `omnis_test_design_w1` is 1595 passed
+| 2 skipped (196 files: 195 passed | 1 skipped), including the 25 updated adapter fixtures in
+`@omnis/adapters/gmail`. The one skipped file is `apps/desktop/test/integration/zero-client.test.ts`
+(2 tests), which skips by design unless `OMNIS_ZERO_URL` points at a live zero-cache — it **collects**
+now, where the earlier rounds on this branch recorded it failing to collect on an unresolved
+`@omnis/db`.
+
+Both shot scripts were re-run after the last source edit in this story, and both exit 0.
+`pnpm tsx tools/e2e/shots.ts` reports `overflow 0px` and zero chip/side-slot overlaps across all 12
+rows at each of 390/768/1024/1280/1440; `pnpm tsx tools/e2e/shots-accent.ts` reports `overflow 0px` at
+390 and 1440 on every screen it writes.
+
+**The correction this round carries.** The earlier attempt's evidence line claimed both scripts "both
+re-shot every frame they own". That was not what shipped: the run landed between the `draft-card.tsx`
+edit and the `row-meta.ts` one, so `agents-density.png` and `row-hover-card.png` still drew the retired
+`Sparkles` avatar on the seven `omnis`-runtime session rows while the source had already deleted that
+entry from `RUNTIME_ICON`. They now draw the `RUNTIME_LETTER` `"O"` that `inbox-row.tsx:130` renders
+for a runtime with no mark — which is the whole point of the frame: it is what made the avatar
+regression visible, and a frame shot before the fix cannot carry that. The two frames were re-shot
+along with every other frame the scripts own, and all 22 now carry mtimes after the last edit.
+`inbox-glass.png` and `ai-panel-commands.png` are US-D01 artifacts (`7f979b8`) that no current script
+writes; they are not part of this count and are left as the D01 record.
