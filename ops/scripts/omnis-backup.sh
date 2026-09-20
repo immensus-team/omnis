@@ -1,8 +1,9 @@
 #!/bin/bash
-# US-B41: pg_dump --format=custom → restic → B2. LaunchDaemon(ops/mini/LaunchDaemons/com.omnis.backup.plist)
-# 이 03:00에 이 스크립트를 그대로 exec한다. GUI 세션 필요(Keychain 읽기, RUNBOOK "미니의 기존 설비" 절 참조).
+# US-B41: pg_dump --format=custom → restic → B2. The LaunchDaemon (ops/mini/LaunchDaemons/com.omnis.backup.plist)
+# execs this script verbatim at 03:00. A GUI session is required (Keychain reads — see the RUNBOOK note
+# "Do not touch the mini's existing infrastructure").
 set -euo pipefail
-# launchd가 주는 PATH는 /usr/bin:/bin:/usr/sbin:/sbin뿐이라 pg_dump·restic이 안 보인다(ops/mini/run.sh와 같은 이유).
+# launchd hands over a PATH of just /usr/bin:/bin:/usr/sbin:/sbin, so pg_dump and restic are not visible (same reason as ops/mini/run.sh).
 export PATH=/opt/homebrew/bin:$PATH
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ACCOUNT="281932556+jinhologankim@users.noreply.github.com"
@@ -31,8 +32,8 @@ do_run() {
   export B2_ACCOUNT_ID; B2_ACCOUNT_ID="$(kc omnis.b2.account_id)"
   export B2_ACCOUNT_KEY; B2_ACCOUNT_KEY="$(kc omnis.b2.account_key)"
 
-  # 덤프 말고는 둘 다 있을 수도 없을 수도 있다 — 없는 경로를 넘기면 restic이 non-zero로 죽어
-  # forget·prune과 로컬 정리가 통째로 안 돈다. 있는 것만 넘긴다.
+  # Apart from the dump, either of these may or may not exist — handing restic a missing path makes it
+  # exit non-zero and forget/prune plus the local cleanup never run at all. Pass only the ones that exist.
   local -a sources=("$PG_DIR")
   local extra
   for extra in "$HOME/.omnis/self-model" "$ROOT/secrets"; do
@@ -41,7 +42,7 @@ do_run() {
   restic backup "${sources[@]}" --tag omnis-backup
   restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune
 
-  # 로컬 덤프는 7일치만 남긴다 — restic이 원격에 장기 보관하므로 로컬은 최근 복구용 버퍼일 뿐.
+  # Keep only 7 days of local dumps — restic retains them long-term in the remote, so locally they are just a buffer for recent recovery.
   find "$PG_DIR" -name 'omnis-*.dump' -mtime +7 -delete
   echo "backup ok: $(date -u +%FT%TZ)"
 }
