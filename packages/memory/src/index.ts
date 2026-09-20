@@ -85,3 +85,4 @@ export {
   type LocalFile,
   type ScanOptions,
 } from "./ingest/local-mini.js";
+export { createLocalMacbookProvider, type BridgeCall } from "./ingest/local-macbook.js";
