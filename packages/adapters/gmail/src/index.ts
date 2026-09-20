@@ -6,6 +6,9 @@ import {
   type Capabilities,
   type Health,
   type NormalizedItem,
+  type Outbound,
+  type SendResult,
+  type ThreadRef,
 } from "@omnis/protocol";
 import { google } from "googleapis";
 import type { gmail_v1, pubsub_v1 } from "googleapis";
@@ -42,6 +45,7 @@ export interface GmailAdapterDeps {
   gmailClient?: gmail_v1.Gmail;
   pubsubClient?: pubsub_v1.Pubsub;
   pubsubSubscription?: string;
+  sink?: (thread: ThreadRef, draft: Outbound) => Promise<SendResult>;
   now?: () => Date;
 }
 
@@ -163,8 +167,43 @@ export function createGmailAdapter(deps: GmailAdapterDeps): Adapter {
       return pull();
     },
 
-    async send(): Promise<never> {
-      throw new AdapterError("fatal_unsupported", CHANNEL, "send not implemented until Task 9");
+    // 승인 게이트(US-A07) 전까지 실제 messages.send는 호출하지 않는다.
+    async send(thread: ThreadRef, draft: Outbound): Promise<SendResult> {
+      const sink =
+        deps.sink ??
+        (async (): Promise<SendResult> => ({
+          externalId: `mock-${now().getTime()}`,
+          sentAt: now().toISOString(),
+        }));
+      return sink(thread, draft);
+    },
+
+    async markRead(thread: ThreadRef): Promise<void> {
+      const gmail =
+        deps.gmailClient ?? google.gmail({ version: "v1", ...(oauth ? { auth: oauth } : {}) });
+      try {
+        await gmail.users.messages.modify({
+          userId: "me",
+          id: thread.externalId,
+          requestBody: { removeLabelIds: ["UNREAD"] },
+        } as never);
+      } catch (cause) {
+        throw mapApiError(cause);
+      }
+    },
+
+    async archive(thread: ThreadRef): Promise<void> {
+      const gmail =
+        deps.gmailClient ?? google.gmail({ version: "v1", ...(oauth ? { auth: oauth } : {}) });
+      try {
+        await gmail.users.messages.modify({
+          userId: "me",
+          id: thread.externalId,
+          requestBody: { removeLabelIds: ["INBOX"] },
+        } as never);
+      } catch (cause) {
+        throw mapApiError(cause);
+      }
     },
 
     async health(): Promise<Health> {
@@ -179,9 +218,11 @@ export function createGmailAdapter(deps: GmailAdapterDeps): Adapter {
   };
 }
 
-// 임시 스텁(Task 8 범위): Task 9가 NormalizedItem 스키마에 맞게 완성한다.
-// 여기 `subject`는 스키마에 없는 필드라 `as unknown as NormalizedItem[]`로
-// 타입만 우회해 컴파일과 이 태스크의 backfill 테스트를 통과시킨다.
+function decodeGmailBody(data: string | undefined): string {
+  if (!data) return "";
+  return Buffer.from(data, "base64url").toString("utf8");
+}
+
 export function normalize(raw: unknown): NormalizedItem[] {
   const r = raw as {
     id?: string;
@@ -191,23 +232,27 @@ export function normalize(raw: unknown): NormalizedItem[] {
   if (!r.id || !r.threadId) return [];
   const headers = r.payload?.headers ?? [];
   const header = (name: string) => headers.find((h) => h.name === name)?.value ?? "";
-  const bodyText = r.payload?.body?.data
-    ? Buffer.from(r.payload.body.data, "base64url").toString("utf8")
-    : "";
+
+  const subject = header("Subject");
+  const from = header("From");
+  const messageId = header("Message-Id");
+  const dateHeader = header("Date");
+  const bodyText = decodeGmailBody(r.payload?.body?.data);
+  const sentAt = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString();
+
   return [
     {
       threadExternalId: r.threadId,
       externalId: r.id,
-      kind: "email" as const,
-      author: { kind: "person" as const, id: header("From") },
-      subject: header("Subject") || undefined,
-      body: bodyText,
+      kind: "email",
+      author: { kind: "person", id: from },
+      body: subject ? `Subject: ${subject}\n\n${bodyText}` : bodyText,
       attachments: [],
-      sentAt: new Date().toISOString(),
-      status: "received" as const,
-      sourceHash: header("Message-Id") || r.id,
+      sentAt,
+      status: "received",
+      sourceHash: messageId || r.id,
     },
-  ] as unknown as NormalizedItem[];
+  ];
 }
 
 export function mapApiError(cause: unknown): AdapterError {
