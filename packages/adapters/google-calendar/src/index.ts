@@ -6,6 +6,9 @@ import {
   type Capabilities,
   type Health,
   type NormalizedItem,
+  type Outbound,
+  type SendResult,
+  type ThreadRef,
 } from "@omnis/protocol";
 import { google } from "googleapis";
 import type { calendar_v3 } from "googleapis";
@@ -39,6 +42,7 @@ export interface GoogleCalendarAdapterDeps {
   oauthClient?: OAuth2Client;
   calendarClient?: calendar_v3.Calendar;
   pollIntervalMs?: number;
+  sink?: (thread: ThreadRef, draft: Outbound) => Promise<SendResult>;
   now?: () => Date;
 }
 
@@ -84,13 +88,41 @@ export function createGoogleCalendarAdapter(deps: GoogleCalendarAdapterDeps): Ad
       status = "down";
     },
 
-    // biome-ignore lint/correctness/useYield: intentional stub, filled in by Task 11
     async *backfill(): AsyncIterable<NormalizedItem> {
-      throw new AdapterError(
-        "fatal_unsupported",
-        CHANNEL,
-        "backfill not implemented until Task 11",
-      );
+      const calendar =
+        deps.calendarClient ??
+        google.calendar({ version: "v3", ...(oauth ? { auth: oauth } : {}) });
+      const quarterStart = new Date(now().getFullYear(), Math.floor(now().getMonth() / 3) * 3, 1);
+      const timeMax = new Date(now().getTime() + 90 * 24 * 60 * 60 * 1000);
+      let pageToken: string | undefined;
+      do {
+        // deviation (plan step 4): googleapis' actual events.list() response
+        // types nextPageToken as `string | null` (Schema$Events), not the
+        // plan's `string | undefined` — same shape mismatch already worked
+        // around for nextSyncToken in subscribe() above.
+        let res: { data: { items?: unknown[]; nextPageToken?: string | null } };
+        try {
+          res = await calendar.events.list({
+            calendarId: "primary",
+            singleEvents: true,
+            pageToken,
+            timeMin: quarterStart.toISOString(),
+            timeMax: timeMax.toISOString(),
+          } as never);
+        } catch (cause) {
+          throw new AdapterError(
+            "retryable_network",
+            CHANNEL,
+            "events.list backfill failed",
+            undefined,
+            cause,
+          );
+        }
+        for (const raw of res.data.items ?? []) {
+          for (const item of normalize(raw)) yield item;
+        }
+        pageToken = res.data.nextPageToken ?? undefined;
+      } while (pageToken);
     },
 
     subscribe(): AsyncIterable<NormalizedItem | AdapterEvent> {
@@ -134,8 +166,15 @@ export function createGoogleCalendarAdapter(deps: GoogleCalendarAdapterDeps): Ad
       return poll();
     },
 
-    async send(): Promise<never> {
-      throw new AdapterError("fatal_unsupported", CHANNEL, "send not implemented until Task 11");
+    // 승인 게이트(US-A07) 전까지 events.insert/update는 절대 호출하지 않는다(A1 §2.3 "항상 pending_approvals를 거쳐").
+    async send(thread: ThreadRef, draft: Outbound): Promise<SendResult> {
+      const sink =
+        deps.sink ??
+        (async (): Promise<SendResult> => ({
+          externalId: `mock-${now().getTime()}`,
+          sentAt: now().toISOString(),
+        }));
+      return sink(thread, draft);
     },
 
     async health(): Promise<Health> {
@@ -144,13 +183,17 @@ export function createGoogleCalendarAdapter(deps: GoogleCalendarAdapterDeps): Ad
   };
 }
 
+interface GCalEvent {
+  id?: string;
+  status?: string;
+  summary?: string;
+  start?: { dateTime?: string };
+  end?: { dateTime?: string };
+  attendees?: { email?: string; displayName?: string }[];
+}
+
 export function normalize(raw: unknown): NormalizedItem[] {
-  const e = raw as {
-    id?: string;
-    summary?: string;
-    start?: { dateTime?: string };
-    end?: { dateTime?: string };
-  };
+  const e = raw as GCalEvent;
   if (!e.id || !e.start?.dateTime) return [];
   return [
     {
@@ -163,6 +206,17 @@ export function normalize(raw: unknown): NormalizedItem[] {
       sentAt: e.start.dateTime,
       status: "received",
       sourceHash: e.id,
+      threadMeta: {
+        externalId: e.id,
+        kind: "calendar",
+        title: e.summary ?? null,
+        participants: (e.attendees ?? []).map((a) => ({
+          externalId: a.email ?? "",
+          displayName: a.displayName ?? a.email ?? "",
+        })),
+        lastItemAt: e.start.dateTime,
+        archivedAt: e.status === "cancelled" ? e.start.dateTime : null,
+      },
     },
   ];
 }
