@@ -23,6 +23,8 @@ export type { Outbox, OutboxDeps } from "./outbox.js";
 export { createIngestSink } from "./ingest.js";
 export { createKernel } from "./kernel.js";
 export type { Kernel, KernelDeps } from "./kernel.js";
+export { SETTING_DEFAULTS, getAllSettings, getSetting, setSetting } from "./settings.js";
+export type { SettingKey } from "./settings.js";
 
 export {
   ZERO_ITEM_COLUMNS,

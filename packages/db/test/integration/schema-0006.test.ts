@@ -73,18 +73,22 @@ describe("0006_kernel", () => {
     expect(left.n).toBe("0");
   });
 
-  it("seeds the 16 jobs A3 §6 lists, with the A4-owned schedules", async () => {
+  it("seeds the 16 jobs A3 §6 lists (+ 0012의 Phase B 4건), with the A4-owned schedules", async () => {
     const rows = await query<{ name: string; schedule: string }>(
       pool,
       "SELECT name, schedule FROM jobs ORDER BY name",
     );
-    expect(rows).toHaveLength(16);
+    expect(rows).toHaveLength(20); // 0006의 16 + 0012_jobs_phase_b.sql의 4(델타 §8)
     const byName = new Map(rows.map((r) => [r.name, r.schedule]));
     expect(byName.get("morning_digest")).toBe("30 6 * * *");
     expect(byName.get("nightly_digest")).toBe("0 23 * * *");
     expect(byName.get("memory_consolidate")).toBe("30 23 * * *");
     expect(byName.get("slot_health")).toBe("*/5 * * * *");
     expect(byName.get("events_rolloff")).toBe("15 4 * * *");
+    expect(byName.get("cost_daily")).toBe("5 0 * * *");
+    expect(byName.get("push_batch")).toBe("0 9,12,15,18 * * *");
+    expect(byName.get("outlook_delta_poll")).toBe("*/5 * * * *");
+    expect(byName.get("cost_report_monthly")).toBe("10 0 1 * *");
   });
 
   it("restricts jobs.last_status to ok/failed/skipped", async () => {
