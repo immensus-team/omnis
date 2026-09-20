@@ -15,7 +15,7 @@ CREATE TABLE probe_items (
   search_tsv tsvector GENERATED ALWAYS AS (to_tsvector('simple', body)) STORED
 );
 
--- items 쪽만 컬럼 리스트로 publication에 넣는다(A3 §7 DDL과 같은 패턴):
+-- Only the items side is included in the publication with a column list (same pattern as the A3 §7 DDL):
 CREATE PUBLICATION zero_spike_13 FOR TABLE
   probe_threads,
   probe_items (id, thread_id, body);

@@ -1,13 +1,13 @@
-# permission-mode ↔ profile 확정 매핑 (gate-12, S-A2-2)
+# Confirmed permission-mode ↔ profile mapping (gate-12, S-A2-2)
 
-| profile (A2 §7.1) | `--permission-mode` | 근거 |
+| profile (A2 §7.1) | `--permission-mode` | Rationale |
 |---|---|---|
-| `observe` | `plan` | 파일 쓰기·도구 실행이 없는 읽기 전용 계획 모드. `inbox:*` 루프 전용(A2 §7.1) |
-| `workspace` | `manual` | cwd 하위 파일 쓰기 + 그 외 도구는 승인 프롬프트(hook 경유, gate-11) |
-| `trusted` | `bypassPermissions` | `origin:'human'`에서만, allowed_roots 내(A2 §7.1 "bypassPermissions는 trusted+origin:human에서만") |
+| `observe` | `plan` | Read-only planning mode with no file writes or tool execution. Exclusive to the `inbox:*` loop (A2 §7.1) |
+| `workspace` | `manual` | Writes files under cwd; all other tools prompt for approval (via hook, gate-11) |
+| `trusted` | `bypassPermissions` | Only with `origin:'human'`, within allowed_roots (A2 §7.1 "bypassPermissions only with trusted+origin:human") |
 
-미사용: `acceptEdits`(workspace보다 느슨하게 파일 편집을 자동 승인 — 어떤 profile에도 배정하지 않음, 승인 게이트 우회 소지), `auto`(런타임 기본 판단에 맡기는 모드라 세 profile 중 무엇에도 결정론적으로 대응 안 됨), `dontAsk`(trusted와 겹치나 bypassPermissions보다 의미가 불명확해 배제).
+Unused: `acceptEdits` (auto-approves file edits more loosely than workspace — assigned to no profile, with the risk of bypassing approval gates), `auto` (a mode that defers to runtime default judgment, so it does not map deterministically to any of the three profiles), `dontAsk` (overlaps trusted, but its semantics are less clear than bypassPermissions, so it is excluded).
 
-## 버전 드리프트 체크 (2026-09-20)
+## Version drift check (2026-09-20)
 
-`claude --version` → `2.1.274 (Claude Code)` — `_probes/2026-09-20-cli-probes.md`가 확인한 버전과 동일. `claude --help 2>&1 | grep -A2 "permission-mode"` 출력의 6개 값(`acceptEdits`, `auto`, `bypassPermissions`, `manual`, `dontAsk`, `plan`) 순서·문자열 모두 일치, `"default"` 값 없음도 재확인. 드리프트 없음.
+`claude --version` → `2.1.274 (Claude Code)` — identical to the version confirmed by `_probes/2026-09-20-cli-probes.md`. The 6 values in the output of `claude --help 2>&1 | grep -A2 "permission-mode"` (`acceptEdits`, `auto`, `bypassPermissions`, `manual`, `dontAsk`, `plan`) match in both order and string, and the absence of a `"default"` value is reconfirmed. No drift.
