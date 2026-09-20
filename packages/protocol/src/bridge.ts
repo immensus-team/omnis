@@ -217,3 +217,81 @@ export const SessionSummary = z.object({
     )
     .max(10),
 });
+
+// --- 메서드 목록과 에러 코드 (A2 §3.2~3.4) ---
+/** hub → bridge 요청 (A2 §3.2) */
+export const HUB_METHODS = [
+  "bridge/discover",
+  "session.create",
+  "session.resume",
+  "turn.start",
+  "turn.cancel",
+  "session.read_summary",
+  "delegate.run",
+  "session.close",
+  "ingest.scan",
+  "ingest.read",
+] as const;
+/** bridge → hub (A2 §3.3). approval.requested만 요청, 나머지는 알림 */
+export const BRIDGE_METHODS = [
+  "runtime.registered",
+  "session.registered",
+  "turn.started",
+  "turn.item.started",
+  "turn.item.delta",
+  "turn.item.completed",
+  "turn.completed",
+  "approval.requested",
+  "health",
+] as const;
+export type HubMethod = (typeof HUB_METHODS)[number];
+export type BridgeMethod = (typeof BRIDGE_METHODS)[number];
+
+/** JSON-RPC 2.0 표준 코드. A2 §3.4가 omnis 범위를 이 위에 얹는다. */
+export const JSONRPC_ERRORS = {
+  PARSE: -32700,
+  INVALID_REQUEST: -32600,
+  METHOD_NOT_FOUND: -32601,
+  INVALID_PARAMS: -32602,
+  INTERNAL: -32603,
+} as const;
+
+export const BRIDGE_ERRORS = {
+  SESSION_NOT_FOUND: -32001,
+  RUNTIME_UNAVAILABLE: -32002,
+  CAPABILITY_UNSUPPORTED: -32003,
+  TURN_ALREADY_ACTIVE: -32004,
+  PATH_NOT_ALLOWED: -32005,
+  APPROVAL_REQUIRED: -32006,
+  TURN_TIMEOUT: -32007,
+  TURN_CANCELLED: -32008,
+  RUNTIME_RATE_LIMITED: -32009,
+  VERSION_UNSUPPORTED: -32010,
+  AUTH_FAILED: -32011,
+  BUDGET_EXCEEDED: -32012,
+} as const;
+
+export type BridgeErrorCode =
+  | (typeof BRIDGE_ERRORS)[keyof typeof BRIDGE_ERRORS]
+  | (typeof JSONRPC_ERRORS)[keyof typeof JSONRPC_ERRORS];
+
+export class BridgeError extends Error {
+  constructor(
+    readonly code: BridgeErrorCode,
+    message: string,
+    readonly data?: unknown,
+  ) {
+    super(message);
+    this.name = "BridgeError";
+  }
+}
+
+/** 표에 없는 상황은 -32603 internal로 접는다(A2 §3.4). */
+export function toJsonRpcError(e: unknown): { code: number; message: string; data?: unknown } {
+  if (e instanceof BridgeError) {
+    return e.data === undefined
+      ? { code: e.code, message: e.message }
+      : { code: e.code, message: e.message, data: e.data };
+  }
+  return { code: JSONRPC_ERRORS.INTERNAL, message: e instanceof Error ? e.message : String(e) };
+}
