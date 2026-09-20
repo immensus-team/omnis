@@ -5,7 +5,7 @@
  * 그래서 "이 줄을 지워라"가 아니라 "여기 후보가 있다"는 출발점으로만 쓴다.
  *
  * 실행: 리포 루트에서 `npx tsx tools/i18n/scan.ts` (인자 없음). */
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 
 const REPO_ROOT = join(import.meta.dirname, "..", "..");
@@ -129,7 +129,8 @@ function scanJsxText(masked: string): Hit[] {
   for (const m of masked.matchAll(/>([^<>{}]+)</g)) {
     const offset = m.index;
     const text = m[1];
-    if (offset !== undefined && text !== undefined) hits.push({ text, offset: offset + 1, jsx: true });
+    if (offset !== undefined && text !== undefined)
+      hits.push({ text, offset: offset + 1, jsx: true });
   }
   return hits;
 }
@@ -147,7 +148,8 @@ function classify(text: string, jsx: boolean): boolean {
   const s = text.trim();
   if (s.length === 0) return false;
   if (HEX_RE.test(s) || FILE_RE.test(s)) return false; // 색상값 / 파일명
-  if (s.includes("://") || s.startsWith("/") || s.startsWith("./") || s.startsWith("../")) return false; // URL·경로
+  if (s.includes("://") || s.startsWith("/") || s.startsWith("./") || s.startsWith("../"))
+    return false; // URL·경로
   if (HANGUL_RE.test(s)) return true;
   if (!/[A-Za-z]{2}/.test(s)) return false;
 
@@ -188,20 +190,29 @@ function roleOf(src: string, hit: Hit): string {
   if (/aria-label\s*=\s*["']?$/.test(before)) return "ariaLabel";
   if (/(?:title|alt|label)\s*=\s*["']?$/.test(before)) return "title";
   const after = src.slice(hit.offset, hit.offset + 160);
-  if (/^\s*["'`]?\s*\}?\s*,?\s*[\s\S]{0,60}?on(?:Click|Press|Submit|Change)\b/.test(after)) return "button";
+  if (/^\s*["'`]?\s*\}?\s*,?\s*[\s\S]{0,60}?on(?:Click|Press|Submit|Change)\b/.test(after))
+    return "button";
   return hit.jsx ? "label" : "text";
 }
 
 function camel(words: readonly string[]): string {
   return words
-    .map((w, i) => (i === 0 ? (w[0] ?? "").toLowerCase() + w.slice(1) : (w[0] ?? "").toUpperCase() + w.slice(1)))
+    .map((w, i) =>
+      i === 0 ? (w[0] ?? "").toLowerCase() + w.slice(1) : (w[0] ?? "").toUpperCase() + w.slice(1),
+    )
     .join("");
 }
 
 /** 키 토막으로 쓸 수 있게 이름을 눕힌다: `Inbox` → `inbox`, `FILTERS` → `filters`,
  * `TOOL_LABELS` → `toolLabels`. 상수 이름을 그냥 소문자화하면 `fILTERS`가 나온다. */
 function decap(name: string): string {
-  if (name === name.toUpperCase()) return camel(name.toLowerCase().split("_").filter((w) => w.length > 0));
+  if (name === name.toUpperCase())
+    return camel(
+      name
+        .toLowerCase()
+        .split("_")
+        .filter((w) => w.length > 0),
+    );
   return (name[0] ?? "").toLowerCase() + name.slice(1);
 }
 
@@ -236,7 +247,9 @@ function scanFile(file: string): Candidate[] {
   // 주석을 먼저 지운 뒤에 두 패스를 돌린다 — JSX 텍스트 정규식은 주석을 구분하지 못해서,
   // 안 지우면 `// 설명 … const [` 같은 코드가 문구로 둔갑한다.
   const masked = maskComments(src);
-  const hits = [...scanLiterals(masked), ...scanJsxText(masked)].sort((a, b) => a.offset - b.offset);
+  const hits = [...scanLiterals(masked), ...scanJsxText(masked)].sort(
+    (a, b) => a.offset - b.offset,
+  );
 
   const found: Candidate[] = [];
   const seen = new Set<string>();
