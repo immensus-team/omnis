@@ -1,5 +1,5 @@
-// B-D1: public.memories는 이 파일이 소유한다. A3 §5 DDL(0005_memory.sql)이 정본이고
-// 여기서는 그 컬럼만 쓴다 — 스키마를 바꾸지 않는다.
+// B-D1: this file owns public.memories. The A3 §5 DDL (0005_memory.sql) is the source of truth
+// and only its columns are used here — no schema changes.
 import { one, query } from "@omnis/db";
 import type { MemoryKind, MemorySourceKind, Scope } from "@omnis/protocol";
 import type { Pool } from "pg";
@@ -15,7 +15,7 @@ export interface MemoryInput {
   person_id?: string;
   entity_id?: string;
   confidence: number;
-  valid_from: string; // 4-timestamp (A3 §5) — recorded_at/invalidated_at은 DB가 쥔다
+  valid_from: string; // 4-timestamp (A3 §5) — recorded_at/invalidated_at are held by the DB
   valid_until?: string;
 }
 
@@ -26,8 +26,9 @@ export interface MemoryRow extends MemoryInput {
   superseded_by: string | null;
 }
 
-/** 같은 소스의 같은 문장이 두 번 들어오면 새 row를 만들지 않는다 — 재스캔이 memories를
- *  배로 불리는 것을 막는 유일한 문이다. `source_ref`가 NULL인 소스(inbox 등)도 같은 규칙. */
+/** The same sentence from the same source arriving twice creates no new row — the only gate that
+ *  keeps a rescan from blowing memories up exponentially. Same rule for sources whose `source_ref`
+ *  is NULL (inbox, etc.). */
 export async function upsertMemory(pool: Pool, m: MemoryInput): Promise<string> {
   const existing = await query<{ id: string }>(
     pool,
@@ -67,8 +68,9 @@ export async function upsertMemory(pool: Pool, m: MemoryInput): Promise<string> 
   return row.id;
 }
 
-/** A3 §11 / A4 §10.4: 파일이 사라지거나 Drive tombstone이 오면 **지우지 않고** 무효화한다.
- *  부분 HNSW(`WHERE invalidated_at IS NULL`)가 자동으로 검색에서 뺀다. */
+/** A3 §11 / A4 §10.4: when a file disappears or a Drive tombstone arrives, the memory is
+ *  **invalidated rather than deleted**. The partial HNSW (`WHERE invalidated_at IS NULL`) drops it
+ *  from search automatically. */
 export async function invalidateBySource(
   pool: Pool,
   source_kind: MemorySourceKind,
@@ -85,7 +87,8 @@ export async function invalidateBySource(
   return rows.length;
 }
 
-/** 모순되는 사실이 들어왔을 때 옛 row를 새 row로 잇는다(A4 §10.4 표의 invalidated_at 행). */
+/** Links the old row to the new one when a contradicting fact arrives (the invalidated_at row of
+ *  the A4 §10.4 table). */
 export async function supersede(pool: Pool, oldId: string, newId: string): Promise<void> {
   await query(
     pool,
@@ -96,7 +99,7 @@ export async function supersede(pool: Pool, oldId: string, newId: string): Promi
   );
 }
 
-/** A4 §10.5 임베딩 실패 행: 다음 폴링 주기에 NULL인 것만 다시 임베딩한다. */
+/** A4 §10.5 embedding-failure row: on the next polling cycle, re-embed only the NULL ones. */
 export async function reembedNulls(pool: Pool, limit = 100): Promise<number> {
   const rows = await query<{ id: string; content: string }>(
     pool,
