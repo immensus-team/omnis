@@ -120,3 +120,15 @@ export {
   type ConsolidationRequest,
   type ConsolidationResult,
 } from "./memory/consolidate.js";
+export {
+  MAX_PATCHES,
+  MAX_PATCH_LINES,
+  SELF_MODEL_CRON,
+  SUPPRESSION_WEEKS,
+  diffHash,
+  isSuppressed,
+  proposeSelfModelPatches,
+  suppressPatch,
+  validatePatch,
+  type SelfModelPatch,
+} from "./self-model/propose.js";

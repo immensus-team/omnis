@@ -109,3 +109,10 @@ export {
   zeroSchema,
 } from "./zero-schema.js";
 export { ZeroPublicationError, assertZeroPublication } from "./zero-publication.js";
+
+export {
+  SELF_MODEL_DIR_ENV,
+  applyApprovedSelfModelPatch,
+  checkPatch,
+  selfModelDir,
+} from "./self-model/apply.js";
