@@ -30,3 +30,4 @@ export {
   ZERO_TABLES,
   zeroSchema,
 } from "./zero-schema.js";
+export { ZeroPublicationError, assertZeroPublication } from "./zero-publication.js";
