@@ -2,7 +2,6 @@
   <img src="docs/assets/omnis-banner.png" alt="omnis — Inbox that works with you" width="100%">
 </p>
 
-# omnis 📯
 
 **Inbox that works with you.**
 
