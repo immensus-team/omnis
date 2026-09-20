@@ -1,5 +1,5 @@
 #!/bin/bash
-# US-B43: 미니 부팅 체크리스트. 읽기 전용 — 고치지 않고 실패 항목만 출력한다(A6 §2).
+# US-B43: mini boot checklist. Read-only — it prints only the failing items and fixes nothing (A6 §2).
 set -uo pipefail
 FAILS=()
 
@@ -16,11 +16,11 @@ check_pmset() {
   local out; out="$(pmset -g 2>/dev/null | grep -E '^\s*(sleep|displaysleep|disksleep)\s')"
   echo "$out" | awk '{ if ($2 != 0) exit 1 }' || FAILS+=("pmset sleep != 0: $(echo "$out" | tr '\n' ';')")
 }
-# autorestart는 sleep 3종과 반대로 1이어야 한다(정전 복구 시 자동 부팅, A6 §2.3) —
-# 그리고 인접한 autorestartatconnect 줄에 걸리면 안 되므로 필드 고정으로 따로 본다.
+# Unlike the three sleep settings, autorestart must be 1 (auto boot after a power outage, A6 §2.3) —
+# and it must not match the adjacent autorestartatconnect line, so it is checked separately with an anchored field.
 check_autorestart() {
   pmset -g 2>/dev/null | awk '$1 == "autorestart" { found=1; if ($2 != 1) exit 1 } END { if (!found) exit 1 }' \
-    || FAILS+=("pmset autorestart != 1 (전원 복구 시 자동 부팅 꺼짐)")
+    || FAILS+=("pmset autorestart != 1 (auto boot after power restore is off)")
 }
 check_launchagents() {
   local uid; uid="$(id -u)"
@@ -30,7 +30,7 @@ check_launchagents() {
 }
 check_ollama() {
   curl -fsS -m 5 http://127.0.0.1:11434/api/tags 2>/dev/null | grep -q "nomic-embed-text" \
-    || FAILS+=("ollama: nomic-embed-text 모델 없음")
+    || FAILS+=("ollama: nomic-embed-text model missing")
 }
 check_slot() {
   local active

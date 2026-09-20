@@ -1,6 +1,6 @@
 #!/bin/bash
-# US-B34: hub API + PWA를 tailnet HTTPS 하나에 마운트한다(A6 §3).
-# 실측(RUNBOOK "이 배포가 미니에 실제로 바꾼 것"): --set-path=/api가 이미 미니에서 돈다. sudo 불필요.
+# US-B34: mounts the hub API + PWA on a single tailnet HTTPS endpoint (A6 §3).
+# Measured (RUNBOOK "what this deployment actually changed on the mini"): --set-path=/api already runs on the mini. No sudo needed.
 set -euo pipefail
 
 HUB_PORT="${OMNIS_HUB_PORT:-8787}"
@@ -34,7 +34,7 @@ do_check() {
   local funnel
   funnel="$(tailscale funnel status 2>&1 || true)"
   if echo "$funnel" | grep -qi "funnel on"; then
-    echo "FAIL: Funnel is ON — A6 §3은 Funnel을 상시 OFF로 정했다. 'tailscale funnel 443 off'로 끈다." >&2
+    echo "FAIL: Funnel is ON — A6 §3 specifies that Funnel stays OFF at all times. Turn it off with 'tailscale funnel 443 off'." >&2
     exit 1
   fi
   echo "ok: funnel is off"
