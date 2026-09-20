@@ -40,8 +40,13 @@ export interface InboxRowProps {
   isDraft: boolean;
   avatar: RowAvatar;
   channel: UiChannel;
-  /** null이 아니면 agent_session 행 — 우측 슬롯이 채널 아이콘 대신 상태 배지를 보여준다. */
+  /** null이 아니면 agent_session 행 — 우측 슬롯이 채널 아이콘 대신 상태 배지를 보여준다.
+   *  세션 여부의 사실은 여기 하나로 산다: 그룹 뷰라고 null로 덮으면 행이 채널 글리프로 떨어져
+   *  런타임 세션이 "Slack 메시지"가 되고, 호버 카드까지 없는 채널 줄을 보여준다. */
   agentState: AgentSessionKinsoState | null;
+  /** 바로 위 그룹 헤더가 이미 이 행의 상태를 말하고 있다(Agents 뷰). 행은 상태를 되풀이하지
+   *  않되, 비는 자리를 무관한 채널 글리프로 메우지도 않는다 — 세션 행의 우측 슬롯은 빈다. */
+  groupedByState?: boolean;
   unread: boolean;
   /** 안읽음 개수(threads.unread_count). 행은 점 하나로만 줄여 보여주므로 호버 카드가 수를 말한다. */
   unreadCount?: number;
@@ -130,7 +135,7 @@ export function InboxRow(props: InboxRowProps) {
           </div>
           <div className="inbox-row__side">
             {props.agentState ? (
-              <AgentStatusBadge state={props.agentState} />
+              !props.groupedByState && <AgentStatusBadge state={props.agentState} />
             ) : (
               <span
                 className="inbox-row__channel-icon"

@@ -115,6 +115,27 @@ describe("InboxRow 아바타 (U2: 사진 → 이니셜+파스텔 폴백, agent_s
     expect(screen.queryByLabelText("Slack 메시지")).not.toBeInTheDocument();
   });
 
+  // 그룹 헤더가 이미 상태를 말할 때(Agents 뷰) 행은 상태를 되풀이하지 않는다 — 그런데 그 자리를
+  // 채널 글리프로 메우면 런타임 세션 행이 "Slack 메시지"라고 주장한다. 슬롯을 비운다.
+  it("groupedByState면 상태 배지도, 대신 들어오는 채널 글리프도 그리지 않는다", () => {
+    render(
+      <InboxRow
+        {...baseProps}
+        avatar={{ kind: "runtime", runtime: "claude_code" }}
+        agentState="blocked"
+        groupedByState={true}
+      />,
+    );
+    expect(screen.queryByText("확인 필요")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Slack 메시지")).not.toBeInTheDocument();
+  });
+
+  // 세션이 아닌 행(agentState null)은 그룹 뷰에 섞여 있어도 채널이 그 행의 진짜 사실이다.
+  it("groupedByState라도 세션이 아닌 행은 채널 글리프를 그대로 갖는다", () => {
+    render(<InboxRow {...baseProps} groupedByState={true} />);
+    expect(screen.getByLabelText("Slack 메시지")).toBeInTheDocument();
+  });
+
   it("falls back to a letter tile ('H') for a runtime with no brand mark (Hermes)", () => {
     render(
       <InboxRow {...baseProps} avatar={{ kind: "runtime", runtime: "hermes" }} agentState="idle" />,

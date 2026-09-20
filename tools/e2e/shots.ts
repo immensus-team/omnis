@@ -195,16 +195,43 @@ async function main(): Promise<void> {
     await page.waitForTimeout(1400);
     await page.screenshot({ path: join(OUT, "row-hover-card.png") });
 
-    // 도달 가능한 최소 폭(src-tauri/tauri.conf.json minWidth 1024)에서 가로 스크롤이 없어야
-    // 한다. 탭 pill에 카운트가 붙어 헤더 줄이 넓어졌으므로 라운드마다 다시 잰다.
+    // 도달 가능한 최소 폭(src-tauri/tauri.conf.json minWidth 1024)에서 레이아웃이 버텨야 한다.
+    // 페이지 가로 스크롤만 재는 건 증거가 못 된다: 행 안에서 grid 아이템 둘이 같은 칸을 차지해
+    // 겹쳐도 scrollWidth는 그대로 0이다(US-D02 3회차에 실제로 그렇게 통과했다 — 라벨 칩 위에
+    // 채널 글리프·승인 점이 겹쳐 그려지는데도 "overflow 0px"였다). 그래서 폭마다 두 가지를 잰다:
+    // (1) 페이지 가로 스크롤, (2) 렌더된 모든 행에서 .inbox-row__chips와 .inbox-row__side의
+    //     실제 bounding box가 겹치지 않는지.
     for (const width of [1024, 1280, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
       await page.waitForTimeout(400);
       const over = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
-      console.log(`width ${width}: overflow ${over}px`);
+      const collisions = await page.evaluate(() => {
+        const hits: string[] = [];
+        for (const row of document.querySelectorAll(".inbox-row")) {
+          const chips = row.querySelector(".inbox-row__chips");
+          const side = row.querySelector(".inbox-row__side");
+          if (!chips || !side) continue;
+          const a = chips.getBoundingClientRect();
+          const b = side.getBoundingClientRect();
+          // 빈 칩 컨테이너(width 0)는 아무와도 겹칠 수 없다 — 교집합이 양수일 때만 잡는다.
+          const dx = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+          const dy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+          if (dx > 0 && dy > 0) {
+            const name = row.querySelector(".inbox-row__name")?.textContent ?? "?";
+            hits.push(`${name} (${dx.toFixed(1)}x${dy.toFixed(1)}px)`);
+          }
+        }
+        return hits;
+      });
+      const rows = await page.locator(".inbox-row").count();
+      console.log(
+        `width ${width}: overflow ${over}px, ${rows}개 행 중 칩/우측슬롯 겹침 ${collisions.length}건`,
+      );
       if (over > 0) throw new Error(`가로 스크롤 발생: ${width}px에서 ${over}px`);
+      if (collisions.length > 0)
+        throw new Error(`행 안에서 칩과 우측 슬롯이 겹침: ${width}px에서 ${collisions.join(", ")}`);
     }
 
     await browser.close();

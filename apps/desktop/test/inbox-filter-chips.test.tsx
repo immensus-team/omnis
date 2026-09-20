@@ -140,13 +140,15 @@ describe("Inbox 라벨 필터 칩 (US-D02)", () => {
 
   // 칩 문구는 이 화면의 나머지(보관됨/대기/확인 필요)와 같은 언어여야 한다 — 레퍼런스의
   // 영어 필터 DSL("Label is any of 2 labels")을 그대로 옮기면 한 칩 안에 두 언어가 섞인다.
-  it("칩 문구는 고른 라벨 수를 센다", () => {
+  // 레퍼런스도 값이 하나면 수량사를 접는다("Channel is Slack") — "라벨은 1개 중 하나"는
+  // 사람이 쓰지 않는 문장이라 1개일 때는 채널 칩과 같은 문법(`라벨은 <이름>`)으로 떨어진다.
+  it("라벨이 하나면 이름을, 둘 이상이면 개수를 말한다", () => {
     renderInbox();
     fireEvent.click(addTrigger());
     expect(document.querySelector(".filter-chip")).toBeNull();
 
     fireEvent.click(optionIn("Integrations"));
-    expect(screen.getByText("라벨은 1개 중 하나")).toBeInTheDocument();
+    expect(screen.getByText("라벨은 Integrations")).toBeInTheDocument();
     fireEvent.click(optionIn("Billing"));
     expect(screen.getByText("라벨은 2개 중 하나")).toBeInTheDocument();
   });

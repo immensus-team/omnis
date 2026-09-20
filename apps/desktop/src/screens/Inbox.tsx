@@ -409,7 +409,12 @@ export function Inbox({
     chips.push({
       id: "labels",
       fieldLabel: "라벨",
-      text: `라벨은 ${selectedLabelIds.size}개 중 하나`,
+      // 레퍼런스의 필터 DSL도 값이 하나면 수량사를 접는다("Channel is Slack") —
+      // "라벨은 1개 중 하나"는 사람이 쓰지 않는 문장이라 채널 칩과 같은 문법으로 떨어뜨린다.
+      text:
+        selectedLabelIds.size === 1
+          ? `라벨은 ${labels.find((l) => selectedLabelIds.has(l.id))?.name ?? "1개"}`
+          : `라벨은 ${selectedLabelIds.size}개 중 하나`,
       onRemove: () => setSelectedLabelIds(new Set()),
     });
   }
@@ -510,9 +515,11 @@ export function Inbox({
               avatar={item.row.avatar}
               channel={item.row.channel}
               // 그룹 헤더가 바로 위에서 상태를 말할 때 행이 같은 말을 다시 하지 않는다
-              // (ref-issue-tracker-density.webp도 상태어는 헤더에만 둔다). 배지가 빠진
-              // 우측 슬롯은 채널 글리프가 채운다 — 헤더는 상태, 행은 채널.
-              agentState={grouped ? null : item.row.agentState}
+              // (ref-issue-tracker-density.webp도 상태어는 헤더에만 둔다). 다만 세션이라는
+              // 사실 자체는 지우지 않는다 — agentState를 null로 덮으면 런타임 세션 행이
+              // 채널 글리프로 떨어져 "Slack 메시지"를 자칭했다(3회차 거절 사유).
+              agentState={item.row.agentState}
+              groupedByState={grouped}
               timestamp={item.row.timestamp}
               unread={item.row.unread}
               unreadCount={item.row.unreadCount}

@@ -219,3 +219,48 @@
 
 `pnpm lint` / `pnpm typecheck` 통과, `pnpm test` 584 passed / 2 skipped,
 `pnpm e2e:phase-a` 2패스 38/38 PASS.
+
+## US-D02 4회차 — 행 grid 충돌과 "증거가 아닌 증거"
+
+3회차 거절의 핵심은 pill 시스템이 아니라 **행 레이아웃이 겹쳐 그려지고 있었다**는 것,
+그리고 그 겹침을 못 잡는 스크립트를 겹침이 없다는 증거로 인용했다는 것이다.
+
+1. **`.inbox-row__summary-line`이 `grid-column: 2 / span 2`로 우측 슬롯 칸을 침범했다.**
+   `.inbox-row__side`는 `grid-row: 1 / span 2` + 세로 가운데 정렬이라 **아래 절반이 정확히
+   라벨 칩 줄 위에 내려앉는다.** 그래서 `#omnis-launch`의 Slack 마크가 `launch` 칩을,
+   `PoC slides`/`omnis launch sync`의 Gmail 마크가 `personal`/`launch` 칩을 깔고 앉았다 —
+   3회차가 자기 증거로 커밋한 스크린샷 4장 중 3장에 그대로 찍혀 있었다. US-A33(0354512)부터
+   깨져 있었고 고치는 건 한 줄이다: 칩은 col 2에서 끝낸다.
+2. **`shots.ts`의 "overflow 0px"는 이 겹침에 대해 아무 말도 안 한다.** 페이지 가로 스크롤
+   (`scrollWidth - clientWidth`)은 행 **안에서** grid 아이템 둘이 같은 칸을 차지하는 걸 볼 수
+   없다 — 그래서 "세 폭 모두 0px"가 참이면서 동시에 무의미했다. 이제 폭마다 렌더된 모든 행의
+   `.inbox-row__chips`와 `.inbox-row__side` **실제 bounding box 교집합**을 잰다.
+   *이 검사는 실제로 실패한다는 걸 확인했다*: CSS를 옛 `2 / span 2`로 되돌리면
+   `1024px에서 #omnis-launch (75.0x6.0px), PoC slides (75.0x7.0px), omnis launch sync (55.4x6.0px)`로
+   던진다 — 거절이 지목한 바로 그 3행이다.
+3. **`agentState={grouped ? null : …}`를 되돌렸다.** 그룹 뷰에서 상태를 null로 덮으니 런타임
+   세션 행이 채널 글리프로 떨어져 스크린리더에 "Slack 메시지"라고 자칭했다. 세션이라는 사실은
+   `agentState` 하나에 살고, "헤더가 이미 상태를 말한다"는 건 새 `groupedByState` prop이 말한다 —
+   그룹일 때 세션 행의 우측 슬롯은 **빈다**(무관한 아이콘으로 메우지 않는다).
+4. **`라벨은 1개 중 하나` → `라벨은 Integrations`.** 레퍼런스 DSL도 값이 하나면 수량사를
+   접는다("Channel is Slack"). 2개부터만 개수 문법을 쓴다.
+5. **칩 × 버튼 17x17 → 24x24.** 칩 자체는 안 키운다. 실측으로 확인했다: `margin: -3px 0` 없이는
+   칩이 26px → 32px로 자라고, 있으면 26px 그대로에 버튼 박스만 24x24다.
+6. **틴트 문법을 하나로.** `.filter-chip`이 `color-mix(in oklch, …)`를 쓰고 있었는데, 스무 줄 위
+   `.status-pill` 주석이 바로 그 함수가 hue를 `--bg-elevated`의 h260 쪽으로 돌린다고 설명해
+   놓은 상태였다. 한 파일에 같은 일을 하는 틴트 공식이 둘이고 그중 하나는 문서상 틀린 것으로
+   남아 있었다 — `oklch(from …)`으로 통일했다.
+
+### 반경(radius)에 대한 메모
+
+한 화면에 999px / 12px / 8px / 6px / 4px / 30%가 공존한다. 각각 이유가 주석에 달려 있고
+균일-반경 텔의 반대편이라 그대로 두지만, **명시된 스케일이 없어서 다음 사람이 반올림할 데가
+없다** — `DESIGN-DIRECTION.md`에 한 줄로 적어 둔다.
+
+### 증거
+
+`pnpm lint` / `pnpm typecheck` 통과, `pnpm test` 110 files / 586 passed / 2 skipped
+(3회차 584 + InboxRow `groupedByState` 2건). `tools/e2e/shots.ts`로 4장 다시 찍었고
+세 폭 전부 `overflow 0px, 12개 행 중 칩/우측슬롯 겹침 0건`.
+`pnpm e2e:phase-a`는 공유 포트(5173/8787/4848)를 `resetDatabase()`/`assertPortsFree()`로
+잡기 때문에 다른 체인을 방해하지 않으려고 돌리지 않았다 — `shots.ts`가 같은 스택을 올린다.

@@ -205,11 +205,15 @@ describe("Inbox 그룹 헤더 (US-D02)", () => {
   });
 
   // 헤더가 바로 위에서 상태를 말하는데 행이 같은 말을 되풀이하면 화면이 "확인 필요 / 확인 필요"로
-  // 읽힌다(2회차 거절 사유). 그룹일 때 우측 슬롯은 채널 글리프가 가진다.
-  it("그룹일 때 행은 상태 배지를 반복하지 않는다", () => {
+  // 읽힌다(2회차 거절 사유). 그렇다고 그 슬롯을 채널 글리프로 메우면 런타임 세션 행이
+  // "Slack 메시지"라고 주장하게 된다(3회차 거절 사유) — 세션 행의 우측 슬롯은 비운다.
+  it("그룹일 때 행은 상태 배지를 반복하지도, 채널 글리프로 바꿔 달지도 않는다", () => {
     const { container } = renderInbox();
     filterBy("agents");
     expect(container.querySelectorAll(".status-badge--agent")).toHaveLength(0);
+    // 세션 2행은 빈 슬롯, 세션이 아닌 "에이전트 메일" 1행만 채널 글리프를 갖는다.
+    expect(container.querySelectorAll(".inbox-row__channel-icon")).toHaveLength(1);
+    expect(screen.queryByLabelText("Gmail 메시지")).toBeInTheDocument();
   });
 
   it("그룹이 없는 뷰에서는 행이 상태 배지를 그대로 보여준다", () => {

@@ -633,7 +633,10 @@ body {
 
 .inbox-row__summary-line {
   grid-row: 2;
-  grid-column: 2 / span 2;
+  /* col 3은 .inbox-row__side 전용이다(그 쪽이 grid-row 1/span 2 + align center라 아래 절반이
+     정확히 이 줄 위에 내려앉는다). 여기서 `2 / span 2`로 넘어가면 라벨 칩이 채널 글리프·승인
+     점·보관 버튼 밑에 깔린다 — US-A33 이후 계속 깨져 있던 자리다. 칩은 col 2에서 끝낸다. */
+  grid-column: 2;
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -1005,13 +1008,26 @@ body {
   padding: 3px 6px 3px 10px;
   font-size: 12px;
   color: var(--text-primary);
-  background: color-mix(in oklch, var(--accent) 8%, var(--bg-base));
+  /* 틴트 문법은 이 파일에 하나뿐이다 — .status-pill 위 주석이 color-mix의 hue 회전을
+     설명해 놓고 여기서 다시 color-mix를 쓰면 다음 사람이 어느 쪽을 믿을지 알 수 없다. */
+  background: oklch(from var(--accent) 0.97 calc(c * 0.18) h);
 }
 .filter-chip button {
   border: none;
   background: none;
-  padding: 2px;
-  border-radius: 4px;
+  /* 13px 글리프에 padding 2px면 17x17 — 포인터 타깃 최소치(24px) 아래다. 칩 높이는
+     그대로 두고(패딩만 키우면 칩이 자란다) 버튼만 min-width/height로 채운다. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  /* 24px 버튼이 칩을 키우지 않도록 위아래 3px씩 되돌린다. 실측(tools/e2e/shots.ts 임시 계측):
+     margin 없이 칩 32px → margin -3px×2로 26px, 즉 버튼을 키우기 전 칩 높이 그대로다.
+     버튼 박스는 24x24로 남는다. */
+  margin: -3px 0;
+  padding: 4px;
+  border-radius: 6px;
   color: var(--text-secondary);
   cursor: pointer;
   line-height: 1;
