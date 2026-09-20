@@ -6,8 +6,8 @@ export default defineWorkspace([
     resolve: { alias: omnisAlias },
     test: {
       name: "unit",
-      // 계약 §2: unit은 *.test.ts와 *.test.tsx를 둘 다 덮는다(packages/ui·apps/desktop의 tsx 테스트가
-      // pnpm test에서 조용히 스킵되지 않도록). src/ 옆 테스트와 test/ 디렉터리 테스트를 모두 수집한다.
+      // Contract §2: unit covers both *.test.ts and *.test.tsx (so tsx tests in packages/ui and
+      // apps/desktop are not silently skipped by pnpm test). Collects tests beside src/ and under test/.
       include: [
         "packages/*/src/**/*.test.{ts,tsx}",
         "packages/*/test/**/*.test.{ts,tsx}",
@@ -35,8 +35,8 @@ export default defineWorkspace([
       name: "integration",
       include: ["packages/*/test/integration/**/*.test.ts", "apps/*/test/integration/**/*.test.ts"],
       globalSetup: ["./vitest.global-setup.ts"],
-      // ponytail: vitest 2.1은 프로젝트 레벨 fileParallelism을 무시한다(루트/CLI 전용). 통합 테스트는
-      // omnis_test 한 DB를 공유하므로 파일이 겹쳐 돌면 NOTIFY가 서로 섞인다 → singleFork로 직렬화.
+      // ponytail: vitest 2.1 ignores project-level fileParallelism (root/CLI only). Integration tests
+      // share the single omnis_test DB, so overlapping files mix their NOTIFYs → serialize with singleFork.
       poolOptions: { forks: { singleFork: true } },
       testTimeout: 20_000,
       hookTimeout: 60_000,

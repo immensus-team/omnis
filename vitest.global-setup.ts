@@ -10,9 +10,9 @@ export default async function setup(): Promise<void> {
   }
   process.env.DATABASE_URL = url;
 
-  // US-A21b: zero-cache가 이 DB를 논리 복제 중이면 DROP SCHEMA가 복제본을 깨뜨린다
-  // (ops/zero-cache.env.example의 1회성 기동 재현 절차가 정확히 이 상황이다).
-  // 그 패스에서는 이미 migrate된 DB를 그대로 쓴다.
+  // US-A21b: if zero-cache is logically replicating this DB, DROP SCHEMA breaks the replica
+  // (the one-off startup reproduction procedure in ops/zero-cache.env.example is exactly this case).
+  // That pass uses the already-migrated DB as is.
   if (process.env.OMNIS_KEEP_TEST_DB === "1") return;
 
   // ponytail: root has no `pg` devDependency (pnpm strict isolation), so a static
