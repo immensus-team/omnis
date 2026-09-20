@@ -1,3 +1,4 @@
+import { cn } from "../lib/cn.js";
 import { Button } from "./button.js";
 import { OpaqueSurface } from "./glass-surface.js";
 
@@ -23,7 +24,9 @@ export interface ApprovalCardInterrupt {
   };
 }
 
-const ACTION_LABEL: Record<ApprovalCardAction, string> = {
+/** Exported for the approval stack (US-D03): a collapsed one-line row leads with the same action
+ *  word the expanded card's title uses, so a row and its card cannot disagree. */
+export const ACTION_LABEL: Record<ApprovalCardAction, string> = {
   send: "Send",
   delete: "Delete",
   calendar_write: "Write to calendar",
@@ -35,12 +38,15 @@ const ACTION_LABEL: Record<ApprovalCardAction, string> = {
 export interface ApprovalCardViewProps {
   interrupt: ApprovalCardInterrupt;
   onDecide: (decision: ApprovalCardDecision, decidedArgs?: Record<string, unknown>) => void;
+  /** US-D03: the approval stack passes the elevation hook here rather than wrapping the card —
+   *  a wrapper div would put the shadow outside the card's own radius. */
+  className?: string;
 }
 
-export function ApprovalCardView({ interrupt, onDecide }: ApprovalCardViewProps) {
+export function ApprovalCardView({ interrupt, onDecide, className }: ApprovalCardViewProps) {
   const { config } = interrupt;
   return (
-    <OpaqueSurface className="approval-card">
+    <OpaqueSurface className={cn("approval-card", className)}>
       <p className="approval-card__title">{ACTION_LABEL[interrupt.action]} needs your approval</p>
       <p className="approval-card__description">{interrupt.description}</p>
       <div className="approval-card__actions">

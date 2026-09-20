@@ -13,6 +13,13 @@ export * from "./components/channel-rail.js";
 export * from "./components/status-pill.js";
 export * from "./components/group-header.js";
 export * from "./components/filter-chip-bar.js";
+export * from "./components/key-value-table.js";
+export * from "./components/segmented-control.js";
+export * from "./components/person-card.js";
+export * from "./components/approval-stack.js";
+export { ChevronRight as ChevronRightIcon } from "lucide-react";
+export { Tag as TagIcon } from "lucide-react";
+export { MoreHorizontal as MoreHorizontalIcon } from "lucide-react";
 // The apps (desktop/gallery) do not depend on lucide-react directly — app screens that need an
 // icon take it through @omnis/ui, the same way ChannelGlyph fronts the brand assets.
 export { Archive as ArchiveIcon } from "lucide-react";
