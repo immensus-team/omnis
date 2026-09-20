@@ -248,6 +248,28 @@ const followupGates: Gate<z.infer<typeof FollowupCase>>[] = [
     }
     return out;
   },
+  /** A4 §7.5: if the top channel would be cold outreach, fall back to gmail, else task_only. */
+  (rows) => {
+    const out: Issue[] = [];
+    for (const row of rows) {
+      const { id, past_channels_90d, last_message_from, expected_channel } = row.data;
+      if (past_channels_90d.length === 0) continue;
+      const top = past_channels_90d.reduce((a, b) => (b.count > a.count ? b : a));
+      if (top.channel !== "linkedin" && top.channel !== "kakao") continue;
+      if (last_message_from === "them") continue;
+      const hasGmail = past_channels_90d.some((c) => c.channel === "gmail");
+      const required = hasGmail ? "gmail" : "task_only";
+      if (expected_channel !== required) {
+        out.push(
+          issue(
+            `row ${id}: top channel "${top.channel}" with last_message_from="${last_message_from}", gmail ${hasGmail ? "present" : "absent"} — expected_channel="${expected_channel}" but fallback requires "${required}" (A4 §7.5)`,
+            row.line,
+          ),
+        );
+      }
+    }
+    return out;
+  },
 ];
 
 // --- Runner -----------------------------------------------------------------
