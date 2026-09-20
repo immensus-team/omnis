@@ -242,6 +242,10 @@ export function normalize(raw: unknown): NormalizedItem[] {
   // events (Events API / Socket Mode) do carry `channel`, which is used when present.
   if (m.type !== "message" || !m.ts) return [];
   if (m.subtype === "message_changed" || m.subtype === "message_deleted") return [];
+  // text도 files도 없으면 이 어댑터가 표현할 수 있는 내용이 없다: 레거시 `attachments` 필드만
+  // 싣는 봇 메시지(PagerDuty 등)가 여기 해당한다. 빈 body/attachments 아이템을 내보내는 대신
+  // message_changed/message_deleted와 같은 방식으로 버린다.
+  if (!m.text && !m.files?.length) return [];
 
   const attachments: Attachment[] = (m.files ?? []).map((f) => ({
     kind: mimeToAttachmentKind(f.mimetype),
