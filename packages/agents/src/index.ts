@@ -102,3 +102,12 @@ export {
   type AutonomyRule,
   type DelegateOutputT,
 } from "./loops/delegate.js";
+export {
+  DRAFT_PLACEHOLDER_MS,
+  DRAFT_SLA_MS,
+  DraftOutput,
+  draftLoop,
+  shouldEscalate,
+  writePlaceholderDraft,
+  type DraftOutputT,
+} from "./loops/draft.js";
