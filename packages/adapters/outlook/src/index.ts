@@ -40,6 +40,7 @@ interface GraphMessage {
   toRecipients?: GraphAddress[];
   ccRecipients?: GraphAddress[];
   receivedDateTime?: string;
+  sentDateTime?: string;
   "@removed"?: { reason?: string };
 }
 
@@ -59,6 +60,18 @@ function addr(a?: GraphAddress): { externalId: string; displayName: string } | n
   return { externalId: email, displayName: a?.emailAddress?.name || email };
 }
 
+/** receivedDateTime이 깨진 메시지(스팸, 게이트웨이 경유, 또는 직렬화 과정에서 빈 문자열이 된 경우)는
+ *  toISOString()이 RangeError를 던진다 — normalize()는 backfill()/subscribe() 루프 안에서 메시지마다
+ *  불리므로 그 메시지 하나가 스트림 전체를 죽인다. Graph가 함께 주는 sentDateTime으로, 그것도 못 쓰면
+ *  now()로 물러난다(Gmail의 internalDate 폴백과 같은 원칙). 살아남은 Date는 밀리초가 없을 수 있으므로
+ *  (`...20Z`) `.SSSZ` 형태로 왕복 정규화한다 — NormalizedItem 계약이 기대하는 포맷이다. */
+function parseSentAt(receivedDateTime?: string, sentDateTime?: string): string {
+  const parsed = [receivedDateTime, sentDateTime]
+    .map((s) => (s ? new Date(s) : null))
+    .find((d): d is Date => d !== null && !Number.isNaN(d.getTime()));
+  return (parsed ?? new Date()).toISOString();
+}
+
 export function normalize(raw: unknown): NormalizedItem[] {
   const m = raw as GraphMessage;
   // delta tombstone: 삭제된 메시지를 알리는 행이라 콘텐츠가 없다. items를 지우지 않는다(A3 §11) —
@@ -75,9 +88,7 @@ export function normalize(raw: unknown): NormalizedItem[] {
   ]
     .filter((p): p is { externalId: string; displayName: string } => p !== null)
     .filter((p, i, all) => all.findIndex((o) => o.externalId === p.externalId) === i);
-  // 원본 receivedDateTime엔 밀리초가 없을 수 있다(`...20Z`) — NormalizedItem 계약은 항상
-  // `.SSSZ` 형태를 기대하므로(다른 어댑터와 동일 포맷) Date를 한 번 왕복시켜 정규화한다.
-  const sentAt = new Date(m.receivedDateTime ?? Date.now()).toISOString();
+  const sentAt = parseSentAt(m.receivedDateTime, m.sentDateTime);
   const attachments: Attachment[] = []; // 다운로드는 /attachments 개별 호출(A1 §2.4) — Gmail과 동일 원칙
 
   return [
