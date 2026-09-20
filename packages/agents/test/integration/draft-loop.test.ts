@@ -27,7 +27,8 @@ beforeAll(async () => {
   );
   threadId = t.rows[0]?.id ?? "";
 });
-// 이 테스트가 만든 draft row를 남기면 커널의 push_batch 테스트(전역 draft 수를 센다)가 깨진다.
+// Leaving the draft rows this test creates behind would break the kernel's push_batch test
+// (it counts drafts globally).
 afterAll(async () => {
   await pool.query("DELETE FROM items WHERE thread_id = $1", [threadId]);
   await pool.end();
@@ -76,7 +77,7 @@ describe("draftLoop (A4 §3)", () => {
       body: string;
       meta: { pending?: boolean };
     }>("SELECT status, body, meta FROM items WHERE id = $1", [id]);
-    expect(rows[0]).toMatchObject({ status: "draft", body: "초안 준비 중…" });
+    expect(rows[0]).toMatchObject({ status: "draft", body: "Preparing draft…" });
     expect(rows[0]?.meta.pending).toBe(true);
 
     await draftLoop.apply(
@@ -84,9 +85,9 @@ describe("draftLoop (A4 §3)", () => {
         loop: "draft",
         run_id: "00000000-0000-0000-0000-000000000000",
         output: {
-          body: "내일 오전에 보내드리겠습니다.",
+          body: "I'll send it tomorrow morning.",
           language: "ko",
-          rationale: "상대가 마감일을 물었다",
+          rationale: "The other party asked about the deadline",
           evidence: [],
           confidence: 0.8,
           escalate: false,
@@ -110,7 +111,7 @@ describe("draftLoop (A4 §3)", () => {
       body: string;
       meta: { pending?: boolean; draft?: { register?: string }; draft_self_check?: unknown };
     }>("SELECT body, meta FROM items WHERE id = $1", [id]);
-    expect(after.rows[0]?.body).toBe("내일 오전에 보내드리겠습니다.");
+    expect(after.rows[0]?.body).toBe("I'll send it tomorrow morning.");
     expect(after.rows[0]?.meta.pending).toBeUndefined();
     expect(after.rows[0]?.meta.draft?.register).toBe("formal_ko");
     expect(after.rows[0]?.meta.draft_self_check).toBeDefined();

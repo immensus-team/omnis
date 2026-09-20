@@ -29,7 +29,7 @@ beforeEach(async () => {
   );
   threadId = t.rows[0]?.id ?? "";
   await pool.query("DELETE FROM items WHERE thread_id = $1", [threadId]);
-  // 앞선 테스트 파일이 남긴 보관 표식을 걷어낸다 — nightlyGroups는 DB 전역을 센다.
+  // Clear the archive markers left behind by earlier test files — nightlyGroups counts DB-wide.
   await pool.query(
     "UPDATE items SET meta = meta - 'archived_by' WHERE status = 'archived' AND thread_id <> $1",
     [threadId],
@@ -40,9 +40,9 @@ beforeEach(async () => {
       `INSERT INTO items (thread_id, account_id, kind, status, body, sent_at, meta)
        VALUES ($1,$2,'email','archived',$3, now(),
          jsonb_build_object('archived_by', jsonb_build_object(
-           'rule_ids','["ar_no_cta"]'::jsonb,'reason','뉴스레터','tier','T0',
+           'rule_ids','["ar_no_cta"]'::jsonb,'reason','newsletter','tier','T0',
            'confidence',0.95,'run_id','r','at', now()::text)))`,
-      [threadId, accountId, `뉴스레터 ${i}`],
+      [threadId, accountId, `Newsletter ${i}`],
     );
   }
 });
@@ -55,10 +55,10 @@ describe("nightlyDigestLoop (A4 §6.4·§9.4)", () => {
 
   it("exposes every archived item — count is the full number, samples are capped at 3", async () => {
     const groups = await nightlyGroups(pool, seededAt, "d1");
-    const g = groups.find((x) => x.reason === "뉴스레터");
+    const g = groups.find((x) => x.reason === "newsletter");
     expect(g?.count).toBe(5);
     expect(g?.samples.length).toBe(3);
-    expect(g?.undo_token).toBe(undoTokenFor("d1", "뉴스레터"));
+    expect(g?.undo_token).toBe(undoTokenFor("d1", "newsletter"));
   });
 
   it("stores the cost field the hub injected", async () => {
@@ -67,8 +67,8 @@ describe("nightlyDigestLoop (A4 §6.4·§9.4)", () => {
         loop: "digest",
         run_id: "00000000-0000-0000-0000-00000000bbbb",
         output: {
-          headline: "오늘 처리 3건, 자동 보관 5건.",
-          one_liner: "조용한 하루였습니다.",
+          headline: "3 items handled today, 5 auto-archived.",
+          one_liner: "It was a quiet day.",
           confidence: 0.9,
           rationale: "",
           injection_flags: [],
@@ -103,7 +103,7 @@ describe("nightlyDigestLoop (A4 §6.4·§9.4)", () => {
         loop: "digest",
         run_id: "00000000-0000-0000-0000-00000000cccc",
         output: {
-          headline: "조용합니다.",
+          headline: "Quiet.",
           one_liner: "",
           confidence: 0.9,
           rationale: "",
@@ -121,7 +121,7 @@ describe("nightlyDigestLoop (A4 §6.4·§9.4)", () => {
       `SELECT count(*)::text AS n, (array_agg(body))[1] AS body
          FROM digests WHERE kind = 'nightly'`,
     );
-    expect(rows[0]?.n).toBe("1"); // 하루 1행 — 두 번째 apply는 같은 행을 갱신한다
+    expect(rows[0]?.n).toBe("1"); // one row per day — the second apply updates the same row
     const parsed = JSON.parse(rows[0]?.body ?? "{}") as { cost: { cap_usd: number } };
     expect(parsed.cost).toEqual({ month_to_date_usd: 0, cap_usd: 60, tier_state: "normal" });
   });

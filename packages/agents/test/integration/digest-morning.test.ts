@@ -35,8 +35,8 @@ describe("morningDigestLoop (A4 §6)", () => {
       loop: "digest" as const,
       run_id: "00000000-0000-0000-0000-00000000aaaa",
       output: {
-        greeting: "좋은 아침입니다.",
-        one_liner: "오늘은 견적 2건이 핵심입니다.",
+        greeting: "Good morning.",
+        one_liner: "Two quotes are what matter most today.",
         confidence: 0.9,
         rationale: "",
         injection_flags: [],
@@ -60,14 +60,14 @@ describe("morningDigestLoop (A4 §6)", () => {
   it("collects a thread-less approval as a needs_you candidate", async () => {
     await pool.query(
       `INSERT INTO pending_approvals (action, args, description)
-       VALUES ('send', '{}'::jsonb, '견적서 회신 승인')`,
+       VALUES ('send', '{}'::jsonb, 'Approve the quote reply')`,
     );
     const rows = await morningCandidates(new Date());
     const approval = rows.find((r) => r.ref.kind === "approval");
     expect(approval?.section).toBe("needs_you");
-    expect(approval?.line).toBe("견적서 회신 승인");
+    expect(approval?.line).toBe("Approve the quote reply");
     expect(approval?.pendingApproval).toBe(true);
-    // thread_id가 NULL이어도 dedupe 키가 null이 되면 안 된다.
+    // Even when thread_id is NULL, the dedupe key must not become null.
     expect(approval?.thread_id).toBe(approval?.ref.id);
   });
 });

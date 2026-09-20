@@ -53,11 +53,12 @@ describe("pickFollowupChannel (A4 §7.4)", () => {
         theySentLast: true,
         hasEmail: true,
       }),
-    ).toBe("gmail"); // 동률이면 이메일
+    ).toBe("gmail"); // on a tie, email
   });
 
   it("keeps the cold-outreach gate on a tie with no email — task only, no channel", () => {
-    // A4 §7.4/§7.5 위반 0건: 동률 1위가 금지 채널이면 이메일이 없어도 그 채널로 열지 않는다.
+    // Zero A4 §7.4/§7.5 violations: if the tie leader is a forbidden channel, do not open it even
+    // when there is no email.
     expect(
       pickFollowupChannel({
         counts: { kakaotalk: 3, slack: 3 },
@@ -72,7 +73,7 @@ describe("pickFollowupChannel (A4 §7.4)", () => {
         hasEmail: false,
       }),
     ).toBe(null);
-    // 상대가 먼저 보냈으면 금지가 풀리고, 이메일이 없으니 동률 1위를 그대로 쓴다.
+    // When they sent last the ban lifts, and with no email the tie leader stands as-is.
     expect(
       pickFollowupChannel({
         counts: { kakaotalk: 3, slack: 3 },
@@ -80,7 +81,7 @@ describe("pickFollowupChannel (A4 §7.4)", () => {
         hasEmail: false,
       }),
     ).toBe("kakaotalk");
-    // 금지 채널이 아닌 동률은 이메일이 없을 때 1위를 쓴다.
+    // A tie with no forbidden channel uses the leader when there is no email.
     expect(
       pickFollowupChannel({
         counts: { slack: 3, telegram: 3 },
@@ -88,7 +89,7 @@ describe("pickFollowupChannel (A4 §7.4)", () => {
         hasEmail: false,
       }),
     ).toBe("slack");
-    // 이메일이 있으면 금지 동률도 이메일로 대체된다.
+    // With email available, even a forbidden tie is replaced by email.
     expect(
       pickFollowupChannel({
         counts: { kakaotalk: 3, slack: 3 },
@@ -130,9 +131,9 @@ describe("inactiveCandidates (A4 §7.3)", () => {
     );
     const rows = await inactiveCandidates(pool);
     const names = rows.map((r) => r.display_name);
-    expect(names).toContain("fu-vip"); // vip=14일 < 20일 경과
-    expect(names).not.toContain("fu-warming"); // warming=21일 > 20일 경과
-    expect(names).not.toContain("fu-active"); // active=30일 > 20일 경과
+    expect(names).toContain("fu-vip"); // vip=14 days < 20 days elapsed
+    expect(names).not.toContain("fu-warming"); // warming=21 days > 20 days elapsed
+    expect(names).not.toContain("fu-active"); // active=30 days > 20 days elapsed
     expect(rows.find((r) => r.display_name === "fu-vip")?.effective_cadence_days).toBe(14);
     expect(rows.length).toBeLessThanOrEqual(INACTIVE_SWEEP_LIMIT);
   });
@@ -150,12 +151,12 @@ describe("inactiveCandidates (A4 §7.3)", () => {
       await pool.query<{ id: string }>("SELECT id FROM persons WHERE display_name = 'fu-tasked'"),
     );
     await pool.query(
-      "INSERT INTO tasks (title, kind, state, person_id) VALUES ('팔로업','followup','open',$1)",
+      "INSERT INTO tasks (title, kind, state, person_id) VALUES ('Follow up','followup','open',$1)",
       [tasked],
     );
     const names = (await inactiveCandidates(pool)).map((r) => r.display_name);
-    expect(names).not.toContain("fu-slow"); // 60일 > 20일 경과 — vip 14일을 덮는다
-    expect(names).not.toContain("fu-tasked"); // 14일 안에 만든 followup task가 이미 있다
+    expect(names).not.toContain("fu-slow"); // 60 days > 20 days elapsed — overrides vip's 14 days
+    expect(names).not.toContain("fu-tasked"); // a followup task created within 14 days already exists
   });
 
   it("sweepFollowups runs the loop once per candidate", async () => {
@@ -234,7 +235,7 @@ describe("followupLoop (A4 §7.4)", () => {
       "SELECT relationship_state AS s, cadence_days AS c FROM persons WHERE id = $1",
       [personId],
     ));
-    expect(rows[0]?.s).toBe("active"); // closed는 승인을 타므로 아직 안 바뀐다
+    expect(rows[0]?.s).toBe("active"); // closed requires approval, so it has not changed yet
     const ap = await pool.query<{ n: string }>(
       `SELECT count(*)::text AS n FROM pending_approvals
         WHERE action = 'memory_write' AND args->>'person_id' = $1`,
