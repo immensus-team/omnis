@@ -1,4 +1,4 @@
-import { GlassSurface } from "@omnis/ui";
+import { OpaqueSurface } from "@omnis/ui";
 import {
   InboxRow,
   type LabelChip,
@@ -59,7 +59,14 @@ const HHMM = new Intl.DateTimeFormat("ko-KR", {
   hour12: false,
 });
 
-export function Inbox({ onOpen }: { onOpen?: (target: OpenTarget) => void }) {
+export function Inbox({
+  onOpen,
+  channelFilter = null,
+}: {
+  onOpen?: (target: OpenTarget) => void;
+  /** U1 채널 레일 선택. null = 전체(Inbox 타일). pill 필터(work/personal/…)와 AND로 합쳐진다. */
+  channelFilter?: UiChannel | null;
+}) {
   const zero = useZeroClient();
   const [filter, setFilter] = useState<InboxFilter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -135,12 +142,20 @@ export function Inbox({ onOpen }: { onOpen?: (target: OpenTarget) => void }) {
     [items, pendingThreadIds, channelByAccount, chipsByThread],
   );
 
-  const filtered = useMemo(() => filterInboxItems(rows, filter), [rows, filter]);
+  const channelFiltered = useMemo(
+    () => (channelFilter ? rows.filter((r) => r.channel === channelFilter) : rows),
+    [rows, channelFilter],
+  );
+  const filtered = useMemo(
+    () => filterInboxItems(channelFiltered, filter),
+    [channelFiltered, filter],
+  );
 
   return (
-    <div className="inbox-screen">
-      <GlassSurface slot="sidebar" className="inbox-screen__filters">
-        <div role="radiogroup" aria-label="Inbox 필터">
+    <OpaqueSurface className="inbox-card">
+      <div className="inbox-card__header">
+        <h2 className="inbox-card__title">Inbox</h2>
+        <div role="radiogroup" aria-label="Inbox 필터" className="inbox-card__pills">
           {FILTERS.map((f) => (
             <button
               key={f}
@@ -154,7 +169,7 @@ export function Inbox({ onOpen }: { onOpen?: (target: OpenTarget) => void }) {
             </button>
           ))}
         </div>
-      </GlassSurface>
+      </div>
       <Virtuoso
         role="listbox"
         style={{ flex: "1 1 0", minHeight: 0 }}
@@ -178,6 +193,6 @@ export function Inbox({ onOpen }: { onOpen?: (target: OpenTarget) => void }) {
           />
         )}
       />
-    </div>
+    </OpaqueSurface>
   );
 }

@@ -28,7 +28,8 @@ export interface InboxRowProps {
   onSelect: (id: string) => void;
 }
 
-const CHANNEL_LABEL: Record<UiChannel, string> = {
+/** channel-rail.tsx(U1)도 같은 채널→한글 라벨 매핑이 필요해 여기서 export한다(한 군데서만 유지). */
+export const CHANNEL_LABEL: Record<UiChannel, string> = {
   slack: "Slack",
   gmail: "Gmail",
   gcal: "Google Calendar",
