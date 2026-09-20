@@ -150,7 +150,7 @@ describe("kill switch routes", () => {
 
 describe("unknown routes", () => {
   it("404s the paths other appendices own and anything else", async () => {
-    for (const p of ["/search", "/memory/search", "/transcript/abc", "/nope"]) {
+    for (const p of ["/search", "/memory/search", "/nope"]) {
       expect((await fetch(`${base}${p}`)).status).toBe(404);
     }
   });

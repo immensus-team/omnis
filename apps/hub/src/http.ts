@@ -7,6 +7,7 @@ import type { Adapter } from "@omnis/protocol";
 import type { Pool } from "pg";
 import { setThreadArchived } from "./archive.js";
 import type { HubConfig } from "./config.js";
+import { clampLastN, loadTranscript } from "./transcript.js";
 
 const APPROVAL_STATES = [
   "pending",
@@ -188,7 +189,22 @@ export function createHubServer(deps: HubServerDeps): Server {
       return send(res, 405, { error: "method not allowed" });
     }
 
-    // /search, /memory/search, /transcript/:id는 다른 부록이 소유한다(계약 §5) — Phase A는 열지 않는다.
+    if (path.startsWith("/transcript/")) {
+      if (method !== "GET") return send(res, 405, { error: "method not allowed" });
+      const sessionId = path.slice("/transcript/".length);
+      // A non-uuid would make Postgres throw 22P02 — reject it with a clean 400 first.
+      if (!/^[0-9a-f-]{36}$/i.test(sessionId))
+        return send(res, 400, { error: "invalid session_id" });
+      const summary = await loadTranscript(
+        pool,
+        sessionId,
+        clampLastN(url.searchParams.get("last_n")),
+      );
+      if (summary === null) return send(res, 404, { error: "session not found" });
+      return send(res, 200, summary);
+    }
+
+    // /search and /memory/search belong to a different task (not implemented in this worktree).
     return send(res, 404, { error: "not found" });
   }
 
