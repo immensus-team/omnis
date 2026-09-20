@@ -199,6 +199,11 @@ interface GCalEvent {
 export function normalize(raw: unknown): NormalizedItem[] {
   const e = raw as GCalEvent;
   if (!e.id || !e.start?.dateTime) return [];
+  // summary도 없으면 이 어댑터가 표현할 수 있는 내용이 없다: 제목 없는 이벤트(다른 시스템이 만든
+  // busy 블록, 캘린더가 자동 생성한 항목 등)가 여기 해당한다. body: "" + attachments: [] 아이템을
+  // 내보내는 대신 아이템을 만들지 않는다 — Slack(`if (!m.text && !m.files?.length) return [];`)과
+  // Telegram 어댑터도 같은 이유로 같은 가드를 둔다.
+  if (!e.summary) return [];
   return [
     {
       threadExternalId: e.id,
