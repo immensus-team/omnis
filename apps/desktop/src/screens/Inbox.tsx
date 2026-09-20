@@ -42,9 +42,16 @@ const HHMM = new Intl.DateTimeFormat("ko-KR", {
   hour12: false,
 });
 
-const zero = initZero();
+// 모듈 스코프에서 Zero를 만들면 filterInboxItems만 import해도 WebSocket이 열린다(테스트가 zero-cache에
+// 붙으려다 끊긴다). 화면이 처음 마운트될 때까지 미룬다.
+let zeroClient: ReturnType<typeof initZero> | undefined;
+function getZero() {
+  zeroClient ??= initZero();
+  return zeroClient;
+}
 
 export function Inbox() {
+  const zero = useMemo(getZero, []);
   const [filter, setFilter] = useState<InboxFilter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 

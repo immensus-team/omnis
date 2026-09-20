@@ -57,7 +57,8 @@ const CHANNEL_LABEL: Record<UiChannel, string> = {
 function pickChips(labels: LabelChip[]): { shown: LabelChip[]; more: number } {
   const scope = labels.find((l) => l.kind === "scope");
   const rest = labels.filter((l) => l !== scope);
-  const shown = [scope, rest[0]].filter((l): l is LabelChip => Boolean(l)).slice(0, 2);
+  // A5 §3.1: 칩은 최대 2개. scope가 없으면 그 자리를 비우지 않고 나머지 라벨로 채운다.
+  const shown = (scope ? [scope, ...rest] : rest).slice(0, 2);
   return { shown, more: labels.length - shown.length };
 }
 
@@ -89,7 +90,7 @@ export function InboxRow(props: InboxRowProps) {
       <div className="inbox-row__chips">
         {shown.map((chip) => (
           <span
-            key={chip.kind}
+            key={`${chip.kind}:${chip.name}`}
             className="inbox-row__chip"
             aria-label={`${chip.kind} 라벨: ${chip.name}`}
           >

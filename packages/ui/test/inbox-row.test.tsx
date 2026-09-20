@@ -45,6 +45,33 @@ describe("InboxRow (A5 §3.1)", () => {
     expect(screen.getByLabelText("scope 라벨: work")).toBeInTheDocument();
     expect(screen.getByLabelText("라벨 1개 더 보기")).toHaveTextContent("+1");
   });
+  it("shows 2 chips + N more when no scope label exists — A5 §3.1 최대 2개", () => {
+    render(
+      <InboxRow
+        {...baseProps}
+        labels={[
+          { kind: "topic", name: "a", color: null },
+          { kind: "topic", name: "b", color: null },
+          { kind: "person", name: "c", color: null },
+        ]}
+      />,
+    );
+    expect(screen.getAllByText(/^[abc]$/)).toHaveLength(2);
+    expect(screen.getByLabelText("라벨 1개 더 보기")).toHaveTextContent("+1");
+  });
+  it("renders both chips when two scope labels collide (고유 key)", () => {
+    render(
+      <InboxRow
+        {...baseProps}
+        labels={[
+          { kind: "scope", name: "work", color: null },
+          { kind: "scope", name: "personal", color: null },
+        ]}
+      />,
+    );
+    expect(screen.getByLabelText("scope 라벨: work")).toBeInTheDocument();
+    expect(screen.getByLabelText("scope 라벨: personal")).toBeInTheDocument();
+  });
   it("prefixes draft items with '초안: ' (A5 §3.1)", () => {
     render(<InboxRow {...baseProps} status="draft" preview="네 확인했습니다" />);
     expect(screen.getByText("초안: 네 확인했습니다")).toBeInTheDocument();
