@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { cn } from "../lib/cn.js";
 import { CHANNEL_LABEL } from "../lib/row-meta.js";
 import type { UiChannel } from "../types.js";
+import { AuroraSurface } from "./aurora-surface.js";
 import { ChannelGlyph } from "./channel-glyph.js";
 import { GlassSurface } from "./glass-surface.js";
 
@@ -89,39 +90,47 @@ export function ChannelRail({ channels, selected, onSelect }: ChannelRailProps) 
           shadow = .glass-surface). The tiles stay on top of it — brand marks still read over glass.
           US-D02b: in the narrow shell this plate lies down into the row that fills the bottom bar
           (app.css gives it `display: contents` there), and the bar itself carries the glass — glass
-          is never stacked on glass. */}
-      <GlassSurface slot="sidebar" className="channel-rail__plate">
-        {barTiles.map((channel) => (
-          <button
-            key={channel}
-            type="button"
-            className={cn(
-              "channel-rail__tile",
-              selected === channel && "channel-rail__tile--active",
-            )}
-            aria-pressed={selected === channel}
-            aria-label={CHANNEL_LABEL[channel]}
-            onClick={() => onSelect(channel)}
-          >
-            <ChannelGlyph channel={channel} size={18} />
-          </button>
-        ))}
-        {narrow ? (
-          <RailOverflowPopover
-            tiles={tiles.slice(NARROW_RAIL_TILE_LIMIT)}
-            selected={selected}
-            onSelect={onSelect}
-          />
-        ) : (
-          // In the wide shell there is nothing to overflow, so the chevron is a mark, not a
-          // control: a <span>, out of the tab order and silent to a screen reader. It was a
-          // labelled <button> with no handler, which is the classic copied-the-affordance-without-
-          // the-behaviour tell. The narrow tier's chevron above is the real trigger.
-          <span className="channel-rail__more" aria-hidden="true">
-            <ChevronDown size={16} />
-          </span>
-        )}
-      </GlassSurface>
+          is never stacked on glass.
+          US-D06 §4.1.1: the plate's glass now sits on the `mist` aurora, which is the faint half of
+          reference image 1 — image 1's colour, softness and grain with no silhouette (a 120:200
+          landscape ridge stretched into a 56px-wide plate renders as a vertical finger, not a
+          ridge). The aurora is BEHIND the glass, painted by this ancestor wrapper, never on the
+          plate itself: `.aurora` and `.glass-surface` on one element would fight over the
+          background and the panel would stop being glass (§2.7). */}
+      <AuroraSurface variant="mist" className="channel-rail__aurora">
+        <GlassSurface slot="sidebar" className="channel-rail__plate">
+          {barTiles.map((channel) => (
+            <button
+              key={channel}
+              type="button"
+              className={cn(
+                "channel-rail__tile",
+                selected === channel && "channel-rail__tile--active",
+              )}
+              aria-pressed={selected === channel}
+              aria-label={CHANNEL_LABEL[channel]}
+              onClick={() => onSelect(channel)}
+            >
+              <ChannelGlyph channel={channel} size={18} />
+            </button>
+          ))}
+          {narrow ? (
+            <RailOverflowPopover
+              tiles={tiles.slice(NARROW_RAIL_TILE_LIMIT)}
+              selected={selected}
+              onSelect={onSelect}
+            />
+          ) : (
+            // In the wide shell there is nothing to overflow, so the chevron is a mark, not a
+            // control: a <span>, out of the tab order and silent to a screen reader. It was a
+            // labelled <button> with no handler, which is the classic copied-the-affordance-without-
+            // the-behaviour tell. The narrow tier's chevron above is the real trigger.
+            <span className="channel-rail__more" aria-hidden="true">
+              <ChevronDown size={16} />
+            </span>
+          )}
+        </GlassSurface>
+      </AuroraSurface>
       {narrow ? null : (
         <>
           <div className="channel-rail__spacer" />

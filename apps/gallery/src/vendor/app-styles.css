@@ -113,6 +113,27 @@ body {
   border-radius: 22px;
 }
 
+/* US-D06 §4.1.1: the plate's glass finally has something behind it to blur. `mist` is the rail's
+   variant — reference image 1's colour, softness and grain with no silhouette (§3.1: a 120:200
+   landscape ridge stretched into a 56px-wide plate renders as a vertical finger, not a ridge), at
+   the 6px blur §3.2 maps to this surface and on the plate's own footprint: no padding, no bleed
+   into the canvas.
+   Both selectors are two-class (§2.7) so they are (0,2,0) and beat `.glass-surface` and the
+   `[data-aurora="mist"]` block no matter what order the stylesheets load in.
+   Accepting §4.1.1's known cost deliberately: `.aurora` clips with `overflow: hidden`, which would
+   cut the plate's outer `--shadow-glass` off at the rounded edge, so the drop shadow moves out here
+   to the wrapper and the plate keeps only the inset highlight. The lift is unchanged; only who
+   paints it is. */
+.aurora.channel-rail__aurora {
+  --aurora-blur: 6px;
+  border-radius: 22px;
+  box-shadow: var(--shadow-glass);
+}
+
+.glass-surface.channel-rail__plate {
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
 .channel-rail__tile,
 .channel-rail__icon-button {
   display: flex;
@@ -2042,6 +2063,22 @@ body {
      also retires the pill outline the vertical column's 22px radius used to leave mid-bar. */
   .channel-rail__plate {
     display: contents;
+  }
+
+  /* US-D06: and for the same reason the bar's aurora is off. Leaving the wrapper alive here would
+     put a second glass layer back on the bar (the wrap in channel-rail.tsx is unconditional), so it
+     goes `display: contents` as well — that dissolves its box while leaving the DOM intact, and the
+     tiles stay direct children of the bar's flex row with one gap. The two texture layers are
+     `display: none` rather than dissolved: `.aurora__mass` and `.aurora__grain` are absolutely
+     positioned, so with the wrapper out of the box tree they would resolve against the fixed bar
+     and paint a full-width grain over it. */
+  .aurora.channel-rail__aurora {
+    display: contents;
+  }
+
+  .aurora.channel-rail__aurora > .aurora__mass,
+  .aurora.channel-rail__aurora > .aurora__grain {
+    display: none;
   }
 
   /* Margin that only makes sense in the vertical column — in a horizontal bar it just shoves the

@@ -194,3 +194,24 @@ describe("ChannelRail Phase B controls", () => {
     }
   });
 });
+
+// US-D06 §4.1.1: the plate's glass sits on the rail's aurora, and the two are separate elements on
+// purpose (§2.7) — one element carrying both classes gives the panel a `background-color` and a
+// `background` at the same specificity and the glass loses.
+describe("ChannelRail aurora backdrop (US-D06)", () => {
+  it("paints the mist aurora on an ancestor of the plate, never on the plate itself", () => {
+    const { container } = render(
+      <ChannelRail channels={["gmail"]} selected={null} onSelect={vi.fn()} />,
+    );
+    const plate = container.querySelector(".channel-rail__plate");
+    const aura = container.querySelector(".channel-rail__aurora");
+
+    expect(aura).toHaveAttribute("data-aurora", "mist");
+    // The aurora is the plate's parent, so its texture paints *behind* the glass rather than over
+    // it, and the plate keeps `.glass-surface` to itself.
+    expect(aura).toContainElement(plate);
+    expect(plate).not.toHaveClass("aurora");
+    // Both texture layers travel with it — a variant with no mass still needs the grain.
+    expect(aura?.querySelector(".aurora__grain")).not.toBeNull();
+  });
+});
