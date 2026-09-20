@@ -25,7 +25,7 @@ export interface ApprovalConfig {
   allow_ignore: boolean;
 }
 
-/** pending_approvals row 1:1 (A3 §4). 계약 §5의 Approvals.list가 돌려주는 타입. */
+/** pending_approvals row 1:1 (A3 §4). The type returned by Approvals.list in contract §5. */
 export interface PendingApproval {
   id: string;
   action: ApprovalAction;
@@ -55,13 +55,13 @@ export interface Approvals {
     thread_id?: string;
     limit?: number;
   }): Promise<PendingApproval[]>;
-  /** decided(accept|edit) → executing. 0행이면 ApprovalStateError. runEgress만 부른다. */
+  /** decided(accept|edit) → executing. 0 rows → ApprovalStateError. Only runEgress calls it. */
   beginExecution(id: string): Promise<PendingApproval>;
   /** executing → executed */
   completeExecution(id: string): Promise<void>;
   /** executing → failed */
   failExecution(id: string, reason: string): Promise<void>;
-  /** pending & expires_at <= now → expired(+decision='ignore'). 바뀌었으면 true. */
+  /** pending & expires_at <= now → expired(+decision='ignore'). True if a row changed. */
   expire(id: string): Promise<boolean>;
 }
 
@@ -69,7 +69,7 @@ export interface ApprovalsDeps {
   pool: Pool;
   logger: Logger;
   now?: () => Date;
-  /** Task 21이 audit를 물린다. 없으면 감사 기록을 건너뛴다(테스트 부트스트랩용). */
+  /** Task 21 wires the audit. When absent, audit records are skipped (test bootstrap). */
   audit?: Audit;
 }
 
@@ -83,7 +83,7 @@ export function createApprovals(deps: ApprovalsDeps): Approvals {
 
   return {
     async propose(i) {
-      // zod가 action 6값·config·risk 기본값을 강제한다. DB에 닿기 전에 터진다.
+      // zod enforces the six action values, config and risk defaults, before the DB is touched.
       const v = HumanInterrupt.parse(i);
       const row = await one<{ id: string }>(
         pool,
@@ -104,7 +104,7 @@ export function createApprovals(deps: ApprovalsDeps): Approvals {
           v.expires_at ?? null,
         ],
       );
-      // NOTIFY는 0007의 approvals_notify 트리거가 이미 쏜다 — 여기서 emit하면 두 번 나간다.
+      // The approvals_notify trigger from 0007 already fires NOTIFY — emitting here doubles it.
       await deps.audit?.record({
         actor: "system",
         action: "approval.proposed",
@@ -143,7 +143,7 @@ export function createApprovals(deps: ApprovalsDeps): Approvals {
         throw new ApprovalStateError(`approval ${id} config forbids decision "${v.decision}"`);
       }
 
-      // state와 decision을 한 UPDATE에서 바꿔야 approvals_decided_ck를 만족한다.
+      // state and decision must change in one UPDATE to satisfy approvals_decided_ck.
       const updated = await query<{ id: string }>(
         pool,
         `UPDATE pending_approvals
@@ -179,7 +179,7 @@ export function createApprovals(deps: ApprovalsDeps): Approvals {
         where.push(`thread_id = $${params.length}`);
       }
       params.push(Math.min(f?.limit ?? 50, 200));
-      // A3 §12 (2): 고위험 먼저, 그 다음 오래된 순.
+      // A3 §12 (2): high risk first, then oldest first.
       return query<PendingApproval>(
         pool,
         `${SELECT_ALL}
@@ -191,7 +191,7 @@ export function createApprovals(deps: ApprovalsDeps): Approvals {
     },
 
     async beginExecution(id) {
-      // decision이 accept|edit일 때만 실행할 수 있다. ignore/respond는 채널로 나가지 않는다.
+      // Only decision accept|edit may execute. ignore/respond never reach the channel.
       const rows = await query<PendingApproval>(
         pool,
         `UPDATE pending_approvals
@@ -238,8 +238,8 @@ export function createApprovals(deps: ApprovalsDeps): Approvals {
     },
 
     async expire(id) {
-      // approvals_decided_ck는 state<>'pending'인 row에 non-NULL decision을 요구한다.
-      // 아무도 고르지 않고 시간이 지난 것 = 'ignore'.
+      // approvals_decided_ck requires a non-NULL decision on rows where state<>'pending'.
+      // Nobody chose and time ran out = 'ignore'.
       const rows = await query<{ id: string }>(
         pool,
         `UPDATE pending_approvals
