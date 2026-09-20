@@ -149,8 +149,10 @@ describe("kill switch routes", () => {
 });
 
 describe("unknown routes", () => {
-  it("404s the paths other appendices own and anything else", async () => {
-    for (const p of ["/transcript/abc", "/nope"]) {
+  it("404s anything no route owns", async () => {
+    // /search, /memory/search and /transcript/:id are live now, so the only 404s left are
+    // paths nobody claims — including /transcript without a trailing id.
+    for (const p of ["/nope", "/transcript"]) {
       expect((await fetch(`${base}${p}`)).status).toBe(404);
     }
   });

@@ -9,6 +9,7 @@ import type { Pool } from "pg";
 import { setThreadArchived } from "./archive.js";
 import type { HubConfig } from "./config.js";
 import { createSearchDeps, runSearch } from "./search.js";
+import { clampLastN, loadTranscript } from "./transcript.js";
 
 const APPROVAL_STATES = [
   "pending",
@@ -212,7 +213,21 @@ export function createHubServer(deps: HubServerDeps): Server {
       return send(res, 200, { results: await searchMemories(pool, { query: q }) });
     }
 
-    // /transcript/:id is owned by another appendix (interfaces contract §5).
+    if (path.startsWith("/transcript/")) {
+      if (method !== "GET") return send(res, 405, { error: "method not allowed" });
+      const sessionId = path.slice("/transcript/".length);
+      // A non-uuid would make Postgres throw 22P02 — reject it with a clean 400 first.
+      if (!/^[0-9a-f-]{36}$/i.test(sessionId))
+        return send(res, 400, { error: "invalid session_id" });
+      const summary = await loadTranscript(
+        pool,
+        sessionId,
+        clampLastN(url.searchParams.get("last_n")),
+      );
+      if (summary === null) return send(res, 404, { error: "session not found" });
+      return send(res, 200, summary);
+    }
+
     return send(res, 404, { error: "not found" });
   }
 
