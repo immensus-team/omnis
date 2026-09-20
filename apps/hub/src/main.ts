@@ -110,6 +110,8 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
   const factories = adapterFactories(config);
   logger.info("adapter registry", { configured: Object.keys(factories) });
   const accountRows = await loadAccountRows(pool);
+  // The status→ok mapping already covers the recovery path: "healthy" is `!== "down"`, so it reaches
+  // recordAdapterHealth(ok=true) and clears the failure counter / restores a 'broken' account.
   const reportAdapterHealth = (h: AdapterStatus): Promise<void> =>
     recordAdapterHealth(
       { pool, logger, ntfy: { url: config.ntfyUrl } },

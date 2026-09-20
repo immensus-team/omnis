@@ -10,6 +10,12 @@ import { estimateTokens } from "../src/tokens.js";
 
 const para = (n: number): string => `${"a".repeat(n)}`;
 
+// CLAUDE.md allows a non-English fixture when the test is specifically about non-English input. This
+// one is: estimateTokens has two branches, ASCII at 4 chars/token and wide at 1.5 (src/tokens.ts),
+// and the hangul below is what exercises the wide branch. para() above covers ASCII only — at ~1/3
+// the token density, so the chunk boundaries a Korean document produces were no longer under test.
+const paraWide = (n: number): string => "가".repeat(n);
+
 describe("chunkDocument (A4 §10.3 document)", () => {
   it("returns one chunk for a short document", () => {
     const chunks = chunkDocument("A short note, one line.");
@@ -26,6 +32,15 @@ describe("chunkDocument (A4 §10.3 document)", () => {
   it("keeps every chunk under the 800-token ceiling", () => {
     const doc = Array.from({ length: 30 }, () => para(400)).join("\n\n");
     for (const c of chunkDocument(doc)) {
+      expect(estimateTokens(c.text)).toBeLessThanOrEqual(CHUNK_MAX_TOKENS);
+    }
+  });
+
+  it("keeps every chunk under the ceiling in the wide (CJK) token branch too", () => {
+    const doc = Array.from({ length: 12 }, () => paraWide(300)).join("\n\n");
+    const chunks = chunkDocument(doc);
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const c of chunks) {
       expect(estimateTokens(c.text)).toBeLessThanOrEqual(CHUNK_MAX_TOKENS);
     }
   });

@@ -2,8 +2,8 @@
 // buildAdapters → createHubServer({adapters}) → the US-A36 archive write-back actually fires.
 import type { AddressInfo } from "node:net";
 import { createPool, one } from "@omnis/db";
-import { type Kernel, createKernel, createLogger } from "@omnis/kernel";
-import type { Adapter, AuthRef, Capabilities, ThreadRef } from "@omnis/protocol";
+import { type Kernel, createKernel, createLogger, recordAdapterHealth } from "@omnis/kernel";
+import type { Adapter, AuthRef, Capabilities, Channel, ThreadRef } from "@omnis/protocol";
 import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { adaptersByChannel, buildAdapters, loadAccountRows } from "../../src/adapters.js";
@@ -149,6 +149,34 @@ describe("hub adapter registry (US-B45)", () => {
       `SELECT id FROM accounts WHERE channel = 'gmail' AND external_id = 'registry-no-secret'`,
     );
     expect(ids).not.toContain(rows.id);
+  });
+
+  // F2: before this, nothing in production reported a healthy adapter, so once a channel reached the
+  // failure threshold its accounts stayed state='broken' — buildAdapters skipped them, so not even a
+  // hub restart could rebuild the adapter. The connect path now reports healthy, which is the
+  // ok=true branch of recordAdapterHealth: counter reset + broken→active + last_error cleared.
+  it("brings a broken account back to active once its adapter connects", async () => {
+    await pool.query(
+      `UPDATE accounts SET state = 'broken', last_error = 'oauth revoked'
+        WHERE channel = 'gmail' AND external_id = $1`,
+      [EXTERNAL_ID],
+    );
+    const bound = await buildAdapters({
+      accounts: await loadAccountRows(pool),
+      factories: { gmail: fakeGmail },
+      logger,
+      // The same mapping main.ts wires: anything that is not "down" is ok=true.
+      recordAdapterHealth: (h) =>
+        recordAdapterHealth({ pool, logger }, h.channel as Channel, h.status !== "down", h.error),
+    });
+    expect(bound.map((b) => b.channel)).toContain("gmail");
+    const row = await one<{ state: string; last_error: string | null }>(
+      pool,
+      `SELECT state, last_error FROM accounts WHERE channel = 'gmail' AND external_id = $1`,
+      [EXTERNAL_ID],
+    );
+    expect(row.state).toBe("active");
+    expect(row.last_error).toBeNull();
   });
 
   it("carries the registry's adapter into the archive write-back (US-A36)", async () => {

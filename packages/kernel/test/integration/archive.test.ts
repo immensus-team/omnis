@@ -91,4 +91,19 @@ describe("archiveItem / undoArchive (A4 §9.3·§9.4)", () => {
     const groups = await archivedSince(pool, new Date(Date.now() - 3_600_000));
     expect(groups.find((g) => g.reason === "newsletter")?.count).toBeGreaterThanOrEqual(1);
   });
+
+  // The fallback label for an item archived without a reason. The nightly digest's nightlyGroups()
+  // reports the same bucket, so this pins the reference side of that pair — a casing change here
+  // would split one bucket into two, and the digest hashes undo_token from the reason string.
+  // ArchivedByMeta.reason is required, so this state only arrives from a row written outside
+  // archiveItem (an older writer, a hand-fixed row) — which is exactly what the COALESCE is for.
+  it("buckets an item archived with no reason under 'Other'", async () => {
+    await archiveItem(pool, itemId, meta);
+    await pool.query("UPDATE items SET meta = meta #- '{archived_by,reason}' WHERE id = $1", [
+      itemId,
+    ]);
+    const groups = await archivedSince(pool, new Date(Date.now() - 3_600_000));
+    expect(groups.find((g) => g.reason === "Other")?.count).toBeGreaterThanOrEqual(1);
+    expect(groups.find((g) => g.reason === "other")).toBeUndefined();
+  });
 });
