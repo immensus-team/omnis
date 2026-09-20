@@ -1,25 +1,12 @@
 import { cn } from "../lib/cn.js";
 
-/** protocol Channel enum의 리터럴을 미러링(패키지 경계 판정 참고 — @omnis/protocol import 안 함). */
-export type UiChannel =
-  | "slack"
-  | "gmail"
-  | "gcal"
-  | "outlook"
-  | "telegram"
-  | "whatsapp"
-  | "kakaotalk"
-  | "linkedin"
-  | "agent"
-  | "system";
-export type UiItemStatus =
-  | "received"
-  | "read"
-  | "draft"
-  | "approved"
-  | "sent"
-  | "failed"
-  | "archived";
+// Task 4가 여기 로컬로 선언했던 UiChannel/UiItemStatus는 Task 5(US-A27)에서 ../types.ts로 옮겼다.
+// Task 4의 apps/desktop/src/screens/Inbox.tsx가 이미 이 모듈 경로("@omnis/ui/components/inbox-row")에서
+// 두 타입을 import하므로, 여기서 재export하지 않으면 그 import가 깨진다. 이 파일 안에서도 아래
+// CHANNEL_LABEL/InboxRowProps가 두 타입을 쓰므로 import type으로 로컬 바인딩도 함께 가져온다
+// (export type { X } from "mod" 단독으로는 re-export만 되고 로컬 스코프에 X가 들어오지 않는다).
+import type { UiChannel, UiItemStatus } from "../types.js";
+export type { UiChannel, UiItemStatus };
 
 export interface LabelChip {
   kind: "scope" | "topic" | "priority" | "person";
