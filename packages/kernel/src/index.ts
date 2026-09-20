@@ -20,7 +20,7 @@ export { runEgress } from "./egress.js";
 export type { EgressDeps, EgressSpec, EgressToken } from "./egress.js";
 export { createOutbox } from "./outbox.js";
 export type { Outbox, OutboxDeps } from "./outbox.js";
-export { handleNorm, initialsFor } from "./identity.js";
+export { handleNorm, initialsFor, resolvePerson } from "./identity.js";
 export { createIngestSink } from "./ingest.js";
 export { createKernel } from "./kernel.js";
 export type { Kernel, KernelDeps } from "./kernel.js";
