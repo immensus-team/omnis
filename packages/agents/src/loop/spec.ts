@@ -68,7 +68,10 @@ export interface LoopSpec<TOut> {
   palette: ReadonlyArray<ToolName>;
   budget: LoopBudget;
   tier: "T0" | "T1" | "T2";
-  outputSchema: z.ZodType<TOut>;
+  /** 입력 타입을 unknown으로 열어 둔다 — `.default([])`가 붙은 필드(집안 규칙: classify-t1.ts,
+   *  propose.ts)는 파싱 입력이 출력과 달라 `z.ZodType<TOut>`에 대입되지 않는다. 파싱만 하므로
+   *  출력 타입만 고정하면 된다. */
+  outputSchema: z.ZodType<TOut, z.ZodTypeDef, unknown>;
   /** 모델 없이 결론이 나는 T0 경로. null을 돌려주면 모델 경로로 내려간다.
    *  A4 §9.2의 자동 보관 ①③④가 이 자리에 들어간다. */
   decide?(ctx: TriggerContext): Promise<Omit<LoopResult<TOut>, "run_id"> | null>;

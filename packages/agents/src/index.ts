@@ -73,3 +73,10 @@ export {
   type Register,
 } from "./draft/register.js";
 export { SELF_CHECK_ITEMS, selfCheck, type SelfCheckCtx } from "./draft/selfcheck.js";
+export {
+  ROUTE_CONFIDENCE_HIGH,
+  ROUTE_CONFIDENCE_MIN,
+  RouteOutput,
+  noteRouteLoop,
+  type RouteOutputT,
+} from "./loops/note-route.js";
