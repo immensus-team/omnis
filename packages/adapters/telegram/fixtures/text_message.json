@@ -1,0 +1,33 @@
+{
+  "scenario": "text_message",
+  "raw": {
+    "id": 501,
+    "chat": { "id": 1001, "type": "private" },
+    "sender": { "id": 42, "firstName": "Dana", "lastName": "Lee" },
+    "text": "sync tomorrow at 10am",
+    "date": 1700000000
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "1001",
+        "externalId": "501",
+        "kind": "message",
+        "author": { "kind": "person", "id": "42" },
+        "body": "sync tomorrow at 10am",
+        "attachments": [],
+        "sentAt": "2023-11-14T22:13:20.000Z",
+        "status": "received",
+        "sourceHash": "1001:501",
+        "threadMeta": {
+          "externalId": "1001",
+          "kind": "dm",
+          "title": null,
+          "participants": [{ "externalId": "42", "displayName": "Dana Lee" }],
+          "lastItemAt": "2023-11-14T22:13:20.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

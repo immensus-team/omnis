@@ -10,6 +10,8 @@
     { "path": "./packages/adapters/slack" },
     { "path": "./packages/adapters/gmail" },
     { "path": "./packages/adapters/google-calendar" },
+    { "path": "./packages/adapters/outlook" },
+    { "path": "./packages/adapters/telegram" },
     { "path": "./apps/local-agent" },
     { "path": "./packages/ui" },
     { "path": "./apps/desktop" },

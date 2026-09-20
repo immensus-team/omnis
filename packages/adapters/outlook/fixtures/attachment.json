@@ -1,0 +1,36 @@
+{
+  "scenario": "attachment",
+  "raw": {
+    "id": "AAMkAGI1msg003",
+    "conversationId": "AAQkAGI1conv002",
+    "internetMessageId": "<msg-003@outlook.com>",
+    "subject": "PoC slides",
+    "body": { "contentType": "text", "content": "" },
+    "from": { "emailAddress": { "name": "Dana Lee", "address": "dana@example.com" } },
+    "receivedDateTime": "2023-11-14T23:30:00Z",
+    "hasAttachments": true
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv002",
+        "externalId": "AAMkAGI1msg003",
+        "kind": "email",
+        "author": { "kind": "person", "id": "dana@example.com" },
+        "body": "Subject: PoC slides\n\n",
+        "attachments": [],
+        "sentAt": "2023-11-14T23:30:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-003@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv002",
+          "kind": "email",
+          "title": "PoC slides",
+          "participants": [{ "externalId": "dana@example.com", "displayName": "Dana Lee" }],
+          "lastItemAt": "2023-11-14T23:30:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

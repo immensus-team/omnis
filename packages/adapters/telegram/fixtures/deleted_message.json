@@ -1,0 +1,5 @@
+{
+  "scenario": "deleted_message",
+  "raw": { "deletedMessageIds": [501], "deletedChatId": 1001 },
+  "expected": { "items": [] }
+}
