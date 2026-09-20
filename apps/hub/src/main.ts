@@ -1,5 +1,11 @@
 import { createPool } from "@omnis/db";
-import { type Logger, createKernel, createLogger, registerHealthcheckJob } from "@omnis/kernel";
+import {
+  type Logger,
+  assertZeroPublication,
+  createKernel,
+  createLogger,
+  registerHealthcheckJob,
+} from "@omnis/kernel";
 import { createBridgeHub } from "./bridge.js";
 import { type HubConfig, readConfig } from "./config.js";
 import { createHubServer } from "./http.js";
@@ -15,6 +21,8 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
   const logger = createLogger("@omnis/hub");
   const pool = createPool(env);
   const kernel = createKernel({ pool, logger });
+  // Zero 스키마와 publication이 어긋난 채로 떠 있으면 데스크톱이 빈 인박스를 본다. 부팅에서 깨뜨린다.
+  await assertZeroPublication(pool);
 
   registerHealthcheckJob(kernel.scheduler, { pool, events: kernel.events });
   await kernel.scheduler.start();

@@ -23,3 +23,11 @@ export type { Outbox, OutboxDeps } from "./outbox.js";
 export { createIngestSink } from "./ingest.js";
 export { createKernel } from "./kernel.js";
 export type { Kernel, KernelDeps } from "./kernel.js";
+
+export {
+  ZERO_ITEM_COLUMNS,
+  ZERO_LABEL_RULE_COLUMNS,
+  ZERO_TABLES,
+  zeroSchema,
+} from "./zero-schema.js";
+export { ZeroPublicationError, assertZeroPublication } from "./zero-publication.js";
