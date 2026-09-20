@@ -1,6 +1,6 @@
 # Phase A End-to-End Smoke Report
 
-Generated: 2026-09-20T18:56:50.960Z · `pnpm e2e:phase-a` (tools/e2e/run.ts)
+Generated: 2026-09-20T21:48:47.794Z · `pnpm e2e:phase-a` (tools/e2e/run.ts)
 
 Stack: PostgreSQL `omnis_e2e` (migrations 0001–0008 + Zero permissions) → zero-cache :4848
 → hub :8787 (HTTP + WS /bridge) → local agent bridge (mock runtime fixtures, host=macbook)
@@ -10,50 +10,80 @@ Every part of the seed takes a real code path: adapter `normalize()` → kernel 
 kernel `approvals.propose`, `classify()` from `@omnis/agents` (T0 rule path, no network calls),
 `ClaudeCodeAdapter` + `apps/local-agent/test` fixture replay.
 
-## Pass 1 (8.9s, items=14)
+## Pass 1 (12.6s, items=14)
 
 | Result | Check | Time | Note |
 | --- | --- | --- | --- |
-| PASS | A1 Inbox lists one row per seeded thread (U2: a row is a thread, not an item) | 10ms | 8 thread rows (item count was 14) |
-| PASS | A2 Inbox rows show a visible channel icon for all three channels | 32ms | Slack message / Gmail message / Google Calendar message |
+| PASS | only the rail carries an aurora when the ask panel is closed | 2ms | 1 surface, variant=mist |
+| PASS | no aurora inside a list row (§4.2) | 3ms | 0 list rows tinted |
+| PASS | opening the ask panel adds exactly one dawn surface | 62ms | 2 surfaces: rail + aurora ask-panel |
+| PASS | every rendered aurora mass still computes blur + drop-shadow (§2.4) | 1ms | 1 mass(es) blurred and rimmed; 1 hidden by variant |
+| PASS | no aurora inside a message body, thread item or draft card (§4.2) | 42ms | 0 message bodies tinted |
+| PASS | every aurora is one of §3.2's three surfaces, outside §4.2's list | 2ms | 2 surface(s) checked against the §3.2 allow-list |
+| PASS | no element carries both .aurora and .glass-surface (§2.7) | 1ms | 0 collisions |
+| PASS | no aurora, or its ancestor, carries a filter (§2.4) | 1ms | every wrapper computes filter: none, no filtered ancestor |
+| PASS | the glass inside an aurora is still glass (§4.4) | 2ms | 2 glass plate(s) blurring inside an aurora |
+| PASS | screen 1 (nothing selected) | 718ms | 320px: overflow 0px, worst svg > rect +61.7px; rail aurora: dissolved, 4/4 layers off; 375px: overflow 0px, worst svg > rect +6.7px; rail aurora: dissolved, 4/4 layers off; 390px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 414px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 768px: overflow 0px; rail aurora: dissolved, 4/4 layers off |
+| PASS | screen 2 (ask panel open) | 733ms | 320px: overflow 0px, worst svg > rect +61.7px; rail aurora: dissolved, 4/4 layers off; 375px: overflow 0px, worst svg > rect +6.7px; rail aurora: dissolved, 4/4 layers off; 390px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 414px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 768px: overflow 0px; rail aurora: dissolved, 4/4 layers off |
+| PASS | screen 4 (agents filter) | 756ms | 320px: overflow 0px, worst svg > rect +195.2px; rail aurora: dissolved, 4/4 layers off; 375px: overflow 0px, worst svg > rect +140.2px; rail aurora: dissolved, 4/4 layers off; 390px: overflow 0px, worst svg > rect +125.2px; rail aurora: dissolved, 4/4 layers off; 414px: overflow 0px, worst svg > rect +101.2px; rail aurora: dissolved, 4/4 layers off; 768px: overflow 0px; rail aurora: dissolved, 4/4 layers off |
+| PASS | onboarding is a single void surface | 2ms | 1 surface, variant=void |
+| PASS | every word sits on the scrim card, never on the aurora (§5.3 guard 4) | 0ms | 0 text nodes outside the card |
+| PASS | onboarding does not scroll sideways at the four widths (§5.2) | 638ms | 320px: overflow 0px; 375px: overflow 0px; 390px: overflow 0px; 414px: overflow 0px; 768px: overflow 0px |
+| PASS | A1 Inbox lists one row per seeded thread (U2: a row is a thread, not an item) | 14ms | 8 thread rows (item count was 14) |
+| PASS | A2 Inbox rows show a visible channel icon for all three channels | 24ms | Slack message / Gmail message / Google Calendar message |
 | PASS | A2b Inbox rows show the seeded thread titles | 2ms | #omnis-launch / omnis launch sync |
-| PASS | A3 Inbox rows carry label chips | 3ms |  |
-| PASS | A2c kinso shell: channel rail tiles + ask/search bar | 8ms | rail: Inbox/Slack/Gmail/Google Calendar/Agent + ask bar |
-| PASS | A2d a conversation row has avatar + name + relative time + summary | 4ms | time="now" summary="Draft: Yes, I will review it today.…" |
-| PASS | A4 work/personal filter pills change the list | 112ms | all=8 work=[#omnis-launch] personal=[Dana Lee <dana@example.com>] |
-| PASS | A4b channel rail tile filters the list, Inbox tile restores it | 68ms | all=8 gmail=2 |
-| PASS | A5 Thread screen renders seeded items with status badges | 43ms | 4 status badges |
-| PASS | A6 Agent Session screen shows turns and a ToolCallBadge | 43ms |  |
-| PASS | A7 Approval card shows the pending approval | 12ms |  |
-| PASS | A8 Approve → hub moves the approval to decided | 41ms | pending → decided |
-| PASS | A9 ⌘K opens the floating AI panel and types into the command list | 20ms | panel + cmdk list reachable by typing |
-| PASS | A-archive archiving a row removes it from the list and restoring brings it back | 321ms | "omnis launch sync" archived → restored (8 rows), 2 audit_log actions recorded |
-| PASS | G5 a new item reaches the UI in ≤2s | 72ms | 27ms ingest → on screen (target ≤2000ms) |
+| PASS | A3 Inbox rows carry label chips | 2ms |  |
+| PASS | A2c kinso shell: channel rail tiles + ask/search bar | 7ms | rail: Inbox/Slack/Gmail/Google Calendar/Agent + ask bar |
+| PASS | A2d a conversation row has avatar + name + relative time + summary | 3ms | time="now" summary="Draft: Yes, I will review it today.…" |
+| PASS | A4 work/personal filter pills change the list | 97ms | all=8 work=[#omnis-launch] personal=[Dana Lee <dana@example.com>] |
+| PASS | A4b channel rail tile filters the list, Inbox tile restores it | 69ms | all=8 gmail=2 |
+| PASS | A5 Thread screen renders seeded items with status badges | 39ms | 4 status badges |
+| PASS | A6 Agent Session screen shows turns and a ToolCallBadge | 47ms |  |
+| PASS | A7 Approval card shows the pending approval | 39ms |  |
+| PASS | A8 Approve → hub moves the approval to decided | 40ms | pending → decided |
+| PASS | A9 ⌘K opens the floating AI panel and types into the command list | 23ms | panel + cmdk list reachable by typing |
+| PASS | A-archive archiving a row removes it from the list and restoring brings it back | 697ms | "omnis launch sync" archived → restored (8 rows), 2 audit_log actions recorded |
+| PASS | G5 a new item reaches the UI in ≤2s | 72ms | 29ms ingest → on screen (target ≤2000ms) |
 | PASS | A8b hub recorded audit_log(approval.decided) | 1ms | 1 row(s) |
 | PASS | A8c pending_approvals.state moved to decided(accept) | 0ms | state=decided decision=accept |
 | PASS | A10 classify() recorded a T0 run in agent_runs (no network) | 0ms | 1 run(s), tier=T0 |
 | PASS | A11 local-agent registered over WS /bridge | 0ms | agent_runtimes state=online |
 
-## Pass 2 (8.0s, items=14)
+## Pass 2 (12.7s, items=14)
 
 | Result | Check | Time | Note |
 | --- | --- | --- | --- |
-| PASS | A1 Inbox lists one row per seeded thread (U2: a row is a thread, not an item) | 12ms | 8 thread rows (item count was 14) |
-| PASS | A2 Inbox rows show a visible channel icon for all three channels | 32ms | Slack message / Gmail message / Google Calendar message |
+| PASS | only the rail carries an aurora when the ask panel is closed | 2ms | 1 surface, variant=mist |
+| PASS | no aurora inside a list row (§4.2) | 4ms | 0 list rows tinted |
+| PASS | opening the ask panel adds exactly one dawn surface | 65ms | 2 surfaces: rail + aurora ask-panel |
+| PASS | every rendered aurora mass still computes blur + drop-shadow (§2.4) | 1ms | 1 mass(es) blurred and rimmed; 1 hidden by variant |
+| PASS | no aurora inside a message body, thread item or draft card (§4.2) | 38ms | 0 message bodies tinted |
+| PASS | every aurora is one of §3.2's three surfaces, outside §4.2's list | 1ms | 2 surface(s) checked against the §3.2 allow-list |
+| PASS | no element carries both .aurora and .glass-surface (§2.7) | 1ms | 0 collisions |
+| PASS | no aurora, or its ancestor, carries a filter (§2.4) | 1ms | every wrapper computes filter: none, no filtered ancestor |
+| PASS | the glass inside an aurora is still glass (§4.4) | 1ms | 2 glass plate(s) blurring inside an aurora |
+| PASS | screen 1 (nothing selected) | 742ms | 320px: overflow 0px, worst svg > rect +61.7px; rail aurora: dissolved, 4/4 layers off; 375px: overflow 0px, worst svg > rect +6.7px; rail aurora: dissolved, 4/4 layers off; 390px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 414px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 768px: overflow 0px; rail aurora: dissolved, 4/4 layers off |
+| PASS | screen 2 (ask panel open) | 733ms | 320px: overflow 0px, worst svg > rect +61.7px; rail aurora: dissolved, 4/4 layers off; 375px: overflow 0px, worst svg > rect +6.7px; rail aurora: dissolved, 4/4 layers off; 390px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 414px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 768px: overflow 0px; rail aurora: dissolved, 4/4 layers off |
+| PASS | screen 4 (agents filter) | 761ms | 320px: overflow 0px, worst svg > rect +195.2px; rail aurora: dissolved, 4/4 layers off; 375px: overflow 0px, worst svg > rect +140.2px; rail aurora: dissolved, 4/4 layers off; 390px: overflow 0px, worst svg > rect +125.2px; rail aurora: dissolved, 4/4 layers off; 414px: overflow 0px, worst svg > rect +101.2px; rail aurora: dissolved, 4/4 layers off; 768px: overflow 0px; rail aurora: dissolved, 4/4 layers off |
+| PASS | onboarding is a single void surface | 1ms | 1 surface, variant=void |
+| PASS | every word sits on the scrim card, never on the aurora (§5.3 guard 4) | 1ms | 0 text nodes outside the card |
+| PASS | onboarding does not scroll sideways at the four widths (§5.2) | 634ms | 320px: overflow 0px; 375px: overflow 0px; 390px: overflow 0px; 414px: overflow 0px; 768px: overflow 0px |
+| PASS | A1 Inbox lists one row per seeded thread (U2: a row is a thread, not an item) | 17ms | 8 thread rows (item count was 14) |
+| PASS | A2 Inbox rows show a visible channel icon for all three channels | 28ms | Slack message / Gmail message / Google Calendar message |
 | PASS | A2b Inbox rows show the seeded thread titles | 2ms | #omnis-launch / omnis launch sync |
-| PASS | A3 Inbox rows carry label chips | 3ms |  |
+| PASS | A3 Inbox rows carry label chips | 1ms |  |
 | PASS | A2c kinso shell: channel rail tiles + ask/search bar | 6ms | rail: Inbox/Slack/Gmail/Google Calendar/Agent + ask bar |
-| PASS | A2d a conversation row has avatar + name + relative time + summary | 4ms | time="now" summary="Draft: Yes, I will review it today.…" |
-| PASS | A4 work/personal filter pills change the list | 95ms | all=8 work=[#omnis-launch] personal=[Dana Lee <dana@example.com>] |
-| PASS | A4b channel rail tile filters the list, Inbox tile restores it | 68ms | all=8 gmail=2 |
-| PASS | A5 Thread screen renders seeded items with status badges | 41ms | 4 status badges |
-| PASS | A6 Agent Session screen shows turns and a ToolCallBadge | 42ms |  |
-| PASS | A7 Approval card shows the pending approval | 11ms |  |
-| PASS | A8 Approve → hub moves the approval to decided | 41ms | pending → decided |
-| PASS | A9 ⌘K opens the floating AI panel and types into the command list | 18ms | panel + cmdk list reachable by typing |
-| PASS | A-archive archiving a row removes it from the list and restoring brings it back | 321ms | "omnis launch sync" archived → restored (8 rows), 2 audit_log actions recorded |
-| PASS | G5 a new item reaches the UI in ≤2s | 69ms | 28ms ingest → on screen (target ≤2000ms) |
-| PASS | A8b hub recorded audit_log(approval.decided) | 0ms | 1 row(s) |
+| PASS | A2d a conversation row has avatar + name + relative time + summary | 3ms | time="now" summary="Draft: Yes, I will review it today.…" |
+| PASS | A4 work/personal filter pills change the list | 97ms | all=8 work=[#omnis-launch] personal=[Dana Lee <dana@example.com>] |
+| PASS | A4b channel rail tile filters the list, Inbox tile restores it | 69ms | all=8 gmail=2 |
+| PASS | A5 Thread screen renders seeded items with status badges | 44ms | 4 status badges |
+| PASS | A6 Agent Session screen shows turns and a ToolCallBadge | 32ms |  |
+| PASS | A7 Approval card shows the pending approval | 43ms |  |
+| PASS | A8 Approve → hub moves the approval to decided | 37ms | pending → decided |
+| PASS | A9 ⌘K opens the floating AI panel and types into the command list | 22ms | panel + cmdk list reachable by typing |
+| PASS | A-archive archiving a row removes it from the list and restoring brings it back | 697ms | "omnis launch sync" archived → restored (8 rows), 2 audit_log actions recorded |
+| PASS | G5 a new item reaches the UI in ≤2s | 76ms | 31ms ingest → on screen (target ≤2000ms) |
+| PASS | A8b hub recorded audit_log(approval.decided) | 1ms | 1 row(s) |
 | PASS | A8c pending_approvals.state moved to decided(accept) | 0ms | state=decided decision=accept |
 | PASS | A10 classify() recorded a T0 run in agent_runs (no network) | 0ms | 1 run(s), tier=T0 |
 | PASS | A11 local-agent registered over WS /bridge | 0ms | agent_runtimes state=online |

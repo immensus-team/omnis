@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-// 루트 `pnpm test`(vitest.workspace.ts)는 apps/desktop/vitest.config.ts를 읽지 않는다.
-// 환경과 셋업(jest-dom matchers + afterEach(cleanup))을 파일 자체가 선언한다(packages/ui/test/button.test.tsx와 동일 패턴).
+// The root `pnpm test` (vitest.workspace.ts) does not read apps/desktop/vitest.config.ts, so the
+// environment and the setup (jest-dom matchers + afterEach(cleanup)) are declared by the file itself
+// — the same pattern packages/ui/test/button.test.tsx uses.
 import "./setup.js";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,7 +10,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => undefined) })
 
 import { storeChannelSecret } from "../src/api/keychain.js";
 
-describe("storeChannelSecret (계약 §9 Keychain 명명 규칙)", () => {
+describe("storeChannelSecret (contract §9 keychain naming)", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("invokes keychain_set with the Google identifier for a gmail service", async () => {
@@ -26,7 +27,7 @@ describe("storeChannelSecret (계약 §9 Keychain 명명 규칙)", () => {
     });
   });
 
-  it("invokes keychain_set with the team_id as account for a slack bot-token service (계약 §9 Slack 예외)", async () => {
+  it("invokes keychain_set with the team_id as account for a slack bot-token service (contract §9 Slack exception)", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
     await storeChannelSecret("omnis.slack.xoxb.T123", "T123", "xoxb-secret");
     expect(invoke).toHaveBeenCalledWith("keychain_set", {
@@ -71,29 +72,29 @@ const mockConnect: OAuthClient["connect"] = vi.fn(
         ],
 );
 
-describe("Onboarding (A5 §7.1, Phase A 필수 채널 3개)", () => {
+describe("Onboarding (A5 §7.1, three required Phase A channels)", () => {
   it("continue button is disabled until slack/gmail/gcal are all connected", async () => {
     const oauthClient: OAuthClient = { connect: mockConnect };
     const onDone = vi.fn();
     render(<Onboarding oauthClient={oauthClient} onDone={onDone} />);
-    expect(screen.getByText("계속")).toBeDisabled();
+    expect(screen.getByText("Continue")).toBeDisabled();
 
-    clickFirst("연결");
-    clickFirst("연결"); // gmail (slack 버튼 라벨이 "연결 중…"으로 바뀐 뒤의 다음 "연결")
-    clickFirst("연결"); // gcal
+    clickFirst("Connect");
+    clickFirst("Connect"); // gmail, after the slack button's label became "Connecting…"
+    clickFirst("Connect"); // gcal
 
-    await waitFor(() => expect(screen.getByText("계속")).not.toBeDisabled());
-    fireEvent.click(screen.getByText("계속"));
+    await waitFor(() => expect(screen.getByText("Continue")).not.toBeDisabled());
+    fireEvent.click(screen.getByText("Continue"));
     expect(onDone).toHaveBeenCalledOnce();
   });
 
-  it("stores both slack keychain entries with account=team_id (계약 §9 Slack 2항목 규칙)", async () => {
+  it("stores both slack keychain entries with account=team_id (contract §9 two-entry Slack rule)", async () => {
     const invokeMock = vi.mocked((await import("@tauri-apps/api/core")).invoke);
     invokeMock.mockClear();
     render(<Onboarding oauthClient={{ connect: mockConnect }} onDone={vi.fn()} />);
 
-    clickFirst("연결"); // slack
-    await waitFor(() => expect(screen.getByText("연결됨")).toBeInTheDocument());
+    clickFirst("Connect"); // slack
+    await waitFor(() => expect(screen.getByText("Connected")).toBeInTheDocument());
 
     expect(invokeMock).toHaveBeenCalledWith("keychain_set", {
       service: "omnis.slack.xoxb.T123",
@@ -107,8 +108,29 @@ describe("Onboarding (A5 §7.1, Phase A 필수 채널 3개)", () => {
     });
   });
 
-  it("shows the mac-mini-setup note for WhatsApp/KakaoTalk/LinkedIn (마스터 D12 정직한 정의)", () => {
+  it("shows the Mac-mini-setup note for WhatsApp/KakaoTalk/LinkedIn (master D12, the honest definition)", () => {
     render(<Onboarding oauthClient={{ connect: vi.fn() }} onDone={vi.fn()} />);
-    expect(screen.getByText(/맥미니에서 설정이 필요해요/)).toBeInTheDocument();
+    expect(screen.getByText(/set these up on the Mac mini/)).toBeInTheDocument();
+  });
+
+  // US-D06 §4.1.3: the screen is a full-bleed `void` aurora with the words on a scrim. Both halves
+  // matter: the aurora is what surrounds the card, and the card is why ~40 words of copy can live on
+  // this screen at all (§5.3 guard 4 — text does not sit directly on a moving surface).
+  it("renders the void aurora with the copy on a scrim card (US-D06)", () => {
+    const { container } = render(
+      <Onboarding oauthClient={{ connect: vi.fn() }} onDone={vi.fn()} />,
+    );
+    const aura = container.querySelector(".onboarding");
+    const card = container.querySelector(".onboarding__card");
+
+    expect(aura).toHaveAttribute("data-aurora", "void");
+    // §2.7: the card is content, not chrome — it is not a `.glass-surface` and it is not the
+    // aurora's own element, so neither name can pick up the other's background rule.
+    expect(card).not.toBeNull();
+    expect(card).not.toHaveClass("glass-surface");
+    expect(card).not.toHaveClass("aurora");
+    // Every word of the screen is inside the card, never a sibling of it.
+    expect(card).toContainElement(screen.getByRole("heading", { name: "Welcome to omnis" }));
+    expect(card).toContainElement(screen.getByText("Continue"));
   });
 });
