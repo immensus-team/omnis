@@ -25,3 +25,4 @@ tools/e2e/.logs/
 tools/e2e/.tmp/
 tools/e2e/.playwright/
 ops/mini/env.sh
+tools/auth-kit/accounts.local.json

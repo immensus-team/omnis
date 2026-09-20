@@ -1,0 +1,38 @@
+# omnis Slack app manifest — api.slack.com/apps → "Create New App" → "From an app manifest".
+# A1 §2.1이 요구하는 스코프만 담는다: Socket Mode + message.im/channels/groups/mpim 이벤트 +
+# bot(xoxb)/user(xoxp) 스코프. 배포 후 xoxb/xoxp/app-level 토큰 3개를 Keychain에 저장한다(README.ko.md).
+display_information:
+  name: omnis
+  description: Logan의 개인 인박스/에이전트 브리지 (omnis 프로젝트)
+  background_color: "#1a1a1a"
+features:
+  bot_user:
+    display_name: omnis
+    always_online: true
+oauth_config:
+  scopes:
+    # A1 §2.1: bot(xoxb) — read + send + reaction 읽기
+    bot:
+      - channels:history
+      - im:history
+      - groups:history
+      - mpim:history
+      - chat:write
+      - reactions:read
+    # A1 §2.1: user(xoxp) — 검색 + 실제 사람처럼 send
+    user:
+      - search:read
+      - channels:history
+      - chat:write
+settings:
+  event_subscriptions:
+    bot_events:
+      - message.im
+      - message.channels
+      - message.groups
+      - message.mpim
+  interactivity:
+    is_enabled: false
+  org_deploy_enabled: false
+  socket_mode_enabled: true
+  token_rotation_enabled: false
