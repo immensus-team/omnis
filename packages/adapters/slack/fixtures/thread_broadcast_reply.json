@@ -1,0 +1,39 @@
+{
+  "scenario": "thread_broadcast_reply",
+  "raw": {
+    "type": "message",
+    "subtype": "thread_broadcast",
+    "channel": "C07OMNISLA",
+    "channel_name": "omnis-launch",
+    "user": "U07DANA001",
+    "text": "Posting this to the channel too, not just the thread — deploy freeze at 18:00 today",
+    "ts": "1715678445.000200",
+    "thread_ts": "1715678400.000100",
+    "reply_broadcast": true,
+    "team": "T07OMNISTM",
+    "event_ts": "1715678445.000200"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISLA",
+        "externalId": "1715678445.000200",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U07DANA001" },
+        "body": "Posting this to the channel too, not just the thread — deploy freeze at 18:00 today",
+        "attachments": [],
+        "sentAt": "2024-05-14T09:20:45.000Z",
+        "status": "received",
+        "sourceHash": "1715678445.000200",
+        "threadMeta": {
+          "externalId": "C07OMNISLA",
+          "kind": "group",
+          "title": "#omnis-launch",
+          "participants": [{ "externalId": "U07DANA001", "displayName": "U07DANA001" }],
+          "lastItemAt": "2024-05-14T09:20:45.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

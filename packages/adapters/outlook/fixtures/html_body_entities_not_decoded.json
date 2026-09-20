@@ -1,0 +1,65 @@
+{
+  "scenario": "html_body_entities_not_decoded",
+  "note": "HTML entities are not decoded in v1 — '&amp;' / '&nbsp;' / '&#39;' reach the body verbatim. Pinned so a future change to decoding shows up here.",
+  "raw": {
+    "id": "AAMkAGI1msg051",
+    "conversationId": "AAQkAGI1conv051",
+    "internetMessageId": "<msg-051@outlook.com>",
+    "subject": "Reimbursement &amp; travel policy",
+    "body": {
+      "contentType": "html",
+      "content": "<p>R&amp;D travel is covered&nbsp;up to &#39;standard fare&#39; per the policy.</p>"
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Finance",
+        "address": "finance@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-15T08:15:00Z",
+    "sentDateTime": "2023-11-15T08:15:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv051",
+        "externalId": "AAMkAGI1msg051",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "finance@example.com"
+        },
+        "body": "Subject: Reimbursement &amp; travel policy\n\nR&amp;D travel is covered&nbsp;up to &#39;standard fare&#39; per the policy.",
+        "attachments": [],
+        "sentAt": "2023-11-15T08:15:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-051@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv051",
+          "kind": "email",
+          "title": "Reimbursement &amp; travel policy",
+          "participants": [
+            {
+              "externalId": "finance@example.com",
+              "displayName": "Finance"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T08:15:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

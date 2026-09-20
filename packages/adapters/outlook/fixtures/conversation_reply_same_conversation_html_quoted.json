@@ -1,0 +1,65 @@
+{
+  "scenario": "conversation_reply_same_conversation_html_quoted",
+  "note": "Second message of the same conversationId, HTML with a quoted history block. stripHtml drops the tags and collapses the whitespace, so the quoted text is concatenated into one line.",
+  "raw": {
+    "id": "AAMkAGI1msg011",
+    "conversationId": "AAQkAGI1conv010",
+    "internetMessageId": "<msg-011@outlook.com>",
+    "subject": "RE: omnis launch sync",
+    "body": {
+      "contentType": "html",
+      "content": "<div>10am works. I will bring the checklist.</div><br><blockquote style=\"border-left:1px solid #ccc\"><div>From: Dana Lee</div><div>Sync tomorrow at 10am about the launch checklist.</div></blockquote>"
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Logan Kim",
+        "address": "logan@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Dana Lee",
+          "address": "dana@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-14T23:00:00Z",
+    "sentDateTime": "2023-11-14T23:00:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv010",
+        "externalId": "AAMkAGI1msg011",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "logan@example.com"
+        },
+        "body": "Subject: RE: omnis launch sync\n\n10am works. I will bring the checklist. From: Dana Lee Sync tomorrow at 10am about the launch checklist.",
+        "attachments": [],
+        "sentAt": "2023-11-14T23:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-011@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv010",
+          "kind": "email",
+          "title": "RE: omnis launch sync",
+          "participants": [
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            },
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2023-11-14T23:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

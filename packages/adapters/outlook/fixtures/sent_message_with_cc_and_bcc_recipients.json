@@ -1,0 +1,85 @@
+{
+  "scenario": "sent_message_with_cc_and_bcc_recipients",
+  "note": "bccRecipients is deliberately absent from participants: normalize() builds them from from + toRecipients + ccRecipients only, so bcc is not leaked into the thread's participant list.",
+  "raw": {
+    "id": "AAMkAGI1msg021",
+    "conversationId": "AAQkAGI1conv021",
+    "internetMessageId": "<msg-021@outlook.com>",
+    "subject": "Board deck v3",
+    "body": {
+      "contentType": "text",
+      "content": "Attaching the final numbers."
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Logan Kim",
+        "address": "logan@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Dana Lee",
+          "address": "dana@example.com"
+        }
+      }
+    ],
+    "ccRecipients": [
+      {
+        "emailAddress": {
+          "name": "Priya Raman",
+          "address": "priya@example.com"
+        }
+      }
+    ],
+    "bccRecipients": [
+      {
+        "emailAddress": {
+          "name": "External Audit",
+          "address": "audit@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-15T05:00:00Z",
+    "sentDateTime": "2023-11-15T05:00:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv021",
+        "externalId": "AAMkAGI1msg021",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "logan@example.com"
+        },
+        "body": "Subject: Board deck v3\n\nAttaching the final numbers.",
+        "attachments": [],
+        "sentAt": "2023-11-15T05:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-021@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv021",
+          "kind": "email",
+          "title": "Board deck v3",
+          "participants": [
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            },
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "priya@example.com",
+              "displayName": "Priya Raman"
+            }
+          ],
+          "lastItemAt": "2023-11-15T05:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

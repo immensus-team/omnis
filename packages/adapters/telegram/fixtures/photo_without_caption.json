@@ -1,0 +1,59 @@
+{
+  "scenario": "photo_without_caption",
+  "raw": {
+    "id": 8401,
+    "chat": {
+      "id": 1001,
+      "type": "private"
+    },
+    "sender": {
+      "id": 42,
+      "firstName": "Dana",
+      "lastName": "Lee",
+      "username": "danalee"
+    },
+    "date": 1700006000,
+    "media": {
+      "type": "photo",
+      "mimeType": "image/jpeg",
+      "fileSize": 204800
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "1001",
+        "externalId": "8401",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "42"
+        },
+        "body": "",
+        "attachments": [
+          {
+            "kind": "image",
+            "mimeType": "image/jpeg",
+            "sizeBytes": 204800
+          }
+        ],
+        "sentAt": "2023-11-14T23:53:20.000Z",
+        "status": "received",
+        "sourceHash": "1001:8401",
+        "threadMeta": {
+          "externalId": "1001",
+          "kind": "dm",
+          "title": null,
+          "participants": [
+            {
+              "externalId": "42",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2023-11-14T23:53:20.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

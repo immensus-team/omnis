@@ -1,0 +1,18 @@
+{
+  "scenario": "reaction_update_without_message",
+  "raw": {
+    "chatId": -1001234567890,
+    "messageId": 8301,
+    "senderId": 42,
+    "reactions": [
+      {
+        "emoji": "🔥",
+        "count": 4
+      }
+    ],
+    "date": 1700005300
+  },
+  "expected": {
+    "items": []
+  }
+}

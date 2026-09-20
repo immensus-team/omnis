@@ -1,0 +1,9 @@
+{
+  "scenario": "flood_wait_message_only_no_code",
+  "raw": {
+    "message": "FLOOD_WAIT_120"
+  },
+  "expected": {
+    "errorKind": "retryable_rate_limit"
+  }
+}

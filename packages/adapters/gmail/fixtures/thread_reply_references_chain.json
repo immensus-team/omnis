@@ -1,0 +1,93 @@
+{
+  "scenario": "thread_reply_references_chain",
+  "note": "Reply carrying both In-Reply-To and a References chain. normalize() ignores both (threading is via threadId), so the subject keeps its Re: prefix.",
+  "raw": {
+    "id": "18c2f4a1b2d3e4fa",
+    "threadId": "18c2f4a1b2d3e4f0",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Dana Lee <dana@example.com>"
+        },
+        {
+          "name": "To",
+          "value": "Logan Kim <281932556+jinhologankim@users.noreply.github.com>"
+        },
+        {
+          "name": "Cc",
+          "value": "Priya Raman <priya@example.com>"
+        },
+        {
+          "name": "Subject",
+          "value": "Re: omnis launch sync"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId004@mail.gmail.com>"
+        },
+        {
+          "name": "In-Reply-To",
+          "value": "<CAFakeMsgId001@mail.gmail.com>"
+        },
+        {
+          "name": "References",
+          "value": "<CAFakeMsgId000@mail.gmail.com> <CAFakeMsgId001@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Tue, 14 Nov 2023 22:41:05 +0000"
+        }
+      ],
+      "body": {
+        "size": 84,
+        "data": "QWRkaW5nIFByaXlhIHNvIHNoZSBzZWVzIHRoZSBkZXBsb3kgd2luZG93Lg"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3e4f0",
+        "externalId": "18c2f4a1b2d3e4fa",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Dana Lee <dana@example.com>"
+        },
+        "body": "Subject: Re: omnis launch sync\n\nAdding Priya so she sees the deploy window.",
+        "attachments": [],
+        "sentAt": "2023-11-14T22:41:05.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId004@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3e4f0",
+          "kind": "email",
+          "title": "Re: omnis launch sync",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "displayName": "Logan Kim"
+            },
+            {
+              "externalId": "priya@example.com",
+              "displayName": "Priya Raman"
+            }
+          ],
+          "lastItemAt": "2023-11-14T22:41:05.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

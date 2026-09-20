@@ -1,0 +1,15 @@
+{
+  "scenario": "deleted_message_update_with_chat_object",
+  "raw": {
+    "chat": {
+      "id": -1001234567890,
+      "type": "supergroup",
+      "title": "omnis launch"
+    },
+    "deletedMessageIds": [8210],
+    "date": 1700004600
+  },
+  "expected": {
+    "items": []
+  }
+}

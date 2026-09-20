@@ -1,0 +1,49 @@
+{
+  "scenario": "korean_text_with_emoji",
+  "raw": {
+    "id": 8801,
+    "chat": {
+      "id": 2002,
+      "type": "group",
+      "title": "omnis 운영"
+    },
+    "sender": {
+      "id": 43,
+      "firstName": "Logan",
+      "username": "logankim"
+    },
+    "text": "오늘 배포는 오후 3시에 진행할게요 🙏 문제 있으면 알려주세요!",
+    "date": 1700010000
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "2002",
+        "externalId": "8801",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "43"
+        },
+        "body": "오늘 배포는 오후 3시에 진행할게요 🙏 문제 있으면 알려주세요!",
+        "attachments": [],
+        "sentAt": "2023-11-15T01:00:00.000Z",
+        "status": "received",
+        "sourceHash": "2002:8801",
+        "threadMeta": {
+          "externalId": "2002",
+          "kind": "group",
+          "title": "omnis 운영",
+          "participants": [
+            {
+              "externalId": "43",
+              "displayName": "Logan"
+            }
+          ],
+          "lastItemAt": "2023-11-15T01:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

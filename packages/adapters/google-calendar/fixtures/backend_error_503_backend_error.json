@@ -1,0 +1,18 @@
+{
+  "scenario": "backend_error_503_backend_error",
+  "raw": {
+    "code": 503,
+    "message": "The service is currently unavailable.",
+    "errors": [
+      {
+        "message": "The service is currently unavailable.",
+        "domain": "global",
+        "reason": "backendError"
+      }
+    ],
+    "status": "UNAVAILABLE"
+  },
+  "expected": {
+    "errorKind": "retryable_network"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "scenario": "missing_chat_yields_nothing",
+  "raw": {
+    "id": 9003,
+    "sender": {
+      "id": 42,
+      "firstName": "Dana",
+      "lastName": "Lee",
+      "username": "danalee"
+    },
+    "text": "partial update with no chat",
+    "date": 1700012100
+  },
+  "expected": {
+    "items": []
+  }
+}

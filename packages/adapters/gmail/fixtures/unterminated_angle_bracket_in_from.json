@@ -1,0 +1,76 @@
+{
+  "scenario": "unterminated_angle_bracket_in_from",
+  "note": "Malformed sender with an unclosed '<' (no '>'). The angled-address regex does not match, so the whole entry becomes the mailbox: author id and the participant externalId carry the display name too. Pinned as-is.",
+  "raw": {
+    "id": "18c2f4a1b2d3f51a",
+    "threadId": "18c2f4a1b2d3f51a",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Pierre <pierre@example.fr"
+        },
+        {
+          "name": "To",
+          "value": "281932556+jinhologankim@users.noreply.github.com"
+        },
+        {
+          "name": "Subject",
+          "value": "Broken sender header"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId031@example.fr>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 20:10:00 +0000"
+        }
+      ],
+      "body": {
+        "data": "TXkgY2xpZW50IG1hbmdsZWQgdGhlIEZyb20gaGVhZGVyLg"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f51a",
+        "externalId": "18c2f4a1b2d3f51a",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Pierre <pierre@example.fr"
+        },
+        "body": "Subject: Broken sender header\n\nMy client mangled the From header.",
+        "attachments": [],
+        "sentAt": "2023-11-15T20:10:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId031@example.fr>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f51a",
+          "kind": "email",
+          "title": "Broken sender header",
+          "participants": [
+            {
+              "externalId": "Pierre <pierre@example.fr",
+              "displayName": "Pierre <pierre@example.fr"
+            },
+            {
+              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "displayName": "281932556+jinhologankim@users.noreply.github.com"
+            }
+          ],
+          "lastItemAt": "2023-11-15T20:10:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

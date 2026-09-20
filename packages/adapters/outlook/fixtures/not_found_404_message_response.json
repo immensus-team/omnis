@@ -1,0 +1,16 @@
+{
+  "scenario": "not_found_404_message_response",
+  "note": "Unmapped status falls through to retryable_network (no distinct 'gone' kind in the adapter's vocabulary).",
+  "raw": {
+    "statusCode": 404,
+    "body": {
+      "error": {
+        "code": "ErrorItemNotFound",
+        "message": "The specified object was not found."
+      }
+    }
+  },
+  "expected": {
+    "errorKind": "retryable_network"
+  }
+}

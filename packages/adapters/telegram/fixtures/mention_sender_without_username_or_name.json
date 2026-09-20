@@ -1,0 +1,47 @@
+{
+  "scenario": "mention_sender_without_username_or_name",
+  "raw": {
+    "id": 8502,
+    "chat": {
+      "id": 2002,
+      "type": "group",
+      "title": "omnis ops"
+    },
+    "sender": {
+      "id": 424242
+    },
+    "text": "@logankim this is the alert bot",
+    "date": 1700007100
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "2002",
+        "externalId": "8502",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "424242"
+        },
+        "body": "@logankim this is the alert bot",
+        "attachments": [],
+        "sentAt": "2023-11-15T00:11:40.000Z",
+        "status": "received",
+        "sourceHash": "2002:8502",
+        "threadMeta": {
+          "externalId": "2002",
+          "kind": "group",
+          "title": "omnis ops",
+          "participants": [
+            {
+              "externalId": "424242",
+              "displayName": "424242"
+            }
+          ],
+          "lastItemAt": "2023-11-15T00:11:40.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

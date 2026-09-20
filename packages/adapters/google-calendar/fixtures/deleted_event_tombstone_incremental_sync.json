@@ -1,0 +1,14 @@
+{
+  "scenario": "deleted_event_tombstone_incremental_sync",
+  "raw": {
+    "kind": "calendar#event",
+    "etag": "\"3422000000000000\"",
+    "id": "evt_tombstone_1",
+    "status": "cancelled",
+    "eventType": "default",
+    "updated": "2026-09-12T03:00:00.000Z"
+  },
+  "expected": {
+    "items": []
+  }
+}

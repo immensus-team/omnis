@@ -1,0 +1,52 @@
+{
+  "scenario": "empty_attendees_array",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_empty_attendees",
+    "status": "confirmed",
+    "summary": "Solo Focus Time",
+    "creator": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "organizer": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "attendees": [],
+    "start": {
+      "dateTime": "2026-09-30T09:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-09-30T12:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_empty_attendees",
+        "externalId": "evt_empty_attendees",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "Solo Focus Time",
+        "attachments": [],
+        "sentAt": "2026-09-30T09:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_empty_attendees",
+        "threadMeta": {
+          "externalId": "evt_empty_attendees",
+          "kind": "calendar",
+          "title": "Solo Focus Time",
+          "participants": [],
+          "lastItemAt": "2026-09-30T09:00:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

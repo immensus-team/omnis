@@ -1,0 +1,35 @@
+{
+  "scenario": "dm_message_without_channel_name",
+  "raw": {
+    "type": "message",
+    "channel": "D07OMNISDA",
+    "channel_type": "im",
+    "user": "U07DANA001",
+    "text": "Did you get a chance to look at the spec doc I sent yesterday?",
+    "ts": "1715678640.001700",
+    "team": "T07OMNISTM"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "D07OMNISDA",
+        "externalId": "1715678640.001700",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U07DANA001" },
+        "body": "Did you get a chance to look at the spec doc I sent yesterday?",
+        "attachments": [],
+        "sentAt": "2024-05-14T09:24:00.001Z",
+        "status": "received",
+        "sourceHash": "1715678640.001700",
+        "threadMeta": {
+          "externalId": "D07OMNISDA",
+          "kind": "dm",
+          "title": null,
+          "participants": [{ "externalId": "U07DANA001", "displayName": "U07DANA001" }],
+          "lastItemAt": "2024-05-14T09:24:00.001Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

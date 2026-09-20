@@ -191,6 +191,7 @@ interface GCalEvent {
   id?: string;
   status?: string;
   summary?: string;
+  description?: string;
   start?: { dateTime?: string };
   end?: { dateTime?: string };
   attendees?: { email?: string; displayName?: string }[];
@@ -199,13 +200,20 @@ interface GCalEvent {
 export function normalize(raw: unknown): NormalizedItem[] {
   const e = raw as GCalEvent;
   if (!e.id || !e.start?.dateTime) return [];
+  // There is nothing to express only when both summary and description are absent. Rather than emitting an
+  // item with body: "" + attachments: [], we emit no item at all — Slack (`if (!m.text && !m.files?.length) return [];`)
+  // and the Telegram adapter keep the same guard for the same reason.
+  // summary is optional in the API: a title-less busy block pushed in by another system has no summary
+  // at all, while its description carries the real content. Dropping such an event would lose data, so we
+  // keep it by using description as the body instead of the title (threadMeta.title stays null — an already supported state).
+  if (!e.summary && !e.description) return [];
   return [
     {
       threadExternalId: e.id,
       externalId: e.id,
       kind: "event",
       author: { kind: "system", id: "" },
-      body: e.summary ?? "",
+      body: e.summary ?? e.description ?? "",
       attachments: [],
       sentAt: e.start.dateTime,
       status: "received",

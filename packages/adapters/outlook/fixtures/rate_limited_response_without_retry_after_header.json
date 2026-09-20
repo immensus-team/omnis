@@ -1,0 +1,16 @@
+{
+  "scenario": "rate_limited_response_without_retry_after_header",
+  "note": "429 with no Retry-After: still retryable_rate_limit, and the adapter defaults the backoff to 60s.",
+  "raw": {
+    "statusCode": 429,
+    "headers": {},
+    "body": {
+      "error": {
+        "code": "TooManyRequests"
+      }
+    }
+  },
+  "expected": {
+    "errorKind": "retryable_rate_limit"
+  }
+}

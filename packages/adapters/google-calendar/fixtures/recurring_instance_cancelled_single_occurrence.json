@@ -1,0 +1,60 @@
+{
+  "scenario": "recurring_instance_cancelled_single_occurrence",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_rec_daily_instance_20261009",
+    "status": "cancelled",
+    "summary": "Daily Standup",
+    "created": "2026-09-01T00:00:00.000Z",
+    "updated": "2026-10-08T22:10:00.000Z",
+    "creator": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "organizer": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "start": {
+      "dateTime": "2026-10-09T09:15:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-10-09T09:30:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "recurringEventId": "evt_rec_daily_base",
+    "originalStartTime": {
+      "dateTime": "2026-10-09T09:15:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "sequence": 1,
+    "iCalUID": "recdaily@google.com"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_rec_daily_instance_20261009",
+        "externalId": "evt_rec_daily_instance_20261009",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "Daily Standup",
+        "attachments": [],
+        "sentAt": "2026-10-09T09:15:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_rec_daily_instance_20261009",
+        "threadMeta": {
+          "externalId": "evt_rec_daily_instance_20261009",
+          "kind": "calendar",
+          "title": "Daily Standup",
+          "participants": [],
+          "lastItemAt": "2026-10-09T09:15:00+09:00",
+          "archivedAt": "2026-10-09T09:15:00+09:00"
+        }
+      }
+    ]
+  }
+}

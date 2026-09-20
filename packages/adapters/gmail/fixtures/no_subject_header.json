@@ -1,0 +1,64 @@
+{
+  "scenario": "no_subject_header",
+  "note": "Missing Subject: body is the decoded text with no 'Subject:' prefix (title falls back to null).",
+  "raw": {
+    "id": "18c2f4a1b2d3f50c",
+    "threadId": "18c2f4a1b2d3f50c",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Dana Lee <dana@example.com>"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId021@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 18:10:00 +0000"
+        }
+      ],
+      "body": {
+        "data": "Tm8gc3ViamVjdCBvbiB0aGlzIG9uZS4"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f50c",
+        "externalId": "18c2f4a1b2d3f50c",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Dana Lee <dana@example.com>"
+        },
+        "body": "No subject on this one.",
+        "attachments": [],
+        "sentAt": "2023-11-15T18:10:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId021@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f50c",
+          "kind": "email",
+          "title": null,
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2023-11-15T18:10:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

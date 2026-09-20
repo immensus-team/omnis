@@ -1,0 +1,10 @@
+{
+  "scenario": "token_revoked_response",
+  "raw": {
+    "httpStatus": 401,
+    "headers": { "content-type": "application/json; charset=utf-8" },
+    "body": { "ok": false, "error": "token_revoked" },
+    "statusText": "Unauthorized"
+  },
+  "expected": { "errorKind": "auth_revoked" }
+}

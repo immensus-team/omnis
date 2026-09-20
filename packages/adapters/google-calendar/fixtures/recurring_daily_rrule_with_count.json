@@ -1,0 +1,84 @@
+{
+  "scenario": "recurring_daily_rrule_with_count",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_rec_daily_instance_20261005",
+    "status": "confirmed",
+    "summary": "Daily Standup",
+    "created": "2026-09-01T00:00:00.000Z",
+    "updated": "2026-09-01T00:00:00.000Z",
+    "creator": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "organizer": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "start": {
+      "dateTime": "2026-10-05T09:15:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-10-05T09:30:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "recurringEventId": "evt_rec_daily_base",
+    "originalStartTime": {
+      "dateTime": "2026-10-05T09:15:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "recurrence": ["RRULE:FREQ=DAILY;COUNT=10"],
+    "attendees": [
+      {
+        "email": "dana@example.com",
+        "displayName": "Dana Lee",
+        "responseStatus": "accepted"
+      },
+      {
+        "email": "sora@example.com",
+        "displayName": "Sora Park",
+        "responseStatus": "tentative"
+      }
+    ],
+    "transparency": "opaque",
+    "visibility": "default",
+    "sequence": 3,
+    "iCalUID": "recdaily@google.com"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_rec_daily_instance_20261005",
+        "externalId": "evt_rec_daily_instance_20261005",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "Daily Standup",
+        "attachments": [],
+        "sentAt": "2026-10-05T09:15:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_rec_daily_instance_20261005",
+        "threadMeta": {
+          "externalId": "evt_rec_daily_instance_20261005",
+          "kind": "calendar",
+          "title": "Daily Standup",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "sora@example.com",
+              "displayName": "Sora Park"
+            }
+          ],
+          "lastItemAt": "2026-10-05T09:15:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

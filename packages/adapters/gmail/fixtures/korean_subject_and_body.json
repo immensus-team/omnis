@@ -1,0 +1,76 @@
+{
+  "scenario": "korean_subject_and_body",
+  "raw": {
+    "id": "18c2f4a1b2d3f508",
+    "threadId": "18c2f4a1b2d3f508",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "김진호 <281932556+jinhologankim@users.noreply.github.com>"
+        },
+        {
+          "name": "To",
+          "value": "박서연 <seoyeon@example.co.kr>"
+        },
+        {
+          "name": "Subject",
+          "value": "스프린트 리뷰 일정 안내"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId017@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 16:00:00 +0900"
+        }
+      ],
+      "body": {
+        "size": 190,
+        "data": "7JWI64WV7ZWY7IS47JqULCDsmLTri4jsiqQg7YyA7J6F64uI64ukLiDsnbTrsogg7Iqk7ZSE66aw7Yq4IOumrOu3sOuKlCDtmZTsmpTsnbwg7Jik7KCEIDEw7Iuc7JeQIOynhO2Wie2VqeuLiOuLpC4"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f508",
+        "externalId": "18c2f4a1b2d3f508",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "김진호 <281932556+jinhologankim@users.noreply.github.com>"
+        },
+        "body": "Subject: 스프린트 리뷰 일정 안내\n\n안녕하세요, 옴니스 팀입니다. 이번 스프린트 리뷰는 화요일 오전 10시에 진행합니다.",
+        "attachments": [],
+        "sentAt": "2023-11-15T07:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId017@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f508",
+          "kind": "email",
+          "title": "스프린트 리뷰 일정 안내",
+          "participants": [
+            {
+              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "displayName": "김진호"
+            },
+            {
+              "externalId": "seoyeon@example.co.kr",
+              "displayName": "박서연"
+            }
+          ],
+          "lastItemAt": "2023-11-15T07:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "scenario": "draft_reply_edited_unsent_pinned_as_received",
+  "note": "An edited, unsent draft (isDraft:true, no sentDateTime). The adapter exposes no draft semantics (Capabilities has no drafts flag; send() goes through the sink), so it normalizes as a received item — pinned as-is rather than silently filtered.",
+  "raw": {
+    "id": "AAMkAGI1draft020",
+    "conversationId": "AAQkAGI1conv020",
+    "internetMessageId": "<draft-020@outlook.com>",
+    "subject": "RE: Pricing pilot",
+    "body": {
+      "contentType": "html",
+      "content": "<div>Draft v2 — still waiting on legal before we send this.</div>"
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Logan Kim",
+        "address": "logan@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Sales Team",
+          "address": "sales@example.com"
+        }
+      }
+    ],
+    "isDraft": true,
+    "isRead": true,
+    "changeKey": "CQAAABYAAAB2",
+    "receivedDateTime": "2023-11-15T04:10:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv020",
+        "externalId": "AAMkAGI1draft020",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "logan@example.com"
+        },
+        "body": "Subject: RE: Pricing pilot\n\nDraft v2 — still waiting on legal before we send this.",
+        "attachments": [],
+        "sentAt": "2023-11-15T04:10:00.000Z",
+        "status": "received",
+        "sourceHash": "<draft-020@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv020",
+          "kind": "email",
+          "title": "RE: Pricing pilot",
+          "participants": [
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            },
+            {
+              "externalId": "sales@example.com",
+              "displayName": "Sales Team"
+            }
+          ],
+          "lastItemAt": "2023-11-15T04:10:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

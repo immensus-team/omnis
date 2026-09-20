@@ -1,0 +1,72 @@
+{
+  "scenario": "timezone_event_offset_differs_from_calendar_tz",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_tz_berlin_offsite",
+    "status": "confirmed",
+    "summary": "Berlin offsite sync",
+    "location": "Berlin Office, Room 3",
+    "creator": {
+      "email": "eu@example.com"
+    },
+    "organizer": {
+      "email": "eu@example.com",
+      "displayName": "EU Team"
+    },
+    "start": {
+      "dateTime": "2026-07-14T09:00:00+02:00",
+      "timeZone": "Europe/Berlin"
+    },
+    "end": {
+      "dateTime": "2026-07-14T10:00:00+02:00",
+      "timeZone": "Europe/Berlin"
+    },
+    "attendees": [
+      {
+        "email": "eu@example.com",
+        "displayName": "EU Team",
+        "responseStatus": "accepted"
+      },
+      {
+        "email": "dana@example.com",
+        "displayName": "Dana Lee",
+        "responseStatus": "accepted"
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_tz_berlin_offsite",
+        "externalId": "evt_tz_berlin_offsite",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "Berlin offsite sync",
+        "attachments": [],
+        "sentAt": "2026-07-14T09:00:00+02:00",
+        "status": "received",
+        "sourceHash": "evt_tz_berlin_offsite",
+        "threadMeta": {
+          "externalId": "evt_tz_berlin_offsite",
+          "kind": "calendar",
+          "title": "Berlin offsite sync",
+          "participants": [
+            {
+              "externalId": "eu@example.com",
+              "displayName": "EU Team"
+            },
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2026-07-14T09:00:00+02:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

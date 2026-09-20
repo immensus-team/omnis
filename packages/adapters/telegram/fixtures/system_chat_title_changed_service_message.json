@@ -1,0 +1,24 @@
+{
+  "scenario": "system_chat_title_changed_service_message",
+  "raw": {
+    "id": 8703,
+    "chat": {
+      "id": -1001234567890,
+      "type": "supergroup",
+      "title": "omnis launch v2"
+    },
+    "sender": {
+      "id": 43,
+      "firstName": "Logan",
+      "username": "logankim"
+    },
+    "date": 1700009200,
+    "action": {
+      "_": "messageActionChatEditTitle",
+      "title": "omnis launch v2"
+    }
+  },
+  "expected": {
+    "items": []
+  }
+}

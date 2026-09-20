@@ -1,0 +1,65 @@
+{
+  "scenario": "html_body_tables_and_lists_collapsed",
+  "note": "Table + list markup collapses into a single line because every tag becomes a space and runs of whitespace are squeezed. Readable, but cell/list boundaries are lost — the reason the stripHtml note calls out tables as the promotion trigger.",
+  "raw": {
+    "id": "AAMkAGI1msg052",
+    "conversationId": "AAQkAGI1conv052",
+    "internetMessageId": "<msg-052@outlook.com>",
+    "subject": "Sprint 42 status",
+    "body": {
+      "contentType": "html",
+      "content": "<h2>Sprint 42</h2><table><tr><th>Owner</th><th>Status</th></tr><tr><td>Dana</td><td>Done</td></tr><tr><td>Priya</td><td>In review</td></tr></table><ul><li>Backfill shipped</li><li>Delta polling still queued</li></ul>"
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Dana Lee",
+        "address": "dana@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-11-15T08:30:00Z",
+    "sentDateTime": "2023-11-15T08:30:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv052",
+        "externalId": "AAMkAGI1msg052",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "dana@example.com"
+        },
+        "body": "Subject: Sprint 42 status\n\nSprint 42 Owner Status Dana Done Priya In review Backfill shipped Delta polling still queued",
+        "attachments": [],
+        "sentAt": "2023-11-15T08:30:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-052@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv052",
+          "kind": "email",
+          "title": "Sprint 42 status",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T08:30:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

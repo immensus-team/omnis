@@ -1,0 +1,66 @@
+{
+  "scenario": "moved_to_junk_folder_still_normalizes",
+  "note": "A message now sitting in Junk Email keeps flowing through delta with a full body. Same as trashed mail: no folder filtering in v1, so it normalizes normally.",
+  "raw": {
+    "id": "AAMkAGI1msg033",
+    "conversationId": "AAQkAGI1conv033",
+    "internetMessageId": "<msg-033@outlook.com>",
+    "subject": "Your account statement is ready",
+    "body": {
+      "contentType": "text",
+      "content": "View your statement online."
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Bank Statements",
+        "address": "statements@bank.example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "parentFolderId": "AAMkAGI1junkemail",
+    "receivedDateTime": "2023-11-15T06:00:00Z",
+    "sentDateTime": "2023-11-15T06:00:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv033",
+        "externalId": "AAMkAGI1msg033",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "statements@bank.example.com"
+        },
+        "body": "Subject: Your account statement is ready\n\nView your statement online.",
+        "attachments": [],
+        "sentAt": "2023-11-15T06:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-033@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv033",
+          "kind": "email",
+          "title": "Your account statement is ready",
+          "participants": [
+            {
+              "externalId": "statements@bank.example.com",
+              "displayName": "Bank Statements"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T06:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

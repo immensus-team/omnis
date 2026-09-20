@@ -1,0 +1,68 @@
+{
+  "scenario": "base64url_body_truncated_no_padding",
+  "note": "Corrupt payload: last quantum truncated mid-character. Decoder yields the bytes it can, no throw.",
+  "raw": {
+    "id": "18c2f4a1b2d3f515",
+    "threadId": "18c2f4a1b2d3f515",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Dana Lee <dana@example.com>"
+        },
+        {
+          "name": "Subject",
+          "value": "Truncated body"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId026@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 19:10:00 +0000"
+        }
+      ],
+      "body": {
+        "data": "VHJ1bmNhdGVkIGJvZHkgY29udGVudCB0aGF0IGxvc3QgaXRzIGxhc3Q"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f515",
+        "externalId": "18c2f4a1b2d3f515",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Dana Lee <dana@example.com>"
+        },
+        "body": "Subject: Truncated body\n\nTruncated body content that lost its last",
+        "attachments": [],
+        "sentAt": "2023-11-15T19:10:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId026@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f515",
+          "kind": "email",
+          "title": "Truncated body",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2023-11-15T19:10:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

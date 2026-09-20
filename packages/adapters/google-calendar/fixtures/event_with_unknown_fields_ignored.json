@@ -1,0 +1,85 @@
+{
+  "scenario": "event_with_unknown_fields_ignored",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_unknown_fields",
+    "status": "confirmed",
+    "summary": "Event with a Pile of Extra Fields",
+    "colorId": "11",
+    "visibility": "private",
+    "transparency": "opaque",
+    "sequence": 7,
+    "iCalUID": "unknownfields@google.com",
+    "gadget": {
+      "title": "Gadget",
+      "link": "https://example.com/gadget",
+      "iconLink": "https://example.com/icon.png"
+    },
+    "extendedProperties": {
+      "private": {
+        "omnisKey": "abc-123"
+      },
+      "shared": {
+        "team": "platform"
+      }
+    },
+    "conferenceData": {
+      "conferenceId": "xyz-1234-abc",
+      "entryPoints": [
+        {
+          "entryPointType": "video",
+          "uri": "https://meet.google.com/xyz-1234-abc"
+        }
+      ]
+    },
+    "attachments": [
+      {
+        "fileUrl": "https://drive.google.com/file/d/abc123",
+        "title": "agenda.pdf",
+        "mimeType": "application/pdf"
+      }
+    ],
+    "creator": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "organizer": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "start": {
+      "dateTime": "2026-10-19T10:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-10-19T11:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_unknown_fields",
+        "externalId": "evt_unknown_fields",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "Event with a Pile of Extra Fields",
+        "attachments": [],
+        "sentAt": "2026-10-19T10:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_unknown_fields",
+        "threadMeta": {
+          "externalId": "evt_unknown_fields",
+          "kind": "calendar",
+          "title": "Event with a Pile of Extra Fields",
+          "participants": [],
+          "lastItemAt": "2026-10-19T10:00:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

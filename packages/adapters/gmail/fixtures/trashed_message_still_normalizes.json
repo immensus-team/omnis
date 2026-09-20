@@ -1,0 +1,68 @@
+{
+  "scenario": "trashed_message_still_normalizes",
+  "note": "Trashed mail keeps arriving through history/backfill. normalize() does not read labelIds at all, so TRASH is reported like any other received item. Pinned as-is: the adapter exposes no delete semantics (capabilities.delete = false).",
+  "raw": {
+    "id": "18c2f4a1b2d3e4fe",
+    "threadId": "18c2f4a1b2d3e4fe",
+    "labelIds": ["TRASH"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "newsletter@example.com"
+        },
+        {
+          "name": "Subject",
+          "value": "Weekly digest #212"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId008@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 06:00:00 +0000"
+        }
+      ],
+      "body": {
+        "data": "VG9wIHN0b3JpZXMgdGhpcyB3ZWVrLg"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3e4fe",
+        "externalId": "18c2f4a1b2d3e4fe",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "newsletter@example.com"
+        },
+        "body": "Subject: Weekly digest #212\n\nTop stories this week.",
+        "attachments": [],
+        "sentAt": "2023-11-15T06:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId008@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3e4fe",
+          "kind": "email",
+          "title": "Weekly digest #212",
+          "participants": [
+            {
+              "externalId": "newsletter@example.com",
+              "displayName": "newsletter@example.com"
+            }
+          ],
+          "lastItemAt": "2023-11-15T06:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

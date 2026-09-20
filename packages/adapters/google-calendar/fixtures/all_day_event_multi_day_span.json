@@ -1,0 +1,40 @@
+{
+  "scenario": "all_day_event_multi_day_span",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_allday_trip_jeju",
+    "status": "confirmed",
+    "summary": "Jeju Workshop (3 days, 2 nights)",
+    "location": "Jeju Shilla Hotel",
+    "description": "Check in at 14:00 on day one, check out at 11:00 on the last day.",
+    "creator": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "organizer": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "start": {
+      "date": "2026-10-26"
+    },
+    "end": {
+      "date": "2026-10-29"
+    },
+    "attendees": [
+      {
+        "email": "dana@example.com",
+        "displayName": "Dana Lee",
+        "responseStatus": "accepted"
+      },
+      {
+        "email": "minjun@example.com",
+        "displayName": "Minjun Kim",
+        "responseStatus": "accepted"
+      }
+    ]
+  },
+  "expected": {
+    "items": []
+  }
+}

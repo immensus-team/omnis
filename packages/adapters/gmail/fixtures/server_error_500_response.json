@@ -1,0 +1,15 @@
+{
+  "scenario": "server_error_500_response",
+  "raw": {
+    "code": 500,
+    "message": "Backend Error",
+    "errors": [
+      {
+        "reason": "backendError"
+      }
+    ]
+  },
+  "expected": {
+    "errorKind": "retryable_network"
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "scenario": "blocks_with_fallback_text",
+  "raw": {
+    "type": "message",
+    "subtype": "bot_message",
+    "channel": "C07OMNISEN",
+    "channel_name": "omnis-eng",
+    "bot_id": "B07OMNISBOT",
+    "username": "omnis-alerts",
+    "text": "Alert: p99 latency 812ms on api-gateway (threshold 500ms)",
+    "ts": "1715678550.000800",
+    "team": "T07OMNISTM",
+    "blocks": [
+      {
+        "type": "header",
+        "text": { "type": "plain_text", "text": "p99 latency alert" }
+      },
+      {
+        "type": "section",
+        "fields": [
+          { "type": "mrkdwn", "text": "*service:*\napi-gateway" },
+          { "type": "mrkdwn", "text": "*p99:*\n812ms" }
+        ]
+      },
+      {
+        "type": "actions",
+        "elements": [
+          {
+            "type": "button",
+            "text": { "type": "plain_text", "text": "Runbook" },
+            "url": "https://runbooks.internal/omnis/api-gateway-latency"
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISEN",
+        "externalId": "1715678550.000800",
+        "kind": "message",
+        "author": { "kind": "person", "id": "" },
+        "body": "Alert: p99 latency 812ms on api-gateway (threshold 500ms)",
+        "attachments": [],
+        "sentAt": "2024-05-14T09:22:30.000Z",
+        "status": "received",
+        "sourceHash": "1715678550.000800",
+        "threadMeta": {
+          "externalId": "C07OMNISEN",
+          "kind": "group",
+          "title": "#omnis-eng",
+          "participants": [],
+          "lastItemAt": "2024-05-14T09:22:30.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "scenario": "deleted_message_ids_multiple",
+  "raw": {
+    "deletedMessageIds": [8201, 8202, 8203],
+    "deletedChatId": -1001234567890,
+    "date": 1700004500
+  },
+  "expected": {
+    "items": []
+  }
+}

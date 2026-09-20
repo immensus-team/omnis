@@ -1,0 +1,84 @@
+{
+  "scenario": "address_list_with_group_and_bare_address",
+  "note": "Mixed To list: display-name form, bare address, and an address that also appears in Cc (deduped).",
+  "raw": {
+    "id": "18c2f4a1b2d3f519",
+    "threadId": "18c2f4a1b2d3f519",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Ops <ops@example.com>"
+        },
+        {
+          "name": "To",
+          "value": "Dana Lee <dana@example.com>, priya@example.com"
+        },
+        {
+          "name": "Cc",
+          "value": "Dana Lee <dana@example.com>"
+        },
+        {
+          "name": "Subject",
+          "value": "Roll call"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId030@example.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 20:00:00 +0000"
+        }
+      ],
+      "body": {
+        "data": "VHdvIHJlY2lwaWVudHMsIG9uZSBpbiBDYyB0b28u"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f519",
+        "externalId": "18c2f4a1b2d3f519",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Ops <ops@example.com>"
+        },
+        "body": "Subject: Roll call\n\nTwo recipients, one in Cc too.",
+        "attachments": [],
+        "sentAt": "2023-11-15T20:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId030@example.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f519",
+          "kind": "email",
+          "title": "Roll call",
+          "participants": [
+            {
+              "externalId": "ops@example.com",
+              "displayName": "Ops"
+            },
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "priya@example.com",
+              "displayName": "priya@example.com"
+            }
+          ],
+          "lastItemAt": "2023-11-15T20:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

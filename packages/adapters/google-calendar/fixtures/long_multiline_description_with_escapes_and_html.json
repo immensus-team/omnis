@@ -1,0 +1,52 @@
+{
+  "scenario": "long_multiline_description_with_escapes_and_html",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_escaped_desc",
+    "status": "confirmed",
+    "summary": "Incident Retrospective (postmortem)",
+    "description": "Summary: alert storm at 09:12 KST → mitigated at 09:41\n\nCause:\n\t\"retry storm\" — a worker retrying without backoff\n\tquotes (\"), a backslash (\\), tabs, and newlines\n\nLink: <a href=\"https://example.com/incidents/1234?a=1&amp;b=2\">https://example.com/incidents/1234?a=1&amp;b=2</a>\nAction items: ① exponential backoff ② circuit breaker ③ adjust dashboard thresholds",
+    "creator": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "organizer": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "start": {
+      "dateTime": "2026-10-08T16:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-10-08T17:30:00+09:00",
+      "timeZone": "Asia/Seoul"
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_escaped_desc",
+        "externalId": "evt_escaped_desc",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "Incident Retrospective (postmortem)",
+        "attachments": [],
+        "sentAt": "2026-10-08T16:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_escaped_desc",
+        "threadMeta": {
+          "externalId": "evt_escaped_desc",
+          "kind": "calendar",
+          "title": "Incident Retrospective (postmortem)",
+          "participants": [],
+          "lastItemAt": "2026-10-08T16:00:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

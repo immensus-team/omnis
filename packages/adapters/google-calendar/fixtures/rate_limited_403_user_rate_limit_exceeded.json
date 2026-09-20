@@ -1,0 +1,18 @@
+{
+  "scenario": "rate_limited_403_user_rate_limit_exceeded",
+  "raw": {
+    "code": 403,
+    "message": "User Rate Limit Exceeded",
+    "errors": [
+      {
+        "message": "User Rate Limit Exceeded",
+        "domain": "usageLimits",
+        "reason": "userRateLimitExceeded"
+      }
+    ],
+    "status": "PERMISSION_DENIED"
+  },
+  "expected": {
+    "errorKind": "retryable_network"
+  }
+}

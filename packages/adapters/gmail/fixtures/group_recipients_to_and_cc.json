@@ -1,0 +1,92 @@
+{
+  "scenario": "group_recipients_to_and_cc",
+  "note": "Group send: 3 To + 2 Cc, with a quoted-comma display name and the sender repeated in To (deduped).",
+  "raw": {
+    "id": "18c2f4a1b2d3f504",
+    "threadId": "18c2f4a1b2d3f504",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "From",
+          "value": "Logan Kim <281932556+jinhologankim@users.noreply.github.com>"
+        },
+        {
+          "name": "To",
+          "value": "Dana Lee <dana@example.com>, \"Kim, Minji\" <minji@example.com>, Priya Raman <priya@example.com>"
+        },
+        {
+          "name": "Cc",
+          "value": "281932556+jinhologankim@users.noreply.github.com, ops@example.com"
+        },
+        {
+          "name": "Subject",
+          "value": "Sprint review agenda (5 attendees)"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId014@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 14:00:00 +0000"
+        }
+      ],
+      "body": {
+        "data": "QWdlbmRhIGF0dGFjaGVkIGJlbG93Lg"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f504",
+        "externalId": "18c2f4a1b2d3f504",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "Logan Kim <281932556+jinhologankim@users.noreply.github.com>"
+        },
+        "body": "Subject: Sprint review agenda (5 attendees)\n\nAgenda attached below.",
+        "attachments": [],
+        "sentAt": "2023-11-15T14:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId014@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f504",
+          "kind": "email",
+          "title": "Sprint review agenda (5 attendees)",
+          "participants": [
+            {
+              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "displayName": "Logan Kim"
+            },
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "minji@example.com",
+              "displayName": "Kim, Minji"
+            },
+            {
+              "externalId": "priya@example.com",
+              "displayName": "Priya Raman"
+            },
+            {
+              "externalId": "ops@example.com",
+              "displayName": "ops@example.com"
+            }
+          ],
+          "lastItemAt": "2023-11-15T14:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

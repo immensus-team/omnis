@@ -1,0 +1,7 @@
+{
+  "scenario": "mtproto_error_as_plain_string",
+  "raw": "Bad Request: MESSAGE_ID_INVALID",
+  "expected": {
+    "errorKind": "retryable_network"
+  }
+}

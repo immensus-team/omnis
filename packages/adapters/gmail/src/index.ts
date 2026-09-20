@@ -260,10 +260,22 @@ function parseAddressList(headerValue: string): { externalId: string; displayNam
   return out;
 }
 
+/** Mail with a broken Date header (spam, gateway relays) is common. If toISOString() throws a
+ *  RangeError, the whole backfill stream calling normalize() dies over that one message, so fall
+ *  back to the internalDate (epoch ms) Gmail always sends with it, and to now() if that is missing. */
+function parseSentAt(dateHeader: string, internalDate: string | undefined): string {
+  const parsed = [
+    dateHeader ? new Date(dateHeader) : null,
+    internalDate ? new Date(Number(internalDate)) : null,
+  ].find((d): d is Date => d !== null && !Number.isNaN(d.getTime()));
+  return (parsed ?? new Date()).toISOString();
+}
+
 export function normalize(raw: unknown): NormalizedItem[] {
   const r = raw as {
     id?: string;
     threadId?: string;
+    internalDate?: string;
     payload?: { headers?: { name?: string; value?: string }[]; body?: { data?: string } };
   };
   if (!r.id || !r.threadId) return [];
@@ -273,9 +285,8 @@ export function normalize(raw: unknown): NormalizedItem[] {
   const subject = header("Subject");
   const from = header("From");
   const messageId = header("Message-Id");
-  const dateHeader = header("Date");
   const bodyText = decodeGmailBody(r.payload?.body?.data);
-  const sentAt = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString();
+  const sentAt = parseSentAt(header("Date"), r.internalDate);
 
   const participants = [
     ...parseAddressList(from),

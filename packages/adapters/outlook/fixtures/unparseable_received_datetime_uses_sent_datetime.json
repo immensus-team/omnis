@@ -1,0 +1,65 @@
+{
+  "scenario": "unparseable_received_datetime_uses_sent_datetime",
+  "note": "Regression pin for the sentDateTime fallback: an out-of-range receivedDateTime (broken gateway / mis-serialized DateTimeOffset) used to make new Date(...).toISOString() throw inside normalize(), aborting the whole delta stream. Graph's sentDateTime is the fallback.",
+  "raw": {
+    "id": "AAMkAGI1msg110",
+    "conversationId": "AAQkAGI1conv110",
+    "internetMessageId": "<msg-110@mailer.example.net>",
+    "subject": "Malformed received timestamp",
+    "body": {
+      "contentType": "text",
+      "content": "Relayed through a broken gateway."
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Mailer Daemon",
+        "address": "bounce@mailer.example.net"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "receivedDateTime": "2023-13-45T25:99:99Z",
+    "sentDateTime": "2023-11-15T14:00:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv110",
+        "externalId": "AAMkAGI1msg110",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "bounce@mailer.example.net"
+        },
+        "body": "Subject: Malformed received timestamp\n\nRelayed through a broken gateway.",
+        "attachments": [],
+        "sentAt": "2023-11-15T14:00:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-110@mailer.example.net>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv110",
+          "kind": "email",
+          "title": "Malformed received timestamp",
+          "participants": [
+            {
+              "externalId": "bounce@mailer.example.net",
+              "displayName": "Mailer Daemon"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T14:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

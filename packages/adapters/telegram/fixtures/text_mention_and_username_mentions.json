@@ -1,0 +1,71 @@
+{
+  "scenario": "text_mention_and_username_mentions",
+  "raw": {
+    "id": 8501,
+    "chat": {
+      "id": -1001234567890,
+      "type": "supergroup",
+      "title": "omnis launch"
+    },
+    "sender": {
+      "id": 42,
+      "firstName": "Dana",
+      "lastName": "Lee",
+      "username": "danalee"
+    },
+    "text": "@logankim @omnis_bot 10am work for you?",
+    "date": 1700007000,
+    "entities": [
+      {
+        "type": "mention",
+        "offset": 0,
+        "length": 9
+      },
+      {
+        "type": "mention",
+        "offset": 10,
+        "length": 10
+      },
+      {
+        "type": "text_mention",
+        "offset": 21,
+        "length": 4,
+        "user": {
+          "id": 43,
+          "firstName": "Logan"
+        }
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "-1001234567890",
+        "externalId": "8501",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "42"
+        },
+        "body": "@logankim @omnis_bot 10am work for you?",
+        "attachments": [],
+        "sentAt": "2023-11-15T00:10:00.000Z",
+        "status": "received",
+        "sourceHash": "-1001234567890:8501",
+        "threadMeta": {
+          "externalId": "-1001234567890",
+          "kind": "group",
+          "title": "omnis launch",
+          "participants": [
+            {
+              "externalId": "42",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2023-11-15T00:10:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

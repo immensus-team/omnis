@@ -1,0 +1,91 @@
+{
+  "scenario": "recurring_weekly_rrule_expanded_instance",
+  "raw": {
+    "kind": "calendar#event",
+    "etag": "\"3420135312345000\"",
+    "id": "evt_rec_weekly_instance_20260925",
+    "status": "confirmed",
+    "htmlLink": "https://www.google.com/calendar/event?eid=recweekly",
+    "created": "2026-07-01T00:12:33.000Z",
+    "updated": "2026-07-01T00:12:33.000Z",
+    "summary": "Weekly Sprint Review",
+    "description": "Recurring review every Monday and Wednesday. See the sprint board for the agenda.",
+    "location": "Meeting Room A (hybrid)",
+    "colorId": "9",
+    "creator": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "organizer": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "start": {
+      "dateTime": "2026-09-25T10:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-09-25T10:30:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "recurringEventId": "evt_rec_weekly_base",
+    "originalStartTime": {
+      "dateTime": "2026-09-25T10:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=MO,WE;UNTIL=20261230T045959Z"],
+    "attendees": [
+      {
+        "email": "dana@example.com",
+        "displayName": "Dana Lee",
+        "responseStatus": "accepted"
+      },
+      {
+        "email": "minjun@example.com",
+        "displayName": "Minjun Kim",
+        "responseStatus": "accepted"
+      }
+    ],
+    "reminders": {
+      "useDefault": true
+    },
+    "sequence": 0,
+    "iCalUID": "recweekly@google.com",
+    "eventType": "default"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_rec_weekly_instance_20260925",
+        "externalId": "evt_rec_weekly_instance_20260925",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "Weekly Sprint Review",
+        "attachments": [],
+        "sentAt": "2026-09-25T10:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_rec_weekly_instance_20260925",
+        "threadMeta": {
+          "externalId": "evt_rec_weekly_instance_20260925",
+          "kind": "calendar",
+          "title": "Weekly Sprint Review",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "minjun@example.com",
+              "displayName": "Minjun Kim"
+            }
+          ],
+          "lastItemAt": "2026-09-25T10:00:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

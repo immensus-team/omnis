@@ -1,0 +1,90 @@
+{
+  "scenario": "attendees_mixed_response_status",
+  "raw": {
+    "kind": "calendar#event",
+    "id": "evt_attendees_mixed",
+    "status": "confirmed",
+    "summary": "Design Review",
+    "location": "Meeting Room B",
+    "creator": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "organizer": {
+      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "self": true
+    },
+    "start": {
+      "dateTime": "2026-11-12T15:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "end": {
+      "dateTime": "2026-11-12T16:00:00+09:00",
+      "timeZone": "Asia/Seoul"
+    },
+    "attendees": [
+      {
+        "email": "dana@example.com",
+        "displayName": "Dana Lee",
+        "responseStatus": "accepted"
+      },
+      {
+        "email": "minjun@example.com",
+        "displayName": "Minjun Kim",
+        "responseStatus": "declined"
+      },
+      {
+        "email": "sora@example.com",
+        "displayName": "Sora Park",
+        "responseStatus": "tentative"
+      },
+      {
+        "email": "guest@example.com",
+        "responseStatus": "needsAction"
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "evt_attendees_mixed",
+        "externalId": "evt_attendees_mixed",
+        "kind": "event",
+        "author": {
+          "kind": "system",
+          "id": ""
+        },
+        "body": "Design Review",
+        "attachments": [],
+        "sentAt": "2026-11-12T15:00:00+09:00",
+        "status": "received",
+        "sourceHash": "evt_attendees_mixed",
+        "threadMeta": {
+          "externalId": "evt_attendees_mixed",
+          "kind": "calendar",
+          "title": "Design Review",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            },
+            {
+              "externalId": "minjun@example.com",
+              "displayName": "Minjun Kim"
+            },
+            {
+              "externalId": "sora@example.com",
+              "displayName": "Sora Park"
+            },
+            {
+              "externalId": "guest@example.com",
+              "displayName": "guest@example.com"
+            }
+          ],
+          "lastItemAt": "2026-11-12T15:00:00+09:00",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "scenario": "missing_from_header",
+  "note": "Some malformed/proxied mail has no From. normalize() still emits an item with an empty author id and an empty display name — pinned as-is.",
+  "raw": {
+    "id": "18c2f4a1b2d3f50d",
+    "threadId": "18c2f4a1b2d3f50d",
+    "labelIds": ["UNREAD", "INBOX"],
+    "snippet": "",
+    "historyId": "17890001",
+    "payload": {
+      "partId": "",
+      "mimeType": "text/plain",
+      "filename": "",
+      "headers": [
+        {
+          "name": "Subject",
+          "value": "Undisclosed sender"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId022@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Wed, 15 Nov 2023 18:20:00 +0000"
+        }
+      ],
+      "body": {
+        "data": "Qm9keSBwcmVzZW50LCBzZW5kZXIgaGVhZGVyIG1pc3Npbmcu"
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "18c2f4a1b2d3f50d",
+        "externalId": "18c2f4a1b2d3f50d",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": ""
+        },
+        "body": "Subject: Undisclosed sender\n\nBody present, sender header missing.",
+        "attachments": [],
+        "sentAt": "2023-11-15T18:20:00.000Z",
+        "status": "received",
+        "sourceHash": "<CAFakeMsgId022@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3f50d",
+          "kind": "email",
+          "title": "Undisclosed sender",
+          "participants": [],
+          "lastItemAt": "2023-11-15T18:20:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

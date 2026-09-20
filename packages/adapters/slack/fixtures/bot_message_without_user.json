@@ -1,0 +1,43 @@
+{
+  "scenario": "bot_message_without_user",
+  "raw": {
+    "type": "message",
+    "subtype": "bot_message",
+    "channel": "C07OMNISEN",
+    "channel_name": "omnis-eng",
+    "bot_id": "B07OMNISBOT",
+    "username": "omnis-ci",
+    "text": "Deploy complete: omnis-web@1.4.2 → production ✅",
+    "ts": "1715678530.000600",
+    "team": "T07OMNISTM",
+    "blocks": [
+      {
+        "type": "section",
+        "text": { "type": "mrkdwn", "text": "*Deploy complete* omnis-web@1.4.2" }
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISEN",
+        "externalId": "1715678530.000600",
+        "kind": "message",
+        "author": { "kind": "person", "id": "" },
+        "body": "Deploy complete: omnis-web@1.4.2 → production ✅",
+        "attachments": [],
+        "sentAt": "2024-05-14T09:22:10.000Z",
+        "status": "received",
+        "sourceHash": "1715678530.000600",
+        "threadMeta": {
+          "externalId": "C07OMNISEN",
+          "kind": "group",
+          "title": "#omnis-eng",
+          "participants": [],
+          "lastItemAt": "2024-05-14T09:22:10.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

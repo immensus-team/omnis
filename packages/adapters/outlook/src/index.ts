@@ -40,6 +40,7 @@ interface GraphMessage {
   toRecipients?: GraphAddress[];
   ccRecipients?: GraphAddress[];
   receivedDateTime?: string;
+  sentDateTime?: string;
   "@removed"?: { reason?: string };
 }
 
@@ -59,6 +60,19 @@ function addr(a?: GraphAddress): { externalId: string; displayName: string } | n
   return { externalId: email, displayName: a?.emailAddress?.name || email };
 }
 
+/** A message with a broken receivedDateTime (spam, gateway relays, or an empty string left over from
+ *  serialization) makes toISOString() throw a RangeError — normalize() runs per message inside the
+ *  backfill()/subscribe() loop, so that one message kills the whole stream. Fall back to the
+ *  sentDateTime Graph sends alongside it, and to now() if that is unusable too (same principle as
+ *  Gmail's internalDate fallback). A surviving Date may carry no milliseconds (`...20Z`), so round-trip
+ *  it into the `.SSSZ` form the NormalizedItem contract expects. */
+function parseSentAt(receivedDateTime?: string, sentDateTime?: string): string {
+  const parsed = [receivedDateTime, sentDateTime]
+    .map((s) => (s ? new Date(s) : null))
+    .find((d): d is Date => d !== null && !Number.isNaN(d.getTime()));
+  return (parsed ?? new Date()).toISOString();
+}
+
 export function normalize(raw: unknown): NormalizedItem[] {
   const m = raw as GraphMessage;
   // delta tombstone: 삭제된 메시지를 알리는 행이라 콘텐츠가 없다. items를 지우지 않는다(A3 §11) —
@@ -75,9 +89,7 @@ export function normalize(raw: unknown): NormalizedItem[] {
   ]
     .filter((p): p is { externalId: string; displayName: string } => p !== null)
     .filter((p, i, all) => all.findIndex((o) => o.externalId === p.externalId) === i);
-  // 원본 receivedDateTime엔 밀리초가 없을 수 있다(`...20Z`) — NormalizedItem 계약은 항상
-  // `.SSSZ` 형태를 기대하므로(다른 어댑터와 동일 포맷) Date를 한 번 왕복시켜 정규화한다.
-  const sentAt = new Date(m.receivedDateTime ?? Date.now()).toISOString();
+  const sentAt = parseSentAt(m.receivedDateTime, m.sentDateTime);
   const attachments: Attachment[] = []; // 다운로드는 /attachments 개별 호출(A1 §2.4) — Gmail과 동일 원칙
 
   return [

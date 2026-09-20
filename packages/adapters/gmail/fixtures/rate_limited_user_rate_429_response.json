@@ -1,0 +1,17 @@
+{
+  "scenario": "rate_limited_user_rate_429_response",
+  "raw": {
+    "code": 429,
+    "message": "Rate Limit Exceeded",
+    "errors": [
+      {
+        "reason": "rateLimitExceeded",
+        "domain": "usageLimits"
+      }
+    ],
+    "status": "RESOURCE_EXHAUSTED"
+  },
+  "expected": {
+    "errorKind": "retryable_rate_limit"
+  }
+}

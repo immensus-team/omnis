@@ -1,0 +1,15 @@
+{
+  "scenario": "moved_out_of_folder_tombstone_reason_changed",
+  "note": "Move to Deleted Items arrives as a tombstone with reason 'changed'. The adapter treats any @removed as no-visible-item regardless of reason.",
+  "raw": {
+    "id": "AAMkAGI1msg031",
+    "conversationId": "AAQkAGI1conv031",
+    "parentFolderId": "AAMkAGI1deleteditems",
+    "@removed": {
+      "reason": "changed"
+    }
+  },
+  "expected": {
+    "items": []
+  }
+}

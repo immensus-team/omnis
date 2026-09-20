@@ -1,0 +1,66 @@
+{
+  "scenario": "attachment_only_message_without_body_content",
+  "note": "Scanned-fax style message: empty html body content, everything is the attachment. The subject line keeps body non-empty (same shape as the Gmail attachment_only fixture).",
+  "raw": {
+    "id": "AAMkAGI1msg043",
+    "conversationId": "AAQkAGI1conv043",
+    "internetMessageId": "<msg-043@outlook.com>",
+    "subject": "Scan from office MFP",
+    "body": {
+      "contentType": "html",
+      "content": ""
+    },
+    "from": {
+      "emailAddress": {
+        "name": "Office MFP",
+        "address": "mfp@example.com"
+      }
+    },
+    "toRecipients": [
+      {
+        "emailAddress": {
+          "name": "Logan Kim",
+          "address": "logan@example.com"
+        }
+      }
+    ],
+    "hasAttachments": true,
+    "receivedDateTime": "2023-11-15T07:45:00Z",
+    "sentDateTime": "2023-11-15T07:45:00Z"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "AAQkAGI1conv043",
+        "externalId": "AAMkAGI1msg043",
+        "kind": "email",
+        "author": {
+          "kind": "person",
+          "id": "mfp@example.com"
+        },
+        "body": "Subject: Scan from office MFP\n\n",
+        "attachments": [],
+        "sentAt": "2023-11-15T07:45:00.000Z",
+        "status": "received",
+        "sourceHash": "<msg-043@outlook.com>",
+        "threadMeta": {
+          "externalId": "AAQkAGI1conv043",
+          "kind": "email",
+          "title": "Scan from office MFP",
+          "participants": [
+            {
+              "externalId": "mfp@example.com",
+              "displayName": "Office MFP"
+            },
+            {
+              "externalId": "logan@example.com",
+              "displayName": "Logan Kim"
+            }
+          ],
+          "lastItemAt": "2023-11-15T07:45:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

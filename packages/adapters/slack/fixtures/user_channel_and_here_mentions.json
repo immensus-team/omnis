@@ -1,0 +1,50 @@
+{
+  "scenario": "user_channel_and_here_mentions",
+  "raw": {
+    "type": "message",
+    "channel": "C07OMNISLA",
+    "channel_name": "omnis-launch",
+    "user": "U07JIN0001",
+    "text": "<!here> <@U07DANA001> <#C07OMNISEN|omnis-eng> please check the deploy. <!subteam^S07OMNISSRE|@sre-oncall> needs to be on standby. See <https://omnis.internal/rfc/42|RFC-42> for details.",
+    "ts": "1715678610.001400",
+    "team": "T07OMNISTM",
+    "blocks": [
+      {
+        "type": "rich_text",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              { "type": "broadcast", "range": "here" },
+              { "type": "user", "user_id": "U07DANA001" },
+              { "type": "text", "text": " please check the deploy." }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "C07OMNISLA",
+        "externalId": "1715678610.001400",
+        "kind": "message",
+        "author": { "kind": "person", "id": "U07JIN0001" },
+        "body": "<!here> <@U07DANA001> <#C07OMNISEN|omnis-eng> please check the deploy. <!subteam^S07OMNISSRE|@sre-oncall> needs to be on standby. See <https://omnis.internal/rfc/42|RFC-42> for details.",
+        "attachments": [],
+        "sentAt": "2024-05-14T09:23:30.001Z",
+        "status": "received",
+        "sourceHash": "1715678610.001400",
+        "threadMeta": {
+          "externalId": "C07OMNISLA",
+          "kind": "group",
+          "title": "#omnis-launch",
+          "participants": [{ "externalId": "U07JIN0001", "displayName": "U07JIN0001" }],
+          "lastItemAt": "2024-05-14T09:23:30.001Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

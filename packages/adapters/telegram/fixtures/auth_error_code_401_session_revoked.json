@@ -1,0 +1,10 @@
+{
+  "scenario": "auth_error_code_401_session_revoked",
+  "raw": {
+    "code": 401,
+    "message": "SESSION_REVOKED"
+  },
+  "expected": {
+    "errorKind": "auth_revoked"
+  }
+}

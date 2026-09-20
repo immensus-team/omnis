@@ -1,0 +1,12 @@
+{
+  "scenario": "missing_id_yields_nothing",
+  "note": "No Graph id (also no @removed) — same guard, nothing is emitted.",
+  "raw": {
+    "conversationId": "AAQkAGI1conv104",
+    "subject": "Id-less fragment",
+    "receivedDateTime": "2023-11-15T13:30:00Z"
+  },
+  "expected": {
+    "items": []
+  }
+}

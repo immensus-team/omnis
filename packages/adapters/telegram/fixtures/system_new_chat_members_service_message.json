@@ -1,0 +1,24 @@
+{
+  "scenario": "system_new_chat_members_service_message",
+  "raw": {
+    "id": 8702,
+    "chat": {
+      "id": -1001234567890,
+      "type": "supergroup",
+      "title": "omnis launch"
+    },
+    "sender": {
+      "id": 43,
+      "firstName": "Logan",
+      "username": "logankim"
+    },
+    "date": 1700009100,
+    "action": {
+      "_": "messageActionChatAddUser",
+      "users": [44, 45]
+    }
+  },
+  "expected": {
+    "items": []
+  }
+}

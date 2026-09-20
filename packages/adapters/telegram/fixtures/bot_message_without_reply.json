@@ -1,0 +1,53 @@
+{
+  "scenario": "bot_message_without_reply",
+  "raw": {
+    "id": 8701,
+    "chat": {
+      "id": 1001,
+      "type": "private"
+    },
+    "sender": {
+      "id": 777000,
+      "firstName": "omnis bot",
+      "username": "omnis_bot",
+      "isBot": true
+    },
+    "text": "Build #1284 succeeded ✅",
+    "date": 1700009000,
+    "viaBot": {
+      "id": 777000,
+      "username": "omnis_bot"
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "1001",
+        "externalId": "8701",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "777000"
+        },
+        "body": "Build #1284 succeeded ✅",
+        "attachments": [],
+        "sentAt": "2023-11-15T00:43:20.000Z",
+        "status": "received",
+        "sourceHash": "1001:8701",
+        "threadMeta": {
+          "externalId": "1001",
+          "kind": "dm",
+          "title": null,
+          "participants": [
+            {
+              "externalId": "777000",
+              "displayName": "omnis bot"
+            }
+          ],
+          "lastItemAt": "2023-11-15T00:43:20.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}
