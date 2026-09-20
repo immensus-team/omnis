@@ -8,6 +8,8 @@ import {
   type HostId,
   type HumanInterrupt,
   type HumanResponse,
+  IngestReadParams,
+  IngestScanParams,
   JSONRPC_ERRORS,
   PROTOCOL_VERSION,
   type RuntimeCapabilities,
@@ -19,6 +21,7 @@ import {
   TurnStartParams,
   assertProtocolVersion,
 } from "@omnis/protocol";
+import { handleIngestRead, handleIngestScan } from "./ingest.js";
 import type { Logger } from "./logger.js";
 import { assertPathAllowed } from "./paths.js";
 import type { SessionRecord, SessionRegistry } from "./session-registry.js";
@@ -61,8 +64,6 @@ export interface DispatchDeps {
   turnCap?: TurnCap;
 }
 
-const PHASE_B_METHODS = new Set(["ingest.scan", "ingest.read"]);
-
 export function createDispatcher(
   deps: DispatchDeps,
 ): (method: string, params: unknown) => Promise<unknown> {
@@ -80,12 +81,6 @@ export function createDispatcher(
 
   return async (method: string, params: unknown): Promise<unknown> => {
     assertProtocolVersion(params);
-    if (PHASE_B_METHODS.has(method)) {
-      throw new BridgeError(
-        JSONRPC_ERRORS.METHOD_NOT_FOUND,
-        `${method} is Phase B (A7 §7 Phase B 시드 메모)`,
-      );
-    }
     if (!(HUB_METHODS as readonly string[]).includes(method)) {
       throw new BridgeError(JSONRPC_ERRORS.METHOD_NOT_FOUND, `unknown method: ${method}`);
     }
@@ -173,6 +168,25 @@ export function createDispatcher(
           BRIDGE_ERRORS.CAPABILITY_UNSUPPORTED,
           "session.read_summary is served by the hub, not the bridge",
         );
+
+      // US-B10: A2 §3.2. 모든 런타임의 allowed_roots 합집합 안에서만 읽는다 — 런타임별로
+      // 권한을 나눌 이유가 없다(읽기 전용이고, 파일에는 런타임 개념이 없다).
+      case "ingest.scan": {
+        const p = IngestScanParams.parse(params);
+        return handleIngestScan(p, {
+          allowedRoots: [...new Set([...deps.allowedRoots.values()].flat())],
+          logger: deps.logger,
+          skipDisallowedRoots: true,
+        });
+      }
+
+      case "ingest.read": {
+        const p = IngestReadParams.parse(params);
+        return handleIngestRead(p, {
+          allowedRoots: [...new Set([...deps.allowedRoots.values()].flat())],
+          logger: deps.logger,
+        });
+      }
 
       case "delegate.run": {
         // A2 §5.1: 허브가 서명한 approval_id 없이는 와이어에서 거절한다. Phase A에는 실행 분기가 없다.

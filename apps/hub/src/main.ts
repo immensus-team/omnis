@@ -11,6 +11,7 @@ import {
 import { createBridgeHub } from "./bridge.js";
 import { type HubConfig, readConfig } from "./config.js";
 import { createHubServer } from "./http.js";
+import { registerIngestJobs } from "./ingest-job.js";
 import { registerSummaryJob } from "./summarize-job.js";
 
 export interface RunningHub {
@@ -45,6 +46,18 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
   if (config.bridgeToken === "") {
     logger.warn("OMNIS_BRIDGE_TOKEN is empty — WS /bridge refuses every upgrade with 503");
   }
+  // ingest 잡은 start() **뒤에** 등록한다(startLoops와 같은 자리). drive_poll/github_poll 행은
+  // 0006_kernel.sql이 이미 seed했고 tick()은 매 틱 handlers Map을 다시 훑으므로 다음 틱(10초)에
+  // 바로 돈다. 반대로 start() 앞에 두면 start() 끝의 await tick()이 seed된 due 행을 즉시 집어
+  // 전체 ingestion 한 바퀴(로컬 스캔·임베딩·T1)를 listen() 전에 동기로 돌려버린다 — 그 사이
+  // /health와 시그널 핸들러가 둘 다 없다.
+  const stopIngestWatch = await registerIngestJobs({
+    pool,
+    logger,
+    scheduler: kernel.scheduler,
+    bridge,
+  });
+
   const startedAt = Date.now();
   const server = createHubServer({
     kernel,
@@ -75,6 +88,7 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
           setTimeout(() => server.closeAllConnections(), 2000).unref();
         });
         await bridge.close();
+        stopIngestWatch();
         stopSummaryJob();
         stopLoops();
         // 2) 스케줄러를 멈추고 진행 중 틱이 claimed_at을 풀고 끝나기를 기다린다(Task 14의 stop()).

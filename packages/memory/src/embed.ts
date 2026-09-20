@@ -3,6 +3,12 @@
 export const EMBED_MODEL = "nomic-embed-text-v1.5";
 export const EMBED_DIMS = 768;
 
+/** nomic-embed-text는 query/document를 비대칭 태스크 프리픽스로 구분해서 학습됐다 —
+ *  프리픽스 없이 넣으면 코사인 거리가 사실상 랜덤에 가까워진다. 저장할 때는 document,
+ *  검색할 때는 query를 쓴다 (Nomic 모델 카드). */
+export const EMBED_QUERY_PREFIX = "search_query: ";
+export const EMBED_DOCUMENT_PREFIX = "search_document: ";
+
 /** 차원이 틀린 벡터가 SQL까지 내려가는 것을 막는 유일한 문. 임베딩 값 자체는 메시지에 넣지 않는다. */
 export class MemoryEmbedError extends Error {
   constructor(message: string) {

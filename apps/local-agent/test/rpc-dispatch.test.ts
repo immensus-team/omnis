@@ -1,3 +1,5 @@
+import { mkdtemp } from "node:fs/promises";
+import { join } from "node:path";
 import { withMeta } from "@omnis/protocol";
 import { describe, expect, it, vi } from "vitest";
 import { createLogger } from "../src/logger.js";
@@ -46,10 +48,17 @@ describe("rpc dispatcher", () => {
     ).rejects.toMatchObject({ code: -32010 });
   });
 
-  it("answers -32601 for ingest.* in Phase A", async () => {
-    await expect(dispatch()("ingest.scan", withMeta({ roots: ["/tmp"] }))).rejects.toMatchObject({
-      code: -32601,
-    });
+  // US-B10: Phase A 게이트(-32601)가 걷혔다 — ingest.scan은 이제 실제 핸들러로 간다.
+  it("routes ingest.scan to a real result instead of the Phase A gate", async () => {
+    // dispatch()의 allowedRoots는 codex → ["/tmp"]로 고정돼 있으니, /tmp 아래에 직접 판다
+    // (os.tmpdir()은 macOS에서 /tmp가 아니라 $TMPDIR이라 allowlist를 벗어난다).
+    const root = await mkdtemp(join("/tmp", "omnis-rpc-ingest-"));
+    const res = (await dispatch()("ingest.scan", withMeta({ roots: [root] }))) as {
+      files: unknown[];
+      truncated: boolean;
+    };
+    expect(res.files).toEqual([]);
+    expect(res.truncated).toBe(false);
   });
 
   it("answers -32601 for an entirely unknown method", async () => {

@@ -142,6 +142,9 @@ importers:
       '@omnis/kernel':
         specifier: workspace:*
         version: link:../../packages/kernel
+      '@omnis/memory':
+        specifier: workspace:*
+        version: link:../../packages/memory
       '@omnis/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol

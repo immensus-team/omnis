@@ -15,6 +15,7 @@
     "@omnis/agents": "workspace:*",
     "@omnis/db": "workspace:*",
     "@omnis/kernel": "workspace:*",
+    "@omnis/memory": "workspace:*",
     "@omnis/protocol": "workspace:*",
     "pg": "8.13.1",
     "ws": "8.18.0"

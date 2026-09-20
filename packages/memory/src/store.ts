@@ -3,7 +3,7 @@
 import { one, query } from "@omnis/db";
 import type { MemoryKind, MemorySourceKind, Scope } from "@omnis/protocol";
 import type { Pool } from "pg";
-import { embed, toVectorLiteral } from "./embed.js";
+import { EMBED_DOCUMENT_PREFIX, embed, toVectorLiteral } from "./embed.js";
 
 export interface MemoryInput {
   content: string;
@@ -42,7 +42,7 @@ export async function upsertMemory(pool: Pool, m: MemoryInput): Promise<string> 
   const hit = existing[0];
   if (hit !== undefined) return hit.id;
 
-  const [vec] = await embed([m.content]);
+  const [vec] = await embed([EMBED_DOCUMENT_PREFIX + m.content]);
   const row = await one<{ id: string }>(
     pool,
     `INSERT INTO memories (content, embedding, kind, scope, source_kind, source_ref,
@@ -108,7 +108,7 @@ export async function reembedNulls(pool: Pool, limit = 100): Promise<number> {
   );
   if (rows.length === 0) return 0;
 
-  const vecs = await embed(rows.map((r) => r.content));
+  const vecs = await embed(rows.map((r) => EMBED_DOCUMENT_PREFIX + r.content));
   let filled = 0;
   for (const [i, r] of rows.entries()) {
     const v = vecs[i];
