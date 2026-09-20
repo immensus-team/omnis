@@ -3,6 +3,7 @@
   "raw": {
     "type": "message",
     "channel": "C0123456789",
+    "channel_name": "omnis-launch",
     "user": "U0123456789",
     "text": "sounds good",
     "ts": "1700000100.000200",
@@ -15,12 +16,28 @@
         "threadExternalId": "C0123456789",
         "externalId": "1700000100.000200",
         "kind": "message",
-        "author": { "kind": "person", "id": "U0123456789" },
+        "author": {
+          "kind": "person",
+          "id": "U0123456789"
+        },
         "body": "sounds good",
         "attachments": [],
         "sentAt": "2023-11-14T22:15:00.000Z",
         "status": "received",
-        "sourceHash": "1700000100.000200"
+        "sourceHash": "1700000100.000200",
+        "threadMeta": {
+          "externalId": "C0123456789",
+          "kind": "group",
+          "title": "#omnis-launch",
+          "participants": [
+            {
+              "externalId": "U0123456789",
+              "displayName": "U0123456789"
+            }
+          ],
+          "lastItemAt": "2023-11-14T22:15:00.000Z",
+          "archivedAt": null
+        }
       }
     ]
   }

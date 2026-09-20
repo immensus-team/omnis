@@ -3,6 +3,7 @@
   "raw": {
     "type": "message",
     "channel": "C0123456789",
+    "channel_name": "omnis-launch",
     "user": "U0123456789",
     "text": "see attached",
     "ts": "1700000200.000300",
@@ -22,14 +23,35 @@
         "threadExternalId": "C0123456789",
         "externalId": "1700000200.000300",
         "kind": "message",
-        "author": { "kind": "person", "id": "U0123456789" },
+        "author": {
+          "kind": "person",
+          "id": "U0123456789"
+        },
         "body": "see attached",
         "attachments": [
-          { "kind": "image", "mimeType": "image/png", "sizeBytes": 2048, "caption": "y.png" }
+          {
+            "kind": "image",
+            "mimeType": "image/png",
+            "sizeBytes": 2048,
+            "caption": "y.png"
+          }
         ],
         "sentAt": "2023-11-14T22:16:40.000Z",
         "status": "received",
-        "sourceHash": "1700000200.000300"
+        "sourceHash": "1700000200.000300",
+        "threadMeta": {
+          "externalId": "C0123456789",
+          "kind": "group",
+          "title": "#omnis-launch",
+          "participants": [
+            {
+              "externalId": "U0123456789",
+              "displayName": "U0123456789"
+            }
+          ],
+          "lastItemAt": "2023-11-14T22:16:40.000Z",
+          "archivedAt": null
+        }
       }
     ]
   }

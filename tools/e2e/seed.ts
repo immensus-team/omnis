@@ -14,12 +14,7 @@ import { normalize as normalizeSlack } from "../../packages/adapters/slack/src/i
 import { classify, configureAgents } from "../../packages/agents/src/index.js";
 import { type Pool, one, query } from "../../packages/db/src/index.js";
 import { createIngestSink, createKernel, createLogger } from "../../packages/kernel/src/index.js";
-import type {
-  Channel,
-  NormalizedItem,
-  NormalizedThread,
-  ThreadKind,
-} from "../../packages/protocol/src/index.js";
+import type { Channel, NormalizedItem } from "../../packages/protocol/src/index.js";
 import { BRIDGE_HOST, type E2EEnv, HUB_PORT, REPO_ROOT } from "./stack.js";
 
 const logger = createLogger("@omnis/e2e");
@@ -40,29 +35,21 @@ const CHANNELS: {
   channel: Channel;
   fixturesDir: string;
   normalize: (raw: unknown) => NormalizedItem[];
-  threadKind: ThreadKind;
-  title: string;
 }[] = [
   {
     channel: "slack",
     fixturesDir: join(REPO_ROOT, "packages/adapters/slack/fixtures"),
     normalize: normalizeSlack,
-    threadKind: "group",
-    title: "#omnis-launch",
   },
   {
     channel: "gmail",
     fixturesDir: join(REPO_ROOT, "packages/adapters/gmail/fixtures"),
     normalize: normalizeGmail,
-    threadKind: "email",
-    title: "omnis launch sync",
   },
   {
     channel: "gcal",
     fixturesDir: join(REPO_ROOT, "packages/adapters/google-calendar/fixtures"),
     normalize: normalizeGcal,
-    threadKind: "calendar",
-    title: "omnis launch sync",
   },
 ];
 
@@ -87,22 +74,6 @@ function fixtureItems(
   return out;
 }
 
-/** DEVIATION(main의 실결함 #1): slack/gmail의 normalize()는 threadMeta를 절대 싣지 않는데
- *  커널 IngestSink는 "첫 목격 스레드에는 threadMeta가 와야 한다"며 던진다 — 두 채널의 인제스트가
- *  프로덕션에서 통째로 막힌다. 픽스처(계약)를 바꾸지 않으려고 여기서 합성한다. */
-function withThreadMeta(item: NormalizedItem, kind: ThreadKind, title: string): NormalizedItem {
-  if (item.threadMeta !== undefined) return item;
-  const meta: NormalizedThread = {
-    externalId: item.threadExternalId,
-    kind,
-    title,
-    participants: [],
-    lastItemAt: item.sentAt,
-    archivedAt: null,
-  };
-  return { ...item, threadMeta: meta };
-}
-
 export async function seed(pool: Pool, env: E2EEnv): Promise<SeedResult> {
   const sink = createIngestSink({ pool, logger });
   const threadIds: Record<string, string> = {};
@@ -116,11 +87,10 @@ export async function seed(pool: Pool, env: E2EEnv): Promise<SeedResult> {
          RETURNING id`,
       [spec.channel, `e2e-${spec.channel}`, `e2e ${spec.channel}`],
     );
-    const seen = new Set<string>();
-    for (const raw of fixtureItems(spec.fixturesDir, spec.normalize)) {
-      const first = !seen.has(raw.threadExternalId);
-      seen.add(raw.threadExternalId);
-      await sink(account.id, first ? withThreadMeta(raw, spec.threadKind, spec.title) : raw);
+    // 이제 slack/gmail/gcal의 normalize()가 전부 threadMeta를 싣는다 — raw fixture를
+    // 그대로 넣는다(합성 workaround 제거, main의 실결함 #1 root fix).
+    for (const item of fixtureItems(spec.fixturesDir, spec.normalize)) {
+      await sink(account.id, item);
     }
     const thread = await one<{ id: string }>(
       pool,

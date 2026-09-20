@@ -5,10 +5,22 @@
     "threadId": "18c2f4a1b2d3e4f1",
     "payload": {
       "headers": [
-        { "name": "From", "value": "Dana Lee <dana@example.com>" },
-        { "name": "Subject", "value": "PoC slides" },
-        { "name": "Message-Id", "value": "<CAFakeMsgId003@mail.gmail.com>" },
-        { "name": "Date", "value": "Tue, 14 Nov 2023 23:00:00 +0000" }
+        {
+          "name": "From",
+          "value": "Dana Lee <dana@example.com>"
+        },
+        {
+          "name": "Subject",
+          "value": "PoC slides"
+        },
+        {
+          "name": "Message-Id",
+          "value": "<CAFakeMsgId003@mail.gmail.com>"
+        },
+        {
+          "name": "Date",
+          "value": "Tue, 14 Nov 2023 23:00:00 +0000"
+        }
       ],
       "mimeType": "multipart/mixed",
       "body": {},
@@ -16,7 +28,10 @@
         {
           "filename": "poc.pdf",
           "mimeType": "application/pdf",
-          "body": { "attachmentId": "att-1", "size": 40960 }
+          "body": {
+            "attachmentId": "att-1",
+            "size": 40960
+          }
         }
       ]
     }
@@ -27,12 +42,28 @@
         "threadExternalId": "18c2f4a1b2d3e4f1",
         "externalId": "18c2f4a1b2d3e4f7",
         "kind": "email",
-        "author": { "kind": "person", "id": "Dana Lee <dana@example.com>" },
+        "author": {
+          "kind": "person",
+          "id": "Dana Lee <dana@example.com>"
+        },
         "body": "Subject: PoC slides\n\n",
         "attachments": [],
         "sentAt": "2023-11-14T23:00:00.000Z",
         "status": "received",
-        "sourceHash": "<CAFakeMsgId003@mail.gmail.com>"
+        "sourceHash": "<CAFakeMsgId003@mail.gmail.com>",
+        "threadMeta": {
+          "externalId": "18c2f4a1b2d3e4f1",
+          "kind": "email",
+          "title": "PoC slides",
+          "participants": [
+            {
+              "externalId": "dana@example.com",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2023-11-14T23:00:00.000Z",
+          "archivedAt": null
+        }
       }
     ]
   }
