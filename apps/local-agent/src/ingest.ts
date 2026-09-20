@@ -1,5 +1,5 @@
-// A2 §3.2: 허브가 보낸 roots/path를 브리지가 다시 자른다. 상한 3종 —
-// ① allowlist ∩ allowed_roots 교집합 + realpath 재검사, ② 비밀 파일 무조건 거부, ③ 1MB 절단.
+// A2 §3.2: the bridge re-cuts the roots/path the hub sent. Three bounds —
+// ① allowlist ∩ allowed_roots intersection + realpath re-check, ② secret files always rejected, ③ 1MB truncation.
 import { createHash } from "node:crypto";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
@@ -23,7 +23,7 @@ export interface IngestDeps {
   allowedRoots: string[];
   logger: Logger;
   maxFiles?: number;
-  /** 허용되지 않은 루트를 에러 대신 조용히 버린다(허브가 여러 호스트의 루트를 한 번에 보낼 때). */
+  /** An unauthorized root is dropped silently instead of raising (the hub sends several hosts' roots at once). */
   skipDisallowedRoots?: boolean;
 }
 
@@ -39,7 +39,7 @@ export async function handleIngestScan(
   for (const rawRoot of params.roots) {
     let root: string;
     try {
-      root = assertPathAllowed(rawRoot, deps.allowedRoots); // realpath 재검사 포함
+      root = assertPathAllowed(rawRoot, deps.allowedRoots); // includes the realpath re-check
     } catch (e) {
       if (deps.skipDisallowedRoots === true) {
         deps.logger.warn("ingest.scan root skipped", { root: rawRoot });
@@ -67,7 +67,7 @@ export async function handleIngestScan(
           break;
         }
         const path = join(dir, entry.name);
-        if (isDenied(path)) continue; // 상한 ②
+        if (isDenied(path)) continue; // bound ②
         if (entry.isDirectory()) {
           stack.push(path);
           continue;
@@ -101,9 +101,9 @@ export async function handleIngestRead(
   params: IngestReadParams,
   deps: IngestDeps,
 ): Promise<IngestReadResult> {
-  const path = assertPathAllowed(params.path, deps.allowedRoots); // 상한 ①
+  const path = assertPathAllowed(params.path, deps.allowedRoots); // bound ①
   if (isDenied(path)) {
-    // 거부 사유를 구체적으로 말하지 않는다 — 어떤 경로가 비밀 목록에 걸리는지가 그 자체로 정보다.
+    // The rejection reason is not stated specifically — which path hits the secret list is itself information.
     throw new BridgeError(BRIDGE_ERRORS.PATH_NOT_ALLOWED, "path is not readable", {
       path: params.path,
     });
@@ -125,7 +125,7 @@ export async function handleIngestRead(
     });
   }
 
-  const limit = Math.min(params.max_bytes, MAX_INGEST_FILE_BYTES); // 상한 ③
+  const limit = Math.min(params.max_bytes, MAX_INGEST_FILE_BYTES); // bound ③
   const slice = buf.subarray(0, limit);
   return {
     path,

@@ -11,7 +11,7 @@ export interface SocketLike {
 export interface HubClientDeps {
   url: string;
   token: string;
-  /** 허브 handleUpgrade가 x-omnis-host를 요구한다 — 없으면 400으로 끊긴다(apps/hub/src/bridge.ts). */
+  /** The hub's handleUpgrade requires x-omnis-host — without it the connection is cut with a 400 (apps/hub/src/bridge.ts). */
   host: HostId;
   logger: Logger;
   connect: (url: string, headers: Record<string, string>) => SocketLike;
@@ -21,7 +21,7 @@ export interface HubClientDeps {
   onClose?: () => void;
 }
 
-/** A2 §2.2 5항: 1s → 2s → 4s → … → 30s 상한, ±20% jitter. */
+/** A2 §2.2 item 5: 1s → 2s → 4s → … → 30s cap, ±20% jitter. */
 export function backoffDelayMs(attempt: number, rand: () => number = Math.random): number {
   const base = Math.min(1000 * 2 ** attempt, 30_000);
   return Math.round(base * (0.8 + 0.4 * rand()));

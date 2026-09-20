@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 const run = promisify(execFile);
 export const KEYCHAIN_ACCOUNT = "281932556+jinhologankim@users.noreply.github.com";
 
-/** 값은 절대 로그·이벤트·에러 메시지에 싣지 않는다(A2 §7.2). */
+/** The value is never carried in logs, events or error messages (A2 §7.2). */
 export async function readKeychainSecret(
   item: string,
   account: string = KEYCHAIN_ACCOUNT,
