@@ -19,7 +19,7 @@ const HEAD = 2048;
 const TAIL = 1024;
 const LIMIT = 8192;
 
-/** A2 §4.1: 8KB 초과 tool_result는 앞 2KB + 잘린 바이트 수 + 뒤 1KB로 줄이고 전문은 cold에 둔다. */
+/** A2 §4.1: a tool_result over 8KB is shrunk to the first 2KB + the truncated byte count + the last 1KB, with the full text kept in cold. */
 export function truncateToolResult(body: string): { body: string; truncated: boolean } {
   const bytes = Buffer.byteLength(body, "utf8");
   if (bytes <= LIMIT) return { body, truncated: false };
@@ -46,7 +46,7 @@ function item(ctx: Ctx, itemId: string, extra: Record<string, unknown>): Record<
   return { session_key: ctx.session_key, turn_id: ctx.turn_id, item_id: itemId, ...extra };
 }
 
-/** A2 §4.1 매핑표. 표에 없는 이벤트는 빈 배열 → cold 티어에만 남는다. */
+/** A2 §4.1 mapping table. An event absent from the table yields an empty array → it stays in the cold tier only. */
 export function mapStreamJsonEvent(raw: unknown, ctx: Ctx): BridgeEmit[] {
   const ev = raw as Record<string, unknown>;
   const type = ev.type;
