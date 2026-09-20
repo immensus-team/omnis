@@ -865,3 +865,73 @@ body {
 [cmdk-item][data-selected="true"] {
   background: var(--bg-elevated);
 }
+
+/* US-D02: 밀도 높은 리스트의 그룹 헤더/필터용 tinted pill — ref-issue-tracker-density.webp 실측
+   (높이 28px, radius 12px, 라벨 13px/590, leading 8px 도트, trailing 카운트는 회색).
+   위 .status-badge와 달리 완전 캡슐(999px)이 아니라 모서리를 남긴다: 같은 스크린샷에서 필터 칩은
+   캡슐, 상태 pill은 라운드 렉트다 — 두 문법을 섞지 않는다. flat, 테두리·그림자 없음(레퍼런스 그대로).
+   톤 배경·라벨 둘 다 color-mix가 아니라 상대 색상 문법(oklch(from … L c h))으로 만든다.
+   color-mix(in oklch, 톤, --bg-elevated)는 색상각까지 보간해서 hue를 돌려버린다: --bg-elevated가
+   h260이라 warn(h80)은 정확히 180° 반대 → 청록, danger(h25)·success(h150)은 각각 자홍·파랑으로
+   끌려간다(실측: 네 톤 틴트가 전부 #d?e?f? 계열 파랑으로 나왔다). 대비는 7:1로 통과하는데 색만
+   틀리는 종류의 버그라 숫자만 봐서는 안 잡힌다. 상대 색상 문법은 h를 그대로 물려받으므로 틴트는
+   L만 올리고 채도만 낮추면 되고, 라벨은 L만 내리면 된다. 라벨 L=0.44는 톤 원값(accent L0.62·
+   warn L0.75)이 자기 틴트 위에서 2.4:1이라 13px 텍스트로 못 읽기 때문 — 실측 5.5~6.4:1로
+   WCAG AA(4.5:1)를 넘는다. */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 590;
+  white-space: nowrap;
+}
+
+.status-pill__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: 0 0 auto;
+}
+
+/* 카운트만 톤 컬러에서 빠져 회색이 된다 — 라벨이 의미를 지고 숫자는 밀도만 담당한다(레퍼런스 실측:
+   "In review 6"의 6은 파랑이 아니라 회색). --text-tertiary(alpha .75)는 틴트 위에서 2.2:1이라
+   안 읽혀서 한 단계 진한 --text-secondary로 내렸다. */
+.status-pill__count {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ponytail: 다크(data-theme="dark") 오버라이드 없음 — 라이트 기본이 이 프로젝트의 결정이고
+   (DESIGN-DIRECTION.md), data-theme="dark"를 세팅하는 코드가 아직 없다(tokens.css에 블록만 존재).
+   다크가 실제로 켜지는 날 4개 톤 라벨이 L0.4 vs 틴트 L0.25로 1.8:1이 되니 그때 여기 아래에
+   `:root[data-theme="dark"] .status-pill[data-tone="…"] { color: oklch(from currentColor 0.8 c h); }`
+   4줄을 붙인다. */
+.status-pill[data-tone="neutral"] {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+.status-pill[data-tone="info"] {
+  background: oklch(from var(--accent) 0.92 calc(c * 0.25) h);
+  color: oklch(from var(--accent) 0.44 c h);
+}
+
+.status-pill[data-tone="warning"] {
+  background: oklch(from var(--warn-500) 0.92 calc(c * 0.25) h);
+  color: oklch(from var(--warn-500) 0.44 c h);
+}
+
+.status-pill[data-tone="danger"] {
+  background: oklch(from var(--danger-500) 0.92 calc(c * 0.25) h);
+  color: oklch(from var(--danger-500) 0.44 c h);
+}
+
+.status-pill[data-tone="success"] {
+  background: oklch(from var(--success-500) 0.92 calc(c * 0.25) h);
+  color: oklch(from var(--success-500) 0.44 c h);
+}
