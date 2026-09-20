@@ -84,3 +84,19 @@ export {
   type AutoArchiveOutputT,
   type HardGateResult,
 } from "./loops/auto-archive.js";
+export {
+  SECTION_CAPS,
+  rankBriefItems,
+  type BriefCandidate,
+  type BriefItem,
+  type BriefSection,
+  type BriefSectionId,
+  type MorningBriefing,
+} from "./digest/rank.js";
+export {
+  MORNING_DIGEST_CRON,
+  MorningDigestOutput,
+  morningCandidates,
+  morningDigestLoop,
+  type MorningDigestOutputT,
+} from "./loops/digest-morning.js";
