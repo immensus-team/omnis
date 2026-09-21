@@ -9,8 +9,8 @@
 // environment and setup are declared by the file itself.
 import "./setup";
 
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { BottomBar } from "../src/components/bottom-bar";
 import { PHASE_B_TITLE } from "../src/components/channel-rail";
 
@@ -54,19 +54,37 @@ describe("BottomBar (US-D08 §c.9)", () => {
     expect(filters).not.toHaveClass("bottom-bar__piece--compose");
   });
 
-  // Both circles are gated the way the rail's Account and Settings tiles are (channel-rail.tsx):
-  // the destination is D9's — §c.9 itself says the filters button opens the Sheet — so rather than
-  // announcing as actionable and doing nothing, they are disabled with the reason in the title.
-  // The shared constant is the point: a second literal here could drift from the rail's.
-  it("gates both circles with the rail's own reason, and keeps their names", () => {
+  // A circle with no destination is gated the way the rail's Account and Settings tiles are
+  // (channel-rail.tsx): disabled, with the reason in the title rather than announced as actionable
+  // and doing nothing. US-D09 gave Filters its destination (§c.6's sheet) and Compose still has
+  // none, so this is now one of each — and the shared constant is the point, since a second literal
+  // here could drift from the rail's.
+  it("gates the circle the shell gave nothing to, and keeps both names", () => {
     render(<BottomBar>{slot()}</BottomBar>);
 
+    const compose = screen.getByRole("button", { name: "Compose" });
+    expect(compose).toBeDisabled();
+    expect(compose).toHaveAttribute("title", PHASE_B_TITLE);
+
     for (const name of ["Filters", "Compose"]) {
-      const circle = screen.getByRole("button", { name });
-      expect(circle).toBeDisabled();
-      expect(circle).toHaveAttribute("title", PHASE_B_TITLE);
       // The accessible name is a real word and not the glyph — the icons are decorative.
-      expect(circle.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+      expect(screen.getByRole("button", { name }).querySelector("svg")).toHaveAttribute(
+        "aria-hidden",
+        "true",
+      );
     }
+  });
+
+  // §c.6/M125: with the sheet handed in, the circle is a control — enabled, named the same way, and
+  // it opens the sheet rather than a tooltip about Phase B.
+  it("opens the filters sheet when the shell hands it one", () => {
+    const onOpenFilters = vi.fn();
+    render(<BottomBar onOpenFilters={onOpenFilters}>{slot()}</BottomBar>);
+
+    const filters = screen.getByRole("button", { name: "Filters" });
+    expect(filters).toBeEnabled();
+    expect(filters).toHaveAttribute("title", "Filters");
+    fireEvent.click(filters);
+    expect(onOpenFilters).toHaveBeenCalledOnce();
   });
 });

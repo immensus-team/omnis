@@ -54,6 +54,10 @@ function Shell() {
   const [open, setOpen] = useState<OpenTarget | null>(null);
   const [askOpen, setAskOpen] = useState(false);
   const [railChannel, setRailChannel] = useState<RailSelection>(null);
+  // US-D09 §c.6: the BottomBar's filters circle opens M125's sheet, and the sheet edits the list's
+  // own filter state — so the open flag lives here (the trigger is in this file's bar) while the
+  // rows live in Inbox.tsx (which owns what they change).
+  const [filtersOpen, setFiltersOpen] = useState(false);
   // US-D08 §c.9: below 900 the ask bar leaves the top of the list and becomes the BottomBar's
   // middle piece. One element in one of two places, never both — a second render of the palette
   // would be a second cmdk list, a second action list to keep in sync, and two things answering
@@ -157,6 +161,8 @@ function Shell() {
           onOpen={setOpen}
           channelFilter={railChannel}
           onChannelFilterChange={setRailChannel}
+          filtersOpen={filtersOpen}
+          onFiltersOpenChange={setFiltersOpen}
         />
       </div>
       {/* §c.9: the narrow tier's bar, above the rail bar rather than stacked into it. It is
@@ -168,7 +174,11 @@ function Shell() {
           band belongs to the thread's floating action bar, which Thread.tsx portals to the body so
           it can sit in the BottomBar's line between the two circles. Rendering the pill as well
           would put two controls in one slot (§e guard 11 wants a twin, not a duplicate). */}
-      {narrow ? <BottomBar>{threadOpen ? null : askBar}</BottomBar> : null}
+      {narrow ? (
+        <BottomBar onOpenFilters={() => setFiltersOpen(true)}>
+          {threadOpen ? null : askBar}
+        </BottomBar>
+      ) : null}
       {/* US-D02b/US-D09: the detail pane no longer carries `.glass-surface`. It used to, and app.css
           took the glass back off at >=1280 — but the class itself stayed in the DOM, and §c.5 puts a
           glass toolbar inside the pane, which would then be a glass surface nested in a glass

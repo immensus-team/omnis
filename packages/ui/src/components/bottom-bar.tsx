@@ -13,7 +13,17 @@ import { PHASE_B_TITLE } from "./channel-rail.js";
  *
  *  The bar itself is transparent — the three pieces are individually glass. A full-bleed glass band
  *  here would be a second rail bar stacked on the first, which is exactly what §c.9 says it is not. */
-export function BottomBar({ children }: { children: ReactNode }) {
+export function BottomBar({
+  children,
+  /** US-D09 §c.6: the filters circle opens M125's sheet. It is handed in rather than built here —
+   *  what the sheet filters is the list's state, and the list is the shell's child, not the bar's.
+   *  Without it the circle stays gated with the reason in its title, the way the rail's
+   *  Account/Settings tiles are: a destination that does not exist is said, not silently ignored. */
+  onOpenFilters,
+}: {
+  children: ReactNode;
+  onOpenFilters?: () => void;
+}) {
   // Both circles are glass, and the class is applied by hand rather than through <GlassSurface>:
   // the element has to be the <button> itself and GlassSurface only renders a div — the same reason
   // filter-chip-bar.tsx's popover carries `glass-surface` as a className. data-glass-slot is the
@@ -25,8 +35,9 @@ export function BottomBar({ children }: { children: ReactNode }) {
         className="bottom-bar__piece glass-surface"
         data-glass-slot="toolbar"
         aria-label="Filters"
-        title={PHASE_B_TITLE}
-        disabled
+        title={onOpenFilters === undefined ? PHASE_B_TITLE : "Filters"}
+        disabled={onOpenFilters === undefined}
+        onClick={onOpenFilters}
       >
         <Menu size={20} aria-hidden="true" />
       </button>

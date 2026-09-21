@@ -2,11 +2,17 @@ import {
   ArchiveIcon,
   BotIcon,
   BriefcaseIcon,
+  CONFIRM_COPY,
   ClockIcon,
+  ConfirmPrompt,
   type FilterChip,
   FilterChipBar,
   InboxIcon,
   OpaqueSurface,
+  Sheet,
+  SheetCheck,
+  SheetGroup,
+  SheetRow,
   type UiChannel,
   type UiItemStatus,
   UserIcon,
@@ -242,6 +248,8 @@ export function Inbox({
   onOpen,
   channelFilter = null,
   onChannelFilterChange,
+  filtersOpen = false,
+  onFiltersOpenChange,
 }: {
   onOpen?: (target: OpenTarget) => void;
   /** U1 channel rail selection. null = everything (the Inbox tile). ANDed with the pill filters
@@ -250,6 +258,11 @@ export function Inbox({
   /** US-D02: how the channel chip's x undoes the rail selection. Without it the channel chip is
    *  not drawn at all — an x that does nothing is worse than no x. */
   onChannelFilterChange?: (c: UiChannel | null) => void;
+  /** US-D09 §c.6: M125's sheet, opened by the BottomBar's filters circle. It is controlled from the
+   *  shell because the trigger is the shell's bar, while the state it edits (the filter pill, the
+   *  Archived view, the label chips) is this screen's. */
+  filtersOpen?: boolean;
+  onFiltersOpenChange?: (open: boolean) => void;
 }) {
   const zero = useZeroClient();
   const [filter, setFilter] = useState<InboxFilter>("all");
@@ -265,6 +278,10 @@ export function Inbox({
   // US-D02: the label chip filter. An empty Set means no label condition (it is ANDed with the
   // others).
   const [selectedLabelIds, setSelectedLabelIds] = useState<Set<string>>(new Set());
+  /** US-D09 §c.8: the bulk action's confirmation. It holds the **ids** the question named rather
+   *  than a count or a boolean: the question says "Archive 3 threads?" and confirming has to archive
+   *  those three, not whatever is on screen a replication later. */
+  const [archiveAll, setArchiveAll] = useState<string[] | null>(null);
 
   // Deviation from plan A26 step 7, measured against interface contract §7's zeroSchema: the
   // zeroSchema (A21, packages/kernel/src/zero-schema.ts) defines only the three relations
@@ -422,6 +439,17 @@ export function Inbox({
     });
   }, [threadRows]);
 
+  // One toggle, two call sites: the "+ Label" popover and §c.6's sheet edit the same Set, and a
+  // second copy of this is where the two would start disagreeing.
+  const toggleLabel = useCallback((id: string) => {
+    setSelectedLabelIds((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
   const toggleArchive = useCallback((threadId: string, archived: boolean) => {
     // US-D04: the row is held in the list for one leave animation. The server call goes out
     // immediately rather than after the animation — the round trip overlaps the 240ms instead of
@@ -538,13 +566,7 @@ export function Inbox({
     fieldLabel: "Label",
     options: labels.map((l) => ({ id: l.id, label: l.name })),
     selectedIds: [...selectedLabelIds],
-    onToggle: (id: string) =>
-      setSelectedLabelIds((s) => {
-        const next = new Set(s);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        return next;
-      }),
+    onToggle: toggleLabel,
   };
 
   // US-D02: grouping happens in the agents view only. needs-approval queries pending alone
@@ -723,6 +745,89 @@ export function Inbox({
             />
           )
         }
+      />
+      {/* US-D09 §c.6: M125's Filters sheet. It is a sibling of the prompt below rather than its
+          ancestor, and that is load-bearing — both portal to <body>, and React bubbles a synthetic
+          event through the **React** tree, so a prompt rendered inside the sheet would deliver its
+          own Escape and Tab to the sheet's trap as well. They are two surfaces, so they are two
+          branches.
+          The rows apply as they are pressed (that is what M125's checkmarks mean), which makes
+          Done a dismissal and not a commit — hence a no-op confirm rather than a copy of the
+          filter state to write back. */}
+      {onFiltersOpenChange && (
+        <Sheet
+          open={filtersOpen}
+          onOpenChange={onFiltersOpenChange}
+          title="Filters"
+          confirm={{ label: "Done", onConfirm: () => {} }}
+        >
+          <SheetGroup label="Show">
+            {FILTERS.map((f) => (
+              <SheetRow
+                key={f}
+                // biome-ignore lint/a11y/useSemanticElements: M125's rows are 48px card rows closed by a check — an <input type="radio"> cannot render one, and the role is what carries the semantics into the sheet's own grammar.
+                role="radio"
+                checked={filter === f}
+                trailing={<SheetCheck checked={filter === f} />}
+                onClick={() => setFilter(f)}
+              >
+                {FILTER_LABEL[f]}
+              </SheetRow>
+            ))}
+          </SheetGroup>
+          {/* The Archived toggle is a view, not a sixth filter pill: the pills are radio (mutually
+              exclusive by construction) and it is a checkbox — the same distinction the strip's own
+              circle makes by sitting outside the radiogroup. */}
+          <SheetGroup label="View">
+            <SheetRow
+              // biome-ignore lint/a11y/useSemanticElements: the same call as the rows above — the toggle is a sheet row, not a bare <input type="checkbox">.
+              role="checkbox"
+              checked={view === "archived"}
+              trailing={<SheetCheck checked={view === "archived"} />}
+              onClick={() => setView((v) => (v === "archived" ? "inbox" : "archived"))}
+            >
+              Archived threads
+            </SheetRow>
+          </SheetGroup>
+          {labels.length > 0 && (
+            <SheetGroup label="Labels">
+              {labels.map((l) => (
+                <SheetRow
+                  key={l.id}
+                  // biome-ignore lint/a11y/useSemanticElements: a sheet row again — the label names a Set membership, and the row is what M125 draws it in.
+                  role="checkbox"
+                  checked={selectedLabelIds.has(l.id)}
+                  trailing={<SheetCheck checked={selectedLabelIds.has(l.id)} />}
+                  onClick={() => toggleLabel(l.id)}
+                >
+                  {l.name}
+                </SheetRow>
+              ))}
+            </SheetGroup>
+          )}
+          {/* The bulk action, and the only thing in this sheet that is not reversible by pressing
+              the row again — so it is the one that asks (§c.8). With nothing on screen there is
+              nothing to archive and the group is not drawn: an "Archive 0 threads?" question is a
+              control with nothing to act on. */}
+          {view === "inbox" && filtered.length > 0 && (
+            <SheetGroup label="Actions">
+              <SheetRow onClick={() => setArchiveAll(filtered.map((r) => r.threadId))}>
+                {`Archive all ${filtered.length} shown`}
+              </SheetRow>
+            </SheetGroup>
+          )}
+        </Sheet>
+      )}
+      {/* §c.8: the title is the whole question and it names the count, while the list it will act
+          on was frozen when the question was asked. */}
+      <ConfirmPrompt
+        open={archiveAll !== null}
+        onOpenChange={(open) => !open && setArchiveAll(null)}
+        {...CONFIRM_COPY.archiveThreads(archiveAll?.length ?? 0)}
+        confirmLabel="Archive"
+        onConfirm={() => {
+          for (const threadId of archiveAll ?? []) toggleArchive(threadId, true);
+        }}
       />
     </OpaqueSurface>
   );
