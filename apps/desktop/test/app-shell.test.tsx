@@ -130,7 +130,11 @@ describe("App shell search mode (US-B27)", () => {
 
     // Wait past the debounce window: the request that must not happen has had its chance.
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(fetchMock).not.toHaveBeenCalled();
+    // Scoped to /search: the shell's own settings read (US-D10's pane layout, restored on mount) is
+    // also a hub call, and "the palette stayed quiet" is the claim this test makes.
+    expect(fetchMock.mock.calls.filter((call) => String(call[0]).includes("/search"))).toHaveLength(
+      0,
+    );
     expect(screen.getByText("Go to Inbox")).toBeInTheDocument();
   });
 });

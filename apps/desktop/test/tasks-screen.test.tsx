@@ -3,7 +3,7 @@
 // environment and setup (the same situation as app-shell.test.tsx).
 import "./setup";
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   TASKS_BANNER,
@@ -291,6 +291,12 @@ describe("Tasks screen (A5 §3.5)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Needs approval" }));
     expect(screen.getByText(/Handing this task to/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    // US-D09 §c.8: Accept is the one decision here that goes out to the tool and cannot be taken
+    // back, so the card asks once before it decides — the same click-through the ApprovalCard's own
+    // suite makes. The card's button is still mounted behind the prompt, so the confirm is scoped.
+    const prompt = screen.getByRole("alertdialog", { name: "Approve this action?" });
+    expect(decideApproval).not.toHaveBeenCalled();
+    fireEvent.click(within(prompt).getByRole("button", { name: "Approve" }));
     expect(decideApproval).toHaveBeenCalledWith("a1", "accept", undefined);
   });
 
