@@ -69,23 +69,21 @@ describe("App shell layout (U1 kinso: rail + main column)", () => {
 });
 
 describe("App shell responsive contract (US-D02b)", () => {
-  // The narrow-shell breakpoint is held in **both** the CSS container query and
-  // channel-rail.tsx's matchMedia — React cannot read a container query's result, so the two
-  // cannot be merged. Change one and the rail draws the wrong tier (a bottom bar with six tiles,
-  // or the reverse) while the screen still looks plausible. This test stops that drift: when
-  // app.css changes, channel-rail.tsx's NARROW_RAIL_QUERY changes with it.
-  it("uses the same narrow-rail breakpoint in app.css and channel-rail.tsx", () => {
+  // The narrow-shell breakpoint is held in **both** the CSS container query and TS — React cannot
+  // read a container query's result, so the two cannot be merged. Change one and the shell draws
+  // the wrong tier (a bottom bar with six tiles, or the reverse) while the screen still looks
+  // plausible. This test stops that drift: when app.css changes, media-query.ts changes with it.
+  // US-D08: the literal moved out of channel-rail.tsx into lib/media-query.ts, because the row
+  // swipe is narrow-only too and a second copy of it in the row is exactly the drift this guards.
+  it("uses the same narrow-shell breakpoint in app.css and lib/media-query.ts", () => {
     const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
-    const tsx = readFileSync(
-      join(TEST_DIR, "../../../packages/ui/src/components/channel-rail.tsx"),
-      "utf8",
-    );
+    const ts = readFileSync(join(TEST_DIR, "../../../packages/ui/src/lib/media-query.ts"), "utf8");
     // Look for the cut TS asserts inside the CSS. That catches drift in both directions: change
     // either side alone and the string is no longer in the CSS, which fails here. (Picking "the
     // narrowest cut" instead would grab the wrong value the moment a narrower cut is added.)
-    const fromTsx = tsx.match(/NARROW_RAIL_QUERY = "\(max-width: ([\d.]+)px\)"/)?.[1];
+    const fromTs = ts.match(/NARROW_SHELL_QUERY = "\(max-width: ([\d.]+)px\)"/)?.[1];
 
-    expect(fromTsx).toBeDefined();
-    expect(css).toContain(`@container shell (max-width: ${fromTsx}px)`);
+    expect(fromTs).toBeDefined();
+    expect(css).toContain(`@container shell (max-width: ${fromTs}px)`);
   });
 });

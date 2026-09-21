@@ -3,6 +3,7 @@ import { ChevronDown, Inbox as InboxGlyph, Settings, User } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type * as React from "react";
 import { cn } from "../lib/cn.js";
+import { useNarrowShell } from "../lib/media-query.js";
 import { pointerDrag } from "../lib/pointer-drag.js";
 import { applyOrder, moveTile, readRailOrder, writeRailOrder } from "../lib/rail-order.js";
 import { CHANNEL_LABEL } from "../lib/row-meta.js";
@@ -27,13 +28,6 @@ export interface ChannelRailProps {
   onSelect: (selection: RailSelection) => void;
 }
 
-/** US-D02b: the breakpoint at which the rail folds down into a bottom bar. It must be the **same
- *  number** as app.css's `@container shell (max-width: 899.98px)` — React cannot read the result of
- *  a CSS container query (it is neither the window width nor the shell box width), so the value is
- *  written in both places. This slice does not share the literal between CSS and TS: change it in
- *  one file and you change it in the other. */
-const NARROW_RAIL_QUERY = "(max-width: 899.98px)";
-
 /** Upper bound on the `tiles` that stand in the bottom bar — the Inbox tile is separate and is not
  *  counted here. */
 const NARROW_RAIL_TILE_LIMIT = 4;
@@ -44,29 +38,6 @@ const TOUCH_HOLD_MS = 350;
 
 /** D7 §c.2: the tile's lift while it is held — the haptic-like "picked up" cue, over --dur-fast. */
 const LIFT_SCALE = 1.08;
-
-/** jsdom has no matchMedia — without it we fall back to the wide shell (the same defence as
- *  command-palette.tsx's panelExitMs). The wide tier is the rail as it has always been, so that is
- *  what the tests see; the narrow tier is for the CSS container queries and a real browser. */
-function mediaQuery(query: string): MediaQueryList | null {
-  try {
-    return window.matchMedia(query);
-  } catch {
-    return null;
-  }
-}
-
-function useNarrowRail(): boolean {
-  const [narrow, setNarrow] = useState(() => mediaQuery(NARROW_RAIL_QUERY)?.matches ?? false);
-  useEffect(() => {
-    const mq = mediaQuery(NARROW_RAIL_QUERY);
-    if (!mq) return;
-    const onChange = () => setNarrow(mq.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-  return narrow;
-}
 
 /** Phase B gate. Account and Settings have no screen behind them yet, so they are rendered
  *  disabled with a title that says why rather than as labelled buttons that announce as actionable
@@ -124,7 +95,7 @@ export function ChannelRail({ channels, selected, onSelect }: ChannelRailProps) 
     () => (channels.includes("agent") ? channels : [...channels, "agent" as const]),
     [channels],
   );
-  const narrow = useNarrowRail();
+  const narrow = useNarrowShell();
 
   // The stored order is a preference, not the truth: applyOrder turns it into a permutation of the
   // tiles the hub actually reports, so a disconnected account leaves no hole and a newly connected
