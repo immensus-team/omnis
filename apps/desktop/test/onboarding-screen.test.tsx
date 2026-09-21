@@ -15,14 +15,10 @@ describe("storeChannelSecret (contract §9 keychain naming)", () => {
 
   it("invokes keychain_set with the Google identifier for a gmail service", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
-    await storeChannelSecret(
-      "omnis.gmail.281932556+jinhologankim@users.noreply.github.com",
-      "281932556+jinhologankim@users.noreply.github.com",
-      "secret-token",
-    );
+    await storeChannelSecret("omnis.gmail.you@example.com", "omnis", "secret-token");
     expect(invoke).toHaveBeenCalledWith("keychain_set", {
-      service: "omnis.gmail.281932556+jinhologankim@users.noreply.github.com",
-      account: "281932556+jinhologankim@users.noreply.github.com",
+      service: "omnis.gmail.you@example.com",
+      account: "omnis",
       secret: "secret-token",
     });
   });
@@ -65,8 +61,8 @@ const mockConnect: OAuthClient["connect"] = vi.fn(
         ]
       : [
           {
-            keychainService: `omnis.${channel}.281932556+jinhologankim@users.noreply.github.com`,
-            account: "281932556+jinhologankim@users.noreply.github.com",
+            keychainService: `omnis.${channel}.you@example.com`,
+            account: "omnis",
             secret: "s",
           },
         ],

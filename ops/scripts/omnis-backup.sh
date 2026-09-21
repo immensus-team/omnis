@@ -6,12 +6,14 @@ set -euo pipefail
 # launchd hands over a PATH of just /usr/bin:/bin:/usr/sbin:/sbin, so pg_dump and restic are not visible (same reason as ops/mini/run.sh).
 export PATH=/opt/homebrew/bin:$PATH
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-ACCOUNT="281932556+jinhologankim@users.noreply.github.com"
-kc() { security find-generic-password -s "$1" -a "$ACCOUNT" -w; }
+# No `-a`: reads resolve by service name alone, so items stamped with any account still match.
+kc() { security find-generic-password -s "$1" -w; }
 
 BACKUP_DIR="${OMNIS_BACKUP_DIR:-$HOME/omnis-var/backup}"
 PG_DIR="$BACKUP_DIR/pg"
-DATABASE_URL="${DATABASE_URL:-postgres://vigor@127.0.0.1:5432/omnis}"
+# The LaunchAgent execs this script with launchd's bare environment, so this fallback is load-bearing.
+# Derive the role from the login user rather than naming anyone (A6 §9).
+DATABASE_URL="${DATABASE_URL:-postgres://$(id -un)@127.0.0.1:5432/omnis}"
 
 do_check() {
   command -v pg_dump >/dev/null || { echo "FAIL: pg_dump not on PATH" >&2; return 1; }

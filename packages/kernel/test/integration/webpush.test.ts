@@ -92,7 +92,7 @@ describe("vapidFromEnv (delta §9)", () => {
     ).toEqual({
       publicKey: "P",
       privateKey: "S",
-      subject: "mailto:281932556+jinhologankim@users.noreply.github.com",
+      subject: "mailto:omnis@localhost",
     });
     expect(vapidFromEnv({}).publicKey).toBe("");
   });

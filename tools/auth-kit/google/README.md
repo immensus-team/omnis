@@ -74,7 +74,7 @@ tools/auth-kit/keychain-add.sh omnis.google.oauth_client_id
 tools/auth-kit/keychain-add.sh omnis.google.oauth_client_secret
 ```
 
-`<email>` is your Gmail address verbatim (for example, `281932556+jinhologankim@users.noreply.github.com`).
+`<email>` is your Gmail address verbatim (for example, `you@example.com`).
 
 ## 7. Verification
 

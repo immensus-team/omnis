@@ -208,11 +208,7 @@ export function createOutlookAdapter(deps: OutlookAdapterDeps): Adapter {
           // same pattern as the google-calendar adapter — packages/adapters/google-calendar/src/index.ts connect()).
           graphClient = deps.graphClient;
         } else {
-          const refreshToken = await readKeychainSecret(
-            auth.keychainService,
-            auth.keychainAccount,
-            CHANNEL,
-          );
+          const refreshToken = await readKeychainSecret(auth.keychainService, CHANNEL);
           const { accessToken } = await refreshAccessToken(
             deps.oauthClientId,
             refreshToken,

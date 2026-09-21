@@ -72,17 +72,9 @@ export function createSlackAdapter(deps: SlackAdapterDeps = {}): Adapter {
     capabilities: () => CAPABILITIES,
 
     async connect(auth: AuthRef): Promise<void> {
-      const xoxbToken = await readKeychainSecret(
-        auth.keychainService,
-        auth.keychainAccount,
-        CHANNEL,
-      );
+      const xoxbToken = await readKeychainSecret(auth.keychainService, CHANNEL);
       web = deps.webClient ?? new WebClient(xoxbToken);
-      const appToken = await readKeychainSecret(
-        `${auth.keychainService}.app`,
-        auth.keychainAccount,
-        CHANNEL,
-      );
+      const appToken = await readKeychainSecret(`${auth.keychainService}.app`, CHANNEL);
       socket = deps.socketClient ?? new SocketModeClient({ appToken });
 
       socket.on("disconnect", () => {

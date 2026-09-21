@@ -528,7 +528,7 @@ export async function loadZeroToken(hubUrl?: string): Promise<void>; // main.tsx
 - CLI flags: `--hub <url>` (→`hub_url`), `--host <mini|macbook>`, `--token-keychain-item <name>`, `--runtimes <csv>`.
 - Corresponding env vars: `OMNIS_HUB_URL`, `OMNIS_HOST`, `OMNIS_TOKEN_KEYCHAIN_ITEM`, `OMNIS_RUNTIMES`.
 - Host config (`src/host-config.ts`): `mini` → `hub_url="ws://127.0.0.1:8787/bridge"`, exposed runtimes `["codex","hermes"]` (Hermes is Phase B), concurrent active turn cap 4. `macbook` → `hub_url="wss://<mini>.ts.net/api/bridge"`, runtimes `["claude_code","codex","claude_ds","hermes"]`, cap 4.
-- Keychain: `omnis.bridge.token.mini`, `omnis.bridge.token.macbook`, `omnis.hermes.api_key.mini`, `omnis.hermes.api_key.macbook`. The account field is `281932556+jinhologankim@users.noreply.github.com`. Channel secrets are `omnis.<channel>.<kind>.<external_id>` (A1 §1.3).
+- Keychain: `omnis.bridge.token.mini`, `omnis.bridge.token.macbook`, `omnis.hermes.api_key.mini`, `omnis.hermes.api_key.macbook`. The account field is `omnis`. Channel secrets are `omnis.<channel>.<kind>.<external_id>` (A1 §1.3).
 - JSON-RPC methods: inbound (hub→bridge) = `HUB_METHODS`, outbound (bridge→hub) = `BRIDGE_METHODS` (§3.5). Parameters and result types all use `@omnis/protocol` symbols — `session.create` is `{session_key: SessionKey, runtime: RuntimeKind, cwd, purpose, origin, permission_profile, model?}` → `{session_id: null, thread_id}`, `turn.start` is `{session_key, input:{text, attachments?}, model?, timeout_ms?}` → `{turn_id}`, `approval.requested` is `{session_key, turn_id, interrupt: HumanInterrupt}` → `HumanResponse`. Phase A does not implement `ingest.scan`/`ingest.read` (Phase B).
 - The `--permission-mode` literals (measured on claude 2.1.274, `tools/spikes/_probes/2026-09-20-cli-probes.md`): **`acceptEdits` · `auto` · `bypassPermissions` · `manual` · `dontAsk` · `plan`**. There is **no** value called `"default"`.
 - `PermissionProfile` → `--permission-mode` mapping (A2 §7.1): `observe` → `plan`, `workspace` → `manual`, `trusted` → `bypassPermissions` (only inside allowed_roots). Pending until the gate ⑫ result settles it.
@@ -537,7 +537,7 @@ export async function loadZeroToken(hubUrl?: string): Promise<void>; // main.tsx
 ## 9. Common conventions
 
 - **Env vars**: `DATABASE_URL` (required), `OMNIS_HUB_PORT=8787`, `OMNIS_HUB_URL`, `OMNIS_HOST`, `OMNIS_TOKEN_KEYCHAIN_ITEM`, `OMNIS_RUNTIMES`, `OMNIS_HUB_HTTP_URL`, `OMNIS_BRIDGE_TOKEN` (injected by the A6 wrapper from Keychain `omnis.bridge.token.<host>`), `OMNIS_ZERO_URL`, `ZERO_UPSTREAM_DB`, `ZERO_CVR_DB`, `ZERO_REPLICA_FILE`, `OLLAMA_HOST=127.0.0.1:11434`, `HERMES_BASE_URL`. New variables use the `OMNIS_` prefix + upper snake case.
-- **Keychain item rules** (base form `omnis.<channel>.<kind>.<external_id>`, the account field is `281932556+jinhologankim@users.noreply.github.com`):
+- **Keychain item rules** (base form `omnis.<channel>.<kind>.<external_id>`, the account field is `omnis`):
   - The Google family (`gmail`/`gcal`) **shares 1 item, `omnis.gmail.<email>`**, and omits the `<kind>` segment. The `gcal` adapter has `channel:"gcal"` while reusing the same `keychainService`.
   - Slack uses **2 items**: `omnis.slack.xoxb.<team_id>` (bot token, account=`<team_id>`) and `omnis.slack.xoxb.<team_id>.app` (app token). Onboarding writes these names too (not `xoxp`).
   - The bridge token is `omnis.bridge.token.<host>` (§8).

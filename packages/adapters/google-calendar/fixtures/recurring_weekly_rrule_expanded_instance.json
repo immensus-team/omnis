@@ -13,11 +13,11 @@
     "location": "Meeting Room A (hybrid)",
     "colorId": "9",
     "creator": {
-      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "email": "me@example.com",
       "self": true
     },
     "organizer": {
-      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "email": "me@example.com",
       "self": true
     },
     "start": {

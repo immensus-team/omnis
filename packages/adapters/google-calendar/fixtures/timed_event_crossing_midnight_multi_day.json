@@ -7,11 +7,11 @@
     "summary": "Year-End Deploy Window (crosses midnight)",
     "description": "12/31 23:30 ~ 1/1 07:00. Rollback owner on standby.",
     "creator": {
-      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "email": "me@example.com",
       "self": true
     },
     "organizer": {
-      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "email": "me@example.com",
       "self": true
     },
     "start": {

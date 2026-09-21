@@ -5,14 +5,15 @@
 #
 # Usage: tools/auth-kit/keychain-add.sh <item> [account]
 #   item    Keychain service name (required)
-#   account defaults to 281932556+jinhologankim@users.noreply.github.com (identifies Logan himself, A6 §9)
+#   account defaults to omnis — a fixed, non-identifying label (A6 §9). Readers look items up by
+#   service name only, so the account never has to match anything.
 #
 # Only works in a GUI session — in an SSH shell (Background session) security rejects it
 # with "User interaction is not allowed" (ops/mini/RUNBOOK.md §4).
 set -euo pipefail
 
 item="${1:?usage: keychain-add.sh <item> [account]}"
-account="${2:-281932556+jinhologankim@users.noreply.github.com}"
+account="${2:-omnis}"
 
 read -r -s -p "Value for $item (account=$account): " secret
 echo

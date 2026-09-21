@@ -124,7 +124,7 @@ describe("hub adapter registry (US-B45)", () => {
         channel: "gmail",
         accountExternalId: EXTERNAL_ID,
         keychainService: `omnis.gmail.refresh.${EXTERNAL_ID}`,
-        keychainAccount: "281932556+jinhologankim@users.noreply.github.com",
+        keychainAccount: "omnis",
       },
     ]);
   });

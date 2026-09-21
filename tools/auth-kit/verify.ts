@@ -1,9 +1,10 @@
 #!/usr/bin/env -S pnpm exec tsx
 // Checks each channel's Keychain item existence plus a one-shot read-only API call, and prints a table.
 // Token values are never printed to stdout: existence is checked without `-w`, and only the API call
-// reads the value into memory and uses it immediately (A6 §9). The only channels wired up today are
-// slack/gmail/gcal, which actually have adapters (A1 §2.1-§2.3) — outlook/telegram have no adapter at
-// all, so they're out of scope (see each README.md).
+// reads the value into memory and uses it immediately (A6 §9). Every read looks the item up by service
+// name only — `-a` is omitted, so an item stamped with any account still resolves. The only channels
+// wired up today are slack/gmail/gcal, which actually have adapters (A1 §2.1-§2.3) — outlook/telegram
+// have no adapter at all, so they're out of scope (see each README.md).
 
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -13,7 +14,6 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const DIR = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_ACCOUNT = "281932556+jinhologankim@users.noreply.github.com";
 
 export type KeychainStatus = "ok" | "missing";
 export type ApiStatus = "ok" | "fail" | "skip";
@@ -31,7 +31,6 @@ export interface ChannelSpec {
   account: string;
   /** Every Keychain service the adapter reads in connect() — missing even one breaks the connection. */
   keychainServices: string[];
-  keychainAccount: string;
   checkApi: () => Promise<{ ok: boolean; detail?: string }>;
 }
 
@@ -39,14 +38,14 @@ type ExecFn = (cmd: string, args: string[]) => Promise<{ stdout: string }>;
 
 const realExec: ExecFn = (cmd, args) => execFileAsync(cmd, args);
 
-/** Existence check only — `-w` is omitted, so the value is never read or printed. */
+/** Existence check only — `-w` is omitted, so the value is never read or printed. `-a` is omitted
+ *  too: the lookup is by service name, so an item stamped with any account still resolves. */
 export async function checkKeychainItem(
   service: string,
-  account: string,
   exec: ExecFn = realExec,
 ): Promise<KeychainStatus> {
   try {
-    await exec("security", ["find-generic-password", "-s", service, "-a", account]);
+    await exec("security", ["find-generic-password", "-s", service]);
     return "ok";
   } catch {
     return "missing";
@@ -54,31 +53,20 @@ export async function checkKeychainItem(
 }
 
 /** Use only when the API call genuinely needs the value. Keeping the return value out of logs is the caller's job. */
-export async function readKeychainValue(
-  service: string,
-  account: string,
-  exec: ExecFn = realExec,
-): Promise<string> {
-  const { stdout } = await exec("security", [
-    "find-generic-password",
-    "-s",
-    service,
-    "-a",
-    account,
-    "-w",
-  ]);
+export async function readKeychainValue(service: string, exec: ExecFn = realExec): Promise<string> {
+  const { stdout } = await exec("security", ["find-generic-password", "-s", service, "-w"]);
   return stdout.trim();
 }
 
 export async function runVerify(
   specs: ChannelSpec[],
-  checkKeychain: (service: string, account: string) => Promise<KeychainStatus> = checkKeychainItem,
+  checkKeychain: (service: string) => Promise<KeychainStatus> = checkKeychainItem,
 ): Promise<Row[]> {
   const rows: Row[] = [];
   for (const spec of specs) {
     let missing: string | undefined;
     for (const service of spec.keychainServices) {
-      if ((await checkKeychain(service, spec.keychainAccount)) !== "ok") {
+      if ((await checkKeychain(service)) !== "ok") {
         missing = service;
         break;
       }
@@ -137,18 +125,18 @@ export function formatReport(rows: Row[]): string {
 // same libraries the adapters do, but makes a single read-only call with none of connect()/subscribe()'s
 // socket and polling overhead. ----
 
-async function slackApiCheck(service: string, account: string) {
-  const token = await readKeychainValue(service, account);
+async function slackApiCheck(service: string) {
+  const token = await readKeychainValue(service);
   const { WebClient } = await import("@slack/web-api");
   const res = await new WebClient(token).auth.test();
   return { ok: res.ok === true, detail: res.ok ? `team=${res.team}` : String(res.error ?? "") };
 }
 
-async function gmailApiCheck(service: string, account: string) {
+async function gmailApiCheck(service: string) {
   const [refreshToken, clientId, clientSecret] = await Promise.all([
-    readKeychainValue(service, account),
-    readKeychainValue("omnis.google.oauth_client_id", DEFAULT_ACCOUNT),
-    readKeychainValue("omnis.google.oauth_client_secret", DEFAULT_ACCOUNT),
+    readKeychainValue(service),
+    readKeychainValue("omnis.google.oauth_client_id"),
+    readKeychainValue("omnis.google.oauth_client_secret"),
   ]);
   const { google } = await import("googleapis");
   const oauth = new google.auth.OAuth2(clientId, clientSecret);
@@ -158,11 +146,11 @@ async function gmailApiCheck(service: string, account: string) {
   return { ok: true, detail: res.data.emailAddress ?? "" };
 }
 
-async function calendarApiCheck(service: string, account: string) {
+async function calendarApiCheck(service: string) {
   const [refreshToken, clientId, clientSecret] = await Promise.all([
-    readKeychainValue(service, account),
-    readKeychainValue("omnis.google.oauth_client_id", DEFAULT_ACCOUNT),
-    readKeychainValue("omnis.google.oauth_client_secret", DEFAULT_ACCOUNT),
+    readKeychainValue(service),
+    readKeychainValue("omnis.google.oauth_client_id"),
+    readKeychainValue("omnis.google.oauth_client_secret"),
   ]);
   const { google } = await import("googleapis");
   const oauth = new google.auth.OAuth2(clientId, clientSecret);
@@ -198,8 +186,7 @@ function buildSpecs(accounts: AccountsConfig): ChannelSpec[] {
       // connect() reads both the xoxb and the app-level (`.app`) token —
       // packages/adapters/slack/src/index.ts. Without `.app`, Socket Mode can't come up.
       keychainServices: [service, `${service}.app`],
-      keychainAccount: teamId,
-      checkApi: () => slackApiCheck(service, teamId),
+      checkApi: () => slackApiCheck(service),
     });
   }
   if (accounts.google) {
@@ -211,15 +198,13 @@ function buildSpecs(accounts: AccountsConfig): ChannelSpec[] {
       channel: "gmail",
       account: email,
       keychainServices: [service],
-      keychainAccount: email,
-      checkApi: () => gmailApiCheck(service, email),
+      checkApi: () => gmailApiCheck(service),
     });
     specs.push({
       channel: "gcal",
       account: email,
       keychainServices: [service],
-      keychainAccount: email,
-      checkApi: () => calendarApiCheck(service, email),
+      checkApi: () => calendarApiCheck(service),
     });
   }
   return specs;

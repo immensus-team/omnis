@@ -85,7 +85,7 @@ export function createTelegramAdapter(deps: TelegramAdapterDeps = {}): Adapter {
 
     async connect(auth: AuthRef): Promise<void> {
       // The Keychain holds only the encryption key wrapping the session file, not the file itself (A1 §2.5) — it is never logged.
-      await readKeychainSecret(auth.keychainService, auth.keychainAccount, CHANNEL);
+      await readKeychainSecret(auth.keychainService, CHANNEL);
       if (client === undefined) {
         status = "down";
         throw new AdapterError(

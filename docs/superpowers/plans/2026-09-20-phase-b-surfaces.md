@@ -3244,7 +3244,7 @@ cd /Users/logankim/AI-Workspaces/omnis && grep -n "export function initialsFromN
    // added to the readConfig() return object:
    webpushVapidPublic: env.OMNIS_WEBPUSH_VAPID_PUBLIC ?? "",
    webpushVapidPrivate: env.OMNIS_WEBPUSH_VAPID_PRIVATE ?? "",
-   webpushSubject: env.OMNIS_WEBPUSH_SUBJECT ?? "mailto:281932556+jinhologankim@users.noreply.github.com",
+   webpushSubject: env.OMNIS_WEBPUSH_SUBJECT ?? "mailto:omnis@localhost",
    ```
    ```ts
    // apps/hub/src/http.ts — added import + top of createHubServer + routes

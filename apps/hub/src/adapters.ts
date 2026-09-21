@@ -10,8 +10,10 @@ import type { Pool } from "pg";
 //
 // This module deliberately imports no channel SDK — the real factory table lives in `main.ts`.
 
-/** A6 §9: the Keychain account is common to every item. Duplicated per package, like createLogger. */
-const KEYCHAIN_ACCOUNT = "281932556+jinhologankim@users.noreply.github.com";
+/** A6 §9: the Keychain account is a fixed, non-identifying label common to every item. Readers never
+ *  filter on it (lookup is by service name only), so it is only what a *writer* stamps on a new item.
+ *  Duplicated per package, like createLogger. */
+const KEYCHAIN_ACCOUNT = "omnis";
 
 export interface AccountRow {
   id: string;

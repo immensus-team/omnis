@@ -34,7 +34,8 @@ check_ollama() {
 }
 check_slot() {
   local active
-  active="$(psql "${DATABASE_URL:-postgres://vigor@127.0.0.1:5432/omnis}" -Atc \
+  # The mini's Postgres role is its login user — derive it instead of naming anyone (A6 §9).
+  active="$(psql "${DATABASE_URL:-postgres://$(id -un)@127.0.0.1:5432/omnis}" -Atc \
     "select coalesce(bool_and(active), true) from pg_replication_slots" 2>/dev/null || echo f)"
   [ "$active" = "t" ] || FAILS+=("replication slot inactive")
 }

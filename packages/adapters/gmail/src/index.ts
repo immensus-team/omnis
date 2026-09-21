@@ -62,11 +62,7 @@ export function createGmailAdapter(deps: GmailAdapterDeps): Adapter {
     capabilities: () => CAPABILITIES,
 
     async connect(auth: AuthRef): Promise<void> {
-      const refreshToken = await readKeychainSecret(
-        auth.keychainService,
-        auth.keychainAccount,
-        CHANNEL,
-      );
+      const refreshToken = await readKeychainSecret(auth.keychainService, CHANNEL);
       oauth =
         deps.oauthClient ?? new google.auth.OAuth2(deps.oauthClientId, deps.oauthClientSecret);
       oauth.setCredentials({ refresh_token: refreshToken });

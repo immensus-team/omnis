@@ -4,11 +4,12 @@
 # For all 6 steps of the rotation procedure see ops/mini/RUNBOOK.md "Web Push VAPID keys".
 set -euo pipefail
 
-ACCOUNT="281932556+jinhologankim@users.noreply.github.com"
+ACCOUNT="omnis"   # the fixed, non-identifying label new items are stamped with (A6 §9)
 PUB_SERVICE="omnis.webpush.vapid_public"
 PRIV_SERVICE="omnis.webpush.vapid_private"
 
-kc_get() { security find-generic-password -s "$1" -a "$ACCOUNT" -w 2>/dev/null; }
+# No `-a`: reads resolve by service name alone, so items stamped with an older account still match.
+kc_get() { security find-generic-password -s "$1" -w 2>/dev/null; }
 # NOTE: `security` only accepts the value as an argv (ending with a bare `-w` triggers a tty prompt,
 # which a script cannot answer). So for this one line the private key is visible to `ps` on the same
 # machine. It never lands in output, logs, or commits.

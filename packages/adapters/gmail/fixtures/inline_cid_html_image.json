@@ -18,7 +18,7 @@
         },
         {
           "name": "To",
-          "value": "281932556+jinhologankim@users.noreply.github.com"
+          "value": "me@example.com"
         },
         {
           "name": "Subject",
@@ -95,8 +95,8 @@
               "displayName": "Brand, Omnis"
             },
             {
-              "externalId": "281932556+jinhologankim@users.noreply.github.com",
-              "displayName": "281932556+jinhologankim@users.noreply.github.com"
+              "externalId": "me@example.com",
+              "displayName": "me@example.com"
             }
           ],
           "lastItemAt": "2023-11-15T12:30:00.000Z",
