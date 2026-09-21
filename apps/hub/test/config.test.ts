@@ -68,3 +68,24 @@ describe("adapter registry config (US-B45)", () => {
     expect(c.ntfyUrl).toBe("http://ntfy.test");
   });
 });
+
+describe("web push config (US-B36)", () => {
+  it("leaves the VAPID keypair empty — that is what makes /push/* 503 — and keeps a usable subject", () => {
+    const c = readConfig({ DATABASE_URL: "postgres://x/y" });
+    expect(c.webpushVapidPublic).toBe("");
+    expect(c.webpushVapidPrivate).toBe("");
+    expect(c.webpushSubject).toMatch(/^(mailto:|https?:)/);
+  });
+
+  it("reads the keypair and subject from the environment (delta §9)", () => {
+    const c = readConfig({
+      DATABASE_URL: "postgres://x/y",
+      OMNIS_WEBPUSH_VAPID_PUBLIC: "pub",
+      OMNIS_WEBPUSH_VAPID_PRIVATE: "priv",
+      OMNIS_WEBPUSH_SUBJECT: "mailto:ops@example.com",
+    });
+    expect(c.webpushVapidPublic).toBe("pub");
+    expect(c.webpushVapidPrivate).toBe("priv");
+    expect(c.webpushSubject).toBe("mailto:ops@example.com");
+  });
+});

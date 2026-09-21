@@ -16,6 +16,16 @@ export interface HubConfig {
   outlookClientId: string;
   /** self-hosted ntfy (A6 §8, delta §9). Adapter health failures surface here as well as in a system Item. */
   ntfyUrl: string;
+  /** Web Push VAPID keypair (delta §9, Keychain omnis.webpush.vapid_*). Empty means push is not
+   *  configured at all: /push/* answers 503 and nothing can be subscribed. The *sender* that calls
+   *  setVapidDetails with these is @omnis/kernel's sendWebPush (single owner, cross review
+   *  M-webpush); the hub only reports the public key to the browser. */
+  webpushVapidPublic: string;
+  webpushVapidPrivate: string;
+  /** The VAPID `sub` claim — a mailto: or URL the push service can reach the operator at.
+   *  Same env name and default as @omnis/kernel's vapidFromEnv, so the hub's "is it configured"
+   *  check and the sender's key loading never disagree. */
+  webpushSubject: string;
 }
 
 export const HUB_VERSION = "0.1.0";
@@ -44,5 +54,9 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): HubConfig {
     googleOAuthClientSecret: env.OMNIS_GOOGLE_OAUTH_CLIENT_SECRET ?? "",
     outlookClientId: env.OMNIS_OUTLOOK_CLIENT_ID ?? "",
     ntfyUrl: env.OMNIS_NTFY_URL ?? "http://127.0.0.1:2586",
+    webpushVapidPublic: env.OMNIS_WEBPUSH_VAPID_PUBLIC ?? "",
+    webpushVapidPrivate: env.OMNIS_WEBPUSH_VAPID_PRIVATE ?? "",
+    webpushSubject:
+      env.OMNIS_WEBPUSH_SUBJECT ?? "mailto:281932556+jinhologankim@users.noreply.github.com",
   };
 }
