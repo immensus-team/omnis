@@ -10,10 +10,23 @@ PRIV_SERVICE="omnis.webpush.vapid_private"
 
 # No `-a`: reads resolve by service name alone, so items stamped with an older account still match.
 kc_get() { security find-generic-password -s "$1" -w 2>/dev/null; }
+# Writes delete every item for the service before adding. A generic-password item is keyed by
+# (service, account), so `-U` only replaces an item whose account matches too: an item left under an
+# older label — older installs stamped a personal address there — would survive as a second item on the
+# same service, and kc_get resolves by service alone, so a rotation could keep serving the stale key
+# with nothing in the output to show it. Deleting first makes --force a real replacement, and an item
+# that survives the delete (a denied delete aborts the loop) fails the write loudly instead.
 # NOTE: `security` only accepts the value as an argv (ending with a bare `-w` triggers a tty prompt,
 # which a script cannot answer). So for this one line the private key is visible to `ps` on the same
 # machine. It never lands in output, logs, or commits.
-kc_set() { security add-generic-password -s "$1" -a "$ACCOUNT" -w "$2" -U >/dev/null; }
+kc_set() {
+  while security delete-generic-password -s "$1" >/dev/null 2>&1; do :; done
+  if security find-generic-password -s "$1" >/dev/null 2>&1; then
+    echo "refusing to write $1: an existing item could not be removed" >&2
+    return 1
+  fi
+  security add-generic-password -s "$1" -a "$ACCOUNT" -w "$2" >/dev/null
+}
 
 gen_keys() {
   # 2 lines on stdout: line 1 public (base64url uncompressed point), line 2 private (base64url d).
