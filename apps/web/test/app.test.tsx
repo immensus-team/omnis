@@ -1,9 +1,24 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/App.js";
 
+/** The shell is what this file is about, so Zero is stubbed at the module boundary: a real client
+ *  would open a WebSocket to 127.0.0.1:4848 from every test run. `useQuery` answers "loaded, no
+ *  rows", which is the state the empty inbox copy describes. */
+const zqlChain: unknown = new Proxy(function zql() {} as unknown as object, {
+  get: () => zqlChain,
+  apply: () => zqlChain,
+});
+
+vi.mock("@rocicorp/zero/react", () => ({
+  ZeroProvider: ({ children }: { children: ReactNode }) => children,
+  useZero: () => ({ query: zqlChain }),
+  useQuery: () => [[], { type: "complete" }],
+}));
+
 /** jsdom has no matchMedia, and the shell asks it one question at mount ("is this installed?").
- *  The default stub says "no" — i.e. a browser, which is where the install guide belongs. */
+ *  The default stub says "no" — a browser, which is where the install guide belongs. */
 const realMatchMedia = window.matchMedia;
 
 function stubStandalone(standalone: boolean): void {
@@ -48,5 +63,14 @@ describe("App shell", () => {
     stubStandalone(true);
     render(<App />);
     expect(screen.queryByRole("dialog", { name: "Add to Home Screen" })).toBeNull();
+  });
+
+  it("draws the Inbox tab's body and says so on the surface", () => {
+    stubStandalone(true);
+    render(<App />);
+    expect(screen.getByRole("main")).toHaveAttribute("data-screen", "inbox");
+    // The screenshot tool reads this attribute — a frame of an empty list photographs as cleanly
+    // as a finished one.
+    expect(screen.getByText("Nothing in the inbox.")).toBeInTheDocument();
   });
 });

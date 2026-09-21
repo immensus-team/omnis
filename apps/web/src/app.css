@@ -142,6 +142,24 @@ body {
   margin-bottom: 4px;
 }
 
+/* The Inbox tab's body: the list as one card on the canvas. Same recipe as the desktop's
+   .inbox-card (opaque, radius 20, the selected-row shadow, no hairline) minus the pane layout it
+   does not need here — the phone has one column, so the card is the whole body. */
+.pwa-inbox {
+  background: var(--bg-base);
+  border-radius: 20px;
+  box-shadow: var(--shadow-row-selected);
+  padding: 8px;
+  overflow: hidden;
+}
+
+.pwa-inbox__empty {
+  margin: 0;
+  padding: 32px 12px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
 /* One entrance, not a fade-up on everything (SKILLS.md checklist 9), and nothing at all under
    prefers-reduced-motion (checklist 10). */
 @keyframes web-card-in {
