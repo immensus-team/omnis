@@ -1407,7 +1407,9 @@ describe("App shell queue destinations and task completion (loop-r2-06)", () => 
   }
 
   const bodiesFor = (calls: HubCall[], path: string): unknown[] =>
-    calls.filter((call) => call.url.includes(path)).map((call) => JSON.parse(String(call.init?.body)));
+    calls
+      .filter((call) => call.url.includes(path))
+      .map((call) => JSON.parse(String(call.init?.body)));
 
   beforeEach(() => {
     approvals.rows = [];
@@ -1490,9 +1492,7 @@ describe("App shell queue destinations and task completion (loop-r2-06)", () => 
 
     // The box fills on the click — the write is still in flight — and the hub is told "done".
     expect(box).toBeChecked();
-    await waitFor(() =>
-      expect(bodiesFor(calls, "/tasks/t1/state")).toEqual([{ state: "done" }]),
-    );
+    await waitFor(() => expect(bodiesFor(calls, "/tasks/t1/state")).toEqual([{ state: "done" }]));
     // The title travels with the callback, so the toast names the task rather than saying
     // "Completed" about nothing in particular.
     const toast = await waitFor(() => {
