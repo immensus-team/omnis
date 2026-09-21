@@ -796,6 +796,27 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* loop-r1-02/L-04: the queue's entry point, inside the subline above. A text button and not a chip:
+   §e guard 7 keeps pills for the filters, and this is a fourth segment of a sentence, not a filter.
+   No underline — the accent colour is the whole affordance, and an underline under three words in a
+   caption reads as a link out of the app. `font: inherit` is what makes it the subline's own 13px;
+   the padding is zeroed so it adds no height to the line it shares. */
+.inbox-card__approvals {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.inbox-card__approvals:hover {
+  text-decoration: none;
+  opacity: 0.8;
+}
+
 /* US-D02b: the whole filter UI — radio pills, the Archived toggle and the label chips on one
    line. Narrow does not wrap it, it **slides** (horizontal scroll). Every child is `flex: 0 0
    auto`, so none of them shrinks or folds — folding is the original three-line bug.
@@ -1407,8 +1428,60 @@ body {
    floating button would be covered by it as soon as the user scrolled. */
 .detail-pane__chrome {
   display: flex;
+  align-items: center;
+  gap: 8px;
   justify-content: flex-end;
   margin-bottom: 8px;
+  /* loop-r1-02/NC-32: the chrome row is controls, not prose. Without this a press that slides along
+     it selects the ✕'s neighbour and the row comes back highlighted. */
+  user-select: none;
+}
+
+/* loop-r1-02: the floating tier's ✕ (900–1279.98 — the shell renders it only where the pane is a
+   sheet). 32px and circular with `--chip-bg`, which is v3 §c.6's own close: a filled disc, not a
+   second ghost chevron, so the pair reads as "put this away" and "make this a column" rather than as
+   two spellings of one thing. */
+.detail-pane__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--chip-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.detail-pane__close:hover {
+  color: var(--text-primary);
+}
+
+/* loop-r1-02/NC-37: the `<900` sheet's back row. Hidden above 900 — where the pane is a column or a
+   floating sheet and both draw their own close — and shown by the narrow tier's block far below, so
+   the element exists once in the markup and the tier decides whether there is a row at all. */
+.detail-pane__sheet-head {
+  display: none;
+}
+
+/* The row is controls, like the chrome above it: a press that slides across it must not select the
+   word "Inbox" (NC-32). */
+.detail-pane__back {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 44px;
+  padding: 0 8px 0 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  user-select: none;
 }
 
 .detail-pane__toggle {
@@ -1693,13 +1766,21 @@ body {
   flex: 0 0 auto;
 }
 
+/* loop-r1-02/L-26, NC-27: four decisions on one line do not fit a 320px pane or a 390 window, and
+   the row used to solve that by overflowing — "Ignore" was clipped and "Edit & approve" wrapped to
+   two lines, which is a card whose right edge cuts off a decision the user is being asked to make.
+   Wrapping is the honest answer: the buttons stay whole and the card grows a second row. `nowrap` on
+   each button is the other half — without it a narrow pane breaks a label across two lines inside
+   its own button, which is the same clipping one level down. */
 .approval-card__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 8px;
 }
 
 .approval-card__actions button {
+  white-space: nowrap;
   border: var(--hairline);
   border-radius: 8px;
   padding: 4px 12px;
@@ -1749,6 +1830,9 @@ body {
   font-size: 13px;
   text-align: left;
   cursor: pointer;
+  /* loop-r1-02/NC-32: the row is a button, not a line of text. Dragging across a list of them used
+     to leave a selection highlight over the queue — the same bug the sheet's own header had. */
+  user-select: none;
 }
 
 /* A collapsed row is still a button — it promotes itself to the expanded card — but it does not
@@ -2875,12 +2959,26 @@ body {
 
   /* US-D10: no handle and no toggle in this tier. The pane is the window's full width, so there is
      nothing to resize against — and no column, so nothing to collapse: the pane here is a sheet the
-     user opened by tapping a row, and the way to close it is the same as it has always been
-     (US-D02b's sheet behaviour, unchanged). The grip would also land on top of the sheet's own edge
-     at this size, where a divider between one thing and nothing reads as a bug. */
+     user opened by tapping a row. The grip would also land on top of the sheet's own edge at this
+     size, where a divider between one thing and nothing reads as a bug.
+     loop-r1-02/NC-37: "the way to close it is the same as it has always been" was not true — the
+     sheet had no way out at all, so opening a thread at 390 was a one-way door. The chrome row
+     stays `display: none` (there is no column for a chevron to collapse) and the tier draws its own
+     back row instead, below. */
   .detail-pane__grip,
   .detail-pane__chrome {
     display: none;
+  }
+
+  /* loop-r1-02/NC-37: the sheet's back row. 44px, which is the tap target §c.5 asks for in this
+     tier and the height of the Sheet component's own header (§c.6) — the two are the same control
+     in the same place on two different surfaces, so they are the same size. The negative top margin
+     is the 44px row taking back half of the pane's own 16px of padding: at 0 it sits a full gutter
+     below the sheet's edge, which reads as a row that has not arrived yet. */
+  .detail-pane__sheet-head {
+    display: flex;
+    align-items: center;
+    margin: -8px 0 4px;
   }
 
   /* There is no room to keep 420px — full width, with 16px of margin each side. */

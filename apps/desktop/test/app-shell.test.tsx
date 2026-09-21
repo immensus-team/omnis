@@ -10,9 +10,11 @@ import {
   DETAIL_DEFAULT_WIDTH,
   DETAIL_MIN_WIDTH,
   DETAIL_WIDTH_KEY,
+  FLOATING_PANE_QUERY,
+  NARROW_SHELL_QUERY,
 } from "@omnis/ui";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /** This test file's own directory. vitest's transform can leave import.meta.url on a scheme other
  *  than file: (fileURLToPath then throws "The URL must be of scheme file"), so only the pathname is
@@ -22,8 +24,20 @@ const TEST_DIR = dirname(new URL(import.meta.url).pathname);
 
 // This test only asks whether the screens are actually mounted in the shell. The Zero round trip
 // is tools/e2e's job (Playwright).
+//
+// loop-r1-02: the queue is the one relation a test can put rows into. Every other query answers an
+// empty list — which is what the tests above expect and what keeps them unchanged — while
+// `pending_approvals` answers `approvals.rows`. `queue` is a second Proxy with its own identity so
+// the `useQuery` mock below can recognise it: the chain's `get` and `apply` both return it, so
+// `zero.query.pending_approvals.where("state", "=", "pending")` hands the *same object* to useQuery
+// and nothing derived from it can be mistaken for it.
+const approvals: { rows: unknown[] } = { rows: [] };
+const queue: unknown = new Proxy(() => queue, {
+  get: () => queue,
+  apply: () => queue,
+});
 const chain: unknown = new Proxy(() => chain, {
-  get: () => chain,
+  get: (_target, prop) => (prop === "pending_approvals" ? queue : chain),
   apply: () => chain,
 });
 vi.mock("../src/zero-client.js", () => ({
@@ -32,7 +46,7 @@ vi.mock("../src/zero-client.js", () => ({
   loadZeroToken: async () => {},
 }));
 vi.mock("@rocicorp/zero/react", () => ({
-  useQuery: () => [[], { type: "complete" }],
+  useQuery: (q: unknown) => [q === queue ? approvals.rows : [], { type: "complete" }],
   useZero: () => chain,
   ZeroProvider: ({ children }: { children: unknown }) => children,
 }));
@@ -780,5 +794,142 @@ describe("App shell detail pane (US-D10: width and collapse are settings)", () =
     );
     expect(writes(calls)).toHaveLength(0);
     expect(screen.queryByRole("button", { name: "Expand details" })).not.toBeInTheDocument();
+  });
+});
+
+/** loop-r1-02: the pending-approval queue and the pane's three ways out.
+ *
+ *  The story is that the pane stops opening itself below 1280 (L-04, L-17, NC-03) and that every
+ *  tier it *is* open in has a way back to the list (NC-37, NC-09). Both halves are shell state, so
+ *  both are testable here without a browser: the auto-open rule is one boolean expression in App.tsx
+ *  and the close is one callback three controls share.
+ *
+ *  What this file cannot reach is the geometry — that the 390 list is actually uncovered, and that
+ *  the approval card's buttons stop at its right edge. Those are app.css and a real layout, and they
+ *  belong to tools/e2e/shots-loop-r1-02.ts. */
+describe("App shell approval queue (loop-r1-02: the list comes first)", () => {
+  const REAL_MATCH_MEDIA = window.matchMedia;
+  beforeEach(() => {
+    approvals.rows = [];
+  });
+  afterEach(() => {
+    window.matchMedia = REAL_MATCH_MEDIA;
+  });
+
+  /** The tier the shell is drawn in, answered per query. A stub that says `matches: true` to
+   *  everything is not the same thing: the shell asks matchMedia three separate questions —
+   *  narrow, floating, and (lib/motion.ts) reduced motion — and a yes to the third shortens the
+   *  pane's leave from --dur-move to the 80ms fade, which would make the closes below pass for the
+   *  wrong reason. */
+  function stubTiers({ narrow, floating }: { narrow: boolean; floating: boolean }): void {
+    window.matchMedia = ((query: string) => ({
+      media: query,
+      matches:
+        query === NARROW_SHELL_QUERY ? narrow : query === FLOATING_PANE_QUERY ? floating : false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+  }
+
+  /** One row of the queue, in the shape ApprovalStackItem asks for — the same fields
+   *  pending_approvals carries through Zero. */
+  const approval = (id: string) => ({
+    id,
+    thread_id: `thread-${id}`,
+    risk: "normal",
+    created_at: 1,
+    action: "send",
+    description: `Approval ${id}`,
+    config: { allow_accept: true, allow_edit: true, allow_respond: true, allow_ignore: true },
+  });
+
+  const pane = () => screen.queryByTestId("detail-pane");
+
+  it("draws no pane at all below 1280, and the queue when it is asked for", () => {
+    approvals.rows = [approval("a1"), approval("a2")];
+    stubTiers({ narrow: false, floating: true });
+    render(<App />);
+
+    // The finding itself. Two approvals are waiting and the pane is nowhere: at 900–1279 that is
+    // the ~40% of the list the sheet used to float over (L-17), and at 390 the full-height overlay
+    // that made the inbox unreachable until every approval had been decided (L-04, NC-03).
+    expect(pane()).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Pending approvals" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "2 need approval" }));
+    expect(pane()).toBeInTheDocument();
+    // With nothing open the queue *is* the pane, so the stack is what it draws.
+    expect(screen.getByRole("region", { name: "Pending approvals" })).toBeInTheDocument();
+  });
+
+  it("takes the queue away again on Escape", async () => {
+    approvals.rows = [approval("a1"), approval("a2")];
+    stubTiers({ narrow: false, floating: true });
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "2 need approval" }));
+    expect(pane()).toBeInTheDocument();
+
+    // Escape closes, and below 1280 it closes for good: there is no auto-open rule to put the queue
+    // back, which is the tier where the list has to win.
+    fireEvent.keyDown(window, { key: "Escape" });
+    // The pane is held in the DOM for --dur-move while it leaves (useClosingSpring) — a stylesheet
+    // cannot animate a node React has already unmounted.
+    await waitFor(() => expect(pane()).not.toBeInTheDocument());
+  });
+
+  it("does not open itself on the narrow tier either, and its back row is the way out", async () => {
+    approvals.rows = [approval("a1"), approval("a2")];
+    stubTiers({ narrow: true, floating: true });
+    render(<App />);
+
+    expect(pane()).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "2 need approval" }));
+    expect(pane()).toBeInTheDocument();
+
+    // NC-37: at 390 the pane is a full-width sheet and `.detail-pane__chrome` is `display: none`
+    // there, so this row is the tier's only way back. jsdom applies no stylesheet, which is why the
+    // control is reachable in both tiers here and its *visibility* is the Playwright check's job.
+    fireEvent.click(screen.getByRole("button", { name: "Back to Inbox" }));
+    await waitFor(() => expect(pane()).not.toBeInTheDocument());
+  });
+
+  it("says it in the singular for one, and draws nothing at zero", () => {
+    stubTiers({ narrow: false, floating: true });
+
+    approvals.rows = [approval("a1")];
+    const { unmount } = render(<App />);
+    const button = screen.getByRole("button", { name: "1 needs approval" });
+    // A child of the subline and not a row beside it. That is the half of L-32 this file can hold:
+    // an inline child of the same 13px line adds no height to the header, while a sibling block
+    // under it would — and the header growing and shrinking as the last approval is decided is the
+    // jump the finding is about. The rest is geometry, and belongs to the browser check.
+    expect(button.parentElement?.className).toBe("inbox-card__subline");
+    unmount();
+
+    approvals.rows = [];
+    render(<App />);
+    expect(screen.queryByRole("button", { name: /needs? approval/ })).toBeNull();
+  });
+
+  // The regression guard: >=1280 the pane is a column and opening for the queue on arrival is the
+  // behaviour the story deliberately leaves alone.
+  it("still opens itself in the column tier", () => {
+    approvals.rows = [approval("a1"), approval("a2")];
+    render(<App />);
+    expect(pane()).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Pending approvals" })).toBeInTheDocument();
+  });
+
+  // ...and the same tier is where the subline button earns its second job: a pane the user has
+  // collapsed does not re-open for the queue on its own, so this is the way back to it.
+  it("re-opens a collapsed pane for the queue at >=1280", async () => {
+    approvals.rows = [approval("a1")];
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Collapse details" }));
+    await waitFor(() => expect(pane()).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "1 needs approval" }));
+    expect(pane()).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Pending approvals" })).toBeInTheDocument();
   });
 });

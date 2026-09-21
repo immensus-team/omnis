@@ -250,6 +250,8 @@ export function Inbox({
   onChannelFilterChange,
   filtersOpen = false,
   onFiltersOpenChange,
+  pendingApprovals = 0,
+  onOpenApprovals,
 }: {
   onOpen?: (target: OpenTarget) => void;
   /** U1 channel rail selection. null = everything (the Inbox tile). ANDed with the pill filters
@@ -263,6 +265,12 @@ export function Inbox({
    *  Archived view, the label chips) is this screen's. */
   filtersOpen?: boolean;
   onFiltersOpenChange?: (open: boolean) => void;
+  /** loop-r1-02/L-04: how many approvals are waiting, and how to get to them. The queue is the
+   *  shell's pane, so the list can neither open nor count it by itself — what the list can do is say
+   *  it exists. Below 1280 this is the *only* way the pane opens on the queue (it no longer opens
+   *  itself there), and at >=1280 it is the way back after the user has collapsed the pane. */
+  pendingApprovals?: number;
+  onOpenApprovals?: () => void;
 }) {
   const zero = useZeroClient();
   const [filter, setFilter] = useState<InboxFilter>("all");
@@ -311,7 +319,11 @@ export function Inbox({
   // Exactly what the name says: pending only. Replicating the whole lifecycle grows the client's
   // approvals table without bound, while the only question the inbox actually asks is what is
   // waiting on a decision right now.
-  const [pendingApprovals] = useQuery(
+  // loop-r1-02: `pendingApprovalRows`, not `pendingApprovals` — that name is the prop above, and the
+  // two are the same number by different routes. The prop is the shell's count (its own query, and
+  // the one the pane draws); this is the *rows*, which is what the per-row approval dot needs. They
+  // agree because both ask for state='pending'.
+  const [pendingApprovalRows] = useQuery(
     zero.query.pending_approvals
       .where("state", "=", "pending")
       .orderBy("created_at", "desc")
@@ -329,13 +341,13 @@ export function Inbox({
   // One approval per thread, the most recent. The query is created_at desc, so the first
   // appearance is the newest.
   const approvalByThread = useMemo(() => {
-    const best = new Map<string, (typeof pendingApprovals)[number]>();
-    for (const approval of pendingApprovals) {
+    const best = new Map<string, (typeof pendingApprovalRows)[number]>();
+    for (const approval of pendingApprovalRows) {
       if (!approval.thread_id) continue;
       if (!best.has(approval.thread_id)) best.set(approval.thread_id, approval);
     }
     return best;
-  }, [pendingApprovals]);
+  }, [pendingApprovalRows]);
   const labelById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels]);
   const chipsByThread = useMemo(() => {
     const map = new Map<string, LabelChip[]>();
@@ -635,7 +647,27 @@ export function Inbox({
     <OpaqueSurface className="inbox-card">
       <div className="inbox-card__header">
         <h2 className="inbox-card__title">{view === "archived" ? "Archived" : "Inbox"}</h2>
-        {subline && <p className="inbox-card__subline">{subline}</p>}
+        {/* loop-r1-02/L-04: the queue's entry point. It is a fourth segment of the subline rather
+            than a control of its own, because that is where Mail puts "N unread" and a person
+            looking for what is waiting looks there. It is inline, so the line keeps the height of
+            one line of 13px whether or not the count is there — the header must not jump as the
+            last approval is decided (L-32). The `<p>` itself is still conditional: with nothing to
+            say at all there is no line, which is what the list has always done. */}
+        {(subline !== "" || (pendingApprovals > 0 && onOpenApprovals !== undefined)) && (
+          <p className="inbox-card__subline">
+            {subline}
+            {pendingApprovals > 0 && onOpenApprovals !== undefined && (
+              <>
+                {subline !== "" && " · "}
+                <button type="button" className="inbox-card__approvals" onClick={onOpenApprovals}>
+                  {pendingApprovals === 1
+                    ? "1 needs approval"
+                    : `${pendingApprovals} need approval`}
+                </button>
+              </>
+            )}
+          </p>
+        )}
       </div>
       {/* US-D02b: this one line under the title is the whole filter UI — the view pills, the
           Archived toggle and the label chips used to scatter over three lines (that is the

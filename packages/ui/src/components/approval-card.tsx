@@ -57,9 +57,13 @@ export function ApprovalCardView({ interrupt, onDecide, className }: ApprovalCar
       <p className="approval-card__description">{interrupt.description}</p>
       <div className="approval-card__actions">
         {config.allow_accept && <Button onClick={() => setConfirming(true)}>Approve</Button>}
+        {/* loop-r1-02/L-26: one word, not "Edit & approve". At 320 and 390 a pane that is the
+            window's width had no room for the longer label, so the button wrapped to two lines and
+            pushed "Ignore" past the card's right edge. Which decision it is belongs to
+            `onDecide("edit")`; the card's title already says the approval is pending. */}
         {config.allow_edit && (
           <Button variant="ghost" onClick={() => onDecide("edit", interrupt.args)}>
-            Edit &amp; approve
+            Edit
           </Button>
         )}
         {config.allow_respond && (

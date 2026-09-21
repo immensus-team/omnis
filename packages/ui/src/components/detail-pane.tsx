@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { type KeyboardEvent, useRef, useState } from "react";
 import { cn } from "../lib/cn.js";
 import {
@@ -11,12 +11,13 @@ import {
 } from "../lib/detail-pane.js";
 import { pointerDrag } from "../lib/pointer-drag.js";
 
-// US-D10 §c.5 — the detail pane's own two controls: the collapse chevron and the drag grip.
+// US-D10 §c.5 — the detail pane's own controls: the collapse chevron, the drag grip, and the two
+// ways out the floating tiers needed (loop-r1-02: the sheet's `‹ Inbox` row and the ✕).
 //
-// Both are here rather than in apps/desktop/App.tsx for the same reason the rail's tiles are in
-// this package: the pane's chrome is components, and what the shell owns is where they sit. They
-// are also the two things the shell has no state for — the toggle reports a press and the grip
-// reports a width, and neither reads the settings KV itself.
+// All of them are here rather than in apps/desktop/App.tsx for the same reason the rail's tiles are
+// in this package: the pane's chrome is components, and what the shell owns is where they sit. They
+// are also the things the shell has no state for — the toggle reports a press and the grip reports a
+// width, and none of them reads the settings KV itself.
 
 export interface DetailPaneToggleProps {
   /** True while the pane is collapsed — i.e. while the press would *bring it back*. The chevron
@@ -45,6 +46,57 @@ export function DetailPaneToggle({ collapsed, onToggle, className }: DetailPaneT
       onClick={onToggle}
     >
       <Icon size={18} aria-hidden="true" />
+    </button>
+  );
+}
+
+export interface DetailPaneBackProps {
+  onBack(): void;
+  className?: string;
+}
+
+/** `<900` only: the sheet's way back to the list.
+ *
+ *  The tier's equivalent of the collapse chevron. There the pane is the window's full width, so the
+ *  way out is a row at the top of the sheet rather than a control on an edge that is off screen —
+ *  and the chevron is deliberately `display: none` there (app.css), because a control for a column
+ *  that does not exist is a control that lies.
+ *
+ *  A word and not a bare `<`. "Inbox" is what the press goes back to; the chevron alone would be a
+ *  second unlabelled direction glyph next to the pane's own, and the two point opposite ways. */
+export function DetailPaneBack({ onBack, className }: DetailPaneBackProps) {
+  return (
+    <button
+      type="button"
+      className={cn("detail-pane__back", className)}
+      aria-label="Back to Inbox"
+      onClick={onBack}
+    >
+      <ChevronLeft size={18} aria-hidden="true" />
+      Inbox
+    </button>
+  );
+}
+
+export interface DetailPaneCloseProps {
+  onClose(): void;
+  className?: string;
+}
+
+/** `900–1279.98` only: the floating sheet's ✕ (v3 §c.6's close control).
+ *
+ *  Below 900 the sheet draws `DetailPaneBack` instead, and at >=1280 the pane is a column whose
+ *  collapse chevron already puts it away — so the shell renders this in exactly one tier, and the
+ *  three controls cannot appear together and compete. */
+export function DetailPaneClose({ onClose, className }: DetailPaneCloseProps) {
+  return (
+    <button
+      type="button"
+      className={cn("detail-pane__close", className)}
+      aria-label="Close"
+      onClick={onClose}
+    >
+      <X size={16} aria-hidden="true" />
     </button>
   );
 }

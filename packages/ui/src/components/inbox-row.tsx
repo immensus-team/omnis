@@ -331,6 +331,11 @@ export function InboxRow(props: InboxRowProps) {
           style={collapse.style}
           // biome-ignore lint/a11y/useSemanticElements: A5 §3.1 listbox/option pattern — <option> is only valid inside <select> and can't hold this row's markup.
           role="option"
+          // loop-r1-02/NC-09: the thread this row opens, so the shell can put focus back on it
+          // after Escape closes the pane. The row is the list's own handle on the thread, and the
+          // shell has no other way to find it — the rows live in a virtualiser it does not hold a
+          // reference to.
+          data-thread-id={props.id}
           tabIndex={0}
           aria-selected={props.selected}
           className={cn(
