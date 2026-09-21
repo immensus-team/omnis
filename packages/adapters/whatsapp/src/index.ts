@@ -35,7 +35,12 @@ export const WS_UNSTABLE_MESSAGE = "ws_unstable: consider whatsmeow fallback (A1
 export const DEDUPE_WINDOW = 5_000;
 
 /** One page per chat per pass. Beeper already holds history locally, so pages are cheap; a message
- *  sitting past the page edge arrives on the next pass, where sourceHash makes it idempotent. */
+ *  sitting past the page edge arrives on the next pass, where sourceHash makes it idempotent. That is
+ *  true of the poll, which runs every POLL_MS forever — backfill() is one-shot, so it cannot lean on a
+ *  next pass. See its note.
+ *  UNVERIFIED: this assumes `after` returns the OLDEST rows first. If Beeper returns newest-first, a
+ *  chat producing more than a page between two polls misses the older slice for good while the cursor
+ *  advances past it — the US-C23 spike settles the ordering before the poll is trusted. */
 const MESSAGE_PAGE_LIMIT = 100;
 
 /** A Beeper Desktop API WS frame, as the client hands it over. The wire format is flat — `{ type, seq,
@@ -87,8 +92,10 @@ const WHATSAPP_ACCOUNT = /whatsapp/i;
  *  (`local-whatsapp_ba_…` / `whatsapp_…` — the ids the API docs show). An empty `network` is treated as
  *  absent rather than as a mismatch, so a sparsely-populated payload is not silently dropped. */
 export function isWhatsAppChat(chat: { accountID?: string; network?: string }): boolean {
-  const network = textOf(chat.network);
-  if (network !== null) return network.toLowerCase() === "whatsapp";
+  // Trimmed before the comparison: a padded value must not read as a mismatch, because that is not a
+  // mislabelled chat but a dropped one — listWhatsAppChats skips it and every message in it is lost.
+  const network = textOf(chat.network)?.trim() ?? null;
+  if (network !== null && network !== "") return network.toLowerCase() === "whatsapp";
   return WHATSAPP_ACCOUNT.test(chat.accountID ?? "");
 }
 
@@ -203,12 +210,23 @@ function attachmentsOf(raw: unknown): Attachment[] {
   return out;
 }
 
+/** Epoch values below this are seconds, not milliseconds: 1e12 ms is 2001-09-09, and Beeper's own `ts`
+ *  is ~1.7e12, so a genuine millisecond stamp is three orders of magnitude clear of the floor. */
+const EPOCH_MS_FLOOR = 1e12;
+
 /** `sentAt` must be a valid ISO string. Beeper sends ISO-8601, but the WS `ts` field is epoch
  *  milliseconds (the docs' own example: `ts: 1739320000000`), and a client that forwards the frame
- *  verbatim can hand either one over — so both are read, and anything else yields no item rather than a
- *  silently-epoch row (the same call the Gmail/Outlook/telegram adapters make). */
+ *  verbatim can hand either one over — so both are read. Anything else yields no item rather than a
+ *  mis-dated row, and that includes an epoch-*seconds* number, which read as ms would silently put the
+ *  message in 1970 (the same drop-rather-than-guess call the Gmail/Outlook/telegram adapters make). */
 function parseSentAt(value: unknown): string | null {
-  if (typeof value !== "string" && typeof value !== "number") return null;
+  // A number is epoch milliseconds by definition, so it is measured against the floor rather than
+  // trusted: a seconds value is the one way a numeric `ts` can be silently mis-dated instead of dropped.
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value < EPOCH_MS_FLOOR) return null;
+    return new Date(value).toISOString();
+  }
+  if (typeof value !== "string") return null;
   const ms = new Date(value).getTime();
   return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
 }
@@ -449,6 +467,13 @@ export function createWhatsAppAdapter(deps: WhatsAppAdapterDeps = {}): Adapter {
   }
 
   function handleEvent(event: BeeperEvent): void {
+    // The real `message.upserted` frame carries `entries` — an array — so a client that forwards the
+    // frame's list rather than one extracted payload is understood here rather than dropped. A drop
+    // would be invisible: the WS is the only realtime path, and the poll arriving late looks the same.
+    if (Array.isArray(event.data)) {
+      for (const entry of event.data) emit(entry);
+      return;
+    }
     const payload = recordOf(event.data) ?? recordOf(event);
     if (event.type === "chat.upserted" && payload !== null) rememberChat(payload);
     if (event.type === "chat.deleted") {
@@ -472,7 +497,9 @@ export function createWhatsAppAdapter(deps: WhatsAppAdapterDeps = {}): Adapter {
   // one delivers goes through emit(), so a message both saw is stored once (sourceHash).
   async function pollOnce(): Promise<void> {
     const active = client;
-    if (active === undefined) return;
+    // `up` is checked as well as the timer being cleared: disconnect() is what makes this adapter stop
+    // reading, so a chain that survived a re-subscribe must not reach the client after it.
+    if (active === undefined || !up) return;
     const startedAt = now().toISOString();
     try {
       for (const chat of await listWhatsAppChats(active)) {
@@ -526,6 +553,9 @@ export function createWhatsAppAdapter(deps: WhatsAppAdapterDeps = {}): Adapter {
         );
       }
       up = true;
+      // The previous session's failure is not this one's: the warm-up below either succeeds (healthy)
+      // or records its own error, so a reconnect cannot report a fault that has already been cleared.
+      failure = undefined;
       lastEventAt = now().toISOString();
       // Warm the chat cache before any WS event can arrive: it is what lets a group's first WS message
       // carry threadMeta.kind = "group". threads.kind is written on insert only
@@ -551,6 +581,10 @@ export function createWhatsAppAdapter(deps: WhatsAppAdapterDeps = {}): Adapter {
 
     // A1 §2.6: Beeper already holds the history locally, so a backfill is the same two REST calls the
     // poll makes, with the caller's own `since` as the cursor.
+    // ponytail: one page per chat (MESSAGE_PAGE_LIMIT). This is a ceiling, not a design — a chat with
+    // more than one page since `since` is truncated silently, and the poll's next-pass argument does not
+    // apply because a one-shot backfill has no next pass. Nothing calls backfill() yet; whoever wires it
+    // (Task 24) must loop the REST cursor, and the US-C23 spike has to pin `after`'s inclusivity first.
     async *backfill(since?: Date): AsyncIterable<NormalizedItem> {
       const active = requireClient("backfill");
       let chatsList: Array<Json & { id: string }>;
@@ -575,16 +609,20 @@ export function createWhatsAppAdapter(deps: WhatsAppAdapterDeps = {}): Adapter {
           }
         }
       }
-      queue.push({
-        kind: "backfill_progress",
-        done,
-        total: chatsList.length,
-        at: now().toISOString(),
-      });
+      // `done` counts items, so a chat count would be the wrong unit for `total` (it reads as >100%
+      // progress the moment a chat yields more than one item) and the item total is not knowable before
+      // paging anyway — so the denominator is null, the way kakaotalk's and slack's backfills report it.
+      queue.push({ kind: "backfill_progress", done, total: null, at: now().toISOString() });
     },
 
     subscribe(): AsyncIterable<NormalizedItem | AdapterEvent> {
       const active = requireClient("subscribe");
+      // The hub's pump() re-subscribes on a sink failure (apps/hub/src/adapters.ts:203), so this is not
+      // once-per-adapter in production: a second call replaces the first registration and poll chain
+      // rather than stacking a second 60-second poller on Beeper's REST API and leaving the old WS
+      // callback live.
+      unsubscribe?.();
+      if (pollTimer !== undefined) clearTimeout(pollTimer);
       unsubscribe = active.onEvent(handleEvent, handleClose);
       schedulePoll();
       return queue;

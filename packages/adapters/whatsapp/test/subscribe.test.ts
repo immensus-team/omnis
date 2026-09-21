@@ -117,12 +117,17 @@ interface FakeClient {
    *  connect method), so this is the whole of what the adapter sees. */
   closeWs: (reason: string) => void;
   stopped: () => boolean;
+  /** How many onEvent() registrations were made, and how many of them the adapter stopped. A
+   *  re-subscribe that does not stop the one it replaces leaves the old callback live. */
+  wsRegistrations: () => number;
+  wsStops: () => number;
 }
 
 function fakeClient(over: Partial<BeeperClientLike> = {}): FakeClient {
   let onEvent: ((event: BeeperEvent) => void) | undefined;
   let onClose: ((reason: string) => void) | undefined;
-  let stopped = false;
+  let registrations = 0;
+  let stops = 0;
   const client: BeeperClientLike = {
     listChats: vi.fn(async () => [dmChat(), groupChat(), telegramChat()]),
     listMessages: vi.fn(async () => []),
@@ -131,8 +136,9 @@ function fakeClient(over: Partial<BeeperClientLike> = {}): FakeClient {
     onEvent: vi.fn((cb: (event: BeeperEvent) => void, close: (reason: string) => void) => {
       onEvent = cb;
       onClose = close;
+      registrations += 1;
       return () => {
-        stopped = true;
+        stops += 1;
       };
     }),
     ...over,
@@ -141,7 +147,9 @@ function fakeClient(over: Partial<BeeperClientLike> = {}): FakeClient {
     client,
     emit: (event) => onEvent?.(event),
     closeWs: (reason) => onClose?.(reason),
-    stopped: () => stopped,
+    stopped: () => stops > 0,
+    wsRegistrations: () => registrations,
+    wsStops: () => stops,
   };
 }
 
@@ -245,6 +253,33 @@ describe("WhatsApp connect()/disconnect()", () => {
     await vi.advanceTimersByTimeAsync(5 * 60_000);
     expect(vi.mocked(fake.client.listChats).mock.calls.length).toBe(callsAfterDisconnect);
   });
+
+  // A failure belongs to the session that hit it. Once a new session is up — connect() re-lists the
+  // chats and succeeds — reporting the previous session's error would show the user a stale fault.
+  it("drops a previous session's failure when a new session comes up", async () => {
+    vi.useFakeTimers();
+    const fake = fakeClient();
+    const time = clock();
+    const adapter = createWhatsAppAdapter({ client: fake.client, now: time.now });
+    await adapter.connect(auth);
+
+    vi.mocked(fake.client.listChats).mockRejectedValueOnce({
+      status: 500,
+      message: "Beeper is restarting",
+    });
+    adapter.subscribe();
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    expect((await adapter.health()).status).toBe("down");
+
+    await adapter.disconnect();
+    // The fresh session's warm-up succeeds, and there is no error left over from before it.
+    await adapter.connect(auth);
+    const health = await adapter.health();
+    expect(health.status).toBe("healthy");
+    expect(health.lastError).toBeUndefined();
+
+    await adapter.disconnect();
+  });
 });
 
 describe("WhatsApp subscribe()", () => {
@@ -265,6 +300,30 @@ describe("WhatsApp subscribe()", () => {
     expect(item.body).toBe("hi");
     expect(item.threadExternalId).toBe(CHAT_ID);
     expect(item.threadMeta?.title).toBe("Dana Lee");
+
+    await adapter.disconnect();
+  });
+
+  // The real `message.upserted` frame carries `entries` — an array — so a client that forwards the
+  // frame's list rather than one extracted payload has to be understood, not silently dropped. A drop
+  // here is invisible: the WS is the only realtime path and the poll would look like it was merely late.
+  it("carries every entry when the frame hands over the entries array", async () => {
+    const fake = fakeClient();
+    const time = clock();
+    const adapter = createWhatsAppAdapter({ client: fake.client, now: time.now });
+    await adapter.connect(auth);
+    const iterator = adapter.subscribe()[Symbol.asyncIterator]();
+    await iterator.next();
+
+    fake.emit({
+      type: "message.upserted",
+      data: [message(), message({ id: "1343994", text: "and one more" })],
+    });
+
+    const first = (await iterator.next()).value as NormalizedItem;
+    const second = (await iterator.next()).value as NormalizedItem;
+    expect([first.externalId, second.externalId]).toEqual(["1343993", "1343994"]);
+    expect(second.body).toBe("and one more");
 
     await adapter.disconnect();
   });
@@ -311,6 +370,30 @@ describe("WhatsApp subscribe()", () => {
     await vi.advanceTimersByTimeAsync(POLL_MS);
     expect(vi.mocked(fake.client.listMessages).mock.calls.length).toBeGreaterThan(0);
     expect(await stillPending(next)).toBe(true);
+
+    await adapter.disconnect();
+  });
+
+  // apps/hub/src/adapters.ts pump() calls subscribe() again after a sink failure, so in production this
+  // is not once-per-adapter. A second call has to _replace_ the first WS registration and poll chain: if
+  // it merely adds, every retry leaves the old WS callback live and stacks another 60-second poller
+  // against Beeper's REST API.
+  it("replaces the WS registration and the poll chain when subscribe() is called again", async () => {
+    vi.useFakeTimers();
+    const fake = fakeClient({ listMessages: vi.fn(async () => []) });
+    const time = clock();
+    const adapter = createWhatsAppAdapter({ client: fake.client, now: time.now });
+    await adapter.connect(auth);
+
+    adapter.subscribe();
+    adapter.subscribe();
+    expect(fake.wsRegistrations()).toBe(2);
+    // The registration the first call made was stopped by the second, not left firing.
+    expect(fake.wsStops()).toBe(1);
+
+    // One poll pass over the two WhatsApp chats — not the two a stacked chain would produce.
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    expect(vi.mocked(fake.client.listMessages).mock.calls).toHaveLength(2);
 
     await adapter.disconnect();
   });

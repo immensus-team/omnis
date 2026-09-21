@@ -69,8 +69,18 @@ describe("isWhatsAppChat()", () => {
   });
 
   it("treats an empty or missing network as absent rather than as a mismatch", () => {
+    // The accountID is what separates "absent" from "mismatch" here: `{ network: "" }` alone would be
+    // false under either reading, so it cannot tell the two apart on its own.
+    expect(isWhatsAppChat({ network: "", accountID: "local-whatsapp_ba_x" })).toBe(true);
     expect(isWhatsAppChat({ network: "" })).toBe(false);
     expect(isWhatsAppChat({})).toBe(false);
+  });
+
+  it("tolerates a padded network value rather than dropping the whole chat", () => {
+    // A padded value read as a mismatch is not a mislabelled chat, it is a lost one: listWhatsAppChats
+    // skips the chat and every message in it never becomes an item.
+    expect(isWhatsAppChat({ network: " WhatsApp " })).toBe(true);
+    expect(isWhatsAppChat({ network: "whatsapp\n" })).toBe(true);
   });
 });
 
@@ -92,6 +102,9 @@ describe("normalize() drops what it cannot represent", () => {
     // timeline, so the row is dropped instead (the same call linkedin's extractor makes).
     expect(normalize(message({ timestamp: "not a date" }))).toEqual([]);
     expect(normalize(message({ timestamp: undefined }))).toEqual([]);
+    // Epoch *seconds*: the one numeric value that would otherwise be silently mis-dated rather than
+    // dropped — read as milliseconds it lands in 1970, at the very top of the timeline.
+    expect(normalize(message({ timestamp: 1758531243 }))).toEqual([]);
   });
 
   it("yields nothing for a chat payload, which carries no message content", () => {
@@ -135,7 +148,17 @@ describe("normalize() shape", () => {
   it("accepts a bare message payload as well as an event envelope", () => {
     // The REST poll hands normalize() the row directly; the WS hands it the event. Both have to reach
     // the same item or the two paths would double-insert.
+    // The length is asserted first: comparing the two calls alone also passes when both are [].
+    expect(normalize(message())).toHaveLength(1);
     expect(normalize(message())).toEqual(normalize({ type: "message.upserted", data: message() }));
+  });
+
+  it("reads a numeric WS `ts` as epoch milliseconds", () => {
+    // The frame's `ts` is epoch ms (the docs' own example is `ts: 1739320000000`), so a client that
+    // forwards it verbatim is read correctly rather than dropped.
+    expect(firstItem(message({ timestamp: 1758531243000 })).sentAt).toBe(
+      "2025-09-22T08:54:03.000Z",
+    );
   });
 
   it("falls back to the sender id when Beeper resolves no display name", () => {
