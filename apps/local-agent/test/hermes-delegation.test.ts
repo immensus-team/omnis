@@ -225,6 +225,30 @@ describe("HermesAdapter delegation (US-C06)", () => {
     expect(calls).toHaveLength(0); // nothing was sent to Hermes
   });
 
+  it("ignores an approval event on a read-only host — no approval row, no decision posted (A2-D9)", async () => {
+    const calls: FetchCall[] = [];
+    const harness = sinkHarness({ decision: "accept" });
+    const adapter = new HermesAdapter({
+      baseUrl: BASE_URL,
+      token: "tok-1",
+      fetchFn: recordingFetch(calls), // delegation left unset: this host is still Phase B
+    });
+
+    // 'human' is the only origin such a host accepts, so that is the turn the event has to arrive on.
+    await adapter.startTurn(baseSession("human"), { text: "deploy" }, harness.sink);
+    await until(() => harness.calls.turnCompleted.length === 1);
+
+    expect(harness.calls.approval).toHaveLength(0); // never promoted to a pending_approvals row
+    expect(approvalPosts(calls)).toHaveLength(0); // and the S-A2-5 endpoint is never guessed at
+    expect(harness.calls.raw).toHaveLength(1); // reported instead, so a stall is diagnosable
+    expect(harness.calls.raw[0]).toMatch(/read-only/);
+    // The approval event is dropped, not fatal: the rest of the stream still reaches the sink.
+    expect(harness.calls.delta.map((d) => d.text)).toEqual([
+      "Checking the deploy script.",
+      " Waiting for approval.",
+    ]);
+  });
+
   it("maps an approval event to sink.approval and posts {decision:'approve'} on 'accept', without stalling the stream", async () => {
     const calls: FetchCall[] = [];
     const harness = sinkHarness(); // the decision stays pending until the test releases it

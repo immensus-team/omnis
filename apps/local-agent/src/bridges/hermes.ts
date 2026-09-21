@@ -189,6 +189,13 @@ export class HermesAdapter implements RuntimeAdapter {
         const id = typeof ev.id === "string" ? ev.id : "";
         const command = typeof ev.command === "string" ? ev.command : "";
         if (id === "" || command === "") return;
+        // A2-D9: a host whose TOML has not opted in is still Phase B, where §4.4 says approvals cannot arise —
+        // and the endpoint below is S-A2-5's to confirm. So a read-only host reports the event and acts on
+        // nothing, keeping the flag-off invariant "no pending_approvals arise from Hermes" at this layer too.
+        if (this.cfg.delegation !== true) {
+          sink.raw(`[hermes] ignored an approval event on a read-only host: ${command}`);
+          return;
+        }
         void (async (): Promise<void> => {
           // Off the read loop: a human decision takes minutes, and the SSE stream must keep draining meanwhile.
           try {
