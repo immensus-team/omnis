@@ -3,10 +3,30 @@
 // so the file declares its own environment and setup (jest-dom matchers + afterEach(cleanup)).
 import "./setup";
 
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import { PersonCard } from "../src/components/person-card.js";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { PersonCard, relationshipDot } from "../src/components/person-card.js";
 import { initialsFromName } from "../src/lib/row-meta.js";
+
+describe("relationshipDot (A5 §3.6 — six stored states, three levels)", () => {
+  it("maps active to active", () => {
+    expect(relationshipDot("active")).toBe("active");
+  });
+
+  it("maps new and warming to warming (a relationship forming)", () => {
+    expect(relationshipDot("new")).toBe("warming");
+    expect(relationshipDot("warming")).toBe("warming");
+  });
+
+  it("maps dormant and closed to dormant (gone cold)", () => {
+    expect(relationshipDot("dormant")).toBe("dormant");
+    expect(relationshipDot("closed")).toBe("dormant");
+  });
+
+  it("maps unknown to unknown, which draws no dot", () => {
+    expect(relationshipDot("unknown")).toBe("unknown");
+  });
+});
 
 describe("PersonCard (US-D03: the reference's photo + badge + key-value block)", () => {
   it("falls back to initials when the person has no photo", () => {
@@ -77,5 +97,54 @@ describe("PersonCard (US-D03: the reference's photo + badge + key-value block)",
     );
     expect(screen.getByText("Unread")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
+  });
+});
+
+describe("PersonCard — A5 §3.6 Network fields (US-B30)", () => {
+  it("prints affiliation and title under the name", () => {
+    render(<PersonCard person={{ name: "David Park", org: "Davich", role: "CTO" }} />);
+    expect(screen.getByText("Davich · CTO")).toBeInTheDocument();
+  });
+
+  it("drops the separator when only one of org/role is known", () => {
+    // " · CTO" and "Davich · " are both strings, and both read as a field that failed to load.
+    render(<PersonCard person={{ name: "David Park", role: "CTO" }} />);
+    expect(screen.getByText("CTO")).toBeInTheDocument();
+    expect(screen.queryByText(" · CTO")).not.toBeInTheDocument();
+
+    render(<PersonCard person={{ name: "Sora Kim", org: "Ownered Lab" }} />);
+    expect(screen.getByText("Ownered Lab")).toBeInTheDocument();
+  });
+
+  it("carries the three-level dot alongside the state's own word", () => {
+    // A5 §3.6: the dot has 3 levels, the label keeps the precise state — so `new` and `warming`
+    // share a dot colour but not a word, and neither is readable by colour alone.
+    const { rerender } = render(
+      <PersonCard person={{ name: "David Park", relationshipState: "active" }} />,
+    );
+    expect(screen.getByText("Active").closest(".status-pill")).toHaveAttribute(
+      "data-dot",
+      "active",
+    );
+
+    rerender(<PersonCard person={{ name: "David Park", relationshipState: "new" }} />);
+    expect(screen.getByText("New").closest(".status-pill")).toHaveAttribute("data-dot", "warming");
+
+    rerender(<PersonCard person={{ name: "David Park", relationshipState: "closed" }} />);
+    expect(screen.getByText("Closed").closest(".status-pill")).toHaveAttribute(
+      "data-dot",
+      "dormant",
+    );
+  });
+
+  it("makes the name a button only when there is somewhere to open", () => {
+    const onOpen = vi.fn();
+    const { rerender } = render(<PersonCard person={{ name: "David Park" }} />);
+    // The hover card has no detail pane behind it, so its card is not a control.
+    expect(screen.queryByRole("button", { name: "David Park" })).not.toBeInTheDocument();
+
+    rerender(<PersonCard person={{ name: "David Park" }} onOpen={onOpen} />);
+    fireEvent.click(screen.getByRole("button", { name: "David Park" }));
+    expect(onOpen).toHaveBeenCalledTimes(1);
   });
 });

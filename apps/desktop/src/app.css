@@ -1593,6 +1593,22 @@ body {
   flex: 0 0 auto;
 }
 
+/* US-B30 (A5 §3.6): the relationship dot has three levels, the chip's word has six states. The dot
+   therefore takes its colour from `data-dot`, not from the chip's tone — `New` and `Warming` are
+   both tone="info" and must draw the same amber dot. `unknown` draws no dot at all (the card drops
+   the row), so there is no fourth rule here. */
+.status-pill__dot[data-dot="active"] {
+  background: var(--success-500);
+}
+
+.status-pill__dot[data-dot="warming"] {
+  background: var(--warn-500);
+}
+
+.status-pill__dot[data-dot="dormant"] {
+  background: var(--text-secondary);
+}
+
 /* ponytail: no data-theme="dark" override — light is this project's decision
    (DESIGN-DIRECTION.md) and nothing sets data-theme="dark" yet (tokens.css only holds the block).
    On the day dark actually turns on, the four tone labels land at L0.4 against an L0.25 tint,
@@ -2005,12 +2021,58 @@ body {
   object-fit: cover;
 }
 
+.person-card__identity {
+  display: flex;
+  flex-direction: column;
+  /* A 2px step, not the card's 10px: the affiliation belongs to the name above it, not to the
+     badge row below. */
+  gap: 2px;
+  min-width: 0;
+}
+
 .person-card__name {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
   /* The reference's name sits tight against its own line height rather than the body's 1.5. */
   line-height: 1.3;
+}
+
+/* US-B30: on the Network screen the name is the control that opens the detail pane. It is stripped
+   back to the heading it replaces — a person's name on a card is not a link-coloured word, and the
+   whole card cannot be the button because the card can hold its own buttons (the follow-up draft's
+   "Edit & send") and a button inside a button is invalid. */
+.person-card__name--open {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+
+.person-card__name--open:hover {
+  text-decoration: underline;
+}
+
+.person-card__name--open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+/* A5 §3.6's "affiliation and title" (persons.org · persons.role). Secondary weight because it
+   qualifies the name rather than introducing a second subject. */
+.person-card__org {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .person-card__badges {
