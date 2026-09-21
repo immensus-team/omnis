@@ -74,6 +74,22 @@ if (typeof Element.prototype.animate === "undefined") {
   })) as unknown as Element["animate"];
 }
 
+// deviation: jsdom 25 has no `onpointerdown` on `window` — the Pointer Events *interface* is
+// missing from its IDL, so `'onpointerdown' in window` is false even after the PointerEvent stub
+// below is installed. That is not a detail of any one library: @use-gesture/core snapshots
+// feature support into a module-level `SUPPORT` object at import time and picks the event family a
+// gesture binds to from it (`pointer` when `SUPPORT.pointer`, `touch` otherwise). Without this
+// line the motion wave's divider drag binds `ontouchstart`/`ontouchmove` in jsdom and the suite
+// would be exercising a device path the app never takes — verified by probe, not assumed: the
+// bound handlers were `onTouchStart`/`onKeyDown`/`onKeyUp` before this line and `onPointerDown`
+// after it.
+//
+// It is a property and not a stub function because nothing dispatches through it: it exists only
+// so the feature *sniff* answers the way a real browser does. `configurable` so a test that wants
+// the touch branch can delete it and re-import.
+if (typeof window !== "undefined" && !("onpointerdown" in window)) {
+  Object.defineProperty(window, "onpointerdown", { value: null, configurable: true });
+}
 // deviation: jsdom 25 implements neither PointerEvent nor pointer capture (probed: both are
 // `undefined`). lib/pointer-drag.ts is Pointer Events only — the whole point of §c.1 is that no
 // drag library is installed — so without these, `@testing-library`'s fireEvent.pointerDown builds
