@@ -10,14 +10,17 @@
 //     pnpm tsx tools/e2e/hold.ts --web
 //   pnpm tsx tools/e2e/shots-loop-r1-06.ts   (desktop http://127.0.0.1:5373)
 //
-// Four checks, in the order a person hits them:
+// Five checks, in the order a person hits them:
 //   1. Archive with `e`: the row leaves, "Archived · Undo" is on screen, and `z` puts the row back —
 //      with threads.archived_at NULL again, which is the half the screen cannot prove.
-//   2. Ignore: the card leaves the queue, the toast offers the undo, and the Undo means the hub was
+//   2. Two archives 3s apart (`j e j e`): the second "Archived" toast keeps its own clock rather
+//      than inheriting the first one's, and `z` still undoes the second archive. The row the first
+//      archive left behind is restored from the Archived view, so the seed is whole.
+//   3. Ignore: the card leaves the queue, the toast offers the undo, and the Undo means the hub was
 //      never told — asserted on the *requests* (none) and then on state='pending' still being there.
-//   3. Approve through the confirmation: "Approved: …" with no undo, and decision='accept' in the
+//   4. Approve through the confirmation: "Approved: …" with no undo, and decision='accept' in the
 //      database.
-//   4. 390: the toast clears the BottomBar instead of sitting behind it.
+//   5. 390: the toast clears the BottomBar instead of sitting behind it.
 //
 // The 390 pass is a resize of the same page rather than a second page: both screenshots the brief
 // wants are the same moment at two widths.
@@ -200,6 +203,105 @@ async function main(): Promise<void> {
       `threads.archived_at to be NULL and the row to be back for ${threadId}`,
     );
     console.log("  `z` put it back: the row is listed and threads.archived_at is NULL again");
+
+    // ---- 1b. Two archives in a row: the second toast keeps its own clock --------------------------
+    // `j e j e` is the core triage loop, and both toasts say the same word — "Archived" — which is
+    // what a countdown keyed on the message cannot tell apart. Under that bug the second pill is
+    // dismissed on the *first* one's clock: 2s after its own archive, taking its Undo and `z` with
+    // it. The pointer is parked in the corner first: a hovered pill holds its timer on purpose, and
+    // a hover here would make this pass for the wrong reason.
+    await page.mouse.move(0, 0);
+    /** `j` to the selected row, `e` to archive it, and the toast that answers. */
+    const archiveSelected = async (): Promise<string> => {
+      await page.keyboard.press("j");
+      const id = await page
+        .locator('.inbox-row[aria-selected="true"]')
+        .getAttribute("data-thread-id");
+      if (id === null) throw new Error("`j` selected no row to archive");
+      await page.keyboard.press("e");
+      await waitForToast(page, (toast) => toast.message === ARCHIVED, `"${ARCHIVED}"`);
+      return id;
+    };
+    const firstId = await archiveSelected();
+    // The gap is most of the first toast's window, so the second toast arrives with the first one's
+    // clock nearly run out rather than with it already gone.
+    await page.waitForTimeout(3_000);
+    const secondId = await archiveSelected();
+
+    // 2.6s on: the live toast is 2.6s old, and the first toast's clock — had it been left running —
+    // is 5.6s and would have fired. This is the assertion that fails when it does.
+    await page.waitForTimeout(2_600);
+    const survivor = await readToast(page);
+    if (survivor?.message !== ARCHIVED) {
+      throw new Error(
+        `the second "${ARCHIVED}" toast was gone 2.6s after its own archive ` +
+          `(read ${JSON.stringify(survivor)}) — it was dismissed on the first toast's clock`,
+      );
+    }
+    // And the undo is the second archive's: `z` restores the row *this* toast names.
+    await page.keyboard.press("z");
+    await waitForToast(page, (toast) => toast.message === RESTORED, "the second undo's toast");
+    await poll(
+      async () => {
+        const rows = await query<{ archived_at: Date | null }>(
+          pool,
+          "SELECT archived_at FROM threads WHERE id = $1",
+          [secondId],
+        );
+        return {
+          archivedAt: rows[0]?.archived_at ?? null,
+          listed: await page.locator(`.inbox-row[data-thread-id="${secondId}"]`).count(),
+        };
+      },
+      (state) => state.archivedAt === null && state.listed === 1,
+      `threads.archived_at to be NULL and the row to be back for ${secondId}`,
+    );
+    console.log(
+      `  archived ${firstId} and ${secondId} 3s apart: the second "${ARCHIVED}" outlived the first one's clock, and \`z\` still put the second row back`,
+    );
+
+    // The first archive has no key left to undo it — the second toast replaced its undo — so the row
+    // goes back the way a person would put it back: the Archived view's own restore, which is the
+    // brief's other sentence ("Moved to Inbox").
+    //
+    // The row is clicked, not walked to with `j`: a row that has just been toggled is in *both* lists
+    // for the length of its leave animation (applyArchiveView's `leaving`), so the restored row is
+    // still in this one and sorts above the row that was stranded — "the next row along" names the
+    // wrong row here, while the row's own id names the right one. The `aria-pressed` wait is the
+    // other half of the same care: without it the click races the view switch and lands in the inbox.
+    const archivedPill = page.locator(".inbox-card__archived-pill");
+    await archivedPill.click();
+    await page
+      .locator('.inbox-card__archived-pill[aria-pressed="true"]')
+      .waitFor({ timeout: 5_000 });
+    const strandedRow = page.locator(`.inbox-row[data-thread-id="${firstId}"]`);
+    await strandedRow.waitFor({ timeout: 5_000 });
+    await strandedRow.click();
+    if ((await strandedRow.getAttribute("aria-selected")) !== "true") {
+      throw new Error(`clicking ${firstId} in the Archived view did not select it`);
+    }
+    await page.keyboard.press("u");
+    await waitForToast(page, (toast) => toast.message === RESTORED, "the Archived view's restore");
+    await poll(
+      async () => {
+        const rows = await query<{ archived_at: Date | null }>(
+          pool,
+          "SELECT archived_at FROM threads WHERE id = $1",
+          [firstId],
+        );
+        return rows[0]?.archived_at ?? null;
+      },
+      (archivedAt) => archivedAt === null,
+      `threads.archived_at to be NULL for ${firstId}`,
+    );
+    // Back to the inbox, where the checks below start — and waited for, for the same reason.
+    await archivedPill.click();
+    await page
+      .locator('.inbox-card__archived-pill[aria-pressed="false"]')
+      .waitFor({ timeout: 5_000 });
+    console.log(
+      `  and the Archived view restored ${firstId} with its own "${RESTORED}" toast — the seed is whole`,
+    );
 
     // ---- 2. Ignore, held back until its toast goes ------------------------------------------------
     const ignored = await topApproval(pool, page);
