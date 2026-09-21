@@ -232,7 +232,7 @@ export function ApprovalCardView({
           </blockquote>
         )
       )}
-      <div className="approval-card__actions">
+      <div className={cn("approval-card__actions", `approval-card__actions--${mode}`)}>
         {inEdit ? (
           <>
             <Button onClick={() => setConfirming("edit")} disabled={draft.trim() === ""}>

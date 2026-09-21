@@ -2129,8 +2129,10 @@ body {
 }
 
 /* "Ignore" sits at the far end, away from the three decisions that act on the message. On a row
-   that overflows, an auto margin resolves to zero and this costs nothing. */
-.approval-card__actions > :last-child {
+   that overflows, an auto margin resolves to zero and this costs nothing.
+   Only the read row: in the edit and respond states the last button is "Cancel", and a margin that
+   means "Ignore is the far one" would fling the cancel of a two-button row across the card. */
+.approval-card__actions--read > :last-child {
   margin-left: auto;
 }
 

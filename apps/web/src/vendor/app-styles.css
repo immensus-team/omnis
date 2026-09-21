@@ -10,10 +10,10 @@
    cite its own sha, so the header names the merge that produced this copy instead of a hash it
    would have to be amended to learn — the same reason the S5 copy named its wave. The count moved
    from 6398 to 6404 when loop-r1-08 added §c.5's `.ask-panel__action kbd` rule — and the gallery's
-   copy, which the same header rule binds and no test guards, was re-copied with it.
+   copy, which the same header rule binds and no test guards, was re-copied with it; loop-r2-01's
+   approval-card editor and reply field are the latest re-copy, at 6528 lines.
    apps/web/test/vendor-css.test.ts is what holds the line: it compares everything below this
-   comment against that file byte for byte, so forgetting to re-copy fails a test rather than
-   shipping a half-styled screen. */
+   comment against that file byte for byte — forgetting to re-copy fails a test, not the screen. */
 /* Shell layout only. Colour and type come from @omnis/ui/tokens.css (A5 §1).
    react-virtuoso needs its scroller to have a real height before it draws even one row, so the
    height chain is joined here. */
@@ -2138,8 +2138,10 @@ body {
 }
 
 /* "Ignore" sits at the far end, away from the three decisions that act on the message. On a row
-   that overflows, an auto margin resolves to zero and this costs nothing. */
-.approval-card__actions > :last-child {
+   that overflows, an auto margin resolves to zero and this costs nothing.
+   Only the read row: in the edit and respond states the last button is "Cancel", and a margin that
+   means "Ignore is the far one" would fling the cancel of a two-button row across the card. */
+.approval-card__actions--read > :last-child {
   margin-left: auto;
 }
 
