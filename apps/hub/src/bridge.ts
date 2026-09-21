@@ -15,6 +15,7 @@ import {
   JSONRPC_ERRORS,
   PROTOCOL_VERSION,
   RuntimeKind,
+  RuntimeState,
   SessionCreateParams,
   assertProtocolVersion,
   toJsonRpcError,
@@ -130,19 +131,24 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     const version = typeof params.version === "string" ? params.version : null;
     const display = typeof params.display === "string" ? params.display : `${runtime}@${host}`;
     const capabilities = (params.capabilities ?? {}) as Record<string, unknown>;
+    // US-C01: the agent probes its binaries once at boot, so a runtime whose probe failed registers as
+    // 'degraded' — the hub still shows it and routing skips it. Absent/garbled state keeps the old
+    // behaviour (registering means "I am here") rather than failing a connection over one field.
+    const parsedState = RuntimeState.safeParse(params.state);
+    const state = parsedState.success ? parsedState.data : "online";
     // US-C00: runtime.registered is a request now, so the bridge learns the row's id here instead of
     // looking it up afterwards (local-agent fills runtimeIds with it — US-C01).
     const { id } = await one<{ id: string }>(
       pool,
       `INSERT INTO agent_runtimes (runtime, host, display, capabilities, version, state, last_seen_at)
-       VALUES ($1, $2, $3, $4::jsonb, $5, 'online', now())
+       VALUES ($1, $2, $3, $4::jsonb, $5, $6, now())
        ON CONFLICT (runtime, host) DO UPDATE
          SET display = EXCLUDED.display, capabilities = EXCLUDED.capabilities,
-             version = EXCLUDED.version, state = 'online', last_seen_at = now()
+             version = EXCLUDED.version, state = EXCLUDED.state, last_seen_at = now()
        RETURNING id`,
-      [runtime, host, display, JSON.stringify(capabilities), version],
+      [runtime, host, display, JSON.stringify(capabilities), version, state],
     );
-    logger.info("runtime registered", { runtime, host, version, runtimeId: id });
+    logger.info("runtime registered", { runtime, host, version, state, runtimeId: id });
     return id;
   }
 
