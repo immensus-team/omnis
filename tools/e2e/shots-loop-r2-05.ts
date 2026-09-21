@@ -82,6 +82,11 @@ const LOADING = "Loading omnis…";
  *  what comes after it is the "no token was ever issued" state rather than a slow success. */
 const TOKEN_DELAY_MS = 5_000;
 
+/** Zero's `DEFAULT_DISCONNECT_TIMEOUT_MS` (zero.js:86, 1.9.0). A socket that goes away leaves Zero
+ *  in `connecting` for this long before it reports `disconnected` — which is the state the banner
+ *  draws "Can't reach omnis" for. Check 2b has to outwait it; see the note there. */
+const ZERO_DISCONNECT_TIMEOUT_MS = 60_000;
+
 /** The boot's root, which the real tree replaces. `boot-skeleton__title` is the boot's alone. */
 const BOOT = ".boot-skeleton__title";
 const SKELETON_ROW = ".inbox-row--skeleton";
@@ -327,19 +332,25 @@ async function main(): Promise<void> {
     await down.close();
 
     // ---- 2b. A warm page whose socket is taken away: the shot --------------------------------------
-    // This is where 1440.png comes from, and the reason is a measurement rather than a preference.
+    // This is where 1440.png comes from, and it is the brief's "Can't reach omnis" over synced rows.
     //
-    // The brief describes the shot as "Can't reach omnis" over synced rows. That state does not
-    // exist in this app: `unreachable` needs no token (a document that never synced, so there are no
-    // rows to put under it) or Zero refusing to reconnect — and Zero 1.9.0 never reports
-    // `disconnected`, `error` or `closed` for a socket that simply goes away. Sampled every 100ms
-    // across 20s after the socket is closed, the banner transitions are exactly
-    // `["(none)", "Connecting to omnis…"]`: Zero goes straight to `connecting` and stays there while
-    // it retries. Forcing the retries closed with a fatal code does not change it either.
+    // Reaching it takes a minute, and that is Zero's number rather than this app's.
+    // `connection-manager.js`'s `#checkTimeout()` moves `connecting` -> `disconnected` once
+    // `Date.now() >= connectingStartedAt + disconnectTimeout`, and `zero.js:86` sets
+    // `DEFAULT_DISCONNECT_TIMEOUT_MS = 60_000`. So a socket that simply goes away leaves Zero in
+    // `connecting` for exactly 60s and *then* reports `disconnected` — which is the name that maps
+    // to `unreachable`. Measured against this stack: banner "(none)" at +0s, "Connecting to
+    // omnis…" at +3s (the copy's own grace period), "Can't reach omnis. Showing what synced
+    // 1m ago. Retrying…" at +60.1s, stable through +90s.
     //
-    // So the artifact is the state a person is actually in when the hub dies mid-session: the
-    // banner, the synced rows still on screen (blanking them would be the regression this story is
-    // fixing), and — the point of the check below — no "Updated …" claim on the subline.
+    // The earlier revision of this file asserted the state did not exist at all. It sampled for 20s
+    // — a third of the timeout — saw only `connecting`, and wrote that up as a limitation of Zero.
+    // It was a limitation of the measurement, and the brief's shot was reachable all along.
+    //
+    // What the state shows is what a person is actually in when the hub dies mid-session: the
+    // banner telling them so, the synced rows still on screen (blanking them would be the
+    // regression this story is fixing), and — the point of the check below — no "Updated …" claim
+    // on the subline above them.
     console.log("Hub gone — a warm page whose socket is taken away (1440.png)");
     const warm: BrowserContext = await browser.newContext({ viewport: WIDE });
     const warmPage = await warm.newPage();
@@ -358,12 +369,9 @@ async function main(): Promise<void> {
     const warmSubline = await subline(warmPage);
 
     await sockets[0]?.close({ code: 1001, reason: "loop-r2-05: the hub goes away" });
-    const dropped = await poll(
-      () => readBanner(warmPage),
-      (banner) => banner !== null,
-      "a banner once the socket is gone",
-      8_000,
-    );
+    // Zero's own 60s to give up (`DEFAULT_DISCONNECT_TIMEOUT_MS`), plus room for the interval it
+    // checks on and for the copy's 3s grace period to have run its course.
+    const dropped = await waitForBanner(warmPage, UNREACHABLE, ZERO_DISCONNECT_TIMEOUT_MS + 20_000);
     const keptRows = await warmPage.locator(REAL_ROW).count();
     if (keptRows !== warmed) {
       throw new Error(
