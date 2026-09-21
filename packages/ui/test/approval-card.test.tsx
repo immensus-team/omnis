@@ -13,12 +13,30 @@ const interrupt: ApprovalCardInterrupt = {
 };
 
 describe("ApprovalCardView (A5-D10, the 4-way HumanInterrupt)", () => {
+  // loop-r1-02/L-26: the four labels are one word each. "Edit & approve" wrapped to two lines inside
+  // its own button at 320 and pushed "Ignore" past the card's right edge — the card is where a
+  // decision is made, so a decision the card clips is the one thing it must not do.
   it("renders only the buttons the config allows", () => {
     render(<ApprovalCardView interrupt={interrupt} onDecide={vi.fn()} />);
     expect(screen.getByText("Approve")).toBeInTheDocument();
-    expect(screen.getByText("Edit & approve")).toBeInTheDocument();
+    expect(screen.getByText("Edit")).toBeInTheDocument();
     expect(screen.queryByText("Respond")).not.toBeInTheDocument();
     expect(screen.getByText("Ignore")).toBeInTheDocument();
+  });
+
+  it("spells all four decisions when the config allows all four", () => {
+    render(
+      <ApprovalCardView
+        interrupt={{
+          ...interrupt,
+          config: { allow_accept: true, allow_edit: true, allow_respond: true, allow_ignore: true },
+        }}
+        onDecide={vi.fn()}
+      />,
+    );
+    for (const label of ["Approve", "Edit", "Respond", "Ignore"]) {
+      expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+    }
   });
 
   // US-D09 §c.8: the card's Accept is the one decision that leaves this screen for the tool, so it

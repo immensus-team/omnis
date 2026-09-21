@@ -9,6 +9,8 @@ import {
   DETAIL_COLLAPSED_KEY,
   DETAIL_DEFAULT_WIDTH,
   DETAIL_WIDTH_KEY,
+  DetailPaneBack,
+  DetailPaneClose,
   DetailPaneHandle,
   DetailPaneToggle,
   LEAVE_MS,
@@ -30,7 +32,7 @@ import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState }
 import { decideApproval } from "./api/approvals.js";
 import { type SearchHit, search, toUiSearchGroups } from "./api/search.js";
 import { fetchSettings, putSetting } from "./api/settings.js";
-import { useKeymap } from "./hooks/use-keymap.js";
+import { isEditableTarget, useKeymap } from "./hooks/use-keymap.js";
 import { AgentSession } from "./screens/AgentSession.js";
 import { Digest } from "./screens/Digest.js";
 import { Inbox, type OpenTarget } from "./screens/Inbox.js";
@@ -139,6 +141,11 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
   // second variant on OpenTarget — the pane draws PersonDetail or Thread, never a mix, and one
   // nullable string says that more plainly than a discriminated union with two members.
   const [openPersonId, setOpenPersonId] = useState<string | null>(null);
+  /** loop-r1-02/L-04: the user asked for the approval queue. A second target beside `open` and
+   *  `openPersonId` because it is a third thing the pane can be showing — the queue with no thread
+   *  behind it — and folding it into `open` would mean inventing a "null thread" variant of a type
+   *  that means "a thread". Below 1280 it is the *only* thing that opens the pane on the queue. */
+  const [queueOpen, setQueueOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
   const [railChannel, setRailChannel] = useState<RailSelection>(null);
   // US-D09 §c.6: the BottomBar's filters circle opens M125's sheet, and the sheet edits the list's
@@ -172,6 +179,10 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
    *  arrives, and the pane springs back open for no reason they can see. Latent in a real browser
    *  (the hub answers in milliseconds) and ordinary in a test, which is how it was found. */
   const arranged = useRef(false);
+  /** loop-r1-02/NC-09: the thread whose row Escape should put the focus back on, once the close has
+   *  been committed. A ref rather than state because it is not something the shell renders — it is a
+   *  message to the effect below, which runs after the render that took the pane away. */
+  const focusRowForThread = useRef<string | null>(null);
 
   // Restored once, at the same moment the Zero socket opens (App follows the same rule): the hub is
   // not necessarily up yet, and `fetchSettings` answers with an empty object rather than failing, so
@@ -410,12 +421,23 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
   // US-D10 narrows that further: below 900 the pane is a full-width sheet and there is no toggle to
   // press, so the user's collapse flag does not apply there — the tier keeps the behaviour it had.
   const paneCollapsed = collapsed && !narrow;
-  // Collapsed, only a target the user asked for opens the pane. The approval queue is *why* the pane
-  // auto-opens when nobody asked; a pane the user has collapsed must not re-open itself for it.
+  // loop-r1-02/L-04, L-17, NC-03: the queue auto-opens in the **column** tier only. Below 1280 the
+  // pane is a floating sheet, and a sheet that opens itself on every load is not a pane — at 390 it
+  // was a full-height overlay with no way out, so the inbox could not be reached until every
+  // approval had been decided, and at 900–1279 it floated over about 40% of the list the user was
+  // trying to read. Apple Mail never opens a sheet on its own (DESIGN-DIRECTION-v3 §c.6, §c.9); the
+  // list comes first and the queue is asked for, through the subline's "N need approval" button.
+  // `!floating` is therefore part of the condition and not a tier branch somewhere below: it is the
+  // same fact — whether the pane would be a column — that decides whether it may open unasked.
+  //
+  // Collapsed, only a target the user asked for opens the pane, in either tier. The queue is *why*
+  // the pane auto-opens when nobody asked; a pane the user has collapsed must not re-open itself
+  // for it. `queueOpen` is not subject to either guard: it *is* the user asking.
   const paneVisible =
     open !== null ||
     openPersonId !== null ||
-    (!paneCollapsed && screen === "inbox" && approvals.length > 0);
+    queueOpen ||
+    (!floating && !paneCollapsed && screen === "inbox" && approvals.length > 0);
   // The pane stays mounted while it leaves, because the close is animated and CSS cannot animate a
   // node React has already unmounted (lib/motion.ts — the same hold the ask panel uses).
   const closing = useClosingSpring(paneVisible, LEAVE_MS);
@@ -437,6 +459,16 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
    *  was for. */
   const remember = useCallback((key: string, value: unknown) => {
     void putSetting(key, value).catch(() => {});
+  }, []);
+
+  /** loop-r1-02 §3: the one way the pane is put away, whichever control asked — the sheet's
+   *  `‹ Inbox`, the floating tier's ✕, or Escape. All three clear every target, because the pane
+   *  has three independent reasons to be on screen and clearing two of them leaves the third
+   *  holding it open: the close would read as a button that does nothing. */
+  const closePane = useCallback(() => {
+    setOpen(null);
+    setOpenPersonId(null);
+    setQueueOpen(false);
   }, []);
 
   const onPaneToggle = useCallback(() => {
@@ -471,6 +503,59 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
   }, []);
 
   useDetailPaneKey(onPaneToggle, !narrow);
+
+  /** loop-r1-02 §4: Escape closes the pane, and the shell owns it rather than the pane.
+   *
+   *  Three surfaces can be showing at once and each has its own reason to want Escape: the
+   *  ConfirmPrompt and the filters Sheet own it through `aria-modal` (Radix dismisses on it), and
+   *  anything being typed into owns every key. So this stands down for both — `defaultPrevented`
+   *  covers a handler that ran first and has already dealt with the press, the editable-target check
+   *  covers the ask bar and a composer, and the `aria-modal` check is what keeps these two listeners
+   *  from closing the pane *behind* an open prompt, which is the shape of the bug where one press
+   *  appears to do two things.
+   *
+   *  At >=1280 with approvals pending the pane is still there when this returns — the auto-open rule
+   *  above puts the queue back, which is exactly the "back to the queue" NC-09 asked for. Below 1280
+   *  there is no auto-open, so the same press leaves the list at full width. One handler, two tiers'
+   *  worth of behaviour, and neither is a special case here.
+   *
+   *  Capture, on `window` — and this is load-bearing, not a style choice. Radix's DismissableLayer
+   *  (every HoverCard, the filters Sheet, the ConfirmPrompt) listens for Escape on `document` in the
+   *  capture phase and calls `preventDefault()` when it dismisses. A bubble-phase listener here runs
+   *  last in line and would never see a press Radix had claimed — and Radix claims one whenever the
+   *  pointer happens to be resting on a row, because that row's hover card is then the highest open
+   *  layer. Click a thread and press Escape without moving the mouse and the pane would simply not
+   *  close. `window` capture is the earliest node there is, so this press is read before any Radix
+   *  layer can take it; the two guards above are what keep it from then stealing a press that a real
+   *  modal wanted. */
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (isEditableTarget(e.target)) return;
+      if (document.querySelector('[aria-modal="true"]') !== null) return;
+      if (!paneVisible) return;
+      // Read before the close: `open` is the target this press is putting away, and it is gone from
+      // the next render onwards.
+      focusRowForThread.current = open?.threadId ?? null;
+      closePane();
+    }
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [paneVisible, open, closePane]);
+
+  /** The other half of the key above: the focus goes back to the row the thread was opened from.
+   *  Without it Escape leaves the focus on `<body>` — the pane is gone and the control that had it
+   *  went with it — so the next Tab starts from the top of the document and a keyboard user who was
+   *  reading a thread has lost their place in the list. No dependency array: this has to run on the
+   *  render that follows `closePane`, and the ref is the guard that keeps it from doing anything on
+   *  every other one. */
+  useEffect(() => {
+    const threadId = focusRowForThread.current;
+    if (threadId === null) return;
+    focusRowForThread.current = null;
+    const row = document.querySelector(`[data-thread-id="${threadId}"]`);
+    if (row instanceof HTMLElement) row.focus();
+  });
   // §c.5: a thread — not the approval queue, and not an agent session, which draws no toolbar —
   // owns the narrow tier's action-band when one is open. It is the same condition Thread.tsx uses
   // to decide whether to portal its floating bar, and it has to be, or the band would hold both the
@@ -526,6 +611,10 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
         onChannelFilterChange={setRailChannel}
         filtersOpen={filtersOpen}
         onFiltersOpenChange={setFiltersOpen}
+        // loop-r1-02 §2: the count is the whole queue, not the rows on screen — the subline says
+        // what is waiting to be decided, and a list filtered to one channel still has all of them.
+        pendingApprovals={approvals.length}
+        onOpenApprovals={() => setQueueOpen(true)}
       />
     );
 
@@ -591,7 +680,19 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
       ) : null}
       {paneRendered && (
         <section data-testid="detail-pane" className="app-shell__detail">
+          {/* loop-r1-02/NC-37: below 900 the pane is the window and `.detail-pane__chrome` is
+              `display: none` there, so this is the tier's own way back to the list. It is drawn in
+              every tier's markup and shown by one container query (app.css), which is the same trick
+              the chrome row already uses — the alternative, a tier read in JS, would need a third
+              matchMedia hook for a row that is a single button. */}
+          <div className="detail-pane__sheet-head">
+            <DetailPaneBack onBack={closePane} />
+          </div>
           <div className="detail-pane__chrome">
+            {/* 900–1279.98 only: the floating sheet's ✕. At >=1280 the pane is a column and the
+                chevron beside it is the close, so rendering both would be two controls for one
+                action in the tier that has the most room for them to be confused. */}
+            {floating ? <DetailPaneClose onClose={closePane} /> : null}
             <DetailPaneToggle collapsed={paneCollapsed} onToggle={onPaneToggle} />
           </div>
           {/* US-B30: a person is not a thread, so it is the pane's own branch rather than a second
