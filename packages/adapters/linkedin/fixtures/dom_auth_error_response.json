@@ -1,0 +1,9 @@
+{
+  "scenario": "auth_error_response",
+  "provenance": "synthetic-from-docs",
+  "note": "A1 §2.9's second failure mode: the session cookies in the persistent Playwright profile stopped being honoured, so the page lands on the auth wall. That is auth_expired — a human re-logs in (2FA included) rather than the poller retrying.",
+  "raw": {
+    "error": { "code": 401, "message": "Session expired, please sign in to continue." }
+  },
+  "expected": { "errorKind": "auth_expired" }
+}

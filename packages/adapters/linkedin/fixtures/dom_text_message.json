@@ -1,0 +1,58 @@
+{
+  "scenario": "text_message",
+  "provenance": "synthetic-from-docs",
+  "note": "`raw` is the JSON the in-page Playwright extractor returns for one opened conversation (A1 §2.9). No live LinkedIn page has been sampled yet — spike A1-⑧ produces the real extractor output and task 26 re-pins these fixtures against it. The conversation id is the value in the LinkedIn conversation URL (/messaging/thread/2-YWJjMTIz/); the profile URLs are placeholders.",
+  "raw": {
+    "conversation": {
+      "conversationId": "2-YWJjMTIz",
+      "title": "Dana Lee",
+      "participants": [
+        { "name": "Logan Kim", "profileUrl": "https://www.linkedin.com/in/logan-kim" },
+        { "name": "Dana Lee", "profileUrl": "https://www.linkedin.com/in/dana-lee-8b1c2" }
+      ],
+      "lastActivityAt": "2026-09-22T09:14:03+09:00",
+      "unread": true
+    },
+    "messages": [
+      {
+        "conversationId": "2-YWJjMTIz",
+        "ordinal": 0,
+        "senderName": "Dana Lee",
+        "senderProfileUrl": "https://www.linkedin.com/in/dana-lee-8b1c2",
+        "isMe": false,
+        "text": "sync tomorrow at 10am",
+        "sentAt": "2026-09-22T09:14:03+09:00",
+        "attachments": []
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "2-YWJjMTIz",
+        "externalId": "d784728f1b82ae341ab40df8058828444ec42de9d28e4d115662c61f2c3fa85f",
+        "kind": "message",
+        "author": { "kind": "person", "id": "https://www.linkedin.com/in/dana-lee-8b1c2" },
+        "body": "sync tomorrow at 10am",
+        "attachments": [],
+        "sentAt": "2026-09-22T00:14:03.000Z",
+        "status": "received",
+        "sourceHash": "d784728f1b82ae341ab40df8058828444ec42de9d28e4d115662c61f2c3fa85f",
+        "threadMeta": {
+          "externalId": "2-YWJjMTIz",
+          "kind": "dm",
+          "title": "Dana Lee",
+          "participants": [
+            { "externalId": "https://www.linkedin.com/in/logan-kim", "displayName": "Logan Kim" },
+            {
+              "externalId": "https://www.linkedin.com/in/dana-lee-8b1c2",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2026-09-22T00:14:03.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

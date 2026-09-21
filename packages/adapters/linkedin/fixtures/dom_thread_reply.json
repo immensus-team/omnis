@@ -1,0 +1,96 @@
+{
+  "scenario": "thread_reply",
+  "provenance": "synthetic-from-docs",
+  "note": "The grouping rule, on synthetic extractor output (A1 §1.7 wants thread_reply). Two rows of one conversation must land in one thread with distinct sourceHashes, and the reply is the local user's own message. Three participants is what makes it a group conversation; the ordinal is the row's DOM position, which is why the two hashes differ even though the conversation id repeats.",
+  "raw": {
+    "conversation": {
+      "conversationId": "2-Z3JvdXA",
+      "title": "launch plan",
+      "participants": [
+        { "name": "Logan Kim", "profileUrl": "https://www.linkedin.com/in/logan-kim" },
+        { "name": "Dana Lee", "profileUrl": "https://www.linkedin.com/in/dana-lee-8b1c2" },
+        { "name": "Sam Park", "profileUrl": "https://www.linkedin.com/in/sam-park" }
+      ],
+      "lastActivityAt": "2026-09-22T09:20:00+09:00",
+      "unread": true
+    },
+    "messages": [
+      {
+        "conversationId": "2-Z3JvdXA",
+        "ordinal": 0,
+        "senderName": "Dana Lee",
+        "senderProfileUrl": "https://www.linkedin.com/in/dana-lee-8b1c2",
+        "isMe": false,
+        "text": "kickoff at 10, agenda in the doc",
+        "sentAt": "2026-09-22T09:14:03+09:00",
+        "attachments": []
+      },
+      {
+        "conversationId": "2-Z3JvdXA",
+        "ordinal": 1,
+        "senderName": "Logan Kim",
+        "senderProfileUrl": "https://www.linkedin.com/in/logan-kim",
+        "isMe": true,
+        "text": "works for me",
+        "sentAt": "2026-09-22T09:20:00+09:00",
+        "attachments": []
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "2-Z3JvdXA",
+        "externalId": "385e2437d8f5f97f5bed70ce0b027bf4aa9b74be62ae85bee89808b75f3411cb",
+        "kind": "message",
+        "author": { "kind": "person", "id": "https://www.linkedin.com/in/dana-lee-8b1c2" },
+        "body": "kickoff at 10, agenda in the doc",
+        "attachments": [],
+        "sentAt": "2026-09-22T00:14:03.000Z",
+        "status": "received",
+        "sourceHash": "385e2437d8f5f97f5bed70ce0b027bf4aa9b74be62ae85bee89808b75f3411cb",
+        "threadMeta": {
+          "externalId": "2-Z3JvdXA",
+          "kind": "group",
+          "title": "launch plan",
+          "participants": [
+            { "externalId": "https://www.linkedin.com/in/logan-kim", "displayName": "Logan Kim" },
+            {
+              "externalId": "https://www.linkedin.com/in/dana-lee-8b1c2",
+              "displayName": "Dana Lee"
+            },
+            { "externalId": "https://www.linkedin.com/in/sam-park", "displayName": "Sam Park" }
+          ],
+          "lastItemAt": "2026-09-22T00:20:00.000Z",
+          "archivedAt": null
+        }
+      },
+      {
+        "threadExternalId": "2-Z3JvdXA",
+        "externalId": "b5749cb8f76768f98f8945122b44a89cbb07f49b8e051691c704385e4842d197",
+        "kind": "message",
+        "author": { "kind": "person", "id": "me" },
+        "body": "works for me",
+        "attachments": [],
+        "sentAt": "2026-09-22T00:20:00.000Z",
+        "status": "received",
+        "sourceHash": "b5749cb8f76768f98f8945122b44a89cbb07f49b8e051691c704385e4842d197",
+        "threadMeta": {
+          "externalId": "2-Z3JvdXA",
+          "kind": "group",
+          "title": "launch plan",
+          "participants": [
+            { "externalId": "https://www.linkedin.com/in/logan-kim", "displayName": "Logan Kim" },
+            {
+              "externalId": "https://www.linkedin.com/in/dana-lee-8b1c2",
+              "displayName": "Dana Lee"
+            },
+            { "externalId": "https://www.linkedin.com/in/sam-park", "displayName": "Sam Park" }
+          ],
+          "lastItemAt": "2026-09-22T00:20:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

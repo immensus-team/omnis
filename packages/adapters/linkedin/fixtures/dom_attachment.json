@@ -1,0 +1,64 @@
+{
+  "scenario": "attachment",
+  "provenance": "synthetic-from-docs",
+  "note": "Media inside a message, on synthetic extractor output. A1 §2.9 says images and documents are extracted with Playwright and cached downstream, so both URLs must survive normalize(); the second row is deliberately the extractor's own `document` kind, which is not one of the protocol's attachment kinds and must degrade to `file` rather than be dropped.",
+  "raw": {
+    "conversation": {
+      "conversationId": "2-YWJjMTIz",
+      "title": "Dana Lee",
+      "participants": [
+        { "name": "Logan Kim", "profileUrl": "https://www.linkedin.com/in/logan-kim" },
+        { "name": "Dana Lee", "profileUrl": "https://www.linkedin.com/in/dana-lee-8b1c2" }
+      ],
+      "lastActivityAt": "2026-09-22T09:18:12+09:00",
+      "unread": true
+    },
+    "messages": [
+      {
+        "conversationId": "2-YWJjMTIz",
+        "ordinal": 0,
+        "senderName": "Dana Lee",
+        "senderProfileUrl": "https://www.linkedin.com/in/dana-lee-8b1c2",
+        "isMe": false,
+        "text": "here's the deck",
+        "sentAt": "2026-09-22T09:18:12+09:00",
+        "attachments": [
+          { "kind": "image", "url": "https://media.linkedin.com/feed/1.png" },
+          { "kind": "document", "url": "https://media.linkedin.com/doc/2.pdf" }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "2-YWJjMTIz",
+        "externalId": "6087ce758e9e68e14d764b67004c7a1028b06a961c6e96eba8ed649bd5cf2c8d",
+        "kind": "message",
+        "author": { "kind": "person", "id": "https://www.linkedin.com/in/dana-lee-8b1c2" },
+        "body": "here's the deck",
+        "attachments": [
+          { "kind": "image", "url": "https://media.linkedin.com/feed/1.png" },
+          { "kind": "file", "url": "https://media.linkedin.com/doc/2.pdf" }
+        ],
+        "sentAt": "2026-09-22T00:18:12.000Z",
+        "status": "received",
+        "sourceHash": "6087ce758e9e68e14d764b67004c7a1028b06a961c6e96eba8ed649bd5cf2c8d",
+        "threadMeta": {
+          "externalId": "2-YWJjMTIz",
+          "kind": "dm",
+          "title": "Dana Lee",
+          "participants": [
+            { "externalId": "https://www.linkedin.com/in/logan-kim", "displayName": "Logan Kim" },
+            {
+              "externalId": "https://www.linkedin.com/in/dana-lee-8b1c2",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2026-09-22T00:18:12.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

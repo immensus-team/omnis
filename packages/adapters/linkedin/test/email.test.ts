@@ -17,8 +17,10 @@ interface Fixture {
 }
 
 const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures");
+/** Only the US-C09 notification-email fixtures: the `dom_*` files are the Playwright adapter's
+ *  extracted-DOM payloads (US-C10), and their `expected.items` is a different shape entirely. */
 const fixtures = readdirSync(fixturesDir)
-  .filter((f) => f.endsWith(".json"))
+  .filter((f) => f.startsWith("email_") && f.endsWith(".json"))
   .map(
     (file) => [file, JSON.parse(readFileSync(join(fixturesDir, file), "utf8")) as Fixture] as const,
   );

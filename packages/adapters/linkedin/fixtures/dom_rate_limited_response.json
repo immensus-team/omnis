@@ -1,0 +1,12 @@
+{
+  "scenario": "rate_limited_response",
+  "provenance": "synthetic-from-docs",
+  "note": "The extractor's failure envelope when LinkedIn throttles the page. A1 §2.9 cites the Unipile provider-limit baselines as the reference ceilings; a 429 is transient and must map to retryable_rate_limit, which is the kind the poller backs off on. No `messages` key — the payload is not a message batch.",
+  "raw": {
+    "error": {
+      "code": 429,
+      "message": "HTTP 429: too many requests — you have reached the weekly invitation limit."
+    }
+  },
+  "expected": { "errorKind": "retryable_rate_limit" }
+}
