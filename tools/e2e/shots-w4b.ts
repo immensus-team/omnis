@@ -62,6 +62,15 @@ async function search(page: Page): Promise<void> {
   await page.waitForSelector(".palette-search__title", { timeout: 15_000 });
   // The tab has to say what the list under it is (US-B27): the switch is part of the frame.
   await page.getByRole("button", { name: "Search" }).waitFor({ timeout: 5_000 });
+  // cmdk marks the selected row with aria-selected, and it identifies a row by its `value` — rows
+  // that share one identity are all marked selected at once, which is the bug the US-B27 review
+  // found in these frames (five rows lit) and would otherwise be invisible to this script. The
+  // seed's mail and calendar copy repeats a title, so the frames only prove anything if exactly one
+  // row is lit; assert it rather than trust the picture.
+  const selected = await page.locator('.palette-search__hit[aria-selected="true"]').count();
+  if (selected !== 1) {
+    throw new Error(`expected exactly 1 selected search row, got ${selected}`);
+  }
 }
 
 /** 1440x900 — the three-pane shell, the seed's one pending approval in the detail pane, and the

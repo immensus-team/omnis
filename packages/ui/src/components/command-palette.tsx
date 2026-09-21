@@ -90,6 +90,12 @@ function SearchResultList({ query, search }: { query: string; search: CommandPal
             {group.results.map((result) => (
               <Command.Item
                 key={`${result.kind}:${result.id}`}
+                // cmdk identifies an item by `value` and falls back to the row's rendered text, so
+                // two hits that share a title would share one identity: both would read as selected,
+                // and Enter/arrow keys would resolve to the first of them (querySelector by
+                // aria-selected) and open the wrong hit. The synthetic value is never filtered on —
+                // search rows are the hub's answer, so shouldFilter is off in this mode.
+                value={`${result.kind}:${result.id}`}
                 className="palette-search__hit"
                 disabled={result.deepLinkDisabled}
                 onSelect={() => {

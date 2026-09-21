@@ -10,6 +10,7 @@ import {
   type PaletteAction,
   SEARCH_DEBOUNCE_MS,
   type UiSearchGroup,
+  type UiSearchHit,
   groupBy,
   matchesAnyAction,
 } from "../src/components/command-palette";
@@ -485,5 +486,44 @@ describe('CommandPalette mode="inline" search mode (US-B27)', () => {
       "true",
     );
     expect(screen.getByText("Go to Inbox")).toBeInTheDocument();
+  });
+});
+
+describe("CommandPalette search rows that share a title (US-B27 cmdk item identity)", () => {
+  // cmdk identifies an item by its `value` prop and falls back to the row's rendered text when
+  // none is passed. Two rows that render the same title therefore collapse into one identity, so
+  // selection (which is `item.value === selectedValue`) matches both at once. The empty snippet
+  // is deliberate: the component skips an empty snippet, so title is all each row renders.
+  const duplicate = (id: string): UiSearchHit => hit("thread", id, "omnis launch sync", "");
+  const groups: UiSearchGroup[] = [
+    { kind: "threads", label: "Threads", results: [duplicate("t1"), duplicate("t2")] },
+  ];
+  const renderSearch = (onSelectHit = vi.fn()) => {
+    render(
+      <CommandPalette
+        open
+        onOpenChange={() => {}}
+        actions={[]}
+        search={{ groups, loading: false, onQueryChange: () => {}, onSelectHit }}
+      />,
+    );
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "launch" } });
+    return onSelectHit;
+  };
+  const selectedRows = () => document.querySelectorAll('[cmdk-item][aria-selected="true"]');
+
+  it("marks exactly one row selected", () => {
+    renderSearch();
+    expect(selectedRows()).toHaveLength(1);
+  });
+
+  it("Enter opens the row the keyboard moved to, not the first row with that title", () => {
+    const onSelectHit = renderSearch();
+    const input = screen.getByRole("combobox");
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(onSelectHit).toHaveBeenCalledWith(duplicate("t2"));
   });
 });
