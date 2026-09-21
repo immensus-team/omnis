@@ -21,8 +21,9 @@ import {
   loadAccountRows,
   startAdapterLoops,
 } from "./adapters.js";
-import { createBridgeHub } from "./bridge.js";
+import { type BridgeDeps, createBridgeHub } from "./bridge.js";
 import { type HubConfig, readConfig } from "./config.js";
+import { type DelegateExecutor, startDelegateExecutor } from "./delegate-exec.js";
 import { createHubServer } from "./http.js";
 import { registerIngestJobs } from "./ingest-job.js";
 import { registerStartupJobs } from "./startup-jobs.js";
@@ -87,10 +88,34 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
   // Attach the registered loops to kernel events / the scheduler (A4 §1.2).
   const stopLoops = startLoops({ kernel, logger });
 
-  const bridge = createBridgeHub({ kernel, pool, logger, token: config.bridgeToken });
+  // US-C03: the bridge and the delegation executor need each other — the bridge hands finished
+  // turns to the executor, the executor calls back through the bridge — so the hooks are attached
+  // to the deps object once the executor exists. bridge.ts reads them per notification, not at
+  // creation, so neither construction order can drop a delegation.
+  const bridgeDeps: BridgeDeps = { kernel, pool, logger, token: config.bridgeToken };
+  const bridge = createBridgeHub(bridgeDeps);
   if (config.bridgeToken === "") {
     logger.warn("OMNIS_BRIDGE_TOKEN is empty — WS /bridge refuses every upgrade with 503");
   }
+  const delegateExec = startDelegateExecutor({
+    pool,
+    kernel,
+    bridge,
+    token: config.bridgeToken,
+    killSwitch: kernel.killSwitch,
+    logger,
+  });
+  const hookFailed =
+    (name: string) =>
+    (e: unknown): void => {
+      logger.error(`delegate ${name} failed`, { err: e instanceof Error ? e.message : String(e) });
+    };
+  bridgeDeps.onTurnCompleted = (host, p) => {
+    void delegateExec.onTurnCompleted(host, p).catch(hookFailed("onTurnCompleted"));
+  };
+  bridgeDeps.onHostConnected = (host) => {
+    void delegateExec.redrive(host).catch(hookFailed("onHostConnected"));
+  };
   // The ingest jobs are registered **after** start() (the same slot as startLoops). The
   // drive_poll/github_poll rows were already seeded by 0006_kernel.sql and tick() re-scans the
   // handlers Map every tick, so they run on the next tick (10s). Registering before start() would
@@ -177,6 +202,8 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
         stopIngestWatch();
         stopSummaryJob();
         stopLoops();
+        // Drop the approval NOTIFY subscription before the pool goes away.
+        delegateExec.stop();
         // 3) Stop the scheduler and wait for an in-flight tick to release claimed_at (Task 14's stop()).
         // 4) Drop the LISTEN connection.
         await kernel.close();
