@@ -1,0 +1,53 @@
+{
+  "scenario": "new_message_no_preview",
+  "provenance": "synthetic-from-docs",
+  "note": "A message notification whose body carries no quoted message text (LinkedIn omits the preview for some message types). The item is still emitted — a bare 'new message arrived' ping is the whole point of this signal — but body is the empty string, never the email's own boilerplate.",
+  "raw": {
+    "threadExternalId": "19bc4f2a3d5e6f71",
+    "externalId": "19bc4f2a3d5e6f71",
+    "kind": "email",
+    "author": { "kind": "person", "id": "hit-reply@linkedin.com" },
+    "body": "Subject: Dana Lee sent you a message\n\nDana Lee sent you a message on LinkedIn.\n\nView message: https://www.linkedin.com/messaging/thread/2-YWJjMTIz/\n\nhttps://www.linkedin.com/in/dana-lee-8b1c2",
+    "attachments": [],
+    "sentAt": "2026-09-22T09:24:45.000Z",
+    "status": "received",
+    "sourceHash": "<li-msg-002@linkedin.com>",
+    "threadMeta": {
+      "externalId": "19bc4f2a3d5e6f71",
+      "kind": "email",
+      "title": "Dana Lee sent you a message",
+      "participants": [
+        { "externalId": "hit-reply@linkedin.com", "displayName": "LinkedIn" },
+        { "externalId": "logan@example.com", "displayName": "Logan Kim" }
+      ],
+      "lastItemAt": "2026-09-22T09:24:45.000Z",
+      "archivedAt": null
+    }
+  },
+  "expected": {
+    "item": {
+      "threadExternalId": "li:2-YWJjMTIz",
+      "externalId": "li-email:19bc4f2a3d5e6f71",
+      "kind": "message",
+      "author": { "kind": "person", "id": "https://www.linkedin.com/in/dana-lee-8b1c2" },
+      "body": "",
+      "attachments": [],
+      "sentAt": "2026-09-22T09:24:45.000Z",
+      "status": "received",
+      "sourceHash": "li-email:<li-msg-002@linkedin.com>",
+      "threadMeta": {
+        "externalId": "li:2-YWJjMTIz",
+        "kind": "dm",
+        "title": "Dana Lee",
+        "participants": [
+          {
+            "externalId": "https://www.linkedin.com/in/dana-lee-8b1c2",
+            "displayName": "Dana Lee"
+          }
+        ],
+        "lastItemAt": "2026-09-22T09:24:45.000Z",
+        "archivedAt": null
+      }
+    }
+  }
+}

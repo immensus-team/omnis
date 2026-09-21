@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@omnis/adapter-gmail": "workspace:*",
+    "@omnis/adapter-linkedin": "workspace:*",
     "@omnis/adapter-google-calendar": "workspace:*",
     "@omnis/adapter-outlook": "workspace:*",
     "@omnis/adapter-slack": "workspace:*",

@@ -217,3 +217,57 @@ describe("ingest.sink", () => {
     expect((await read()).archived_at).not.toBeNull();
   });
 });
+
+// US-C09: a LinkedIn notification email is a "new message arrived" ping whose body is only the
+// preview, so the hub marks its item `meta.partial`. NormalizedItem has no meta field, so the marker
+// rides the item's own INSERT: no follow-up UPDATE means no window where the row reads as a full
+// message, and no new column.
+describe("ingest.sink itemMeta", () => {
+  const marked = (externalId: string): NormalizedItem => ({
+    threadExternalId: "C-li",
+    externalId,
+    kind: "message",
+    author: { kind: "person", id: "https://www.linkedin.com/in/dana-lee-8b1c2" },
+    body: "preview only",
+    attachments: [],
+    sentAt: new Date().toISOString(),
+    status: "received",
+    sourceHash: `hash-${externalId}`,
+    threadMeta: {
+      externalId: "C-li",
+      kind: "dm",
+      title: "Dana Lee",
+      participants: [],
+      lastItemAt: new Date().toISOString(),
+      archivedAt: null,
+    },
+  });
+
+  it("writes meta in the same statement, and leaves other items at the column default", async () => {
+    const withMeta = createKernel({
+      pool,
+      itemMeta: (e) => (e.externalId.startsWith("li-email:") ? { partial: true } : undefined),
+    });
+    const acc = await one<{ id: string }>(
+      pool,
+      `INSERT INTO accounts (channel, external_id, display) VALUES ('linkedin','logan','Logan')
+       ON CONFLICT (channel, external_id) DO UPDATE SET display = EXCLUDED.display RETURNING id`,
+    );
+    const metaOf = async (externalId: string): Promise<Record<string, unknown>> =>
+      (
+        await one<{ meta: Record<string, unknown> }>(
+          pool,
+          "SELECT meta FROM items WHERE account_id = $1 AND external_id = $2",
+          [acc.id, externalId],
+        )
+      ).meta;
+
+    await withMeta.ingest.sink(acc.id, marked("li-email:m-li-1"));
+    expect(await metaOf("li-email:m-li-1")).toEqual({ partial: true });
+
+    await withMeta.ingest.sink(acc.id, marked("m-full-1"));
+    expect(await metaOf("m-full-1")).toEqual({});
+
+    await withMeta.close();
+  });
+});

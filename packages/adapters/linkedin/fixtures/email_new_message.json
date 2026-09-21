@@ -1,0 +1,53 @@
+{
+  "scenario": "new_message",
+  "provenance": "synthetic-from-docs",
+  "note": "raw is a NormalizedItem exactly as @omnis/adapter-gmail emits it (A1 §2.9: the LinkedIn notification email is the parallel signal, reusing the Gmail pipeline). No real notification sample existed when this fixture was written — task 26 re-pins it against a real message obtained through spike A1-⑧.",
+  "raw": {
+    "threadExternalId": "19bc4f2a3d5e6f70",
+    "externalId": "19bc4f2a3d5e6f70",
+    "kind": "email",
+    "author": { "kind": "person", "id": "messages-noreply@linkedin.com" },
+    "body": "Subject: Dana Lee sent you a message\n\nDana Lee sent you a message on LinkedIn.\n\n\"Let's sync tomorrow at 10am about the launch plan.\"\n\nView message: https://www.linkedin.com/messaging/thread/2-YWJjMTIz/\n\nhttps://www.linkedin.com/in/dana-lee-8b1c2",
+    "attachments": [],
+    "sentAt": "2026-09-22T09:14:03.000Z",
+    "status": "received",
+    "sourceHash": "<li-msg-001@linkedin.com>",
+    "threadMeta": {
+      "externalId": "19bc4f2a3d5e6f70",
+      "kind": "email",
+      "title": "Dana Lee sent you a message",
+      "participants": [
+        { "externalId": "messages-noreply@linkedin.com", "displayName": "LinkedIn" },
+        { "externalId": "logan@example.com", "displayName": "Logan Kim" }
+      ],
+      "lastItemAt": "2026-09-22T09:14:03.000Z",
+      "archivedAt": null
+    }
+  },
+  "expected": {
+    "item": {
+      "threadExternalId": "li:2-YWJjMTIz",
+      "externalId": "li-email:19bc4f2a3d5e6f70",
+      "kind": "message",
+      "author": { "kind": "person", "id": "https://www.linkedin.com/in/dana-lee-8b1c2" },
+      "body": "Let's sync tomorrow at 10am about the launch plan.",
+      "attachments": [],
+      "sentAt": "2026-09-22T09:14:03.000Z",
+      "status": "received",
+      "sourceHash": "li-email:<li-msg-001@linkedin.com>",
+      "threadMeta": {
+        "externalId": "li:2-YWJjMTIz",
+        "kind": "dm",
+        "title": "Dana Lee",
+        "participants": [
+          {
+            "externalId": "https://www.linkedin.com/in/dana-lee-8b1c2",
+            "displayName": "Dana Lee"
+          }
+        ],
+        "lastItemAt": "2026-09-22T09:14:03.000Z",
+        "archivedAt": null
+      }
+    }
+  }
+}

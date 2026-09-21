@@ -13,6 +13,7 @@
     { "path": "./packages/adapters/outlook" },
     { "path": "./packages/adapters/telegram" },
     { "path": "./packages/adapters/kakaotalk" },
+    { "path": "./packages/adapters/linkedin" },
     { "path": "./apps/local-agent" },
     { "path": "./packages/ui" },
     { "path": "./apps/desktop" },

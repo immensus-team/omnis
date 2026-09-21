@@ -1,0 +1,30 @@
+{
+  "scenario": "connection_invite_ignored",
+  "provenance": "synthetic-from-docs",
+  "note": "A connection invitation from the same sender domain and even the same sender name. It is not a message: the invite is actionable only inside LinkedIn, and the Playwright path (US-C10) covers it, so it must not become a 'new message arrived' item.",
+  "raw": {
+    "threadExternalId": "19bc4f2a3d5e6f72",
+    "externalId": "19bc4f2a3d5e6f72",
+    "kind": "email",
+    "author": { "kind": "person", "id": "invitations@linkedin.com" },
+    "body": "Subject: Dana Lee wants to connect\n\nDana Lee sent you an invitation to connect on LinkedIn.\n\nView invitation: https://www.linkedin.com/comm/mynetwork/invitation-manager/\n\nhttps://www.linkedin.com/in/dana-lee-8b1c2",
+    "attachments": [],
+    "sentAt": "2026-09-22T09:31:12.000Z",
+    "status": "received",
+    "sourceHash": "<li-invite-001@linkedin.com>",
+    "threadMeta": {
+      "externalId": "19bc4f2a3d5e6f72",
+      "kind": "email",
+      "title": "Dana Lee wants to connect",
+      "participants": [
+        { "externalId": "invitations@linkedin.com", "displayName": "LinkedIn" },
+        { "externalId": "logan@example.com", "displayName": "Logan Kim" }
+      ],
+      "lastItemAt": "2026-09-22T09:31:12.000Z",
+      "archivedAt": null
+    }
+  },
+  "expected": {
+    "item": null
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "scenario": "not_linkedin",
+  "provenance": "synthetic-from-docs",
+  "note": "The second guard: a subject that reads exactly like a LinkedIn message notification, from an unrelated sender. The sender check runs first, so the newsletter never becomes a LinkedIn item.",
+  "raw": {
+    "threadExternalId": "19bc4f2a3d5e6f74",
+    "externalId": "19bc4f2a3d5e6f74",
+    "kind": "email",
+    "author": { "kind": "person", "id": "digest@newsletter.example.com" },
+    "body": "Subject: Dana Lee sent you a message\n\nDana Lee sent you a message on her newsletter.\n\nRead it: https://newsletter.example.com/issues/42\n\nhttps://www.linkedin.com/in/dana-lee-8b1c2",
+    "attachments": [],
+    "sentAt": "2026-09-22T09:40:00.000Z",
+    "status": "received",
+    "sourceHash": "<newsletter-42@newsletter.example.com>",
+    "threadMeta": {
+      "externalId": "19bc4f2a3d5e6f74",
+      "kind": "email",
+      "title": "Dana Lee sent you a message",
+      "participants": [
+        { "externalId": "digest@newsletter.example.com", "displayName": "Example Digest" },
+        { "externalId": "logan@example.com", "displayName": "Logan Kim" }
+      ],
+      "lastItemAt": "2026-09-22T09:40:00.000Z",
+      "archivedAt": null
+    }
+  },
+  "expected": {
+    "item": null
+  }
+}

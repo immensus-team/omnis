@@ -1,10 +1,11 @@
 import { createGmailAdapter } from "@omnis/adapter-gmail";
 import { createGoogleCalendarAdapter } from "@omnis/adapter-google-calendar";
+import { LINKEDIN_EMAIL_PREFIX } from "@omnis/adapter-linkedin";
 import { createOutlookAdapter } from "@omnis/adapter-outlook";
 import { createSlackAdapter } from "@omnis/adapter-slack";
 import { createTelegramAdapter } from "@omnis/adapter-telegram";
 import { configureAgents, startLoops, summarizeThread } from "@omnis/agents";
-import { createPool } from "@omnis/db";
+import { createPool, query } from "@omnis/db";
 import {
   type Logger,
   assertZeroPublication,
@@ -12,7 +13,7 @@ import {
   createLogger,
   recordAdapterHealth,
 } from "@omnis/kernel";
-import type { Channel } from "@omnis/protocol";
+import type { Channel, NormalizedItem } from "@omnis/protocol";
 import {
   type AdapterFactories,
   type AdapterStatus,
@@ -26,6 +27,7 @@ import { type HubConfig, readConfig } from "./config.js";
 import { type DelegateExecutor, startDelegateExecutor } from "./delegate-exec.js";
 import { createHubServer } from "./http.js";
 import { registerIngestJobs } from "./ingest-job.js";
+import { linkedinFromGmail } from "./linkedin-email-hook.js";
 import { registerStartupJobs } from "./startup-jobs.js";
 import { registerSummaryJob } from "./summarize-job.js";
 
@@ -65,7 +67,13 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
   const config = readConfig(env);
   const logger = createLogger("@omnis/hub");
   const pool = createPool(env);
-  const kernel = createKernel({ pool, logger });
+  // US-C09 (A1 §2.9): a LinkedIn notification email is a "new message arrived" ping whose body is
+  // only the preview, so its item is written `meta.partial`. The marker travels as item meta, not as
+  // a channel or a column, because the derived item is an ordinary `linkedin` item in every other
+  // respect — US-C10's Playwright adapter fills the real message in later.
+  const itemMeta = (e: NormalizedItem): Record<string, unknown> | undefined =>
+    e.externalId.startsWith(LINKEDIN_EMAIL_PREFIX) ? { partial: true } : undefined;
+  const kernel = createKernel({ pool, logger, itemMeta });
   // Booting with the Zero schema and the publication out of sync shows the desktop an empty inbox.
   // Break at boot instead.
   await assertZeroPublication(pool);
@@ -155,7 +163,19 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
   const adapters = adaptersByChannel(boundAdapters);
   const adapterLoops = startAdapterLoops({
     adapters: boundAdapters,
-    sink: kernel.ingest.sink,
+    // US-C09: wrapped, so a LinkedIn message notification seen by the Gmail pipeline emits one more
+    // item on the `linkedin` account. With no linkedin account row (US-C10 has not run) the hook
+    // forwards everything unchanged.
+    sink: linkedinFromGmail({
+      findLinkedInAccount: async () => {
+        const rows = await query<{ id: string }>(
+          pool,
+          "SELECT id FROM accounts WHERE channel = 'linkedin' ORDER BY created_at, id LIMIT 1",
+        );
+        return rows[0]?.id ?? null;
+      },
+      sink: kernel.ingest.sink,
+    }),
     logger,
     recordAdapterHealth: reportAdapterHealth,
   });
