@@ -50,6 +50,32 @@ describe("InboxRow (U2 kinso conversation row, one per thread)", () => {
     expect(screen.queryByLabelText("Unread")).not.toBeInTheDocument();
   });
 
+  // US-D08 §c.4: the dot moved out of the meta line into the row's own leading column, so it is the
+  // avatar's sibling and not the name's. The difference is not cosmetic — inside the meta line it
+  // pushed the name and the time along by its own width, and every unread row in the list was
+  // indented against every read one.
+  it("puts the unread dot in the row's gutter, beside the avatar rather than the name", () => {
+    const { container } = render(<InboxRow {...baseProps} unread={true} />);
+    const row = container.querySelector(".inbox-row");
+    const dot = container.querySelector(".inbox-row__unread-dot");
+
+    expect(dot?.parentElement).toBe(row);
+    expect(container.querySelector(".inbox-row__meta")?.contains(dot)).toBe(false);
+    // Order says which grid column it takes: the dot is placed before the avatar, and app.css gives
+    // the two of them columns 1 and 2 respectively.
+    expect(row?.firstElementChild).toBe(dot);
+  });
+
+  // US-D08 §c.4: the list says which row is last, because Virtuoso gives every row its own wrapper
+  // and a `:last-child` selector in CSS would therefore be true of all of them.
+  it("marks the last row of the list so the hairline under it can be dropped", () => {
+    const { container: withLast } = render(<InboxRow {...baseProps} last={true} />);
+    expect(withLast.querySelector(".inbox-row")).toHaveClass("inbox-row--last");
+
+    const { container: without } = render(<InboxRow {...baseProps} />);
+    expect(without.querySelector(".inbox-row")).not.toHaveClass("inbox-row--last");
+  });
+
   it("prefixes draft summaries with 'Draft: ' (A5 §3.1)", () => {
     render(<InboxRow {...baseProps} isDraft={true} summary="Yes, got it" />);
     expect(screen.getByText("Draft: Yes, got it")).toBeInTheDocument();

@@ -892,8 +892,13 @@ body {
   display: grid;
   /* US-D02b: the middle column must be minmax(0, 1fr) — a bare 1fr has a min-content minimum, so
      a long title widens the row (horizontal scroll) and wraps to two lines instead of
-     ellipsizing. That one word is most of this fix. */
-  grid-template-columns: 40px minmax(0, 1fr) auto;
+     ellipsizing. That one word is most of this fix.
+     US-D08 §c.4: the leading 10px is the unread gutter. It is reserved on every row whether or not
+     there is a dot, so a read row and an unread one keep the same text origin — and that origin is
+     `--row-rule-inset` (16 padding + 10 + 12 + 40 + 12), which is where the hairline below starts.
+     Change one of these four numbers and the token has to move with it; the arithmetic is written
+     out in tokens.css next to --row-rule-inset. */
+  grid-template-columns: 10px 40px minmax(0, 1fr) auto;
   grid-template-rows: auto auto;
   column-gap: 12px;
   row-gap: 4px;
@@ -906,8 +911,12 @@ body {
      @keyframes inbox-row-leave below. */
   --row-pad-y: 12px;
   padding: var(--row-pad-y) 16px;
-  /* No hairline separators (23 §2 — kinso divides rows with padding alone). Only the selected row
-     is set apart, by .inbox-row--selected's card and shadow. */
+  /* US-D08 §c.4: kinso divided rows with padding alone (23 §2); the v3 amendment allows a hairline,
+     and the inset is the whole of what makes it read as Mail (M100, M143) rather than as a table.
+     Drawn as a pseudo-element rather than `border-bottom` because a border is full-bleed by
+     construction — the inset and the 1px height are the feature, not decoration on top of one, and
+     a border would also join the row's box, which the height-collapse animation measures. */
+  position: relative;
   cursor: pointer;
   /* US-D04: the selection elevation. A row does not blink into a card — the fill, the radius and
      the shadow travel together over the entry rung (160ms, --dur-base) so pointing at a row and
@@ -928,9 +937,37 @@ body {
   box-shadow: var(--shadow-row-selected);
 }
 
+/* US-D08 §c.4: the row hairline. `--row-rule-inset` on the left, the row's own 16px padding on the
+   right, 1px tall at the row's bottom edge.
+   The ink is written out rather than read from `--border-row`: that token is a `border` shorthand
+   (width + style + colour) and `background` cannot take it. They are the same value in two
+   syntaxes, and they have to stay equal — the value is also what the reviewer check reads off
+   `getComputedStyle(row, "::after").background`, where it must be at or under 8% alpha. */
+.inbox-row::after {
+  content: "";
+  position: absolute;
+  left: var(--row-rule-inset);
+  right: 16px;
+  bottom: 0;
+  height: 1px;
+  background: oklch(0.2 0.004 80 / 0.07);
+  /* The rule must not eat the row's own click. */
+  pointer-events: none;
+}
+
+/* §c.4: the last row has no rule — a divider under the final row divides it from nothing, and in a
+   scroller it is the line that hangs in the air when the list is scrolled to the end.
+   It is a class from the screen rather than `:last-child` on purpose. Virtuoso does not put the rows
+   in one container: each item is wrapped in its own `<div data-index …>` and the row is that div's
+   only child, so `.inbox-row:last-child` matches **every** row and would delete the whole feature
+   silently. Nothing in the row's own DOM says which one is last, so the list has to say it. */
+.inbox-row--last::after {
+  display: none;
+}
+
 .inbox-row__avatar {
   grid-row: 1 / span 2;
-  grid-column: 1;
+  grid-column: 2;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -948,9 +985,11 @@ body {
 .inbox-row__avatar--runtime {
   background: var(--gray-950, #14141a);
   color: var(--gray-000, #fff);
-  /* P1: a runtime logo tile, told apart from a person's circular avatar by shape — the same
-     squircle the channel-rail tiles use. */
-  border-radius: 30%;
+  /* US-D08 §c.4: a runtime logo tile is told apart from a person by shape — always was. The ratio
+     used to be 30%, which is a squircle only at 40px and an accident at any other size; 10px is
+     the same shape stated as the corner it actually is. (Mail's M100 app tiles are squircles and
+     M143's people are circles; that split is the one thing this rule has to keep.) */
+  border-radius: 10px;
 }
 
 .inbox-row__avatar-img {
@@ -961,7 +1000,7 @@ body {
 
 .inbox-row__meta {
   grid-row: 1;
-  grid-column: 2;
+  grid-column: 3;
   display: flex;
   align-items: baseline;
   gap: 6px;
@@ -991,12 +1030,19 @@ body {
   font-weight: 700;
 }
 
+/* US-D08 §c.4: the dot left the meta line for the gutter. Beside the name it pushed the name and
+   the time along by its own width, so an unread row's text started 12px right of a read row's —
+   every unread row in the list was misaligned with every read one. In its own column, centred
+   across both rows, both states start at the same x. */
 .inbox-row__unread-dot {
-  width: 6px;
-  height: 6px;
+  grid-row: 1 / span 2;
+  grid-column: 1;
+  justify-self: center;
+  align-self: center;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--accent);
-  flex: 0 0 auto;
 }
 
 .inbox-row__timestamp {
@@ -1018,7 +1064,7 @@ body {
      its lower half lands exactly over this line). Spilling to `2 / span 2` here buries the label
      chips under the channel mark, the approval dot and the archive button — the spot that had
      been broken ever since US-A33. The chips end in column 2. */
-  grid-column: 2;
+  grid-column: 3;
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -1054,7 +1100,7 @@ body {
 
 .inbox-row__side {
   grid-row: 1 / span 2;
-  grid-column: 3;
+  grid-column: 4;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2144,6 +2190,29 @@ body {
 
   .inbox-card__pills button {
     font-size: 14px;
+  }
+
+  .inbox-row__name {
+    font-size: 16px;
+  }
+
+  .inbox-row__timestamp {
+    font-size: 13px;
+  }
+
+  .inbox-row__summary {
+    font-size: 14px;
+  }
+
+  /* US-D08 §c.4: the selected row stops being a white card in this tier. A card is a thing resting
+     on a surface; here the list is the whole screen and there is no surface left for it to rest on,
+     so the row is tinted in place instead — the same fill hover uses, with the shadow and the
+     radius dropped. The hairline stays: it is the list's grammar, not the selection's. */
+  .inbox-row--selected,
+  .inbox-row--selected:hover {
+    background: var(--state-hover);
+    border-radius: 0;
+    box-shadow: none;
   }
 
   /* This is the tier where the rail has already collapsed to a bottom bar, i.e. the coarse-pointer

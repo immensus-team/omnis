@@ -76,6 +76,11 @@ export interface InboxRowProps {
    *  screen keeps it in the data for the length of the leave animation (motion.ts's LEAVE_MS) so
    *  there is something left to animate; this prop is what makes it collapse while it waits. */
   leaving?: boolean;
+  /** US-D08 §c.4: the last row in the list draws no hairline under itself. It has to be said by the
+   *  list rather than by a `:last-child` selector in CSS — Virtuoso wraps every item in its own
+   *  `<div data-index>`, so the row is an only child and `:last-child` is true of all of them (see
+   *  the rule in app.css). */
+  last?: boolean;
 }
 
 /** US-D04: the archive collapse animates `height`, and `height: auto` only interpolates where
@@ -181,6 +186,7 @@ export function InboxRow(props: InboxRowProps) {
           className={cn(
             "inbox-row",
             props.selected && "inbox-row--selected",
+            props.last && "inbox-row--last",
             leaving && "inbox-row--leaving",
           )}
           onClick={() => props.onSelect(props.id)}
@@ -191,12 +197,16 @@ export function InboxRow(props: InboxRowProps) {
             }
           }}
         >
+          {/* US-D08 §c.4: the unread dot is a sibling of the avatar, not of the name. Laying it in
+              the row's own leading column is what keeps every row's text at one x — inside the meta
+              line it shifted the name and the time right by its own width, so unread rows were
+              indented against read ones. */}
+          {props.unread && <span className="inbox-row__unread-dot" aria-label="Unread" />}
           <RowAvatarView avatar={props.avatar} />
           <div className="inbox-row__meta">
             <span className="inbox-row__name" data-unread={props.unread}>
               {props.name}
             </span>
-            {props.unread && <span className="inbox-row__unread-dot" aria-label="Unread" />}
             <span className="inbox-row__timestamp">{props.timestamp}</span>
           </div>
           <div className="inbox-row__side">

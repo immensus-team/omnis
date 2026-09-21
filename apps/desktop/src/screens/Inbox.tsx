@@ -680,11 +680,15 @@ export function Inbox({
         role="listbox"
         style={{ flex: "1 1 0", minHeight: 0 }}
         data={listItems}
-        itemContent={(_, item) =>
+        itemContent={(index, item) =>
           item.kind === "header" ? (
             <GroupHeader pill={item.pill} count={item.count} />
           ) : (
             <InboxRow
+              // US-D08 §c.4: only the row at the end of the list drops its hairline. The index is
+              // the flat list index, and the last item is always a row — a group header is only
+              // ever emitted above the rows it counts.
+              last={index === listItems.length - 1}
               id={item.row.id}
               name={item.row.title}
               summary={item.row.summary}
