@@ -157,6 +157,52 @@ describe("ContextMenu (US-D09 §c.7)", () => {
     expect(within(panel).queryByRole("menuitem")).not.toBeInTheDocument();
   });
 
+  it("does not leak a press into the React tree that rendered the trigger", () => {
+    // The panel is portaled to the body, so it is not a DOM descendant of the trigger — but React
+    // bubbles synthetic events through the React tree, and a portal's parent is the component that
+    // rendered the trigger. Every trigger in this app sits inside something that reacts to being
+    // pressed (the inbox row opens a thread and starts a swipe drag), so the panel has to stop both
+    // events at its own edge. Asserted on an ancestor rather than on the row so it is a statement
+    // about the component and not about one caller.
+    const outerClick = vi.fn();
+    const outerPress = vi.fn();
+    const pick = vi.fn();
+    render(
+      // biome-ignore lint/a11y/useKeyWithClickEvents: this div is the hazard under test, not a control — it exists to catch a press the panel should have stopped, and giving it a keyboard twin would be inventing behaviour for the fixture.
+      <div onClick={outerClick} onPointerDown={outerPress}>
+        <ContextMenu
+          label="Thread actions"
+          trigger={
+            <button type="button" aria-label="More actions">
+              …
+            </button>
+          }
+          groups={[
+            {
+              items: [
+                { id: "open", label: "Open", icon: Reply, onSelect: vi.fn() },
+                { id: "archive", label: "Archive", icon: Archive, onSelect: pick },
+              ],
+            },
+          ]}
+        />
+      </div>,
+    );
+
+    press(screen.getByRole("button", { name: "More actions" }));
+    // The trigger's own press is the caller's to stop; what matters is that nothing inside the open
+    // panel reaches the ancestor either.
+    outerClick.mockClear();
+    outerPress.mockClear();
+
+    fireEvent.pointerDown(screen.getByText("Archive"));
+    fireEvent.click(screen.getByText("Archive"));
+
+    expect(pick).toHaveBeenCalledOnce();
+    expect(outerPress).not.toHaveBeenCalled();
+    expect(outerClick).not.toHaveBeenCalled();
+  });
+
   it("closes on Escape with the focus back on the trigger", async () => {
     menu(twoGroups());
     const trigger = screen.getByRole("button", { name: "More actions" });

@@ -61,6 +61,15 @@ export function ContextMenu({
           side={side}
           align={align}
           sideOffset={sideOffset}
+          // The panel is portaled to the body, so nothing inside it is a DOM descendant of the
+          // trigger — but React bubbles synthetic events through the *React* tree, and the portal's
+          // parent is the component that rendered the trigger. Without this, picking "Archive" in a
+          // row's menu also runs the row's own click and opens the thread, and a press inside the
+          // menu starts the row's swipe drag with it. One stop at the panel's edge covers the rows
+          // and the padding around them, and it is the panel's job rather than each caller's: every
+          // trigger in this app sits inside something that reacts to being pressed.
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
         >
           {groups.map((group, index) => (
             // Groups are separated by the gap and never by a rule (§c.7). The key is the group's

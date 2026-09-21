@@ -243,19 +243,23 @@ async function sweep(page: Page, suffix: string): Promise<ShotResult[]> {
     // The <900px tiers are the coarse-pointer layout, so two things the string-matching unit tests
     // cannot see are measured here instead.
     if (NARROW_WIDTHS.includes(width)) {
-      // 1. The row's Archive/Restore button must not take the title's width. It is `opacity: 0` in
-      //    the wide tier, which keeps its box — ~65px of dead gutter per row, out of a 390px
-      //    viewport. This used to measure that the narrow tier gave the column back by switching
-      //    the button off (a `display: none` button has no box at all); US-D08 §c.4 brought it
-      //    back as the non-gesture twin of the swipe, so the check now measures the property it was
-      //    always about: the row's `auto` column is sized by the brand mark alone, and the button,
-      //    being absolute, adds nothing to it. An in-flow button fails here by its own width.
+      // 1. The row's hover cluster must not take the title's width. It is `opacity: 0` in the wide
+      //    tier, which keeps its box — ~65px of dead gutter per row, out of a 390px viewport. This
+      //    used to measure that the narrow tier gave the column back by switching the button off (a
+      //    `display: none` button has no box at all); US-D08 §c.4 brought it back as the
+      //    non-gesture twin of the swipe, so the check now measures the property it was always
+      //    about: the row's `auto` column is sized by the brand mark alone, and the cluster, being
+      //    absolute, adds nothing to it. An in-flow control fails here by its own width.
+      //    US-D09 §c.7: the `…` and the Archive pill now travel together inside
+      //    .inbox-row__hover-actions, so that wrapper is the one out-of-flow child to exclude;
+      //    excluding the pill by name again would measure the wrapper and read it as a widened
+      //    column.
       const sides = await page.evaluate(() =>
         [...document.querySelectorAll(".inbox-row__side")].map((side) => {
           const column = side.getBoundingClientRect().width;
-          // Everything in the column except the action, which is the one child that is out of flow.
+          // Everything in the column except the cluster, which is the one child that is out of flow.
           const boxes = [...side.children]
-            .filter((child) => !child.classList.contains("inbox-row__action"))
+            .filter((child) => !child.classList.contains("inbox-row__hover-actions"))
             .map((child) => child.getBoundingClientRect());
           if (boxes.length === 0) return { column, children: 0 };
           return {

@@ -1141,8 +1141,8 @@ body {
   align-items: center;
   gap: 6px;
   justify-self: end;
-  /* The hover-only Archive/Restore button is absolute inside this slot (see
-     .inbox-row__action) — this is its containing block. */
+  /* The hover cluster (the `…` and the Archive/Restore pill) is absolute inside this slot — see
+     .inbox-row__hover-actions. This is its containing block. */
   position: relative;
 }
 
@@ -1157,22 +1157,56 @@ body {
 
 /* US-A36: archive/restore appears on hover (and keyboard focus) only — a row does not carry a
    button at all times.
-   US-D02b: it is taken out of flow as well as faded. `opacity: 0` alone still laid the button
-   out, so column 3 (`auto`) was sized to include it and every row paid ~65px of its width for a
-   control nobody could see — width the title and the summary only get back here. Absolute inside
-   `.inbox-row__side` means the grid column is sized by the brand mark alone; the pill floats over
-   the mark's end of the row while hovered, which is legible because it carries `--bg-base` over
-   the row's `--state-hover` fill. `pointer-events` rides along with `opacity` so the invisible
-   pill is not a click target — this also keeps it reachable by keyboard, which `display: none`
-   would not (a display:none button is not focusable, so the row's `:focus-within` rule could
-   never fire). US-D08 §c.4: the narrow tier no longer switches it off — the swipe is that tier's
-   archive gesture, and this pill is the half of it a gesture cannot be (focusable, named, reachable
-   by a screen reader); see the <900px block. */
-.inbox-row__action {
+   US-D02b: the reveal is out of flow as well as faded. `opacity: 0` alone still laid the control
+   out, so column 3 (`auto`) was sized to include it and every row paid ~65px of its width for
+   something nobody could see — width the title and the summary only get back here. US-D09 §c.7
+   moved that absolutism up to the cluster (.inbox-row__hover-actions) when the `…` joined the
+   pill there, so the grid column is still sized by the brand mark alone and the two float over the
+   mark's end of the row while hovered, legible because each carries `--bg-base` over the row's
+   `--state-hover` fill. `pointer-events` rides along with `opacity` so the invisible control is not
+   a click target — this also keeps it reachable by keyboard, which `display: none` would not (a
+   display:none button is not focusable, so the row's `:focus-within` rule could never fire).
+   US-D08 §c.4: the narrow tier no longer switches it off — the swipe is that tier's archive
+   gesture, and this pill is the half of it a gesture cannot be (focusable, named, reachable by a
+   screen reader); see the <900px block. */
+/* US-D09 §c.7: the cluster the row shows on hover — the `…` and the archive pill — out of flow,
+   right-aligned inside `.inbox-row__side`. The absolutism moved here from the pill: the pill still
+   must not size the `auto` column (US-D02b), and the `…` that joined it must not either, so one box
+   carries both. Visibility is the cluster's, so the two appear and disappear as one control. */
+.inbox-row__hover-actions {
   position: absolute;
   top: 50%;
   right: 0;
   transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The `…` sits at the mark's end, level with the pill beside it, and carries `--bg-base` for the
+   same reason the pill does: it floats over the row's hover fill and the brand mark under it. */
+.inbox-row__more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: var(--hairline);
+  border-radius: 999px;
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.inbox-row__more:hover {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}
+
+.inbox-row__action {
   border: var(--hairline);
   border-radius: 999px;
   padding: 1px 8px;
@@ -1237,8 +1271,11 @@ body {
   }
 }
 
-.inbox-row:hover .inbox-row__action,
-.inbox-row:focus-within .inbox-row__action {
+/* §c.7: the reveal belongs to the cluster now that it has two controls in it. `:focus-within`
+   still carries it — that is what makes the `…` reachable from the keyboard, since the row itself
+   is focusable and reveals the cluster as soon as it is focused. */
+.inbox-row:hover .inbox-row__hover-actions,
+.inbox-row:focus-within .inbox-row__hover-actions {
   opacity: 1;
   pointer-events: auto;
 }

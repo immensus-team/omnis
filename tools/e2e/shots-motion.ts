@@ -108,8 +108,9 @@ async function main(): Promise<void> {
     await page.clock.install();
     await page.clock.pauseAt(new Date());
 
-    // The Archive button is hover-only (`.inbox-row__action` is opacity 0 + pointer-events none
-    // until `.inbox-row:hover`), so the row has to be hovered before it can be pressed.
+    // The Archive button is hover-only (`.inbox-row__hover-actions`, the cluster it shares with the
+    // row's `…`, is opacity 0 + pointer-events none until `.inbox-row:hover`), so the row has to be
+    // hovered before it can be pressed.
     await target.hover();
     await target.getByRole("button", { name: "Archive" }).click();
     await page.waitForSelector(".inbox-row--leaving", { timeout: 5_000 });

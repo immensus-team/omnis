@@ -349,9 +349,11 @@ describe("Inbox filter row responsive contract (US-D02b)", () => {
     // its invisible-at-rest state are in inbox-row-rules.test.tsx, next to the rest of the row.
     expect(narrowShell).toMatch(/\.inbox-row__swipe \{\s*\n\s*position: absolute;/);
     expect(narrowShell).not.toMatch(/^ {2}\.inbox-row__action \{/m);
-    // Not global either way: the wide tier still reveals the action on `:focus-within` for the
-    // keyboard, and now so does this one.
-    expect(css).toContain(".inbox-row:focus-within .inbox-row__action");
+    // Not global either way: the wide tier still reveals the control on `:focus-within` for the
+    // keyboard, and now so does this one. US-D09 §c.7: the reveal moved from the pill to the
+    // cluster when the row's `…` joined it there, so the selector this asserts changed with it —
+    // the pill is still inside the cluster, and the pill is still what the keyboard reaches.
+    expect(css).toContain(".inbox-row:focus-within .inbox-row__hover-actions");
 
     const phoneShell = ruleBlock("shell \\(max-width: 419\\.98px\\)");
     expect(phoneShell).toBeDefined();

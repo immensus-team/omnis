@@ -1,5 +1,5 @@
 import * as HoverCard from "@radix-ui/react-hover-card";
-import { Archive, RotateCcw } from "lucide-react";
+import { Archive, Mail, MoreHorizontal, RotateCcw } from "lucide-react";
 import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
@@ -24,6 +24,7 @@ import {
 } from "../lib/row-meta.js";
 import type { UiChannel } from "../types.js";
 import { ChannelGlyph } from "./channel-glyph.js";
+import { ContextMenu, type ContextMenuItem } from "./context-menu.js";
 import { KeyValueTable } from "./key-value-table.js";
 import { PersonCard, type RelationshipState } from "./person-card.js";
 import { AgentStatusBadge } from "./status-badge.js";
@@ -286,6 +287,36 @@ export function InboxRow(props: InboxRowProps) {
     props.onSelect(props.id);
   };
 
+  /** §c.7: what the row's `…` opens. The list is built from the same two facts the row already
+   *  acts on, so it cannot drift from them — "Open" is the row's own click and the second row is
+   *  the swipe's action, whose label follows `archived` exactly as the pill's and the swipe
+   *  caption's do (guard 11: the gesture is never the only way to reach an action).
+   *  The narrowed `onArchive` is captured rather than read off `props` inside the closure, so the
+   *  guard and the call are provably the same function. */
+  const hoverMenuItems: ContextMenuItem[] = [
+    {
+      id: "open",
+      label: "Open",
+      icon: Mail,
+      // Not `activate`: on a revealed row that one closes the reveal instead of opening, which is
+      // right for a tap on the row and wrong for a row that says "Open". A revealed row is behind
+      // the pane when the thread opens, so it is closed on the way out either way.
+      onSelect: () => {
+        closeRow(props.id);
+        props.onSelect(props.id);
+      },
+    },
+  ];
+  const archive = props.onArchive;
+  if (archive !== undefined) {
+    hoverMenuItems.push({
+      id: "archive",
+      label: props.archived ? "Restore" : "Archive",
+      icon: props.archived ? RotateCcw : Archive,
+      onSelect: () => archive(props.id),
+    });
+  }
+
   return (
     // US-D02: HoverCard.Trigger is asChild, so it only adds hover handlers to this row div — no
     // wrapper element appears and the row's role="option", click and keyboard behaviour are
@@ -387,21 +418,46 @@ export function InboxRow(props: InboxRowProps) {
               {props.hasPendingApproval && (
                 <span className="inbox-row__approval-dot" aria-label="Pending approval" />
               )}
-              {props.onArchive && (
-                <button
-                  type="button"
-                  className="inbox-row__action"
-                  // The whole row is a click target, so without stopping propagation archiving
-                  // also opens the thread.
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    props.onArchive?.(props.id);
-                  }}
-                  onKeyDown={(e) => e.stopPropagation()}
-                >
-                  {props.archived ? "Restore" : "Archive"}
-                </button>
-              )}
+              {/* §c.7/US-D02b: the row's hover cluster — the `…` and the archive pill — as one
+                  absolutely-positioned box. The pill was already out of flow so the row's `auto`
+                  column is sized by the brand mark alone; a second control had to join it there,
+                  and a wrapper keeps the cluster right-aligned to the mark's end without a second
+                  `right` offset to keep in step with the first. */}
+              <div className="inbox-row__hover-actions">
+                <ContextMenu
+                  label={`Actions for ${props.name}`}
+                  trigger={
+                    <button
+                      type="button"
+                      className="inbox-row__more"
+                      // Guard 9: an icon-only control is named.
+                      aria-label="More actions"
+                      // The whole row is a click target, so without stopping propagation opening
+                      // the menu also opens the thread behind it.
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
+                      <MoreHorizontal size={16} aria-hidden="true" />
+                    </button>
+                  }
+                  groups={[{ items: hoverMenuItems }]}
+                />
+                {props.onArchive && (
+                  <button
+                    type="button"
+                    className="inbox-row__action"
+                    // The whole row is a click target, so without stopping propagation archiving
+                    // also opens the thread.
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      props.onArchive?.(props.id);
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    {props.archived ? "Restore" : "Archive"}
+                  </button>
+                )}
+              </div>
             </div>
             <div className="inbox-row__summary-line">
               <span className="inbox-row__summary" data-draft={props.isDraft}>
