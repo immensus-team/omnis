@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import {
   type Adapter,
   type AgentRuntime,
@@ -9,6 +11,7 @@ import {
   type HostId,
   type HumanInterrupt,
   type HumanResponse,
+  ImportScanParams,
   IngestReadParams,
   IngestScanParams,
   JSONRPC_ERRORS,
@@ -24,6 +27,7 @@ import {
 } from "@omnis/protocol";
 import { handleCaptureSend } from "./capture.js";
 import { runDelegation } from "./delegate.js";
+import { scanClaudeProjects } from "./import/claude-jsonl.js";
 import { handleIngestRead, handleIngestScan } from "./ingest.js";
 import type { Logger } from "./logger.js";
 import { assertPathAllowed } from "./paths.js";
@@ -70,6 +74,12 @@ export interface DispatchDeps {
   beforeTurn?: (turnId: string) => void;
   afterTurn?: (turnId: string) => void;
   turnCap?: TurnCap;
+  /** US-C14: where `sessions.import_scan` looks. The defaults are a real host's layout; tests point
+   *  `claudeHome` at a fixture tree. */
+  claudeHome?: string;
+  codexHome?: string;
+  /** Secret values this process already holds (the bridge token) — masked out of imported turn text. */
+  importSecrets?: string[];
 }
 
 /** Same rule as `turn.start`: a host with no sink wired is a bug, and the runtime must not be started for it. */
@@ -199,6 +209,25 @@ export function createDispatcher(
           allowedRoots: [...new Set([...deps.allowedRoots.values()].flat())],
           logger: deps.logger,
         });
+      }
+
+      // US-C14 (C-D7): read-only and pull-based. The scanner opens nothing but
+      // `claudeHome/projects/<dir>/<file>.jsonl`, and keeps only sessions whose cwd is inside the
+      // union of this host's allowed_roots — the same boundary `session.create` enforces for turns.
+      case "sessions.import_scan": {
+        const p = ImportScanParams.parse(params);
+        return {
+          sessions: await scanClaudeProjects(
+            p.since === null ? null : new Date(p.since),
+            p.max_sessions,
+            {
+              claudeHome: deps.claudeHome ?? join(homedir(), ".claude"),
+              codexHome: deps.codexHome ?? join(homedir(), ".codex"),
+              allowedRoots: [...new Set([...deps.allowedRoots.values()].flat())],
+              secrets: deps.importSecrets ?? [],
+            },
+          ),
+        };
       }
 
       case "capture.send":

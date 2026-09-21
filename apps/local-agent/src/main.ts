@@ -112,6 +112,8 @@ export async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<void
       logger,
       host: config.host,
       turnCap: new TurnCap({ max: hostProfile(config.host).maxActiveTurns }),
+      // US-C14: the one secret value this process holds is masked out of imported terminal transcripts.
+      importSecrets: [token],
       // runtime event → hub notification → items (A2 §4.1). The client already exists by the time this closure fires.
       sinkFor: (session, turnId): EventSink =>
         createHubSink({ client, session, turnId, logger, outbox, registry }),
