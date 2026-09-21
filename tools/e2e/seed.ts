@@ -136,10 +136,14 @@ export async function seed(pool: Pool, env: E2EEnv): Promise<SeedResult> {
     "SELECT account_id FROM threads WHERE id = $1",
     [slackThreadId],
   );
-  await query(
+  // loop-r2-02: the returned id is the link the whole story rests on — the approval is *this*
+  // draft, so deciding the approval consumes the item rather than leaving a second copy of the same
+  // reply on screen.
+  const draftItem = await one<{ id: string }>(
     pool,
     `INSERT INTO items (thread_id, account_id, kind, status, scope, body, sent_at)
-       VALUES ($1, $2, 'message', 'draft', 'work', 'Yes, I will review it today.', now())`,
+       VALUES ($1, $2, 'message', 'draft', 'work', 'Yes, I will review it today.', now())
+       RETURNING id`,
     [slackThreadId, slackAccount.account_id],
   );
 
@@ -159,6 +163,7 @@ export async function seed(pool: Pool, env: E2EEnv): Promise<SeedResult> {
       },
       risk: "normal",
       thread_id: slackThreadId,
+      item_id: draftItem.id,
     });
   } finally {
     await kernel.close();
