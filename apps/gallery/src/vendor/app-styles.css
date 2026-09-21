@@ -734,8 +734,8 @@ body {
   background: var(--state-hover);
 }
 
-/* An un-wired Phase B action does not pretend to be pressable — not-allowed cursor, disabled, and
-   a tag on the right. 0.55 is the floor for the fade (hallmark slop-test): below it the row stops
+/* An action with nothing behind it does not pretend to be pressable — not-allowed cursor, disabled,
+   and a tag on the right. 0.55 is the floor for the fade (hallmark slop-test): below it the row stops
    reading as a gated feature and starts reading as an erased screen. */
 .ask-panel__action:disabled {
   opacity: 0.55;

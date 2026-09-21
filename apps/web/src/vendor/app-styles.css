@@ -11,8 +11,9 @@
    would have to be amended to learn — the same reason the S5 copy named its wave. The count moved
    from 6398 to 6404 when loop-r1-08 added §c.5's `.ask-panel__action kbd` rule — and the gallery's
    copy, which the same header rule binds and no test guards, was re-copied with it. loop-r2-02's
-   `.approval-card__provenance` line and its shared `.draft-card__actions button` rule are the
-   latest re-copy, at 6562 lines.
+   `.approval-card__provenance` line and its shared `.draft-card__actions button` rule came next;
+   loop-r2-03's `.reply-composer` block, which takes its box, its field and its action row from the
+   `.approval-card` selectors beside it, is the latest re-copy, at 6636 lines.
    apps/web/test/vendor-css.test.ts is what holds the line: it compares everything below this
    comment against that file byte for byte — forgetting to re-copy fails a test, not the screen. */
 /* Shell layout only. Colour and type come from @omnis/ui/tokens.css (A5 §1).
@@ -744,8 +745,8 @@ body {
   background: var(--state-hover);
 }
 
-/* An un-wired Phase B action does not pretend to be pressable — not-allowed cursor, disabled, and
-   a tag on the right. 0.55 is the floor for the fade (hallmark slop-test): below it the row stops
+/* An action with nothing behind it does not pretend to be pressable — not-allowed cursor, disabled,
+   and a tag on the right. 0.55 is the floor for the fade (hallmark slop-test): below it the row stops
    reading as a gated feature and starts reading as an erased screen. */
 .ask-panel__action:disabled {
   opacity: 0.55;

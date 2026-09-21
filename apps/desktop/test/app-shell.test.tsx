@@ -685,6 +685,56 @@ describe("App shell thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
   });
 });
 
+/* loop-r2-03/NC2-03: the reply composer's box. What the story asks for here is a claim about
+   *selectors* — the composer takes the approval card's radius, padding, margin, field style, action
+   row and buttons by being added to the rules that already declare them — so these read the shared
+   selector rather than the numbers under it. A copy would satisfy a numeric check and drift from the
+   card it is standing in for, which is the whole failure mode (the box becomes the card the moment
+   the proposal lands, and a jump in radius or padding at that moment is the thing being avoided). */
+describe("App shell reply composer (loop-r2-03: `r` opens a box that proposes a send)", () => {
+  const css = (): string => readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
+
+  it("is the card's box, by sharing its rules rather than restating them", () => {
+    // The box, the field, its placeholder and its focus ring: four rules, each naming both.
+    expect(css()).toMatch(/\.approval-card,\n\.reply-composer \{/);
+    expect(css()).toMatch(
+      /\.approval-card__editor,\n\.approval-card__respond,\n\.reply-composer__editor \{/,
+    );
+    expect(css()).toMatch(
+      /\.approval-card__editor::placeholder,\n\.approval-card__respond::placeholder,\n\.reply-composer__editor::placeholder \{/,
+    );
+    expect(css()).toMatch(
+      /\.approval-card__editor:focus-visible,\n\.approval-card__respond:focus-visible,\n\.reply-composer__editor:focus-visible \{/,
+    );
+    // And the margin that keeps it off the message above it — asserted against the neighbour that
+    // makes the group unambiguous, because `.reply-composer,` on its own is in three groups.
+    expect(css()).toMatch(/\n\.reply-composer,\n\.digest-card,/);
+  });
+
+  // 3 rows to start, 12 at most. `rows` is what the component passes and Chromium ignores it once
+  // `field-sizing` applies, so the heights are the row arithmetic and not an attribute.
+  it("sizes the field from its row count", () => {
+    // Not `baseRule`: `.reply-composer__editor {` is the *last line of the three-way field selector*
+    // before it is a rule of its own, and that grouped rule comes first in the file. The standalone
+    // one is found from the end, the way the chrome-row tier is.
+    const text = css();
+    const start = text.lastIndexOf("\n.reply-composer__editor {");
+    expect(start, "the composer's own editor rule is not in app.css").toBeGreaterThan(-1);
+    const body = text.slice(start, text.indexOf("\n}", start));
+    expect(body).toContain("field-sizing: content;");
+    expect(body).toContain("min-height: calc(3 * 1.45 * 15px + 18px);");
+    expect(body).toContain("max-height: calc(12 * 1.45 * 15px + 18px);");
+    expect(body).toContain("overflow-y: auto;");
+  });
+
+  // A phone has no ⌘ key. The hint is text, not a control, so hiding it leaves nothing unlabelled —
+  // the primary button beside it is the whole affordance there.
+  it("hides the send chord from a thumb", () => {
+    const body = atRuleBody("@media (pointer: coarse) {");
+    expect(body).toMatch(/\.reply-composer__hint \{\n\s*display: none;/);
+  });
+});
+
 describe("App shell detail card (US-D10 §c.5: the pane is the list's own card)", () => {
   function listCard(): string {
     return baseRule(".inbox-card");
