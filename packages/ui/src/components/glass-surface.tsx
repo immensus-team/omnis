@@ -21,6 +21,14 @@ export function GlassSurface({
   );
 }
 
-export function OpaqueSurface(props: { className?: string; children: ReactNode }) {
-  return <div className={cn("opaque-surface", props.className)}>{props.children}</div>;
+/** The content-layer twin of GlassSurface, and for the same reason it takes the remaining div
+ *  attributes: a screen that has to say something about a surface — DigestCard's `data-digest-kind`
+ *  is the case that needed it — would otherwise have to wrap the surface in a div that exists only
+ *  to hold one attribute. */
+export function OpaqueSurface({ className, children, ...rest }: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cn("opaque-surface", className)} {...rest}>
+      {children}
+    </div>
+  );
 }

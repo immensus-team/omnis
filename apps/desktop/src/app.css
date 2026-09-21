@@ -1120,6 +1120,7 @@ body {
 .agent-session-screen__system-log,
 .tool-call-badge,
 .approval-card,
+.digest-card,
 .draft-card {
   margin-bottom: 12px;
 }
@@ -1172,6 +1173,43 @@ body {
   border: 1px solid var(--border-hairline-strong);
   border-radius: 12px;
   padding: 12px;
+}
+
+/* A5 §5.2 / §3.4: the morning/nightly digest entry card. One line of headline and, when there is
+   one, a second line of body; the action sits at the far end. Same 12px radius and hairline as the
+   approval card above — both are the same kind of thing (a card laid inside a screen's body), and
+   DESIGN-DIRECTION's radius table has one value for that step.
+   `min-width: 0` on the text block is what keeps a long headline from pushing the button out of
+   the card at 390 (the shell's one-column tier) — a flex item's default min-width is its content's,
+   so without it the headline, not the card, decides the row's width and the page scrolls. */
+.digest-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border-hairline-strong);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.digest-card__text {
+  min-width: 0;
+}
+
+.digest-card__headline {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.digest-card__body {
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.digest-card button {
+  flex: 0 0 auto;
 }
 
 .approval-card__actions {
