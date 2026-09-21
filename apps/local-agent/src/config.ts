@@ -30,11 +30,24 @@ export interface HttpRuntimeConfig {
 }
 export type RuntimeConfig = ProcessRuntimeConfig | HttpRuntimeConfig;
 
+/** US-C12: the two capture channels that run on a GUI host and reach the hub over the bridge. */
+export type CaptureChannel = "kakaotalk" | "linkedin";
+
+/** One `[[capture]]` block: which channel to capture, and the account row on the hub it feeds
+ *  (`accounts.external_id`, A3-D4). The hub resolves the row id from this value, so the string has
+ *  to match `accounts.external_id` exactly — a typo drops every batch. */
+export interface CaptureConfig {
+  channel: CaptureChannel;
+  account_external_id: string;
+}
+
 export interface LocalAgentConfig {
   host: HostId;
   hub_url: string;
   token_keychain_item: string;
   runtimes: RuntimeConfig[];
+  /** Empty unless the TOML declares `[[capture]]` — capture is opt-in per host (C-D3). */
+  capture: CaptureConfig[];
 }
 export interface LoadConfigResult {
   config: LocalAgentConfig;
@@ -137,6 +150,36 @@ function parseRuntime(raw: Record<string, unknown>, homeDir: string): RuntimeCon
   throw new ConfigError(`unknown runtime kind: ${kind}`);
 }
 
+/** US-C12. The channel enum is closed on purpose: a `[[capture]]` block is a promise that a hub
+ *  relay exists for it, and `captureRelayRegistry` only knows these two. */
+const CAPTURE_CHANNELS: readonly string[] = ["kakaotalk", "linkedin"];
+
+function parseCapture(raw: Record<string, unknown>): CaptureConfig {
+  const channel = raw.channel;
+  if (typeof channel !== "string" || !CAPTURE_CHANNELS.includes(channel))
+    throw new ConfigError(`[[capture]] channel must be kakaotalk|linkedin, got ${String(channel)}`);
+  const accountExternalId = raw.account_external_id;
+  if (typeof accountExternalId !== "string" || accountExternalId.trim() === "")
+    throw new ConfigError(`[[capture]] channel='${channel}' requires account_external_id`);
+  return { channel: channel as CaptureChannel, account_external_id: accountExternalId };
+}
+
+/** Two blocks for one channel would create two capture loops feeding one relay; the hub's intake
+ *  drops whichever account the relay is not bound to, so the second block would fail silently. */
+function parseCaptureBlocks(toml: Record<string, unknown>): CaptureConfig[] {
+  if (toml.capture === undefined) return [];
+  if (!Array.isArray(toml.capture))
+    throw new ConfigError("capture must be an array of [[capture]] tables");
+  const blocks = (toml.capture as Record<string, unknown>[]).map(parseCapture);
+  const seen = new Set<string>();
+  for (const block of blocks) {
+    if (seen.has(block.channel))
+      throw new ConfigError(`[[capture]] declares channel '${block.channel}' twice`);
+    seen.add(block.channel);
+  }
+  return blocks;
+}
+
 export function loadConfig(input: {
   argv: string[];
   env: NodeJS.ProcessEnv;
@@ -198,6 +241,7 @@ export function loadConfig(input: {
       hub_url: normalizeHubUrl(hubRaw.value),
       token_keychain_item: token.value,
       runtimes,
+      capture: parseCaptureBlocks(toml),
     },
     provenance: { host: host.source, hub_url: hubRaw.source, token_keychain_item: token.source },
   };

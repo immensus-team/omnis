@@ -188,6 +188,12 @@ importers:
 
   apps/local-agent:
     dependencies:
+      '@omnis/adapter-kakaotalk':
+        specifier: workspace:*
+        version: link:../../packages/adapters/kakaotalk
+      '@omnis/adapter-linkedin':
+        specifier: workspace:*
+        version: link:../../packages/adapters/linkedin
       '@omnis/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol

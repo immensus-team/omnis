@@ -95,3 +95,55 @@ describe("loadConfig precedence (A2-D15)", () => {
     expect(r.provenance).toEqual({ host: "cli", hub_url: "toml", token_keychain_item: "toml" });
   });
 });
+
+describe("[[capture]] blocks (US-C12)", () => {
+  const captureToml = (blocks: string): string => `host = "mini"\n${blocks}`;
+
+  it("is empty when the TOML declares none — capture is opt-in per host", () => {
+    expect(loadConfig(base).config.capture).toEqual([]);
+  });
+
+  it("parses one block per channel", () => {
+    const r = loadConfig({
+      ...base,
+      tomlText: captureToml(
+        `[[capture]]\nchannel = "kakaotalk"\naccount_external_id = "kakaotalk:me"\n` +
+          `[[capture]]\nchannel = "linkedin"\naccount_external_id = "linkedin:logan"\n`,
+      ),
+    });
+    expect(r.config.capture).toEqual([
+      { channel: "kakaotalk", account_external_id: "kakaotalk:me" },
+      { channel: "linkedin", account_external_id: "linkedin:logan" },
+    ]);
+  });
+
+  it("rejects a channel with no relay or a missing account id", () => {
+    expect(() =>
+      loadConfig({
+        ...base,
+        tomlText: captureToml(`[[capture]]\nchannel = "whatsapp"\naccount_external_id = "x"\n`),
+      }),
+    ).toThrow(/kakaotalk\|linkedin/);
+    expect(() =>
+      loadConfig({ ...base, tomlText: captureToml(`[[capture]]\nchannel = "kakaotalk"\n`) }),
+    ).toThrow(/account_external_id/);
+    expect(() =>
+      loadConfig({
+        ...base,
+        tomlText: captureToml(`[[capture]]\nchannel = "kakaotalk"\naccount_external_id = "  "\n`),
+      }),
+    ).toThrow(/account_external_id/);
+  });
+
+  it("rejects a channel declared twice", () => {
+    expect(() =>
+      loadConfig({
+        ...base,
+        tomlText: captureToml(
+          `[[capture]]\nchannel = "kakaotalk"\naccount_external_id = "a"\n` +
+            `[[capture]]\nchannel = "kakaotalk"\naccount_external_id = "b"\n`,
+        ),
+      }),
+    ).toThrow(/twice/);
+  });
+});

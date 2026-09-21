@@ -13,7 +13,7 @@ import {
   createLogger,
   recordAdapterHealth,
 } from "@omnis/kernel";
-import type { Channel, NormalizedItem } from "@omnis/protocol";
+import type { Channel, HostId, NormalizedItem } from "@omnis/protocol";
 import {
   type AdapterFactories,
   type AdapterStatus,
@@ -22,7 +22,8 @@ import {
   loadAccountRows,
   startAdapterLoops,
 } from "./adapters.js";
-import { type BridgeDeps, createBridgeHub } from "./bridge.js";
+import { type BridgeDeps, type BridgeHub, createBridgeHub } from "./bridge.js";
+import { type CaptureRelayRegistry, captureRelayRegistry } from "./capture-relay.js";
 import { type HubConfig, readConfig } from "./config.js";
 import { type DelegateExecutor, startDelegateExecutor } from "./delegate-exec.js";
 import { createHubServer } from "./http.js";
@@ -37,14 +38,27 @@ export interface RunningHub {
   close(): Promise<void>;
 }
 
+/** US-C12/C-D3: the capture sidecars run on the mini's GUI session (kmsg needs Accessibility,
+ *  LinkedIn needs a logged-in profile), so `capture.send` always goes to the mini. */
+const CAPTURE_HOST: HostId = "mini";
+
 /** US-B45: the real factory table — the one place that knows every channel package. A channel whose
  *  app-level credentials are missing is simply absent from the table, so its accounts log
  *  "adapter skipped: no factory for channel" at boot instead of failing there (no credentials exist
  *  yet). slack/telegram need none: those adapters read their own Keychain items in connect(). */
-function adapterFactories(config: HubConfig): AdapterFactories {
+function adapterFactories(
+  config: HubConfig,
+  captureRelays: CaptureRelayRegistry,
+  call: BridgeHub["call"],
+): AdapterFactories {
   const factories: AdapterFactories = {
     slack: () => createSlackAdapter({}),
     telegram: () => createTelegramAdapter({}),
+    // US-C12: kakaotalk/linkedin have no client in the hub at all — the relay is a façade over the
+    // mini's sidecar, and its items arrive through bridge.ts's capture.items intake. The relay reads
+    // no secret, but buildAdapters skips an account whose auth_ref is null (adapters.ts), so a
+    // capture account still needs an account_secrets row holding a name nobody reads.
+    ...captureRelays.factories({ call, token: config.bridgeToken, host: CAPTURE_HOST }),
   };
   if (config.googleOAuthClientId !== "" && config.googleOAuthClientSecret !== "") {
     const google = {
@@ -100,7 +114,16 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
   // turns to the executor, the executor calls back through the bridge — so the hooks are attached
   // to the deps object once the executor exists. bridge.ts reads them per notification, not at
   // creation, so neither construction order can drop a delegation.
-  const bridgeDeps: BridgeDeps = { kernel, pool, logger, token: config.bridgeToken };
+  // One relay table per process: the factories below register into it, and the bridge routes every
+  // capture.items batch through the same instance the subscribe() loop is pumping.
+  const captureRelays = captureRelayRegistry();
+  const bridgeDeps: BridgeDeps = {
+    kernel,
+    pool,
+    logger,
+    token: config.bridgeToken,
+    captureRelays,
+  };
   const bridge = createBridgeHub(bridgeDeps);
   if (config.bridgeToken === "") {
     logger.warn("OMNIS_BRIDGE_TOKEN is empty — WS /bridge refuses every upgrade with 503");
@@ -140,7 +163,7 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
   // US-B45: accounts + account_secrets.auth_ref → live adapters. The hub passes the Keychain item
   // *name* only; each adapter fetches the value (A3-D4). With zero connected accounts this is a
   // no-op and the hub still boots.
-  const factories = adapterFactories(config);
+  const factories = adapterFactories(config, captureRelays, bridge.call);
   logger.info("adapter registry", { configured: Object.keys(factories) });
   const accountRows = await loadAccountRows(pool);
   // The status→ok mapping already covers the recovery path: "healthy" is `!== "down"`, so it reaches

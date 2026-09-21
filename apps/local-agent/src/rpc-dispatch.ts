@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  type Adapter,
   type AgentRuntime,
   BRIDGE_ERRORS,
   BRIDGE_METHODS,
@@ -21,6 +22,7 @@ import {
   TurnStartParams,
   assertProtocolVersion,
 } from "@omnis/protocol";
+import { handleCaptureSend } from "./capture.js";
 import { runDelegation } from "./delegate.js";
 import { handleIngestRead, handleIngestScan } from "./ingest.js";
 import type { Logger } from "./logger.js";
@@ -62,6 +64,9 @@ export interface DispatchDeps {
   host: HostId;
   runtimes?: AgentRuntime[];
   sinkFor?: (s: SessionRecord, turnId: string) => EventSink;
+  /** US-C12: the capture sidecar's adapters, by channel (`startCapture`'s handle). A host with no
+   *  `[[capture]]` block leaves it out and `capture.send` answers RUNTIME_UNAVAILABLE. */
+  captureAdapterFor?: (channel: string) => Adapter | undefined;
   beforeTurn?: (turnId: string) => void;
   afterTurn?: (turnId: string) => void;
   turnCap?: TurnCap;
@@ -195,6 +200,14 @@ export function createDispatcher(
           logger: deps.logger,
         });
       }
+
+      case "capture.send":
+        // US-C12: the hub signed this draft with the approval id (A2 §5.1) — handleCaptureSend
+        // verifies that before any adapter sees it.
+        return handleCaptureSend(params, {
+          token: deps.token,
+          adapterFor: deps.captureAdapterFor ?? (() => undefined),
+        });
 
       case "delegate.run":
         // A2 §5.1: the trust boundary is the HMAC the hub put over the brief — runDelegation checks it,
