@@ -1,0 +1,4 @@
+# Merge Phase B W4b (plan/w4b) into main
+Repo: /Users/logankim/AI-Workspaces/omnis. `git fetch immensus && git pull -q --ff-only origin main && git merge -q --no-edit immensus/main; git merge --no-ff plan/w4b -m "merge: plan/w4b (Phase B W4b — screens + PWA)
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"`; conflicts in apps/desktop/src/App.tsx / app.css / packages/ui/src/index.ts: keep both sides (routes + styles are additive); lockfile → pnpm install. Then with DATABASE_URL=postgres://logankim@127.0.0.1:5432/omnis_test: `pnpm install && pnpm db:migrate && pnpm typecheck && pnpm lint && pnpm test`, then `pnpm e2e:phase-a` (commit refreshed evidence "e2e: refresh after Phase B W4b"). Fix failures with minimal "fix: post-merge — …" commits. Push origin main AND immensus main. Redeploy the Mac mini per ops/mini/RUNBOOK.md and verify /health. Remove the worktree; drop omnis_test_w4b. Print main sha, tests, e2e, mini, notes.

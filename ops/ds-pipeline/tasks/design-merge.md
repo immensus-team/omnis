@@ -1,0 +1,5 @@
+# Merge the design wave (plan/design-w1) into main
+
+Repo: /Users/logankim/AI-Workspaces/omnis (main). `export PATH=/opt/homebrew/bin:$PATH && git pull -q --ff-only origin main && git merge --no-ff plan/design-w1 -m "merge: plan/design-w1 (design wave D1–D6)
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"`. Resolve conflicts keeping both sides (UI vs backend rarely overlap; lockfile → `pnpm install`). Then with `PGUSER=logankim DATABASE_URL=postgres://logankim@127.0.0.1:5432/omnis_test`: `pnpm install && pnpm db:migrate && pnpm typecheck && pnpm lint && pnpm test`, then `pnpm e2e:phase-a` and commit refreshed evidence ("e2e: refresh after design wave"). Fix failures with minimal "fix: post-merge — …" commits (never by deleting tests). Report `git ls-files apps packages | xargs grep -l '[가-힣]' | wc -l`. Push origin main. Remove the worktree (`git worktree remove /Users/logankim/AI-Workspaces/omnis.plan-design-w1`) and drop omnis_test_design_w1. Print: main sha, test summary, e2e summary, notes.

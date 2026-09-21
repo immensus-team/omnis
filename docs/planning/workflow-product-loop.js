@@ -1,0 +1,72 @@
+export const meta = {
+  name: 'omnis-product-loop',
+  description: 'One round of the omnis product-improvement loop: Opus plays the real user on the seeded app (desktop + iPhone widths) and records friction; Opus turns findings + the external UX adoption list + Fable focus into a small backlog; DeepSeek V4.1 Flash implements each item in one worktree with Opus review; Opus re-tests as the user; merge to main',
+  phases: [
+    { title: 'Test', detail: 'two user personas × widths (opus)' },
+    { title: 'Plan', detail: 'backlog of 5–8 self-contained items (opus)' },
+    { title: 'Implement', detail: 'DeepSeek slices + Opus review, ≤3 attempts each' },
+    { title: 'Verify', detail: 'user re-test + before/after report (opus)' },
+    { title: 'Merge', detail: 'merge, tests, e2e, push (opus)' },
+  ],
+}
+const R = args && args.round ? args.round : 1
+const FOCUS = (args && args.focus) || 'general usability'
+const ADOPT = (args && args.adoptionList) || '/Users/logankim/AI-Workspaces/Claude/omnis/research/ux/00-ADOPTION-LIST.md'
+const REPO = '/Users/logankim/AI-Workspaces/omnis'
+const BR = `plan/loop-r${R}`
+const WT = `/Users/logankim/AI-Workspaces/omnis.plan-loop-r${R}`
+const DB = `omnis_test_loop_r${R}`
+const LOOPDIR = `docs/design/loop/r${R}`
+const ENV = `Environment: MacBook, Homebrew in /opt/homebrew/bin — ALWAYS prefix commands with \`export PATH=/opt/homebrew/bin:$PATH &&\`; Node 22 + pnpm 9; Postgres 17 local (PGUSER=logankim; per-chain DB ${DB}: createdb + DATABASE_URL + pnpm db:migrate). Run every command as \`cd ${WT} && export PATH=/opt/homebrew/bin:$PATH && PGUSER=logankim DATABASE_URL=postgres://logankim@127.0.0.1:5432/${DB} <cmd>\`. Seeded app: read tools/e2e/run.ts + tools/e2e/seed.ts to boot hub + zero-cache + desktop (Vite) with the e2e seed; other chains may hold 5173/8787/4848 — use alternate ports if the scripts allow, otherwise wait; never kill others' processes. Playwright is installed (tools/e2e). ENGLISH ONLY (repo CLAUDE.md): UI copy, comments, tests, docs, commits. Design authority: docs/design/DESIGN-DIRECTION.md, docs/design/SKILLS.md (mandatory preamble + anti-slop checklist), references docs/design/reference/*.webp. Never print/commit secrets. Do not push — the merge stage pushes. Commit trailers: "Implemented-by: DeepSeek V4.1 Flash" (or Claude Sonnet/Opus) immediately followed by "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>" in the same trailer block.`
+const SCENARIOS = `Scenarios (do each, at 1440×900 AND 390×844 unless noted): S1 morning triage — open Inbox, read the AI summaries, archive 3 threads with the keyboard only, undo one; S2 switch rail channels and the all/work/personal/agents/needs-approval tabs, add a label filter chip, remove it; S3 open a Slack thread, read it, write a reply draft via the AI panel, see where it goes (approval?); S4 open an agent session thread, follow its tool calls / cost / state, approve or reject a pending approval, kill/retry; S5 ⌘K palette: search a person, jump to a thread, run a command; S6 archived view: find and unarchive; S7 iPhone width only: bottom bar, swipe/scroll, ask bar, sheet for thread; S8 resize the window continuously 1440→390 and watch for anything that wraps, overflows, jumps or misaligns; S9 keyboard-only navigation across all screens (Tab order, focus rings, j/k, Esc); S10 empty/loading/error states (fresh DB, hub down). For every friction point record: id (F-<persona>-NN), screen, width, severity (blocker/major/minor/polish), what you expected vs what happened, exact repro, screenshot path, proposed fix (files/components).`
+const FINDINGS = { type: 'object', properties: { path: { type: 'string' }, count: { type: 'integer' }, blockers: { type: 'integer' }, top: { type: 'array', items: { type: 'string' } } }, required: ['path', 'count', 'blockers', 'top'] }
+const BACKLOG = { type: 'object', properties: { path: { type: 'string' }, tasks: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, title: { type: 'string' }, brief: { type: 'string' }, acceptance: { type: 'string' }, tier: { type: 'string', enum: ['deepseek', 'opus'] } }, required: ['id', 'title', 'brief', 'acceptance', 'tier'] } } }, required: ['path', 'tasks'] }
+const IMPL = { type: 'object', properties: { commit: { type: 'string' }, files_changed: { type: 'array', items: { type: 'string' } }, verify_commands: { type: 'array', items: { type: 'object', properties: { cmd: { type: 'string' }, passed: { type: 'boolean' }, summary: { type: 'string' } }, required: ['cmd', 'passed', 'summary'] } }, screenshots: { type: 'array', items: { type: 'string' } }, deviations: { type: 'array', items: { type: 'string' } }, blocked: { type: 'boolean' }, blocked_reason: { type: 'string' } }, required: ['commit', 'files_changed', 'verify_commands', 'screenshots', 'deviations', 'blocked'] }
+const REV = { type: 'object', properties: { approved: { type: 'boolean' }, issues: { type: 'array', items: { type: 'string' } } }, required: ['approved', 'issues'] }
+const REPORT = { type: 'object', properties: { path: { type: 'string' }, fixed: { type: 'integer' }, still_open: { type: 'integer' }, new_findings: { type: 'integer' }, summary: { type: 'string' } }, required: ['path', 'fixed', 'still_open', 'new_findings', 'summary'] }
+const MERGE = { type: 'object', properties: { main_commit: { type: 'string' }, tests: { type: 'string' }, e2e: { type: 'string' }, notes: { type: 'array', items: { type: 'string' } } }, required: ['main_commit', 'tests', 'e2e', 'notes'] }
+
+phase('Test')
+const setup = await agent(`Create the worktree for omnis product-loop round ${R}: \`cd ${REPO} && export PATH=/opt/homebrew/bin:$PATH && git pull -q --ff-only origin main && wt switch --create ${BR} -y --no-cd\` (if it exists, \`git merge main\` inside it). Then in ${WT}: createdb ${DB} (drop first if it exists), \`pnpm install\`, \`pnpm db:migrate\`, \`pnpm typecheck\`, run the e2e seed once so the DB has realistic data, and \`mkdir -p ${LOOPDIR}\`. ${ENV} Return {path: '${WT}', count: 0, blockers: 0, top: [<what you verified>]}.`, { label: 'setup', phase: 'Test', model: 'sonnet', effort: 'low', schema: FINDINGS })
+const personas = [
+  { id: 'logan', who: 'You are Logan, founder of a small AI studio: 80 Slack/Gmail/KakaoTalk threads a day, three coding agents running, impatient, keyboard-first, uses omnis on a MacBook at 1440 wide and on an iPhone PWA at 390.' },
+  { id: 'newcomer', who: 'You are a first-day user who has just connected Slack and Gmail: you do not know the shortcuts, you read every label, you get lost easily, you resize windows, you try to do everything with the mouse, and you judge polish against Superhuman, Linear and Apple Mail.' },
+]
+const findings = (await parallel(personas.map(p => () => agent(`Play the REAL USER of omnis. ${p.who} ${ENV}
+Worktree ${WT} (branch ${BR}) is set up; boot the seeded app with Playwright (headed not required) and actually USE it. Round focus from the planner: "${FOCUS}". ${SCENARIOS}
+Save screenshots under ${LOOPDIR}/test-${p.id}/ and write ${LOOPDIR}/findings-${p.id}.md (table + one section per finding). Be concrete and harsh; polish findings count too (spacing rhythm, typography scale, copy tone, motion timing, glass consistency). Commit the findings + screenshots ("loop r${R}: user test ${p.id}"). Return {path, count, blockers, top(≤8 ids with one-line titles)}.`, { label: `test:${p.id}`, phase: 'Test', model: 'opus', effort: 'high', schema: FINDINGS })))).filter(Boolean)
+
+phase('Plan')
+const backlog = await agent(`You are the product planner for omnis round ${R}. Round focus set by Fable: "${FOCUS}". Read: ${findings.map(f => f.path).join(', ')}; the external UX adoption list ${ADOPT}; docs/design/DESIGN-DIRECTION.md; docs/design/POLISH-LOG.md; ${LOOPDIR}/../ (earlier rounds' REPORT.md, if any — never repeat a fixed item). ${ENV}
+Produce a backlog of 5–8 items that a single implementer can finish in ≤45 min each, ordered by user impact: all blockers/majors from the findings first, then the adoption-list items that fit the focus. Each item: id (R${R}-01…), title, brief (self-contained: exact files/components, exact behavior, copy in English, states, keyboard, motion timing, reduced-motion, which reference image/URL to look at), acceptance (a Playwright/RTL check or screenshot comparison a reviewer can run), tier: "deepseek" by default; "opus" only for kernel/security/data-model changes. Write ${LOOPDIR}/BACKLOG.md and commit ("loop r${R}: backlog"). Return {path, tasks}.`, { label: 'plan', phase: 'Plan', model: 'opus', effort: 'high', schema: BACKLOG })
+
+phase('Implement')
+const ds = `You are the DRIVER; DeepSeek V4.1 Flash implements. FIRST \`git status\`/\`git diff --stat\` — keep compiling partial edits from an interrupted run, else discard uncommitted ones. DECOMPOSE the item into 2–4 slices; for EACH slice write <worktree>/.omnis-task.md (the docs/design/SKILLS.md preamble verbatim + the slice + repo/DB/commands + "English only; do not skip tests; commit with '<id>: <slice>' + trailers") and run \`claude-ds -p "$(cat .omnis-task.md)" --permission-mode bypassPermissions --strict-mcp-config --output-format json\` with a 6-minute timeout (360000 ms); verify the slice yourself (lint, typecheck, relevant tests), fix small things or re-run claude-ds with a precise diff request (≤2 re-runs per slice); commit if it did not. Never one claude-ds call for the whole item. Then boot the seeded app, take the acceptance screenshot(s) at 1440 and 390, Read them, iterate (≤3 rounds), commit screenshots under ${LOOPDIR}/impl/<id>/. Remove .omnis-task.md. If claude-ds keeps failing on a slice, do it yourself (mark Implemented-by: Claude Sonnet).`
+const implPrompt = (t, attempt, issues) => `Implement ONE product-loop item for omnis, alone, in worktree ${WT} (branch ${BR}; continue on its HEAD). ${ENV}
+## ${t.id}: ${t.title} (attempt ${attempt} of 3${attempt > 1 ? ' — escalation: do it yourself' : ''})
+${t.brief}
+Acceptance: ${t.acceptance}
+${attempt === 1 && t.tier === 'deepseek' ? ds : 'Load the SKILLS.md preamble skills yourself (Skill tool), Read the referenced images, then implement with TDD and take the acceptance screenshots at 1440 and 390 into ' + LOOPDIR + '/impl/' + t.id + '/.'}
+Hard rules: English only; glass only on rail/toolbar/sheet/palette/floating panels, lists opaque; no new heavy dependencies without checking package.json; reduced-motion respected; no horizontal overflow at any width. ${issues ? `Previous attempt REJECTED. Fix first:\n- ${issues.join('\n- ')}` : ''}
+Return commit, files_changed, verify_commands (real output), screenshots (absolute paths), deviations, blocked/blocked_reason.`
+const reviewPrompt = (t, impl) => `Independent reviewer for omnis product-loop item ${t.id} (${t.title}). ${ENV} Worktree ${WT}. Brief: ${t.brief.slice(0, 1500)} Acceptance: ${t.acceptance}. Implementer report: ${JSON.stringify(impl).slice(0, 3500)}.
+Do: git log/diff; RE-RUN lint, typecheck, relevant tests; RUN the acceptance check yourself (boot the seeded app if needed) at 1440 and 390 and Read the screenshots next to the referenced images; check DESIGN-DIRECTION rules + docs/design/SKILLS.md checklist; reject any non-English string/comment/test name, any horizontal overflow, any generic-AI look, missing trailers, dirty tree. Return approved, issues (file:line, what to change).`
+const results = []
+for (const t of backlog.tasks) {
+  let issues = null, done = false
+  for (let a = 1; a <= 3 && !done; a++) {
+    const impl = await agent(implPrompt(t, a, issues), { label: `impl:${t.id}`, phase: 'Implement', model: a === 1 && t.tier === 'deepseek' ? 'sonnet' : 'opus', effort: 'high', schema: IMPL })
+    if (!impl) { issues = ['implementer returned nothing']; continue }
+    if (impl.blocked) { if (/SubagentStop|terminat|interrupt|timed? ?out/i.test(String(impl.blocked_reason))) { issues = ['Previous attempt was interrupted mid-run; continue from the partial worktree state with smaller slices.']; continue } results.push({ id: t.id, ok: false, blocked: impl.blocked_reason }); break }
+    const rev = await agent(reviewPrompt(t, impl), { label: `review:${t.id}`, phase: 'Implement', model: 'opus', effort: 'high', schema: REV })
+    if (rev && rev.approved) { log(`${t.id} approved (attempt ${a})`); results.push({ id: t.id, ok: true, attempts: a, commit: impl.commit }); done = true }
+    else { issues = rev ? rev.issues : ['reviewer returned nothing']; log(`${t.id} attempt ${a} rejected: ${issues.slice(0, 2).join(' | ').slice(0, 160)}`); if (a === 3) results.push({ id: t.id, ok: false, issues }) }
+  }
+}
+
+phase('Verify')
+const report = await agent(`Re-test omnis as the real user after round ${R}. ${ENV} Worktree ${WT}. Read ${findings.map(f => f.path).join(', ')} and ${backlog.path}; implementation outcomes: ${JSON.stringify(results).slice(0, 3000)}. Boot the seeded app; re-run every finding's repro at its width and mark fixed / still open / regressed; run S8 (continuous resize) and S9 (keyboard-only) again fully; note NEW findings you see now. Write ${LOOPDIR}/REPORT.md with before/after screenshot pairs (paths), a table of findings with status, the list of items merged, and "Next round suggestions" (≤8, prioritized). Commit ("loop r${R}: report"). Return {path, fixed, still_open, new_findings, summary}.`, { label: 'verify', phase: 'Verify', model: 'opus', effort: 'high', schema: REPORT })
+
+phase('Merge')
+const merge = await agent(`Merge omnis product-loop round ${R} into main. ${ENV} Outcomes: ${JSON.stringify({ results, report }).slice(0, 4000)}. \`cd ${REPO} && export PATH=/opt/homebrew/bin:$PATH && git pull -q --ff-only origin main && git merge --no-ff ${BR} -m "merge: ${BR} (product loop round ${R})\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"\` (resolve conflicts keeping both; lockfile → pnpm install). Then with DATABASE_URL=postgres://logankim@127.0.0.1:5432/omnis_test: \`pnpm install && pnpm db:migrate && pnpm typecheck && pnpm lint && pnpm test\`, then \`pnpm e2e:phase-a\` and commit refreshed evidence ("e2e: refresh after loop r${R}"). \`git ls-files apps packages | xargs grep -l '[가-힣]' | wc -l\` — report the number in notes. Push origin main; remove the worktree; drop ${DB}. Return main_commit, tests, e2e, notes.`, { label: 'merge', phase: 'Merge', model: 'opus', effort: 'high', schema: MERGE })
+return { round: R, focus: FOCUS, findings, backlog: backlog.path, results, report, merge }

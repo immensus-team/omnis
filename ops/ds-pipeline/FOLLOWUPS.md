@@ -1,0 +1,5 @@
+- 2026-09-21 W4a cost (DeepSeek review note): `registerCostReportJob` is not wired in apps/hub/src/main.ts (only healthcheck + cost daily are). Wire it in the W5 bootstrap task (channels T17 / hub main.ts) or W4b settings screen task.
+- 2026-09-21 launch hygiene: Logan's real Gmail address appears in ~36 adapter fixtures (gmail/gcal) + config examples; replace with placeholders before the repo goes public.
+- 2026-09-21 product loop: rename `system` channel → `omnis` (self-notices) with the omnis mark; rail expanded/collapsed states (ACCENT-DIRECTION §4.4 follow-up).
+- 2026-09-21 mini: W4a merge exposed that the mini's Ollama model tag is `nomic-embed-text:latest`; DeepSeek set `OMNIS_OLLAMA_EMBED_MODEL="nomic-embed-text:latest"` in the mini's local env.sh (uncommitted). Document the knob in ops/mini/RUNBOOK.md + env.sh.example.
+- 2026-09-21 TOP PRIORITY (Logan): purge personal identifiers from git history — email → GitHub noreply, tailnet host + mini IP → placeholders. Full runbook in ds/HISTORY-REWRITE.md. Run after the design chain finishes and all worktrees are gone. Repo is PUBLIC now.
