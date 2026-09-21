@@ -12,6 +12,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="omnis" />
     <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- L-21: an iOS home-screen install takes its icon from this link, not from the manifest, and
+         with no link it screenshots the page instead. The PNG set behind it is rasterised from
+         icon.svg by tools/e2e/rasterize-mark.ts. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>omnis</title>
   </head>
   <body>

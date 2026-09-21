@@ -37,7 +37,10 @@ export const CHANNEL_LABEL: Record<UiChannel, string> = {
   kakaotalk: "KakaoTalk",
   linkedin: "LinkedIn",
   agent: "Agent",
-  system: "System",
+  // L-33: display only. The UiChannel value stays "system" — it is stored in accounts.channel and
+  // checked by accounts_channel_ck (0002_core_inbox.sql, frozen), and adapter-health.ts and
+  // ingest.ts read it. Renaming the value is a migration, not a label.
+  system: "omnis",
 };
 
 /** US-D02b: a channel mark is the real brand PNG (supplied by Logan at 64px/128px), not a
