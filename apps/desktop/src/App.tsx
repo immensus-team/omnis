@@ -342,6 +342,18 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
     () => (approvals as unknown as ApprovalStackItem[]).filter((a) => !hiddenApprovalIds.has(a.id)),
     [approvals, hiddenApprovalIds],
   );
+  /** loop-r2-02: the *items* those hidden approvals were about, which is what the thread view needs.
+   *  A hidden approval is one whose draft it was folding; without this the draft would stop folding
+   *  for the length of the undo window and redraw as a standalone DraftCard — the card the person
+   *  just dismissed, one frame after it left. Read off the full `approvals` list rather than
+   *  `visibleApprovals`, which by definition no longer contains them. */
+  const heldItemIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const a of approvals as unknown as ApprovalStackItem[]) {
+      if (hiddenApprovalIds.has(a.id) && typeof a.item_id === "string") ids.add(a.item_id);
+    }
+    return ids;
+  }, [approvals, hiddenApprovalIds]);
 
   // US-D01: the selected thread's AI summary (threads.meta.summary, filled by the T1 summary loop
   // in packages/agents). No new backend call is needed — it is the same query shape Thread.tsx
@@ -924,7 +936,12 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
       // US-D09 §c.5: the thread's approvals go *into* the conversation, in document order, so this
       // screen gets the list rather than a stack to draw above it. The stack still owns the pane
       // with nothing open, where the queue is the whole subject.
-      <Thread threadId={open.threadId} approvals={visibleApprovals} onDecide={onDecide} />
+      <Thread
+        threadId={open.threadId}
+        approvals={visibleApprovals}
+        onDecide={onDecide}
+        heldItemIds={heldItemIds}
+      />
     );
 
   return (

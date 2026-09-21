@@ -52,6 +52,13 @@ export interface ApprovalCardViewProps {
   destination?: string | null;
   /** The stack's own risk field ('normal' | 'high'). The card draws the mark; it does not rank. */
   risk?: string;
+  /** loop-r2-02: where the message came from, when the card is standing in for a draft the agent
+   *  wrote rather than for one the person wrote. One 12px line under the header, in the same voice
+   *  the standalone DraftCard's provenance sentence uses. Omitted, the card says nothing about it. */
+  provenance?: string;
+  /** loop-r2-02: the last button's label. "Discard" is what an ignore means when the thing being
+   *  ignored is the draft itself — "Ignore" would read as ignoring a question. */
+  ignoreLabel?: string;
 }
 
 /** loop-r2-01: `args` is the kernel's untyped JSON, so every read below is defensive. A value that
@@ -99,6 +106,8 @@ export function ApprovalCardView({
   className,
   destination,
   risk,
+  provenance,
+  ignoreLabel = "Ignore",
 }: ApprovalCardViewProps) {
   const { config } = interrupt;
   /** US-D09 §c.8: approving is the one decision here that goes out to the tool and cannot be taken
@@ -201,6 +210,9 @@ export function ApprovalCardView({
         <span className="approval-card__header-text">{headerText(interrupt, to, channel)}</span>
         {risk === "high" && <span className="approval-stack__risk">High risk</span>}
       </p>
+      {/* loop-r2-02: the provenance line sits between the question and the description, so the
+          order a person reads is: what this is, where it came from, what it says. */}
+      {provenance !== undefined && <p className="approval-card__provenance">{provenance}</p>}
       <p className="approval-card__description">{interrupt.description}</p>
       {inEdit ? (
         <textarea
@@ -283,7 +295,7 @@ export function ApprovalCardView({
             )}
             {config.allow_ignore && (
               <Button variant="ghost" onClick={() => onDecide("ignore", undefined)}>
-                Ignore
+                {ignoreLabel}
               </Button>
             )}
           </>

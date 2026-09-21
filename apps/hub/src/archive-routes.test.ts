@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { handleDigestUndo, handleUnarchiveItem } from "./archive-routes.js";
+import { handleDigestUndo, handleDiscardDraft, handleUnarchiveItem } from "./archive-routes.js";
 
 describe("handleUnarchiveItem (POST /items/:id/unarchive)", () => {
   it("delegates to undoArchive with the item id and returns the restored status", async () => {
@@ -7,6 +7,28 @@ describe("handleUnarchiveItem (POST /items/:id/unarchive)", () => {
     const result = await handleUnarchiveItem({ undoArchive }, "item-1");
     expect(undoArchive).toHaveBeenCalledWith({ itemId: "item-1" }, "me");
     expect(result).toEqual({ id: "item-1", status: "received" });
+  });
+});
+
+/** loop-r2-02: POST /items/:id/discard. The route in http.ts turns a `null` here into the 404 and
+ *  the row into the 200, so both branches are asserted on the value this handler hands it — the same
+ *  shape as the unarchive test above, and the reason the "non-draft" case is a 404 rather than a
+ *  silent success. */
+describe("handleDiscardDraft (POST /items/:id/discard)", () => {
+  it("archives the draft and answers with the item's new status", async () => {
+    const discardDraft = vi.fn().mockResolvedValue(true);
+    await expect(handleDiscardDraft({ discardDraft }, "item-1")).resolves.toEqual({
+      id: "item-1",
+      status: "archived",
+    });
+    expect(discardDraft).toHaveBeenCalledWith("item-1");
+  });
+
+  it("answers nothing for a non-draft, which the route reads as 404", async () => {
+    // The item exists but has already reached the channel (or was never a draft). Discarding it is
+    // not a no-op the screen should read as success, so the handler reports "no row moved".
+    const discardDraft = vi.fn().mockResolvedValue(false);
+    await expect(handleDiscardDraft({ discardDraft }, "item-2")).resolves.toBeNull();
   });
 });
 

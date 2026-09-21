@@ -16,7 +16,13 @@ import {
 import { searchMemories } from "@omnis/memory";
 import type { Adapter } from "@omnis/protocol";
 import type { Pool } from "pg";
-import { type ArchiveRouteDeps, handleDigestUndo, handleUnarchiveItem } from "./archive-routes.js";
+import {
+  type ArchiveRouteDeps,
+  type DiscardRouteDeps,
+  handleDigestUndo,
+  handleDiscardDraft,
+  handleUnarchiveItem,
+} from "./archive-routes.js";
 import { setThreadArchived } from "./archive.js";
 import type { HubConfig } from "./config.js";
 import { NOTE_MAX_CHARS, createNote, decideNoteRouting } from "./notes.js";
@@ -92,6 +98,20 @@ export function createHubServer(deps: HubServerDeps): Server {
   // US-B32: partly applied here so archive-routes.ts never has to know about pg or the audit sink.
   const archiveRouteDeps: ArchiveRouteDeps = {
     undoArchive: (ref, actor) => undoArchive(pool, ref, actor, kernel.audit),
+  };
+  // loop-r2-02: discarding a draft is one statement with one guard, and it is not the kernel's
+  // `undoArchive` (which restores, and which the 7-day window governs) — so it is written where the
+  // route is wired rather than grown onto the archive module.
+  const discardRouteDeps: DiscardRouteDeps = {
+    discardDraft: async (itemId) =>
+      (
+        await query<{ id: string }>(
+          pool,
+          `UPDATE items SET status = 'archived'
+            WHERE id = $1 AND status = 'draft' RETURNING id`,
+          [itemId],
+        )
+      ).length > 0,
   };
 
   const server = createServer((req, res) => {
@@ -196,6 +216,18 @@ export function createHubServer(deps: HubServerDeps): Server {
       const id = unarchiveItem[1];
       if (id === undefined) return send(res, 400, { error: "bad id" });
       return send(res, 200, await handleUnarchiveItem(archiveRouteDeps, id));
+    }
+
+    // loop-r2-02: the draft card's Discard, for a draft no approval is about. Same optional /api
+    // prefix as the two routes around it (Tailscale Serve strips it).
+    const discardItem = /^(?:\/api)?\/items\/([0-9a-fA-F-]{36})\/discard$/.exec(path);
+    if (discardItem !== null) {
+      if (method !== "POST") return send(res, 405, { error: "method not allowed" });
+      const id = discardItem[1];
+      if (id === undefined) return send(res, 400, { error: "bad id" });
+      const result = await handleDiscardDraft(discardRouteDeps, id);
+      if (result === null) return send(res, 404, { error: "draft not found" });
+      return send(res, 200, result);
     }
 
     // US-B32's "Restore all" for one digest category. The body carries the token because that is

@@ -13,9 +13,7 @@ describe("DraftCard (A5-D9)", () => {
       <DraftCard
         body="Yes, confirmed — I will leave comments tomorrow morning."
         rationale="PROJECTS.md #davich"
-        onEditAndSend={vi.fn()}
         onDiscard={vi.fn()}
-        onRegenerate={vi.fn()}
       />,
     );
     expect(
@@ -23,24 +21,21 @@ describe("DraftCard (A5-D9)", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/PROJECTS.md #davich/)).toBeInTheDocument();
   });
-  it("wires the 3 buttons to their callbacks (§8 microcopy, en source locale)", () => {
-    const onEditAndSend = vi.fn();
+
+  it("wires Discard to its callback (§8 microcopy, en source locale)", () => {
     const onDiscard = vi.fn();
-    const onRegenerate = vi.fn();
-    render(
-      <DraftCard
-        body="b"
-        rationale="r"
-        onEditAndSend={onEditAndSend}
-        onDiscard={onDiscard}
-        onRegenerate={onRegenerate}
-      />,
-    );
-    fireEvent.click(screen.getByText("Edit & send"));
-    expect(onEditAndSend).toHaveBeenCalledOnce();
+    render(<DraftCard body="b" rationale="r" onDiscard={onDiscard} />);
     fireEvent.click(screen.getByText("Discard"));
     expect(onDiscard).toHaveBeenCalledOnce();
-    fireEvent.click(screen.getByText("Regenerate"));
-    expect(onRegenerate).toHaveBeenCalledOnce();
+  });
+
+  it("offers Discard and nothing else (loop-r2-02)", () => {
+    // "Edit & send" and "Regenerate" were on this card and neither did anything when pressed — the
+    // reported defect. A draft that has an approval is rendered as that approval's card instead
+    // (foldDraft, Thread.tsx), and the standalone draft's "Edit & send" comes back on loop-r2-03
+    // wired to the composer; until then the card must not grow a button back by accident.
+    render(<DraftCard body="b" rationale="r" onDiscard={vi.fn()} />);
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Discard" })).toBeInTheDocument();
   });
 });

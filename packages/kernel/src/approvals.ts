@@ -144,16 +144,38 @@ export function createApprovals(deps: ApprovalsDeps): Approvals {
       }
 
       // state and decision must change in one UPDATE to satisfy approvals_decided_ck.
-      const updated = await query<{ id: string }>(
+      const updated = await query<{ id: string; item_id: string | null }>(
         pool,
         `UPDATE pending_approvals
             SET state = 'decided', decision = $2, decided_args = $3::jsonb, decided_at = $4
           WHERE id = $1 AND state = 'pending'
-          RETURNING id`,
+          RETURNING id, item_id`,
         [id, v.decision, v.decided_args === undefined ? null : JSON.stringify(v.decided_args), now],
       );
       if (updated[0] === undefined) {
         throw new ApprovalStateError(`approval ${id} is not pending (lost the race)`);
+      }
+      // loop-r2-02: when the approval is the draft — the `item_id` the caller proposed with — the
+      // decision is what the draft was waiting for, so it consumes it. Approving or editing leaves
+      // the message itself behind as 'approved'; ignoring is a discard, so the item is archived out
+      // of the flow. `respond` is not a decision about the draft at all (it goes back to the agent),
+      // so the draft stays a draft for the person to decide on later. Both values are in
+      // items_status_ck (migration 0002) and the `status = 'draft'` guard makes this a no-op for an
+      // approval raised over an ordinary item.
+      const draftItemId = updated[0].item_id;
+      if (draftItemId !== null && v.decision !== "respond") {
+        await query(
+          pool,
+          `UPDATE items
+              SET status = CASE WHEN $2 = 'ignore' THEN 'archived' ELSE 'approved' END
+            WHERE id = $1 AND status = 'draft'`,
+          [draftItemId, v.decision],
+        );
+        logger.info("approval consumed its draft", {
+          id,
+          item_id: draftItemId,
+          decision: v.decision,
+        });
       }
       await deps.audit?.record({
         actor: "me",
