@@ -1120,6 +1120,7 @@ body {
 .agent-session-screen__system-log,
 .tool-call-badge,
 .approval-card,
+.digest-card,
 .draft-card {
   margin-bottom: 12px;
 }
@@ -1172,6 +1173,43 @@ body {
   border: 1px solid var(--border-hairline-strong);
   border-radius: 12px;
   padding: 12px;
+}
+
+/* A5 §5.2 / §3.4: the morning/nightly digest entry card. One line of headline and, when there is
+   one, a second line of body; the action sits at the far end. Same 12px radius and hairline as the
+   approval card above — both are the same kind of thing (a card laid inside a screen's body), and
+   DESIGN-DIRECTION's radius table has one value for that step.
+   `min-width: 0` on the text block is what keeps a long headline from pushing the button out of
+   the card at 390 (the shell's one-column tier) — a flex item's default min-width is its content's,
+   so without it the headline, not the card, decides the row's width and the page scrolls. */
+.digest-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border-hairline-strong);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.digest-card__text {
+  min-width: 0;
+}
+
+.digest-card__headline {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.digest-card__body {
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.digest-card button {
+  flex: 0 0 auto;
 }
 
 .approval-card__actions {
@@ -2288,6 +2326,227 @@ body {
   to {
     opacity: 0;
   }
+}
+
+/* ==========================================================================================
+   US-B28 §3.4 Today — the morning briefing, today's schedule and the pending-approval strip on one
+   screen. It is the Inbox card's twin: same 20px radius, same surface, same place in the shell's
+   main column, so switching screens does not move the ground under the reader. The difference is
+   that Today scrolls as a whole instead of virtualizing a list of uniform rows — its parts have
+   different heights and there are never many of them.
+   ========================================================================================== */
+.today-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1 1 auto;
+  min-height: 0;
+  /* Vertical only. `hidden` on the cross axis is what makes a `overflow-wrap` miss a visible bug
+     instead of a page-level scrollbar at 390. */
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 16px 20px;
+  border-radius: 20px;
+  box-shadow: var(--shadow-row-selected);
+}
+
+/* The four states (US-B28) are one line at the top and nothing else — the rows Zero has already
+   synced stay where they are underneath. It is the same tone as the thread screen's archived
+   banner, because it is the same kind of thing: a statement about the screen, not a row of it. */
+.today-screen__banner {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.today-screen__banner[data-state="error"] {
+  color: var(--danger-500);
+}
+
+.today-screen__greeting {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.today-screen .digest-card {
+  /* The card's own 12px bottom margin is for flow layouts; this screen is a flex column with a
+     16px gap, and the two together leave a 28px hole. */
+  margin-bottom: 0;
+}
+
+.today-screen__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.today-screen__section-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.today-screen__quiet {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.today-screen__lead {
+  margin: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.today-screen__events,
+.today-screen__brief-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.today-screen__event {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Tabular figures so the times line up as a column without a grid — the schedule is read by
+   scanning the left edge. */
+.today-screen__event-time {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.today-screen__event-title {
+  min-width: 0;
+  padding: 0;
+  font-size: 13px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+/* A briefing item is a full-width row rather than a link in a sentence: the whole line is the
+   target, hover is the row's own background (the kinso row grammar), and nothing carries an
+   underline at rest — a list of eight underlined lines is a wall. */
+.today-screen__brief-button,
+.today-screen__brief-static {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  margin: 0 -6px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+/* Both rows open their thread, so both get the same reset — without it the UA's default box turns
+   a text row into something that reads as a form field, which is what the first cut of these frames
+   showed in the schedule. Only the reset is shared: the brief row is a full-width block whose hover
+   is its own background, the event title is a run of text beside its time, and a background there
+   would box in one word of a line. */
+.today-screen__brief-button,
+button.today-screen__event-title {
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.today-screen__brief-button:hover {
+  background: var(--state-hover);
+}
+
+/* The underline is the whole affordance here — at rest the title is plain body copy, matching the
+   event as it reads in a calendar rather than as a link farm. */
+button.today-screen__event-title:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.today-screen__brief-button:focus-visible,
+button.today-screen__event-title:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.today-screen__brief-line {
+  font-size: 13px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.today-screen__brief-static .today-screen__brief-line {
+  font-weight: 400;
+}
+
+.today-screen__brief-why {
+  color: var(--text-secondary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.today-screen__brief-title {
+  margin: 0 0 2px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* The strip wraps instead of scrolling: a chip is a control, and a control that has scrolled out of
+   sight is a control the reader does not know exists. One line each, ellipsized — the full text is
+   in the expanded card the chip opens. */
+.today-screen__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.today-screen__chip {
+  max-width: 100%;
+  border: var(--hairline);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.today-screen__chip:hover {
+  background: var(--state-hover);
+}
+
+.today-screen__chip[aria-expanded="true"] {
+  border-color: var(--border-hairline-strong);
+  background: var(--bg-elevated);
+}
+
+.today-screen__chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.today-screen__expanded {
+  margin-top: 4px;
 }
 
 /* ==========================================================================================

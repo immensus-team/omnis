@@ -18,6 +18,7 @@ import { type SearchHit, search, toUiSearchGroups } from "./api/search.js";
 import { AgentSession } from "./screens/AgentSession.js";
 import { Inbox, type OpenTarget } from "./screens/Inbox.js";
 import { Thread } from "./screens/Thread.js";
+import { Today } from "./screens/Today.js";
 import { initZero, useZeroClient } from "./zero-client.js";
 
 // Created at module scope it would open a WebSocket on import alone — deferred to first render.
@@ -42,16 +43,20 @@ function useCommandPaletteKey(toggle: () => void) {
   }, [toggle]);
 }
 
-export function App() {
+/** The screens the shell can show. The rail switches between them by screen, not by route —
+ *  there is no URL router in the desktop app (src-tauri loads one documents). */
+export type ShellScreen = "inbox" | "today";
+
+export function App({ screen = "inbox" }: { screen?: ShellScreen }) {
   // Without ZeroProvider, useQuery dies with "useZero must be used within a ZeroProvider".
   return (
     <ZeroProvider zero={getZero()}>
-      <Shell />
+      <Shell screen={screen} />
     </ZeroProvider>
   );
 }
 
-function Shell() {
+function Shell({ screen }: { screen: ShellScreen }) {
   const zero = useZeroClient();
   const [open, setOpen] = useState<OpenTarget | null>(null);
   const [askOpen, setAskOpen] = useState(false);
@@ -105,6 +110,12 @@ function Shell() {
     },
     [],
   );
+
+  // A5 §3.4: a briefing item on Today deep-links to its Thread — the one navigation that screen
+  // does (the approvals stay inline, so the detail pane opens only for this).
+  const openThread = useCallback((threadId: string) => {
+    setOpen({ threadId, agentSession: false });
+  }, []);
 
   const actions: PaletteAction[] = [
     {
@@ -178,7 +189,12 @@ function Shell() {
   // The kinso reference has only a rail and a main column — the detail pane opens a third column
   // only when there is something to look at. (Keeping an empty pane open shrinks the Inbox card
   // into a sidebar taking a third of the window.)
-  const detail = open !== null || approvals.length > 0;
+  //
+  // US-B28: Today draws the pending-approval queue inline — a chip expands its card in place, with
+  // no navigation (A5 §3.4) — so the shell leaves the pane closed for it until a thread is actually
+  // opened. Opening it on the queue's account would draw the same approvals twice on one screen,
+  // and at 390 the sheet would cover the screen it duplicates.
+  const detail = open !== null || (screen === "inbox" && approvals.length > 0);
 
   return (
     <main
@@ -197,11 +213,15 @@ function Shell() {
           threadSummary={selectedThreadSummary}
           threadTitle={selectedThreadTitle}
         />
-        <Inbox
-          onOpen={setOpen}
-          channelFilter={railChannel}
-          onChannelFilterChange={setRailChannel}
-        />
+        {screen === "today" ? (
+          <Today onOpenThread={openThread} />
+        ) : (
+          <Inbox
+            onOpen={setOpen}
+            channelFilter={railChannel}
+            onChannelFilterChange={setRailChannel}
+          />
+        )}
       </div>
       {/* US-D02b: the detail pane always renders with the sheet's glass, whatever the width. In
           the narrow shells (<=1279.98px) that is what it actually is — a glass sheet floating over

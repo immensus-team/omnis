@@ -4,6 +4,7 @@ export * from "./components/aurora-surface.js";
 export * from "./components/button.js";
 export * from "./types.js";
 export * from "./components/status-badge.js";
+export * from "./components/digest-card.js";
 export * from "./components/draft-card.js";
 export * from "./components/command-palette.js";
 export * from "./components/ask-panel.js";
