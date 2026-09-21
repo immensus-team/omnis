@@ -155,6 +155,10 @@ describe("scanClaudeProjects", () => {
     expect(violations).toEqual([]);
     expect(opened).toHaveLength(2);
     expect(opened).not.toContain(CREDENTIALS);
+    // The decoy has to be on disk and inside `claudeHome` for the line above to mean anything: a
+    // credential that was never written is one the scanner trivially never opens. This pins the
+    // fixture itself, so deleting it fails the containment test instead of hollowing it out.
+    expect(await readFile(CREDENTIALS, "utf8")).toContain("DECOY-MUST-NOT-BE-READ");
   });
 
   it("returns an empty list when the host has no ~/.claude/projects", async () => {
