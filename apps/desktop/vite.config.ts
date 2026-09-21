@@ -3,12 +3,17 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
-  // zero-client.ts가 읽는 import.meta.env.OMNIS_ZERO_URL은 기본 envPrefix("VITE_")로는
-  // 번들에 주입되지 않는다 — 계약 §7이 못박은 오버라이드가 조용히 죽는다.
+  // `import.meta.env.OMNIS_ZERO_URL`, which zero-client.ts reads, is not injected into the bundle
+  // under the default envPrefix ("VITE_") — an override the contract §7 pins down would die quietly.
   envPrefix: ["VITE_", "OMNIS_"],
   clearScreen: false,
-  // 허브(127.0.0.1:8787)는 dev 서버와 다른 오리진이고 CORS 헤더를 주지 않는다(계약 §5의 127.0.0.1 경계).
-  // dev에서는 같은 오리진으로 프록시하고, 클라이언트는 OMNIS_HUB_HTTP_URL=""로 상대 경로를 쓴다.
+  // The hub (127.0.0.1:8787) is a different origin from the dev server and sends no CORS headers
+  // (the 127.0.0.1 boundary of contract §5). In dev everything is proxied to the same origin and the
+  // client sets OMNIS_HUB_HTTP_URL="" to use relative paths — so this table is the whole list of
+  // routes the app may call. A path missing from it fails *quietly*: Vite's SPA fallback answers the
+  // GET with index.html and a 200, `fetchSettings` dies in `res.json()` and returns `{}`, and every
+  // preference falls back to its default with nothing in the console. US-D10's two `ui.detail_*`
+  // writes are how `/settings` was found missing here.
   server: {
     port: 5173,
     strictPort: true,
@@ -18,6 +23,7 @@ export default defineConfig({
       "/approvals": "http://127.0.0.1:8787",
       "/health": "http://127.0.0.1:8787",
       "/kill-switch": "http://127.0.0.1:8787",
+      "/settings": "http://127.0.0.1:8787",
     },
   },
 });
