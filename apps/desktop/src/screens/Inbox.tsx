@@ -886,6 +886,14 @@ export function Inbox({
           tabIndex={-1}
           style={{ flex: "1 1 0", minHeight: 0 }}
           data={listItems}
+          // loop-r1-03: the row's identity, so React moves a row's DOM node with the row instead of
+          // reusing whatever node sat at that position. Without it, archiving a row shifts every row
+          // below it up one *position*, React reconciles the virtualiser's children by position,
+          // and the node that held the focus is handed to a different thread: the focus ring lands
+          // on a row nobody selected and a screen reader reads the wrong one. Measured, not
+          // theorised — shots-loop-r1-03 read the focus on b3a8cee8 while the selection was on
+          // 46ed6e45. The header half of the union already carries its own stable key (FlatItem).
+          computeItemKey={(_, item) => (item.kind === "header" ? item.key : item.row.id)}
           itemContent={(index, item) =>
             item.kind === "header" ? (
               <GroupHeader pill={item.pill} count={item.count} />
