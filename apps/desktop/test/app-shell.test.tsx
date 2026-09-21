@@ -209,6 +209,61 @@ describe("App shell screen navigation (loop-r1-01)", () => {
   });
 });
 
+/** loop-r2-08/L2-09, L2-14: focus lands somewhere. `g`+letter, a rail tile and a palette "Go to …"
+ *  all route through the shell's one `goTo`, and before this all three left `document.activeElement`
+ *  on `<body>` — or on the rail button that was clicked — so the next Tab restarted at the top of the
+ *  document and a screen reader announced nothing about the screen that had just arrived. The shell
+ *  moves the focus itself, in a frame, to the new screen's own `h1`; on the Inbox it prefers the row
+ *  the user left, which is the other half of the same finding and is asserted in Inbox's own tests. */
+describe("App shell screen focus (loop-r2-08)", () => {
+  /** The shell focuses inside a `requestAnimationFrame` — see App.tsx for why the new screen has to
+   *  have mounted first. One await is enough: the shell's frame is requested before this one. */
+  const nextFrame = async (): Promise<void> => {
+    await act(async () => {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    });
+  };
+
+  const go = async (letter: string): Promise<void> => {
+    fireEvent.keyDown(window, { key: "g" });
+    fireEvent.keyDown(window, { key: letter });
+    await nextFrame();
+  };
+
+  it("focuses the new screen's heading on `g t`", async () => {
+    render(<App />);
+    expect(document.activeElement).toBe(document.body);
+
+    await go("t");
+    // `tabIndex={-1}` on the heading is what makes this possible at all: a heading is not focusable
+    // by default, and putting it in the tab order is the one thing it must not do — so the target is
+    // the `h1` itself and the ring is suppressed for this focus (app.css).
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(document.activeElement).toBe(heading);
+    // The greeting's own words, not just "an h1": that is what tells the user which screen arrived.
+    expect(heading.textContent ?? "").toMatch(/^Good (morning|afternoon|evening), /);
+  });
+
+  it("focuses the Inbox heading on `g i` when nothing was selected there", async () => {
+    render(<App screen="today" />);
+    await go("i");
+
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading).toHaveClass("inbox-card__title");
+    expect(document.activeElement).toBe(heading);
+  });
+
+  it("leaves the focus alone on a cold render", async () => {
+    render(<App />);
+    await nextFrame();
+    // Moving it here would take the first Tab stop away from the skip link and would announce a
+    // screen the user has not navigated to. The guard is a ref compared against the screen rather
+    // than a "first render" flag, because StrictMode mounts, unmounts and remounts and would re-run
+    // the effect with the same screen — the flag would let that second run through.
+    expect(document.activeElement).toBe(document.body);
+  });
+});
+
 describe("App shell search mode (US-B27)", () => {
   // `persons` is module-level state shared by every test in this file, so the row a case fills in
   // goes back to empty with its fetch stub.

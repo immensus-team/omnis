@@ -265,7 +265,9 @@ describe("Inbox archive toasts (loop-r1-06)", () => {
     vi.useFakeTimers();
     archiveWithE();
 
-    expect(toast()).toHaveTextContent("Archived");
+    // loop-r2-08/L2-10, NC2-09: the copy names the thread. "Archived" alone could not be acted on
+    // by anyone with two archives in a row — the Undo under it was a guess about which one.
+    expect(toast()).toHaveTextContent('Archived "New mail"');
     expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
@@ -279,7 +281,7 @@ describe("Inbox archive toasts (loop-r1-06)", () => {
   it("undoes with `z` — the keyboard twin of that button", () => {
     vi.useFakeTimers();
     archiveWithE();
-    expect(toast()).toHaveTextContent("Archived");
+    expect(toast()).toHaveTextContent('Archived "New mail"');
 
     fireEvent.keyDown(window, { key: "z" });
     expect(url(1)).toContain(`/api/threads/${THREAD_A}/unarchive`);
@@ -287,16 +289,47 @@ describe("Inbox archive toasts (loop-r1-06)", () => {
     vi.useRealTimers();
   });
 
-  it("undoes with ⌘Z too, and stops once the toast has gone", () => {
+  it("undoes with ⌘Z, bound by the undo stack rather than by the toast's lifetime", () => {
     vi.useFakeTimers();
     archiveWithE();
     fireEvent.keyDown(window, { key: "z", metaKey: true });
     expect(url(1)).toContain(`/api/threads/${THREAD_A}/unarchive`);
 
-    // The undo is the toast's, not the screen's: five seconds after the archive there is no button
-    // on screen, so ⌘Z has nothing left to take back. (The Ctrl variant is the same branch — the
-    // listener takes either modifier.)
+    // loop-r2-08: the undo used to be the toast's. Five seconds after the archive the button was
+    // gone and ⌘Z had nothing to take back — the keys went dead on a timer, which is half of what
+    // both testers hit. The stack is a data fact and the toast is a UI one, so the archive below is
+    // taken back with the toast long dismissed. (The Ctrl variant is the same branch — the listener
+    // takes either modifier.)
     act(() => vi.advanceTimersByTime(TOAST_MS));
+    fireEvent.click(screen.getByRole("option", { name: /New mail/ }));
+    fireEvent.keyDown(window, { key: "e" });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    act(() => vi.advanceTimersByTime(TOAST_MS));
+    fireEvent.keyDown(window, { key: "z", metaKey: true });
+    expect(url(3)).toContain(`/api/threads/${THREAD_A}/unarchive`);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+
+    // And what stops it is the stack being empty, not a clock: the second undo consumed the second
+    // entry, so a third press posts nothing at all.
+    fireEvent.keyDown(window, { key: "z", metaKey: true });
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    vi.useRealTimers();
+  });
+
+  it("does not take the same archive back twice when the button and the key are both used", () => {
+    vi.useFakeTimers();
+    archiveWithE();
+    // sonner publishes its store one tick behind the raise; `toast()` is that tick, and without it
+    // the button is not on screen yet (see the helper).
+    expect(toast()).toHaveTextContent('Archived "New mail"');
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(url(1)).toContain(`/api/threads/${THREAD_A}/unarchive`);
+
+    // loop-r2-08: the button undoes *its own* entry and consumes it, rather than both it and the
+    // keyboard reading "whatever is on top" — which is how a press followed by ⌘Z took two things
+    // back when only one had been done. Here the press spent the stack, so ⌘Z has nothing.
     fireEvent.keyDown(window, { key: "z", metaKey: true });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     vi.useRealTimers();
