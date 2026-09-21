@@ -20,28 +20,22 @@ loadZeroToken()
     createRoot(root).render(<StrictMode>{previewElement()}</StrictMode>);
   });
 
-/** `?screen=<name>` opens a screen for looking at and for screenshots. There is no URL router in
- *  the desktop app (src-tauri loads one document), and the rail that switches screens for a person
- *  is not built yet, so this is how a screen that is not the Inbox is reached.
+/** `?screen=<name>` sets the screen the shell opens on, for looking at and for screenshots. It is
+ *  the *first* screen only: the rail, `g` + a letter and the palette all switch screens from there
+ *  (App.tsx's goTo), and a URL cannot follow them — there is no URL router in the desktop app
+ *  (src-tauri loads one document), so it is not re-read and not written back.
  *  - `onboarding` (US-D06 §4.1.3): no first-run flow is wired yet, and wiring one is not D6's job.
- *  - `today` (US-B28): the shell's Screen switching belongs to whoever builds the rail; this story
- *    adds the screen and has to be able to photograph it in the real shell.
- *  - `tasks` (US-B29): same reason, same owner. */
+ *    The one screen here that is not a ShellScreen — it is mounted instead of the shell.
+ *  - the seven shell screens are all reachable from the rail now (loop-r1-01); this is how a shot
+ *    tool asks for one before it has clicked anything. */
 function previewElement() {
   const screen = new URLSearchParams(window.location.search).get("screen");
   if (screen === "onboarding") return <OnboardingPreview />;
   if (screen === "today") return <App screen="today" />;
   if (screen === "tasks") return <App screen="tasks" />;
   if (screen === "network") return <App screen="network" />;
-  // `notes` (US-B31): same reason as `today`/`tasks`/`network` — the rail that switches screens is
-  // not built yet, and the story has to be able to photograph the screen in the real shell.
   if (screen === "notes") return <App screen="notes" />;
-  // `digest` (US-B32): same reason — the screen has to be photographable in the real shell, and the
-  // rail that switches screens is still not built.
   if (screen === "digest") return <App screen="digest" />;
-  // `settings` (US-B33): same reason — and the screen cannot be photographed from the rail either,
-  // because the rail's Settings tile is still the Phase B disabled one (ChannelRail's PHASE_B_TITLE
-  // note); wiring the rail is the shell's story, not this screen's.
   if (screen === "settings") return <App screen="settings" />;
   return <App />;
 }
