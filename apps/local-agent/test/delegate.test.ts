@@ -95,9 +95,18 @@ describe("runDelegation", () => {
   it("refuses a missing or forged signature with -32006", async () => {
     const { deps } = harness();
     await expect(runDelegation({ brief }, deps)).rejects.toMatchObject({ code: -32006 });
-    await expect(
-      runDelegation({ brief, sig: signApproval("wrong", brief.approval_id, brief) }, deps),
-    ).rejects.toMatchObject({ code: -32006 });
+    const forged = await runDelegation(
+      { brief, sig: signApproval("wrong", brief.approval_id, brief) },
+      deps,
+    ).then(
+      () => {
+        throw new Error("runDelegation accepted a forged signature");
+      },
+      (e: Error & { code?: number; data?: unknown }) => e,
+    );
+    expect(forged).toMatchObject({ code: -32006 });
+    // A2 §7.2: the bridge token both signs and verifies, so it must not surface where the caller can read it.
+    expect(`${forged.message} ${JSON.stringify(forged.data ?? null)}`).not.toContain(TOKEN);
     await expect(
       runDelegation(
         {
