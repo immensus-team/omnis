@@ -6,7 +6,7 @@
    changes, re-copy the whole file below this comment — verbatim, do not hand-pick a subset, or a
    screen composing an unlisted selector silently loses its styling.
 
-   Source: apps/desktop/src/app.css at commit af0537c (5934 lines).
+   Source: apps/desktop/src/app.css at commit f3b75ff (6055 lines).
    apps/web/test/vendor-css.test.ts is what holds the line: it compares everything below this
    comment against that file byte for byte, so forgetting to re-copy fails a test rather than
    shipping a half-styled screen. */
@@ -4542,6 +4542,116 @@ button.today-screen__event-title:focus-visible {
   font-size: 12px;
 }
 
+/* ==========================================================================================
+   loop-r1-06 — the toast: what the shell says back after a write the list cannot show.
+
+   It is a floating panel, so it is glass, and it declares no background of its own: the tint, the
+   blur and the hairline are `.glass-surface`'s (ACCENT §4.4 — a second `background` here is the
+   "flat tinted panel" tell that section rejects). The plate is drawn as a pill, with the one
+   `--shadow-glass` the glass recipe already puts on it (v3 §e guard 11).
+
+   Position: bottom-centre, above whatever holds the bottom of the window in the current tier.
+   `z-index: 35` is above the detail pane's 20 and the BottomBar's 30 and below the sheet's 40 — a
+   toast belongs to the list, and while a sheet is up the sheet is the thing being read.
+
+   Its reduced-motion override is in the block directly below this one, with the other moving
+   surfaces'.
+   ========================================================================================== */
+.toast {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 35;
+  display: flex;
+  justify-content: center;
+  /* A sentence and a button on one line, and never wider than the window: the brief's 480, and
+     below that the viewport less 12px a side. */
+  width: max-content;
+  max-width: min(480px, calc(100vw - 24px));
+  bottom: var(--bar-gap);
+}
+
+/* Below 900 the BottomBar stands on the window's bottom edge — its top edge is
+   56px + --bar-gap + --bar-h above it, the three numbers `.bottom-bar` itself uses — so the toast
+   takes one more --bar-gap on top of that. Lower, and it would be under the thumb that just made
+   the archive, with half of it behind the bar's own circles.
+   `@container`, not `@media`, because the toast is a child of #root and the rest of the narrow
+   tier is written this way: the toolbar's `@media` block is the exception it documents itself as
+   (Thread.tsx portals it outside the container), and a new `@media (max-width: 899.98px)` here
+   would also be the first one in the file, which is not a thing this section gets to be by
+   accident. */
+@container shell (max-width: 899.98px) {
+  .toast {
+    bottom: calc(56px + var(--bar-h) + var(--bar-gap) * 2);
+  }
+}
+
+.toast__pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  /* Asymmetric on purpose: the message leads at 16px so the text clears the rounded edge, and the
+     action keeps 8px of its own from the pill's cap. */
+  padding: 0 8px 0 16px;
+  border-radius: 999px;
+  animation: toast-in var(--dur-base) var(--ease-spring);
+}
+
+/* The exit. A fade rather than a slide: the toast is going away, and a thing that travels as it
+   leaves is a second movement on a surface that was only ever one sentence. */
+.toast__pill--closing {
+  animation: fade-out var(--dur-fast) var(--ease-spring) forwards;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* One line, ellipsised. It is a toast, not a paragraph, and the pill is 44px: a message long
+   enough to wrap would be a second row. */
+.toast__message {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+/* The action is a text button — the accent is the only thing that makes it look pressable, which
+   is what "Undo" should look like beside a sentence. 32px inside the 44px pill keeps the touch
+   target inside the toast's own height. */
+.toast__action {
+  flex: none;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toast__action:hover {
+  background: var(--state-hover);
+}
+
+.toast__action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   /* The ask panel: 320ms of lift-and-scale becomes a cross-fade. */
   .ask-panel {
@@ -4598,6 +4708,17 @@ button.today-screen__event-title:focus-visible {
      this is a token override and not a second code path. */
   .channel-rail {
     --dur-reorder: 0ms;
+  }
+
+  /* loop-r1-06: the toast's entrance — the 8px it rises by becomes the shared cross-fade, which
+     carries no transform. Its exit was already a fade and keeps its own name, so the two states
+     stay told apart by name as much as by duration. */
+  .toast__pill {
+    animation-name: fade-in;
+  }
+
+  .toast__pill--closing {
+    animation-name: fade-out;
   }
 }
 
