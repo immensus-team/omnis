@@ -155,12 +155,38 @@ body {
   margin-bottom: 4px;
 }
 
-/* HIG (mobile): a control's default size is 44x44pt. @omnis/ui's Button is desktop-sized (14px text
-   with 6px of vertical padding, ~33px tall), which is fine at 1440 and short of the phone's default
-   target for the one control the install guide asks a person to tap. The shots tool measures this
-   rather than trusting it — see assertTapTargets in tools/e2e/shots-w4b-web.ts. */
+/* The card's one control, and the only filled one on the screen. @omnis/ui's Button styles itself
+   only with Tailwind utilities and this app compiles no Tailwind, so without this rule it is the UA's
+   grey box — the same defect the Network frames caught in the desktop (see the reset above
+   `.notes-screen__save` in vendor/app-styles.css) and the same one the w4b inbox frame caught here.
+
+   The fill is .tab-bar__tab[aria-selected="true"]'s ink pill — the app's one grammar for "this is the
+   thing to press" — and 10px is DESIGN-DIRECTION's radius-scale row for "a step down inside a large
+   surface" (the card is 20px). It is also what the Button's own `rounded-[var(--radius-md,10px)]`
+   meant; no stylesheet defines --radius-md, so the number is written here rather than referenced.
+
+   HIG (mobile): a control's default size is 44x44pt, and the Button is desktop-sized (14px text, 6px
+   of vertical padding, ~33px tall) — fine at 1440, short of the phone's default for the one control
+   the guide asks a person to tap. The shots tool measures the box and the paint rather than trusting
+   either: assertTapTargets and assertInstallButtonPainted in tools/e2e/shots-w4b-web.ts. */
 .install-card__dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.install-card__dismiss:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* The Inbox tab's body: the list as one card on the canvas. Same recipe as the desktop's

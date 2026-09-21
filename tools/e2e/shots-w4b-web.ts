@@ -175,6 +175,58 @@ async function assertTapTargets(page: Page): Promise<void> {
   console.log(`  tap targets at ${String(page.viewportSize()?.width)}px — ${measured.join(", ")}`);
 }
 
+/** The install card's control has to be *painted*, not just present. @omnis/ui's Button carries its
+ *  primary variant as Tailwind utilities and no app here compiles Tailwind, so the button renders as
+ *  the UA's grey rounded-rect unless the app's own CSS gives it the fill — and a screenshot review
+ *  caught exactly that once already. The box measurement above cannot see it, so this reads computed
+ *  style: the fill and the label have to resolve to --accent and --accent-fg, and the UA's 1px border
+ *  and square corners have to be gone.
+ *
+ *  The expected colours are read from the tokens rather than hard-coded, by painting two probes —
+ *  so a palette change moves the expectation with the app instead of failing the run. */
+async function assertInstallButtonPainted(page: Page): Promise<void> {
+  // No function expressions in here, deliberately: tsx/esbuild compiles with keepNames and emits a
+  // `__name(...)` call around every named function, which does not exist in the page's own context.
+  const measured = await page.evaluate(() => {
+    const button = document.querySelector(".install-card__dismiss");
+    if (button === null) throw new Error("the install card's button is not on the frame");
+    const probe = document.createElement("div");
+    document.body.append(probe);
+    const tokens: string[] = [];
+    for (const name of ["--accent", "--accent-fg"]) {
+      probe.style.background = `var(${name})`;
+      tokens.push(getComputedStyle(probe).backgroundColor);
+    }
+    probe.remove();
+    const style = getComputedStyle(button);
+    return {
+      background: style.backgroundColor,
+      color: style.color,
+      border: style.borderTopWidth,
+      radius: style.borderRadius,
+      accent: tokens[0] ?? "",
+      accentFg: tokens[1] ?? "",
+    };
+  });
+
+  if (measured.background !== measured.accent) {
+    throw new Error(
+      `the install card's button is painted ${measured.background} but --accent is ${measured.accent} — it is falling back to the UA's own button styling (apps/web/src/app.css .install-card__dismiss)`,
+    );
+  }
+  if (measured.color !== measured.accentFg) {
+    throw new Error(
+      `the install card's button's label is ${measured.color} but --accent-fg is ${measured.accentFg} — that pair is the contrast the frame is meant to show`,
+    );
+  }
+  if (measured.border !== "0px" || measured.radius === "0px") {
+    throw new Error(
+      `the install card's button still carries UA chrome (border ${measured.border}, radius ${measured.radius})`,
+    );
+  }
+  console.log(`  install card's Got it — ${measured.background} on ${measured.accent}`);
+}
+
 /** One frame plus the overflow reading, as every other shot tool takes it. */
 async function shoot(page: Page, label: string): Promise<void> {
   // The pointer was left wherever the last click put it, and a row under it draws its hover card —
@@ -226,6 +278,8 @@ async function pass(
       // The card is up and carries its three steps — the phone frame is of the install path, not just
       // of the list under a heading.
       await page.waitForSelector(".install-card__step", { timeout: 5_000 });
+      // The phone frame is also the one that keeps the card, so it is the one that shows the button.
+      await assertInstallButtonPainted(page);
     }
     if (size.width <= 480) await assertTapTargets(page);
     await shoot(page, label);
