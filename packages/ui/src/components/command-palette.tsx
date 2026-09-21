@@ -143,18 +143,18 @@ export function CommandPalette({
   search,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
-  const onQueryChange = search?.onQueryChange;
-  // A5 §2.5's 180ms debounce. The dependency is the callback, not the `search` object: a consumer
-  // that builds that object inline hands over a new identity every render, which would restart the
-  // timer each time and never fire. Closed, there is nothing to ask about.
-  useEffect(() => {
-    if (!open || onQueryChange === undefined) return;
-    const timer = setTimeout(() => onQueryChange(query), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [open, query, onQueryChange]);
-
   const groups = groupBy(actions, (a) => a.group);
   const showSearch = search !== undefined && !matchesAnyAction(query, actions);
+  const onQueryChange = search?.onQueryChange;
+  // A5 §2.5's 180ms debounce. Only a query that actually puts the palette in search mode is worth a
+  // round trip — a query that matches an action is answered from the action list. The dependency is
+  // the callback, not the `search` object: a consumer that builds that object inline hands over a
+  // new identity every render, which would restart the timer each time and never fire.
+  useEffect(() => {
+    if (!open || !showSearch || onQueryChange === undefined) return;
+    const timer = setTimeout(() => onQueryChange(query), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [open, showSearch, query, onQueryChange]);
   const actionList = (
     <Command.List>
       <Command.Empty>No results</Command.Empty>

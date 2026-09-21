@@ -4,13 +4,17 @@ import {
   type ApprovalStackItem,
   ChannelRail,
   CommandPalette,
+  type CommandPaletteSearch,
   type PaletteAction,
   type RailSelection,
   type UiChannel,
+  type UiSearchGroup,
+  type UiSearchHit,
 } from "@omnis/ui";
 import { ZeroProvider, useQuery } from "@rocicorp/zero/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { decideApproval } from "./api/approvals.js";
+import { type SearchHit, search, toUiSearchGroups } from "./api/search.js";
 import { AgentSession } from "./screens/AgentSession.js";
 import { Inbox, type OpenTarget } from "./screens/Inbox.js";
 import { Thread } from "./screens/Thread.js";
@@ -115,6 +119,62 @@ function Shell() {
     },
   ];
 
+  // US-B27: the palette's search mode. The palette owns the 180ms debounce and hands back the
+  // settled query; the request itself is hub HTTP (contract §5) — search reads across tables Zero
+  // does not replicate. `gen` drops a response that a newer keystroke has already superseded.
+  const [results, setResults] = useState<{ groups: UiSearchGroup[]; loading: boolean }>({
+    groups: [],
+    loading: false,
+  });
+  const gen = useRef(0);
+  // The palette's hit carries no deep_link (it is a UI-level type), so the response is kept here to
+  // route a selected hit to its screen.
+  const hits = useRef(new Map<string, SearchHit>());
+  const runSearch = useCallback((q: string) => {
+    gen.current += 1;
+    const request = gen.current;
+    if (q.trim() === "") {
+      setResults({ groups: [], loading: false });
+      return;
+    }
+    setResults((prev) => ({ ...prev, loading: true }));
+    search(q)
+      .then((response) => {
+        if (request !== gen.current) return;
+        hits.current = new Map(
+          response.groups.flatMap((g) => g.results.map((r) => [`${r.kind}:${r.id}`, r])),
+        );
+        setResults({ groups: toUiSearchGroups(response), loading: false });
+      })
+      .catch((error: unknown) => {
+        if (request !== gen.current) return;
+        // A failed search is not worth a banner across the list: the palette reads "No results",
+        // which is the state the user can act on. The reason stays in the console.
+        console.error("search failed", error);
+        setResults({ groups: [], loading: false });
+      });
+  }, []);
+
+  // Deep links the shell can keep: only the thread route exists so far (a person link's Network
+  // screen and a digest link's Digest screen are other Phase B stories), and a memory's deep link
+  // carries an item id but no thread id — so a memory row is shown and not followed yet.
+  const openHit = useCallback((hit: UiSearchHit) => {
+    const link = hits.current.get(`${hit.kind}:${hit.id}`)?.deep_link;
+    if (link?.screen !== "thread" || link.thread_id === undefined) return;
+    setOpen({ threadId: link.thread_id, agentSession: false });
+    setAskOpen(false);
+  }, []);
+
+  const paletteSearch: CommandPaletteSearch = useMemo(
+    () => ({
+      groups: results.groups,
+      loading: results.loading,
+      onQueryChange: runSearch,
+      onSelectHit: openHit,
+    }),
+    [results, runSearch, openHit],
+  );
+
   // The kinso reference has only a rail and a main column — the detail pane opens a third column
   // only when there is something to look at. (Keeping an empty pane open shrinks the Inbox card
   // into a sidebar taking a third of the window.)
@@ -132,6 +192,7 @@ function Shell() {
           open={askOpen}
           onOpenChange={setAskOpen}
           actions={actions}
+          search={paletteSearch}
           threadSelected={open !== null}
           threadSummary={selectedThreadSummary}
           threadTitle={selectedThreadTitle}
