@@ -23,6 +23,11 @@ const THREADS = [
 const TITLES = ["Row one", "Row two", "Row three", "Row four"] as const;
 const NOW = Date.UTC(2026, 8, 21, 12, 0, 0);
 
+/** InboxRow's `openDelay` on the person card. The two card tests below have to wait past it: a
+ *  card that "did not open" because the test never waited is not the same as one the focus could
+ *  not open, and only the second is the property this story added. */
+const CARD_OPEN_DELAY_MS = 400;
+
 /** Newest first, which is the order the query's `sent_at desc` hands them over and therefore the
  *  order the rows are listed in — the tests' "row 2" has to be the second row on screen. */
 function item(index: number) {
@@ -131,6 +136,17 @@ const nextFrame = async (): Promise<void> => {
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   });
 };
+
+/** Real timers, and the wait is the assertion rather than padding — see CARD_OPEN_DELAY_MS. */
+const pastCardDelay = async (): Promise<void> => {
+  await act(async () => {
+    await new Promise<void>((resolve) => setTimeout(resolve, CARD_OPEN_DELAY_MS + 120));
+  });
+};
+
+/** The hover card's own box. It is portalled to document.body, so it is looked up on the document
+ *  rather than inside the rendered container. */
+const personCard = (): Element | null => document.querySelector(".row-hover-card");
 
 describe("Inbox keyboard triage (loop-r1-03)", () => {
   it("moves the selection down with `j`, from nothing selected, and `k` back up", async () => {
@@ -254,5 +270,35 @@ describe("Inbox keyboard triage (loop-r1-03)", () => {
     for (const button of screen.queryAllByRole("button", { name: "Archive" })) {
       expect(button).toHaveAttribute("tabindex", "-1");
     }
+  });
+
+  it("does not open the row's person card when `j` moves the focus", async () => {
+    renderInbox();
+    // The regression this asserts against: Radix's HoverCardTrigger opens on `focus` as well as on
+    // `pointerenter`. Once `j` began moving the real focus from row to row, every move that rested
+    // opened a PersonCard over the detail pane — the approval queue a keyboard-first triager is
+    // reading, covered by the card of the row they had just landed on.
+    fireEvent.keyDown(window, { key: "j" });
+    await nextFrame();
+    expect(document.activeElement).toBe(rowById(THREADS[0]));
+
+    await pastCardDelay();
+    expect(document.activeElement).toBe(rowById(THREADS[0]));
+    expect(personCard()).toBeNull();
+
+    fireEvent.keyDown(window, { key: "j" });
+    await nextFrame();
+    await pastCardDelay();
+    expect(personCard()).toBeNull();
+  });
+
+  it("still opens the person card on a pointer, so the card survives the guard", async () => {
+    renderInbox();
+    // The other half of the same coin: gating the card on the pointer is only correct if the
+    // pointer still opens it. Without this, "the focus does not open the card" is also satisfied
+    // by a card that never opens at all.
+    fireEvent.pointerOver(rowById(THREADS[0]));
+    await pastCardDelay();
+    expect(personCard()).not.toBeNull();
   });
 });

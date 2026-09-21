@@ -18,11 +18,11 @@
 //   1440  the keyboard triage itself: `j` `j` `j` then `e` `e` `e`, three distinct ids on the wire,
 //         the list three rows shorter, and the focus ring measured off the computed style of the
 //         row rather than read out of the stylesheet (NC-28).
-//   1440  Tab into the list and straight back out: the list is one stop rather than one per row plus
-//         two more on each (NC-18). The count from a cold load is logged with its whole trail, and it
-//         is dominated by the rail, the ask panel and the filter chips — chrome this story does not
-//         own. What it does own is measured instead: arriving lands on a row, and the next press
-//         leaves the list, so the presses needed to cross it no longer grow with the row count.
+//   1440  reaching the list from a cold load, in under 12 interactions (NC-18). Two walks: the raw
+//         Tab-only trail, logged stop by stop and asserted to start on the skip link, and the
+//         journey a keyboard user actually takes — one Tab to the skip link, one activation — which
+//         is the number the assertion is on. Plus the list's own stop count: one Tab in, one out,
+//         however many rows there are.
 //   390   the phone tier: a row tapped, the sheet's `‹ Inbox`, and the flat tint the selected row
 //         keeps under it (v3 §a.1).
 import { mkdirSync } from "node:fs";
@@ -125,14 +125,19 @@ const BLUR_PROBE =
 
 /** What the focus is on, in words, for the Tab trail. Every stop is logged: the number is the
  *  assertion but the trail is the evidence, and a count of 9 that got there through five rail
- *  buttons is a different result from one that got there through five rows. */
+ *  buttons is a different result from one that got there through five rows.
+ *  `inList` is `closest('[role="listbox"]')`, not `closest(".inbox-row")` — the skip link's target
+ *  is the listbox itself, and the acceptance is about reaching the list rather than about landing
+ *  on a particular row. `skipLink` is how the walk below knows it has met the shortcut. */
 const FOCUS_PROBE = `(() => {
   const el = document.activeElement;
-  if (!(el instanceof HTMLElement)) return { what: "nothing focused", inRow: false };
+  if (!(el instanceof HTMLElement)) return { what: "nothing focused", inRow: false, inList: false, skipLink: false };
   return {
     what: el.getAttribute("aria-label") || el.className || el.tagName,
     tag: el.tagName,
     inRow: el.closest(".inbox-row") !== null,
+    inList: el.closest('[role="listbox"]') !== null,
+    skipLink: el.classList.contains("skip-link"),
     threadId: el.getAttribute("data-thread-id"),
   };
 })()`;
@@ -327,52 +332,104 @@ async function main(): Promise<void> {
     }
     console.log(`  the list is down to ${after.length} rows, and no archived id is among them`);
 
-    // ---- 1440: the tab stop count -----------------------------------------------------------------
-    // NC-18: 27 Tabs from the ask bar to the pane, three per row. The assertion is on the whole
-    // journey from a cold load, and every stop is logged, because "9" reached through five rail
-    // buttons is a different answer from "9" reached through five rows.
-    console.log("1440 — Tab into the list, and straight back out");
-    const tabs = await browser.newPage({ viewport: WIDE });
-    await open(tabs);
-    let presses = 0;
-    let landed: { what: string; inRow: boolean; threadId: string | null } = {
-      what: "nothing focused",
-      inRow: false,
-      threadId: null,
-    };
-    for (; presses < 60; presses++) {
-      await tabs.keyboard.press("Tab");
-      landed = (await tabs.evaluate(FOCUS_PROBE)) as typeof landed;
-      console.log(`  tab ${presses + 1}: ${landed.what}`);
-      if (landed.inRow) break;
+    // ---- 1440: reaching the list from a cold load ------------------------------------------------
+    // NC-18's acceptance number: fewer than 12 interactions from a cold load to the focus inside the
+    // list. Two walks, both from a cold load, because the two numbers answer different questions and
+    // only one of them can be asserted.
+    //
+    // The raw walk (Tab only, nothing activated) is the honest count of what stands between a
+    // keyboard user and the list, and it is logged with every stop named. It is NOT under 12, and it
+    // cannot be made under 12 by editing the tab order: every stop above the list is a real control
+    // — twelve rail tiles, the ask bar's input and its two composer buttons, the open panel's two
+    // tabs and its Close, the approval-queue button and seven filter pills. Removing any of them
+    // takes away a control, which is a different (and worse) bug than a long tab order. The first
+    // stop of this walk has to be the skip link, or the shortcut below is not a shortcut.
+    //
+    // The journey walk is the acceptance: Tab to the skip link and activate it, which is what a
+    // keyboard user does, and the focus lands in the list. The assertion is on the interactions that
+    // journey took, and it exits non-zero if it is not under 12.
+    console.log("1440 — reaching the list from a cold load: the raw Tab trail");
+    const raw = await browser.newPage({ viewport: WIDE });
+    await open(raw);
+    await raw.keyboard.press("Tab");
+    const firstStop = (await raw.evaluate(FOCUS_PROBE)) as { what: string; skipLink: boolean };
+    if (!firstStop.skipLink) {
+      throw new Error(
+        `the first Tab lands on "${firstStop.what}", not on the skip link — there is no way past the chrome`,
+      );
     }
-    if (!landed.inRow) {
-      throw new Error(`60 Tabs never reached a row (last stop: ${landed.what})`);
+    let rawTabs = 1;
+    for (; rawTabs < 60; rawTabs++) {
+      const stop = (await raw.evaluate(FOCUS_PROBE)) as { what: string; inList: boolean };
+      console.log(`  tab ${rawTabs}: ${stop.what}`);
+      if (stop.inList) break;
+      await raw.keyboard.press("Tab");
     }
-    // Landing *on a row* is the half of NC-18 that is about what the list is made of: the row is a
-    // stop, and neither of the two controls inside it is one.
-    if (landed.threadId === null) {
-      throw new Error(`the first stop inside the list is "${landed.what}", not a row`);
-    }
+    const lastStop = (await raw.evaluate(FOCUS_PROBE)) as { inList: boolean; what: string };
+    if (!lastStop.inList)
+      throw new Error(`60 Tabs never reached the list (last: ${lastStop.what})`);
     console.log(
-      `  tab ${presses + 1} is a row (${landed.threadId}) — the chrome before it is other stories'`,
+      `  ${rawTabs} Tabs by the long way round: that is the chrome above the list, not the list.`,
     );
 
-    // ...and the half that is about how many stops the list has: the press *after* the one that
-    // arrived leaves it. The list is one stop, not one per row and two more on each of them —
+    console.log("1440 — and by the skip link");
+    const walk = await browser.newPage({ viewport: WIDE });
+    await open(walk);
+    let tabs = 0;
+    let activations = 0;
+    let landed: { what: string; inList: boolean; skipLink: boolean } = {
+      what: "nothing focused",
+      inList: false,
+      skipLink: false,
+    };
+    for (tabs = 1; tabs <= 60; tabs++) {
+      await walk.keyboard.press("Tab");
+      landed = (await walk.evaluate(FOCUS_PROBE)) as typeof landed;
+      console.log(`  tab ${tabs}: ${landed.what}`);
+      if (landed.inList) break;
+      if (landed.skipLink) {
+        await walk.keyboard.press("Enter");
+        activations += 1;
+        await walk.waitForTimeout(150);
+        landed = (await walk.evaluate(FOCUS_PROBE)) as typeof landed;
+        console.log(`  activate the skip link: ${landed.what}`);
+        if (landed.inList) break;
+      }
+    }
+    if (!landed.inList) {
+      throw new Error(`60 Tabs never reached the list (last stop: ${landed.what})`);
+    }
+    // The acceptance, and it is an assertion rather than a log: fewer than 12 interactions from a
+    // cold load, counting the activation because it is a press the user had to make.
+    const journey = tabs + activations;
+    if (journey >= 12) {
+      throw new Error(
+        `the list takes ${journey} interactions from a cold load (${tabs} Tabs + ${activations} activations), not fewer than 12 (NC-18)`,
+      );
+    }
+    console.log(`  ${journey} interactions from a cold load: ${tabs} Tab, ${activations} activate`);
+
+    // And the half of NC-18 that is about how many stops the *list* has: the press after the one
+    // that arrived leaves it. The list is one stop, not one per row and two more on each of them —
     // before this story the same walk went row → "More actions" → "Archive" → row, so the number of
-    // presses to cross the list was 3 × the number of rows (45 at this fixture's fifteen, and the
-    // finding's 27 at the eight rows it was measured with). The count no longer grows with the list,
-    // which is the property a count against a fixed fixture could never show.
-    await tabs.keyboard.press("Tab");
-    const left = (await tabs.evaluate(FOCUS_PROBE)) as { what: string; inRow: boolean };
-    console.log(`  tab ${presses + 2}: ${left.what}`);
+    // presses to cross the list was 3 × the number of rows. The count no longer grows with the list,
+    // which is the property a count against a fixed fixture could never show. The skip link lands on
+    // the listbox rather than on a row, so this is also what says the row is the stop after it.
+    await walk.keyboard.press("Tab");
+    const intoList = (await walk.evaluate(FOCUS_PROBE)) as { what: string; inRow: boolean };
+    console.log(`  the Tab after it: ${intoList.what}`);
+    if (!intoList.inRow) {
+      throw new Error(`the stop after the listbox is "${intoList.what}", not a row`);
+    }
+    await walk.keyboard.press("Tab");
+    const left = (await walk.evaluate(FOCUS_PROBE)) as { what: string; inRow: boolean };
+    console.log(`  tab ${tabs + 3}: ${left.what}`);
     if (left.inRow) {
       throw new Error(
         `a second Tab is still inside the list (${left.what}) — the list is more than one stop (NC-18)`,
       );
     }
-    console.log(`  one Tab crosses the whole list: ${presses + 1} to arrive, 1 to leave`);
+    console.log("  one Tab crosses the whole list: one to arrive, one to leave");
 
     // ---- 390: the phone tier ---------------------------------------------------------------------
     // The selected row is a flat full-width band here, not the white card the desktop tier

@@ -884,6 +884,12 @@ export function Inbox({
           // the focusable-but-invisible stop the keyboard-only session counted. Taking it out
           // leaves the list exactly one tab stop, on the selected row.
           tabIndex={-1}
+          // loop-r1-03/NC-18: the skip link's target (App.tsx). It is the listbox itself rather
+          // than the wrapper above, so the focus the link moves already lands on the element that
+          // owns the arrows and Home/End — and no new tabindex had to be invented for it, since
+          // this one is here for the opposite reason. `-1` is not a tab stop, so the count below is
+          // unchanged: the list is still one stop, and it is still the selected row.
+          id="inbox-list"
           style={{ flex: "1 1 0", minHeight: 0 }}
           data={listItems}
           // loop-r1-03: the row's identity, so React moves a row's DOM node with the row instead of

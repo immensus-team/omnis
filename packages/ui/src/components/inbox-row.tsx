@@ -200,6 +200,19 @@ export function InboxRow(props: InboxRowProps) {
   const collapse = useCollapseHeight(props.leaving === true);
   const leaving = props.leaving === true && collapse.style !== undefined;
 
+  // US-D02 + loop-r1-03: the hover card is a *pointer* affordance, and since this story the list is
+  // also a keyboard surface — `j`/`k`, the arrows and Home/End move the real focus from row to row.
+  // Radix's HoverCardTrigger opens on `focus` as well as on `pointerenter`, so with the keyboard
+  // driving the focus, every move that rested 400ms popped a PersonCard over the detail pane: the
+  // queue a keyboard-first triager is reading got covered by the card of the row they just landed
+  // on. `open` is therefore controlled and only a pointer may raise it. `pointerOver` is the gate
+  // rather than a re-implementation of the timing: the delays below stay Radix's, so the pointer
+  // path behaves exactly as it did, and the focus path is simply refused (`onOpenChange(true)` with
+  // no pointer on the row). Closing is always honoured, so a pointer that leaves, an Escape and a
+  // blur all still put the card away. */
+  const [cardOpen, setCardOpen] = useState(false);
+  const pointerOver = useRef(false);
+
   // US-D08 §c.4: the swipe. Narrow-only — the tier where the rail is already a bottom bar, i.e. the
   // coarse-pointer layout — and only on a row that has something to reveal, so a row with no
   // archive action never moves. The primitive's long-press hold is off (0): the swipe has no
@@ -337,7 +350,14 @@ export function InboxRow(props: InboxRowProps) {
     // The 400ms openDelay is deliberate: rows here are short, so a pointer sweeps across many of
     // them, and with no delay the cards flash one after another (hover intent). closeDelay stays
     // short (100ms) so the card follows while moving between rows.
-    <HoverCard.Root openDelay={400} closeDelay={100}>
+    <HoverCard.Root
+      openDelay={400}
+      closeDelay={100}
+      open={cardOpen}
+      onOpenChange={(next) => {
+        if (!next || pointerOver.current) setCardOpen(next);
+      }}
+    >
       <HoverCard.Trigger asChild>
         <div
           ref={collapse.ref}
@@ -364,6 +384,15 @@ export function InboxRow(props: InboxRowProps) {
             x !== 0 && "inbox-row--revealed",
           )}
           onPointerDown={onPointerDown}
+          // The gate for the controlled card above: these run before Radix's own handlers on the
+          // same element (Radix composes ours first), so the flag is already set when the 400ms
+          // open timer fires.
+          onPointerEnter={() => {
+            pointerOver.current = true;
+          }}
+          onPointerLeave={() => {
+            pointerOver.current = false;
+          }}
           onClickCapture={swallowAfterDrag}
           onClick={activate}
           onKeyDown={(e) => {

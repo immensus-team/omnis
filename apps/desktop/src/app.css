@@ -94,6 +94,43 @@ body {
   grid-template-columns: 76px minmax(0, 1fr) auto;
 }
 
+/* loop-r1-03/NC-18: the skip link (App.tsx). It is first in the shell's markup so it is the first
+   thing Tab reaches, and it is moved off-screen rather than `display: none` — an element that is
+   not rendered cannot hold the focus, and being focusable is the entire point of a skip link.
+   It is opaque and not glass: it lands on top of the rail's own glass plate, and glass over glass
+   kills the text (ACCENT §4.4) — the same reason the model menu above it is opaque. The recipe is
+   that popover's (hairline, `--bg-base`, `--shadow-glass`), at the 12px panel radius rather than
+   `--radius-group`, because this is a floating panel and not a card.
+   `:focus-visible` and not `:focus`: Tab is exactly the focus-visible case, and the link is never
+   reachable any other way.
+   No transition, so there is nothing here for the reduced-motion block to turn off. */
+.skip-link {
+  position: fixed;
+  z-index: 20;
+  left: 16px;
+  top: 16px;
+  padding: 8px 14px;
+  border: var(--hairline);
+  border-radius: 12px;
+  background: var(--bg-base);
+  box-shadow: var(--shadow-glass);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  /* The pill's own height plus the 16px inset above it, so it clears the shell's padding. */
+  transform: translateY(calc(-100% - 32px));
+}
+
+.skip-link:focus-visible {
+  transform: none;
+  /* The house ring for a floating panel's own control — `2px solid var(--accent)`, outside the
+     border rather than inset into it (`-2px` is the *row*'s rule, and a row is a card, not a
+     pill). One ring and nothing else: the shadow above is the panel's depth, not a second ring. */
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .channel-rail {
   display: flex;
   flex-direction: column;
