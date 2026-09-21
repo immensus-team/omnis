@@ -5,8 +5,8 @@ import "./setup";
 
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 /** This test file's own directory. vitest's transform can leave import.meta.url on a scheme other
  *  than file: (fileURLToPath then throws "The URL must be of scheme file"), so only the pathname is
@@ -55,6 +55,70 @@ describe("App shell (US-A25 'empty shell' + A26-A31 screen routing)", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     fireEvent.keyDown(window, { key: "k", metaKey: true });
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+});
+
+describe("App shell search mode (US-B27)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** The hub's GET /search answer for one item hit. */
+  const searchAnswer = (): Response =>
+    new Response(
+      JSON.stringify({
+        q: "launch",
+        took_ms: 3,
+        truncated: false,
+        groups: [
+          {
+            kind: "items",
+            total: 1,
+            results: [
+              {
+                kind: "item",
+                id: "i1",
+                score: 1,
+                title: "omnis launch sync",
+                snippet: "Let's sync tomorrow at 10am",
+                at: null,
+                channel: "gmail",
+                deep_link: { screen: "thread", thread_id: "t1", item_id: "i1" },
+              },
+            ],
+          },
+        ],
+      }),
+      { status: 200 },
+    );
+
+  it("asks the hub and shows results when the query matches no action", async () => {
+    const fetchMock = vi.fn(async () => searchAnswer());
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    fireEvent.change(screen.getByPlaceholderText("Start typing to ask or search"), {
+      target: { value: "launch" },
+    });
+
+    // The palette debounces 180ms before it hands the query over.
+    await waitFor(() => expect(screen.getByText("omnis launch sync")).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/search?q=launch");
+  });
+
+  it("does not ask the hub while the query still matches an action", async () => {
+    const fetchMock = vi.fn(async () => searchAnswer());
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    fireEvent.change(screen.getByPlaceholderText("Start typing to ask or search"), {
+      target: { value: "inbox" },
+    });
+
+    // Wait past the debounce window: the request that must not happen has had its chance.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByText("Go to Inbox")).toBeInTheDocument();
   });
 });
 

@@ -26,6 +26,9 @@ export interface AskPanelProps {
    *  that closes off the dead end where typing filters the cmdk list while the screen still shows
    *  only suggestions. */
   query?: string;
+  /** US-B27: the input matched no action, so the list under the second tab is search results. The
+   *  tab is labelled by what it shows, not by what it usually shows. */
+  searchActive?: boolean;
   /** Set while the close spring is running (app.css .ask-panel--closing), i.e. still in the DOM. */
   closing?: boolean;
   onClose: () => void;
@@ -39,6 +42,7 @@ export function AskPanel({
   threadTitle = null,
   summary,
   query = "",
+  searchActive = false,
   closing = false,
   onClose,
 }: AskPanelProps) {
@@ -92,7 +96,7 @@ export function AskPanel({
               aria-pressed={tab === "commands"}
               onClick={() => setOverride("commands")}
             >
-              Commands
+              {searchActive ? "Search" : "Commands"}
             </button>
           </div>
           <button type="button" className="ask-panel__close" aria-label="Close" onClick={onClose}>

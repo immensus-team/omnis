@@ -29,6 +29,96 @@ export function groupBy<T>(items: T[], key: (t: T) => string): Record<string, T[
   }, {});
 }
 
+/** A5 §2.5: the four search groups, in the order the palette renders them whatever order the hub
+ *  sent them in (people → threads → items → memories). */
+export type UiSearchGroupKind = "people" | "threads" | "items" | "memories";
+
+export interface UiSearchHit {
+  kind: "person" | "thread" | "item" | "memory";
+  id: string;
+  title: string;
+  snippet: string;
+  /** A5 §2.5: a memory with no `deep_link` has nowhere to go, so its row is not clickable. */
+  deepLinkDisabled: boolean;
+  /** A5 §2.5's memory badge (inbox / calendar / file / drive / github / self). Null everywhere
+   *  else — and null on an older memory row that carries no source. */
+  sourceKind: string | null;
+}
+
+export interface UiSearchGroup {
+  kind: UiSearchGroupKind;
+  label: string;
+  results: UiSearchHit[];
+}
+
+/** US-B27: what the palette needs to run in search mode. The consumer owns the request (the hub
+ *  client and its debounce live outside @omnis/ui, which depends on React only) — the palette owns
+ *  the mode decision, the group order and the copy. */
+export interface CommandPaletteSearch {
+  groups: UiSearchGroup[];
+  loading: boolean;
+  onQueryChange: (q: string) => void;
+  onSelectHit: (hit: UiSearchHit) => void;
+}
+
+const SEARCH_GROUP_ORDER: UiSearchGroupKind[] = ["people", "threads", "items", "memories"];
+/** A5 §2.5: how long the palette waits after the last keystroke before it asks for results. */
+export const SEARCH_DEBOUNCE_MS = 180;
+
+/** A5 §2.5: an empty input is always action mode; otherwise it is action mode if any registered
+ *  action name matches as a substring. Nothing matches → search mode. */
+export function matchesAnyAction(query: string, actions: PaletteAction[]): boolean {
+  const q = query.trim().toLowerCase();
+  if (q === "") return true;
+  return actions.some((a) => a.name.toLowerCase().includes(q));
+}
+
+/** US-B27: the search-results body of the palette. Server order is not trusted — the groups are
+ *  rendered in SEARCH_GROUP_ORDER, and a group the hub did not send (or sent empty) is skipped
+ *  rather than drawn as a bare header. */
+function SearchResultList({ query, search }: { query: string; search: CommandPaletteSearch }) {
+  const empty = !search.loading && search.groups.every((g) => g.results.length === 0);
+  return (
+    <Command.List>
+      {search.loading && <div className="palette-search__state">Searching…</div>}
+      {empty && <div className="palette-search__state">{`No results for ${query.trim()}`}</div>}
+      {SEARCH_GROUP_ORDER.map((kind) => {
+        const group = search.groups.find((g) => g.kind === kind);
+        if (!group || group.results.length === 0) return null;
+        return (
+          <Command.Group key={kind} heading={group.label}>
+            {group.results.map((result) => (
+              <Command.Item
+                key={`${result.kind}:${result.id}`}
+                // cmdk identifies an item by `value` and falls back to the row's rendered text, so
+                // two hits that share a title would share one identity: both would read as selected,
+                // and Enter/arrow keys would resolve to the first of them (querySelector by
+                // aria-selected) and open the wrong hit. The synthetic value is never filtered on —
+                // search rows are the hub's answer, so shouldFilter is off in this mode.
+                value={`${result.kind}:${result.id}`}
+                className="palette-search__hit"
+                disabled={result.deepLinkDisabled}
+                onSelect={() => {
+                  if (!result.deepLinkDisabled) search.onSelectHit(result);
+                }}
+              >
+                {/* A5 §2.5's memory badge — where this memory came from (inbox/calendar/file/…). */}
+                {result.sourceKind !== null && (
+                  <span className="palette-search__source">{result.sourceKind}</span>
+                )}
+                <span className="palette-search__title">{result.title}</span>
+                {result.snippet !== "" && result.snippet !== result.title && (
+                  <span className="palette-search__snippet">{result.snippet}</span>
+                )}
+              </Command.Item>
+            ))}
+          </Command.Group>
+        );
+      })}
+    </Command.List>
+  );
+}
+
 export interface CommandPaletteProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -38,6 +128,9 @@ export interface CommandPaletteProps {
    *  never built twice. */
   mode?: "dialog" | "inline";
   placeholder?: string;
+  /** US-B27: when present, a query that matches no action switches the palette to search results.
+   *  Absent (Phase A call sites, the gallery), the palette is action-only exactly as before. */
+  search?: CommandPaletteSearch;
   /** US-D01: "Summarize this thread" only comes alive when a thread is selected (App.tsx's `open`). */
   threadSelected?: boolean;
   /** US-D01: threads.meta.summary — when it is null the panel says "No summary yet". */
@@ -47,7 +140,11 @@ export interface CommandPaletteProps {
 }
 
 /** A5 §2.3: kbar-pattern actions ({id,name,shortcut,perform}) grouped by their `group` and rendered
- *  into GlassSurface(slot="palette"). */
+ *  into GlassSurface(slot="palette").
+ *
+ *  US-B27: the input's query is owned here rather than inside InlinePalette, because the
+ *  action-vs-search decision (`matchesAnyAction`) and the search debounce belong to the palette —
+ *  whichever surface it is rendered on. */
 export function CommandPalette({
   open,
   onOpenChange,
@@ -57,9 +154,22 @@ export function CommandPalette({
   threadSelected = false,
   threadSummary = null,
   threadTitle = null,
+  search,
 }: CommandPaletteProps) {
+  const [query, setQuery] = useState("");
   const groups = groupBy(actions, (a) => a.group);
-  const resultList = (
+  const showSearch = search !== undefined && !matchesAnyAction(query, actions);
+  const onQueryChange = search?.onQueryChange;
+  // A5 §2.5's 180ms debounce. Only a query that actually puts the palette in search mode is worth a
+  // round trip — a query that matches an action is answered from the action list. The dependency is
+  // the callback, not the `search` object: a consumer that builds that object inline hands over a
+  // new identity every render, which would restart the timer each time and never fire.
+  useEffect(() => {
+    if (!open || !showSearch || onQueryChange === undefined) return;
+    const timer = setTimeout(() => onQueryChange(query), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [open, showSearch, query, onQueryChange]);
+  const actionList = (
     <Command.List>
       <Command.Empty>No results</Command.Empty>
       {Object.entries(groups).map(([group, items]) => (
@@ -80,6 +190,12 @@ export function CommandPalette({
       ))}
     </Command.List>
   );
+  const resultList =
+    showSearch && search !== undefined ? (
+      <SearchResultList query={query} search={search} />
+    ) : (
+      actionList
+    );
 
   if (mode === "inline") {
     return (
@@ -88,6 +204,9 @@ export function CommandPalette({
         onOpenChange={onOpenChange}
         placeholder={placeholder ?? "Start typing to ask or search"}
         commands={resultList}
+        query={query}
+        onQueryChange={setQuery}
+        searchActive={showSearch}
         threadSelected={threadSelected}
         threadSummary={threadSummary}
         threadTitle={threadTitle}
@@ -96,9 +215,22 @@ export function CommandPalette({
   }
 
   return (
-    <Command.Dialog open={open} onOpenChange={onOpenChange} label="omnis command palette">
+    // `shouldFilter` is off in search mode: those rows are already the hub's answer to this query,
+    // and cmdk's client-side filter would hide the ones whose text does not literally contain it
+    // (a thread found by its body, say) — or all of them, for a memory whose snippet is unrelated
+    // to the words that found it.
+    <Command.Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      label="omnis command palette"
+      shouldFilter={!showSearch}
+    >
       <GlassSurface slot="palette">
-        <Command.Input placeholder={placeholder ?? "Search or run a command…"} />
+        <Command.Input
+          value={query}
+          onValueChange={setQuery}
+          placeholder={placeholder ?? "Search or run a command…"}
+        />
         {resultList}
       </GlassSurface>
     </Command.Dialog>
@@ -116,6 +248,9 @@ function InlinePalette({
   onOpenChange,
   placeholder,
   commands,
+  query,
+  onQueryChange,
+  searchActive,
   threadSelected,
   threadSummary,
   threadTitle,
@@ -124,15 +259,17 @@ function InlinePalette({
   onOpenChange: (open: boolean) => void;
   placeholder: string;
   commands: ReactNode;
+  /** US-B27: owned by CommandPalette — the action-vs-search decision is made there. */
+  query: string;
+  onQueryChange: (query: string) => void;
+  /** US-B27: the list below is search results, not the action list (the panel's tab says so). */
+  searchActive: boolean;
   threadSelected: boolean;
   threadSummary: string | null;
   threadTitle: string | null;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  // cmdk's Input is controlled here because the @ button has to post an "@" into the input.
-  // Search state is still owned by this one Command root (bar input = the panel command list's filter).
-  const [query, setQuery] = useState("");
   const closing = useClosingSpring(open);
   // Nothing is focused when ⌘K opens it — you have to be able to type straight away (the palette's
   // basic promise), and the Escape/typing handlers only fire while focus is inside the Command root.
@@ -153,6 +290,8 @@ function InlinePalette({
       ref={ref}
       className="ask-bar"
       label="omnis ask/search"
+      // US-B27: same reason as the dialog — search rows are the hub's answer, not cmdk's filter input.
+      shouldFilter={!searchActive}
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.preventDefault();
@@ -171,7 +310,7 @@ function InlinePalette({
             if (!open) onOpenChange(true);
           }}
           onValueChange={(value) => {
-            setQuery(value);
+            onQueryChange(value);
             onOpenChange(true);
           }}
         />
@@ -187,7 +326,7 @@ function InlinePalette({
               className="ask-bar__composer-button"
               aria-label="Add mention"
               onClick={() => {
-                setQuery((q) => `${q}@`);
+                onQueryChange(`${query}@`);
                 inputRef.current?.focus();
               }}
             >
@@ -214,6 +353,7 @@ function InlinePalette({
           threadTitle={threadTitle}
           summary={threadSummary}
           query={query}
+          searchActive={searchActive}
           closing={closing}
           onClose={() => onOpenChange(false)}
         />
