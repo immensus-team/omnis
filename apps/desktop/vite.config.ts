@@ -24,6 +24,12 @@ export default defineConfig({
       // Vite server (a 404 — the request never reaches the hub) and the panel can only ever show
       // its "No results" state, however good the hub's answer is.
       "/search": "http://127.0.0.1:8787",
+      // US-B33: the Settings screen's three reads and its writes — GET/PUT /settings/:key, GET /cost.
+      // Same failure mode as /search above, and the reason it has to be spelled out twice: prefix is
+      // the whole match rule, so "/settings" covers "/settings/cost.cap_usd" but nothing else here,
+      // and /cost is a separate route. The screen's `data-state` lands on "error" without these.
+      "/settings": "http://127.0.0.1:8787",
+      "/cost": "http://127.0.0.1:8787",
     },
   },
 });
