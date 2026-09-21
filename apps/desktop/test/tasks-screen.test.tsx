@@ -3,7 +3,7 @@
 // environment and setup (the same situation as app-shell.test.tsx).
 import "./setup";
 
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   TASKS_BANNER,
@@ -227,6 +227,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("Tasks screen (A5 §3.5)", () => {
@@ -329,5 +330,100 @@ describe("Tasks screen (A5 §3.5)", () => {
     render(<Tasks now={now} onOpenSource={onOpenSource} />);
     fireEvent.click(screen.getByRole("button", { name: "Gmail" }));
     expect(onOpenSource).toHaveBeenCalledWith("i1");
+  });
+});
+
+// ─── the quick-add write (loop-r1-05) ───────────────────────────────────────────────────────────
+
+/** `fetch` at the global, so the real `src/api/tasks.ts` is what builds the URL and the body — the
+ *  assertion below is on the request the app actually makes, not on a module mock's arguments. The
+ *  response is a stub object rather than a `Response`: jsdom has neither, and `createTask` reads
+ *  only `ok`, `status` and `json()`. */
+function mockFetch(status: number): { url: string; init: RequestInit | undefined }[] {
+  const calls: { url: string; init: RequestInit | undefined }[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      return Promise.resolve({
+        ok: status >= 200 && status < 300,
+        status,
+        json: () => Promise.resolve({ id: "t9", title: "x", state: "open", created_at: "" }),
+      });
+    }),
+  );
+  return calls;
+}
+
+const quickAdd = () => screen.getByRole("textbox", { name: "Quick add task" });
+
+describe("Tasks quick-add (A5 §3.5 — the write the field was missing)", () => {
+  it("adds the task through the hub, clears the field and says so", async () => {
+    const calls = mockFetch(201);
+    render(<Tasks now={now} />);
+    fireEvent.change(quickAdd(), { target: { value: "Send Dana the slides" } });
+    fireEvent.submit(quickAdd());
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Added to Tasks");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toMatch(/\/tasks$/);
+    expect(calls[0]?.init?.method).toBe("POST");
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({ title: "Send Dana the slides" });
+    expect(quickAdd()).toHaveValue("");
+  });
+
+  it("keeps the words in the box when the hub refuses them", async () => {
+    mockFetch(500);
+    render(<Tasks now={now} />);
+    fireEvent.change(quickAdd(), { target: { value: "Send Dana the slides" } });
+    fireEvent.submit(quickAdd());
+
+    // The whole point of the story: a failed write must never look like a saved one. The text stays,
+    // and the alert is the Notes composer's wording rather than a second register for the same fact.
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Couldn't add the task. It is still in the box.",
+    );
+    expect(quickAdd()).toHaveValue("Send Dana the slides");
+  });
+
+  // The alert is dismissed by the next keystroke, not by a timer — it has to still be there while
+  // the person decides what to do about it.
+  it("clears the failure line on the next keystroke", async () => {
+    mockFetch(500);
+    render(<Tasks now={now} />);
+    fireEvent.change(quickAdd(), { target: { value: "Send Dana the slides" } });
+    fireEvent.submit(quickAdd());
+    await screen.findByRole("alert");
+
+    fireEvent.change(quickAdd(), { target: { value: "Send Dana the slide" } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("does nothing at all on a blank submit", async () => {
+    const calls = mockFetch(201);
+    render(<Tasks now={now} />);
+    fireEvent.change(quickAdd(), { target: { value: "   " } });
+    fireEvent.submit(quickAdd());
+
+    await waitFor(() => {
+      expect(calls).toHaveLength(0);
+    });
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  // The input is announced as busy while the hub is answering and is still the person's to type in:
+  // the next task does not have to wait for the last one's round trip.
+  it("marks the field busy without taking it away", async () => {
+    const calls = mockFetch(201);
+    render(<Tasks now={now} />);
+    fireEvent.change(quickAdd(), { target: { value: "Send Dana the slides" } });
+    fireEvent.submit(quickAdd());
+    expect(quickAdd()).toHaveAttribute("aria-busy", "true");
+
+    await screen.findByRole("status");
+    expect(quickAdd()).toHaveAttribute("aria-busy", "false");
+    expect(quickAdd()).toBeEnabled();
+    expect(calls).toHaveLength(1);
   });
 });
