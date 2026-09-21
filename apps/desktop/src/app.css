@@ -3869,3 +3869,503 @@ button.today-screen__event-title:focus-visible {
     transition: none;
   }
 }
+
+/* ==== US-B33 — Settings (A5 §3.9) ==============================================================
+   One screen, four sections, one global control. The sub-nav is a SegmentedControl (the same
+   radiogroup the thread header uses); at the wide shell it lays down into the reference's left
+   column, and at the narrow shell it stays the horizontal track it already is, because four
+   segments do not fit down the side of a 390px screen. */
+.settings-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  /* Vertical only, as on Digest/Notes/Tasks: `hidden` on the cross axis turns a wrapping miss into
+     a visible defect instead of a page-level scrollbar at 390. */
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 16px 20px;
+  border-radius: 20px;
+  box-shadow: var(--shadow-row-selected);
+}
+
+.settings-screen__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.settings-screen__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.settings-screen__banner,
+.settings-screen__notice {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.settings-screen__banner[data-state="error"],
+.settings-screen__notice[role="alert"] {
+  color: var(--danger-500);
+}
+
+/* The sub-nav and the section body. One column at every width: a settings form is a list of
+   labelled controls, and splitting it into cards is the "SaaS card kit" the design checklist rules
+   out. The wide shell turns this wrapper into the reference's two-column layout. */
+.settings-screen__panes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.settings-screen__nav {
+  min-width: 0;
+}
+
+.settings-screen__body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.settings-screen__section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.settings-screen__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-screen__label {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 590;
+  color: var(--text-primary);
+}
+
+.settings-screen__sublabel {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.settings-screen__hint {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* A5 §3.9's account rows: the brand mark, the channel's name, its state. No hairline — the list
+   grammar is the product's everywhere else (only the selected row elevates). */
+.settings-screen__accounts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.settings-screen__account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+}
+
+.settings-screen__account-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-screen__switch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.settings-screen__switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  font-size: 13px;
+}
+
+/* The switch is the native-looking one this app already draws elsewhere: a track and a knob, state
+   on `aria-checked` and never on colour alone (A5 §9). */
+.settings-screen__switch {
+  flex: 0 0 auto;
+  position: relative;
+  width: 34px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--border-hairline-strong);
+  cursor: pointer;
+  transition: background var(--dur-base) var(--ease-spring);
+}
+
+.settings-screen__switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--gray-000, #fff);
+  transition: transform var(--dur-base) var(--ease-spring);
+}
+
+.settings-screen__switch[aria-checked="true"] {
+  background: var(--gray-950, #14141a);
+}
+
+.settings-screen__switch[aria-checked="true"]::after {
+  transform: translateX(14px);
+}
+
+.settings-screen__switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.settings-screen__allowlist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.settings-screen__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.settings-screen__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 4px 2px 10px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  font-size: 12px;
+}
+
+.settings-screen__chip-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-screen__chip-remove {
+  border: none;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.settings-screen__chip-remove:hover,
+.settings-screen__chip-remove:focus-visible {
+  color: var(--text-primary);
+}
+
+.settings-screen__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-screen__input {
+  min-width: 0;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: var(--hairline);
+  border-radius: 8px;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.settings-screen__input--number {
+  width: 110px;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-screen__input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Actions are small outline buttons, not the app's primary CTA: a settings page has a dozen of
+   them and none of them is the one thing you came to do. */
+.settings-screen__action {
+  flex: 0 0 auto;
+  padding: 5px 12px;
+  border: var(--hairline);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--dur-base) var(--ease-spring);
+}
+
+.settings-screen__action:hover {
+  background: var(--bg-overlay);
+}
+
+.settings-screen__action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* The kill switch and the two confirmations are the only destructive controls on the screen, so
+   they are the only ones that carry the danger token — and they carry the word too (§9). */
+.settings-screen__action--danger {
+  color: var(--danger-500);
+  border-color: var(--danger-500);
+}
+
+.settings-screen__spend {
+  margin: 0;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A5 §3.9's bar: full width is the cap, the fill is the month's spend, and the last 10% is the
+   reserve segment drawn behind the fill. The boundary mark sits above the segment's left edge.
+   The bar is not `overflow: hidden` — the mark lives outside its box, and the fill and the reserve
+   each carry their own radius, so nothing needs clipping. */
+.settings-screen__bar {
+  position: relative;
+  height: 10px;
+  /* room for the boundary mark, which sits above the track rather than inside it */
+  margin-top: 15px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+}
+
+.settings-screen__bar-spend {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width var(--dur-base) var(--ease-spring);
+}
+
+/* The reserve is a dashed hatch rather than a colour: the 80%/100% thresholds already own the
+   three colours, and a fourth one here would compete with them. */
+.settings-screen__bar-reserve {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 10%;
+  border-radius: 999px;
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--border-hairline-strong) 0 3px,
+    transparent 3px 6px
+  );
+}
+
+.settings-screen__bar-mark {
+  position: absolute;
+  right: 10%;
+  top: -15px;
+  transform: translateX(50%);
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-screen__bar[data-state="warn"] .settings-screen__bar-spend {
+  background: var(--warn-500);
+}
+
+.settings-screen__bar[data-state="danger"] .settings-screen__bar-spend {
+  background: var(--danger-500);
+}
+
+.settings-screen__bar-state {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* The read-only sensitivity rules: the one place on this screen where hairlines are allowed, which
+   is the rule the product already made for KeyValueTable-shaped blocks. */
+.settings-screen__rules {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  max-width: 68ch;
+}
+
+.settings-screen__rules > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 8px;
+  border-bottom: var(--hairline);
+}
+
+.settings-screen__rules > div:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.settings-screen__rules dt {
+  font-size: 12px;
+  font-weight: 590;
+  color: var(--text-primary);
+}
+
+.settings-screen__rules dd {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* The kill switch sits at the foot of the screen whichever section is open (A5 §3.9: it is not a
+   General setting). `margin-top: auto` keeps it there without a sticky layer. */
+.settings-screen__kill {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-top: auto;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+}
+
+.settings-screen__kill[data-state="stopped"] {
+  box-shadow: inset 0 0 0 1px var(--danger-500);
+}
+
+.settings-screen__kill-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* The confirmations are inline panels, not floating sheets: the desktop shell owns the only glass
+   surfaces (rail/toolbar/sheet/palette), and a dialog drawn on the content layer is opaque. */
+.settings-screen__dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  box-shadow: inset 0 0 0 1px var(--danger-500);
+}
+
+.settings-screen__dialog-question {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 590;
+}
+
+.settings-screen__dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* The wide shell: the reference's left sub-nav, with the sections beside it. Scoped to the settings
+   screen so the thread header's SegmentedControl keeps the horizontal track it was built as. */
+@container shell (min-width: 1280px) {
+  .settings-screen__panes {
+    display: grid;
+    grid-template-columns: 168px minmax(0, 1fr);
+    gap: 20px;
+    align-content: start;
+  }
+
+  .settings-screen__nav {
+    position: sticky;
+    top: 0;
+  }
+
+  .settings-screen__nav .segmented-control {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border-radius: 12px;
+  }
+
+  .settings-screen__nav .segmented-control__segment {
+    text-align: left;
+    border-radius: 8px;
+  }
+
+  .settings-screen__field,
+  .settings-screen__accounts,
+  .settings-screen__rules {
+    max-width: 78ch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-screen__switch,
+  .settings-screen__switch::after,
+  .settings-screen__action {
+    transition: none;
+  }
+}

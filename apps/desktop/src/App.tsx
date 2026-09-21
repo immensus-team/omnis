@@ -20,6 +20,7 @@ import { Digest } from "./screens/Digest.js";
 import { Inbox, type OpenTarget } from "./screens/Inbox.js";
 import { Network, PersonDetail } from "./screens/Network.js";
 import { Notes } from "./screens/Notes.js";
+import { Settings } from "./screens/Settings.js";
 import { Tasks } from "./screens/Tasks.js";
 import { Thread } from "./screens/Thread.js";
 import { Today } from "./screens/Today.js";
@@ -49,7 +50,7 @@ function useCommandPaletteKey(toggle: () => void) {
 
 /** The screens the shell can show. The rail switches between them by screen, not by route —
  *  there is no URL router in the desktop app (src-tauri loads one documents). */
-export type ShellScreen = "inbox" | "today" | "tasks" | "network" | "notes" | "digest";
+export type ShellScreen = "inbox" | "today" | "tasks" | "network" | "notes" | "digest" | "settings";
 
 export function App({ screen = "inbox" }: { screen?: ShellScreen }) {
   // Without ZeroProvider, useQuery dies with "useZero must be used within a ZeroProvider".
@@ -252,6 +253,10 @@ function Shell({ screen }: { screen: ShellScreen }) {
           // US-B31: no navigation leaves this screen — a note's target is a label, not a link (A5
           // §3.7), and the routing decision is taken in place.
           <Notes />
+        ) : screen === "settings" ? (
+          // US-B33: Settings is the one screen whose writes are the point of it — every edit goes to
+          // the hub over HTTP (contract §5) and comes back, so nothing is passed in for it.
+          <Settings />
         ) : screen === "digest" ? (
           // US-B32: restoring here is an undo of the night's auto-archive, not navigation — the
           // Thread header banner that would follow the restore is §3.2's story, so nothing is
