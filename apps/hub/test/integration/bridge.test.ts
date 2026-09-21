@@ -223,6 +223,42 @@ describe("register + discover round trip", () => {
     await client.closed;
   });
 
+  it("stores a runtime whose probe failed as degraded, not online (US-C01)", async () => {
+    const client = await connect({});
+    const readState = async (): Promise<string> =>
+      (
+        await one<{ state: string }>(
+          pool,
+          "SELECT state FROM agent_runtimes WHERE runtime = 'hermes' AND host = 'macbook'",
+        )
+      ).state;
+
+    // A binary that is missing still registers — the hub shows it and routing skips it — so the
+    // state the agent probed has to survive the INSERT.
+    await request(client.ws, "runtime.registered", {
+      runtime: "hermes",
+      host: "macbook",
+      version: "unknown",
+      capabilities: { features: ["probe_failed"] },
+      state: "degraded",
+      display: "hermes@macbook",
+    });
+    expect(await readState()).toBe("degraded");
+
+    // …and the upsert branch has to move it back once a probe succeeds.
+    await request(client.ws, "runtime.registered", {
+      runtime: "hermes",
+      host: "macbook",
+      version: "3.0.0",
+      capabilities: {},
+      state: "online",
+    });
+    expect(await readState()).toBe("online");
+
+    client.ws.close();
+    await client.closed;
+  });
+
   it("refuses call() for a host that is not connected", async () => {
     await expect(bridge.call("mini", "session.create", {})).rejects.toThrow(/no bridge connected/);
   });
