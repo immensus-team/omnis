@@ -237,6 +237,71 @@ body {
   color: var(--text-secondary);
 }
 
+/* D7 §c.2: the reorder's two tokens. Every other rung of the motion ladder lives in tokens.css;
+   these two are declared here instead because tokens.css's reduced-motion block must carry no `0ms`
+   rung at all — motion.test.tsx asserts it, and a zero duration is what a rung collapses *to*, not
+   what it is. --dur-reorder is exactly that case: 220ms of travel that becomes 0ms under reduce.
+   Scoped to the rail, so both inherit down to the tiles and the rail does not grow a second use
+   before a second surface needs one. */
+.channel-rail {
+  --dur-reorder: 220ms;
+  --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* §c.2: the plate's tiles are the reorderable ones, and the grab cursor is the one affordance that
+   says so. The Inbox tile is outside the plate (it is "show everything", not a channel) and keeps
+   the plain pointer — the plate is also exactly the set the drop slots are measured over. */
+.channel-rail__plate .channel-rail__tile {
+  cursor: grab;
+}
+
+/* The tile that is in hand. It has to leave the plate's row for the drag to read as "this one is
+   moving, those are making room", and the plate has no `overflow` of its own — the tile is only
+   lifted above its siblings.
+   No `touch-action` here on purpose: it would land after the lift, and a touch-action that arrives
+   mid-gesture is ignored — the browser resolved the gesture from the element it started on. So the
+   narrow tier's "once the hold fires, the finger is the drag's" is enforced where the gesture
+   lives, not in CSS: pointer-drag.ts cancels the touchmove from the moment the drag starts, and
+   leaves the scroll untouched until then. */
+.channel-rail__tile--dragging {
+  /* No `position` here, and that is deliberate. `z-index` was the only reason to want one, and the
+     plate is `display: flex` — a flex item takes `z-index` with a static position (Flexbox §5.4),
+     so the lift paints above its neighbours either way. Adding `position: relative` with no offsets
+     moves nothing but does change what the browser *reports*: Blink resolves `top`/`left` to their
+     used value (0) once a box is positioned, so the same tile reads `top: auto` at rest and
+     `top: 0px` mid-drag. §d's "moves on transform only" check compares exactly those properties,
+     and `auto -> 0px` is a false positive that a reviewer would have to reason their way out of. */
+  z-index: 1;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-glass);
+  cursor: grabbing;
+  /* A drag across the rail must not paint a text selection under the finger. */
+  user-select: none;
+}
+
+/* "This is the current view" and "this is being dragged" are different states, and the ring has to
+   survive the lift. Written as two classes so it beats both rules above on specificity rather than
+   on source order. */
+.channel-rail__tile--dragging.channel-rail__tile--active {
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow-glass);
+}
+
+/* §c.2: the announcement the keyboard reorder makes. The rail's tiles are icon-only, so this is the
+   only place the reorder can say what it did — visually hidden, but the same 1px clipped box the
+   rest of the app hides spoken-only text in, and out of flow so it cannot push the rail's column
+   around. */
+.channel-rail__announce {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 .app-shell__main {
   display: flex;
   flex-direction: column;
@@ -2141,6 +2206,14 @@ body {
   /* There is no room to keep 420px — full width, with 16px of margin each side. */
   .app-shell__detail {
     width: calc(100% - 32px);
+    /* The sheet's 16px bottom margin is right for the list, and wrong for the bar: the bar is the
+       only navigation this tier has, it is `position: fixed` along the bottom 56px, and it has no
+       `z-index` — while this sheet is positioned *and* carries `z-index: 20`, so it paints over the
+       bar and takes its hit area. Measured at 390: `elementFromPoint` at a tile's own centre
+       returned the sheet, so the tiles were visible and untouchable — and with them the rail's
+       touch reorder, which is D7's whole narrow-tier path. The sheet stops above the bar instead,
+       on the same 72px `.app-shell__main` reserves. */
+    bottom: 72px;
   }
 
   /* The rail has gone from a column to a toolbar, and a toolbar is a place glass belongs
@@ -2658,5 +2731,13 @@ button.today-screen__event-title:focus-visible {
      it, and the list closing the gap is a one-frame change of position, not an animation. */
   .inbox-row--leaving {
     animation-name: fade-out;
+  }
+
+  /* §c.2: the reorder's neighbours jump to their new slots with no travel at all — and the order
+     they land in is the same one the full-motion rail lands in. Nothing branches in the component:
+     the FLIP writes the same transform either way and only the duration token changes, which is why
+     this is a token override and not a second code path. */
+  .channel-rail {
+    --dur-reorder: 0ms;
   }
 }

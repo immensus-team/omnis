@@ -3,9 +3,10 @@
 // file declares its own environment and setup (jest-dom matchers + afterEach(cleanup)).
 import "./setup";
 
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ChannelRail } from "../src/components/channel-rail";
+import { RAIL_ORDER_STORAGE_KEY } from "../src/lib/rail-order";
 import type { UiChannel } from "../src/types.js";
 
 // US-D02b: stand in for the narrow shell (<900px). jsdom's window.matchMedia always reports
@@ -20,6 +21,12 @@ function stubNarrowRail(matches: boolean) {
 }
 afterEach(() => {
   window.matchMedia = REAL_MATCH_MEDIA;
+  // D7: the rail's order is a preference the component reads on mount, so a test that reorders has
+  // to leave the store as it found it — the jsdom Storage is one Map for the whole file.
+  localStorage.clear();
+  // The long-press tests run on fake timers; leaving them installed would freeze every timer the
+  // RTL cleanup after this point wants to run.
+  vi.useRealTimers();
 });
 
 describe("ChannelRail (U1 kinso left rail)", () => {
@@ -213,5 +220,358 @@ describe("ChannelRail aurora backdrop (US-D06)", () => {
     expect(plate).not.toHaveClass("aurora");
     // Both texture layers travel with it — a variant with no mass still needs the grain.
     expect(aura?.querySelector(".aurora__grain")).not.toBeNull();
+  });
+});
+
+// D7 §c.2: the rail's reorder. The store is covered by rail-order.test.ts, the gesture by
+// pointer-drag.test.tsx; what is left to prove here is the wiring between them — that the rail
+// reads the stored order, writes it back, and that the drag and the keyboard both go through it.
+describe("ChannelRail reorder (D7 §c.2)", () => {
+  const CHANNELS: UiChannel[] = ["gmail", "slack"];
+
+  /** jsdom lays nothing out: every element's rect is 0x0, so the drop slots the drag measures all
+   *  collapse onto one point and a test could not tell "moved one slot" from "moved to the end".
+   *  This models a real stacked column (the wide rail, y) or row (the narrow bar, x): 44px tiles on
+   *  a 52px stride, centred at 100 + 52i.
+   *
+   *  The rect is computed from the tile's index **at call time**, not baked in at install. That is
+   *  what makes the FLIP testable: a real reorder moves the tile's slot, so the rect the component
+   *  reads after the reorder differs from the one it read before by exactly one stride — and the
+   *  compensation the lifted tile needs is that difference.
+   *
+   *  The transform is deliberately not modelled. `captureRects` and the effect's own reading are
+   *  both taken with the tile's current transform already applied, so it cancels out of their
+   *  difference; leaving it out here still reproduces the browser's numbers. */
+  function stubTileRects(axis: "x" | "y"): HTMLElement[] {
+    const tiles = Array.from(
+      document.querySelectorAll<HTMLElement>(".channel-rail__plate .channel-rail__tile"),
+    );
+    for (const el of tiles) {
+      el.getBoundingClientRect = () => {
+        const live = Array.from(
+          document.querySelectorAll(".channel-rail__plate .channel-rail__tile"),
+        );
+        const centre = 100 + live.indexOf(el) * 52;
+        return {
+          left: axis === "x" ? centre - 22 : 0,
+          top: axis === "y" ? centre - 22 : 0,
+          width: 44,
+          height: 44,
+          right: 0,
+          bottom: 0,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        } as DOMRect;
+      };
+    }
+    return tiles;
+  }
+
+  /** Every tile's aria-label, in the order the plate renders them. */
+  function renderedOrder(scope: ParentNode = document): string[] {
+    return Array.from(scope.querySelectorAll(".channel-rail__plate .channel-rail__tile")).map(
+      (el) => el.getAttribute("aria-label") ?? "",
+    );
+  }
+
+  /** A whole mouse gesture on one tile. The drop rule is that a tile moves once the pointer is past
+   *  the *next slot's centre*, so 60px — a stride of 52 plus the primitive's 6px start slop, with
+   *  room to spare — is one slot and then some. */
+  function dragTile(tile: HTMLElement, delta: { x?: number; y?: number }): void {
+    const x = 500;
+    const y = 500;
+    const ends = { pointerId: 1, clientX: x + (delta.x ?? 0), clientY: y + (delta.y ?? 0) };
+    fireEvent.pointerDown(tile, {
+      button: 0,
+      pointerId: 1,
+      pointerType: "mouse",
+      clientX: x,
+      clientY: y,
+    });
+    fireEvent.pointerMove(tile, ends);
+    fireEvent.pointerUp(tile, ends);
+  }
+
+  it("reads the stored order on mount", () => {
+    localStorage.setItem(RAIL_ORDER_STORAGE_KEY, JSON.stringify(["agent", "slack"]));
+    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    expect(renderedOrder()).toEqual(["Agent", "Slack", "Gmail"]);
+  });
+
+  it("moves a dragged tile one slot and writes the order as a JSON array of channel ids", () => {
+    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    stubTileRects("y");
+    expect(renderedOrder()).toEqual(["Gmail", "Slack", "Agent"]);
+
+    dragTile(screen.getByRole("button", { name: "Slack" }), { y: 60 });
+
+    expect(renderedOrder()).toEqual(["Gmail", "Agent", "Slack"]);
+    expect(JSON.parse(localStorage.getItem(RAIL_ORDER_STORAGE_KEY) ?? "null")).toEqual([
+      "gmail",
+      "agent",
+      "slack",
+    ]);
+  });
+
+  it("keeps the order across a remount — the reload the reviewer checks", () => {
+    const first = render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    stubTileRects("y");
+    dragTile(screen.getByRole("button", { name: "Slack" }), { y: 60 });
+    first.unmount();
+
+    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    expect(renderedOrder()).toEqual(["Gmail", "Agent", "Slack"]);
+  });
+
+  it("moves the lifted tile on transform alone — no top, left or margin", () => {
+    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    stubTileRects("y");
+    const slack = screen.getByRole("button", { name: "Slack" });
+
+    fireEvent.pointerDown(slack, {
+      button: 0,
+      pointerId: 1,
+      pointerType: "mouse",
+      clientX: 500,
+      clientY: 500,
+    });
+    // A press is not a lift. The primitive starts a mouse drag on movement, not on the press, so a
+    // plain click never picks the tile up (§e guard 5: nothing moves for decoration).
+    expect(slack.style.transform).toBe("");
+    expect(slack).not.toHaveClass("channel-rail__tile--dragging");
+
+    // Past the 6px start slop, but not yet past the next slot's centre: the tile is simply wherever
+    // the pointer is.
+    fireEvent.pointerMove(slack, { pointerId: 1, clientX: 500, clientY: 507 });
+    expect(slack).toHaveClass("channel-rail__tile--dragging");
+    expect(slack.style.transform).toBe("translate3d(0px, 7px, 0) scale(1.08)");
+
+    // Layout is React's and the FLIP's; the pointer only ever writes `transform`.
+    for (const property of [
+      "top",
+      "left",
+      "right",
+      "bottom",
+      "margin",
+      "marginTop",
+      "marginLeft",
+    ]) {
+      expect(slack.style.getPropertyValue(property)).toBe("");
+    }
+
+    // Across a slot boundary the transform carries the inverse of the stride the tile's own slot
+    // just moved by: Slack goes from slot 1 to slot 2, so its drawing offset drops by 52 and the
+    // pointer's 60 leaves 8. It is still only ever a transform.
+    fireEvent.pointerMove(slack, { pointerId: 1, clientX: 500, clientY: 560 });
+    expect(slack.style.transform).toBe("translate3d(0px, 8px, 0) scale(1.08)");
+
+    fireEvent.pointerUp(slack, { pointerId: 1, clientX: 500, clientY: 560 });
+    expect(slack.style.transform).toBe("");
+    expect(slack).not.toHaveClass("channel-rail__tile--dragging");
+  });
+
+  it("keeps the lifted tile under the pointer across a slot crossing", () => {
+    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    stubTileRects("y");
+    const slack = screen.getByRole("button", { name: "Slack" });
+
+    // Slot centres are 100 (Gmail), 152 (Slack), 204 (Agent), so Slack passes the next slot at +52.
+    fireEvent.pointerDown(slack, {
+      button: 0,
+      pointerId: 1,
+      pointerType: "mouse",
+      clientX: 500,
+      clientY: 500,
+    });
+    fireEvent.pointerMove(slack, { pointerId: 1, clientX: 500, clientY: 554 });
+    expect(renderedOrder()).toEqual(["Gmail", "Agent", "Slack"]);
+    // Its slot moved a stride under it, so the drawing offset is now 2, not 54: the tile is drawn
+    // at 204 + 2 = 206, which is 152 + 54 — exactly where the pointer is.
+    expect(slack.style.transform).toBe("translate3d(0px, 2px, 0) scale(1.08)");
+
+    // The move that used to break it. Dropping the stride from the composition leaves the tile at
+    // 204 + 58 = 262 instead of 210: a 52px leap, once per crossing, ahead of the finger.
+    fireEvent.pointerMove(slack, { pointerId: 1, clientX: 500, clientY: 558 });
+    expect(slack.style.transform).toBe("translate3d(0px, 6px, 0) scale(1.08)");
+  });
+
+  it("does not select the channel a drag just ended on, but does on the next click", () => {
+    const onSelect = vi.fn();
+    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={onSelect} />);
+    stubTileRects("y");
+    const slack = screen.getByRole("button", { name: "Slack" });
+
+    dragTile(slack, { y: 60 });
+    // The pointerup that ends a drag is followed by a click on the same tile.
+    fireEvent.click(slack);
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.click(slack);
+    expect(onSelect).toHaveBeenCalledWith("slack");
+  });
+
+  it("puts an escaped drag back where it started, store and all", () => {
+    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    stubTileRects("y");
+    const slack = screen.getByRole("button", { name: "Slack" });
+
+    fireEvent.pointerDown(slack, {
+      button: 0,
+      pointerId: 1,
+      pointerType: "mouse",
+      clientX: 500,
+      clientY: 500,
+    });
+    fireEvent.pointerMove(slack, { pointerId: 1, clientX: 500, clientY: 560 });
+    expect(renderedOrder()).toEqual(["Gmail", "Agent", "Slack"]);
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.pointerUp(slack, { pointerId: 1, clientX: 500, clientY: 560 });
+
+    expect(renderedOrder()).toEqual(["Gmail", "Slack", "Agent"]);
+    expect(localStorage.getItem(RAIL_ORDER_STORAGE_KEY)).toBeNull();
+  });
+
+  it("marks the channel tiles reorderable and the Inbox tile not", () => {
+    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Slack" })).toHaveAttribute(
+      "aria-roledescription",
+      "reorderable",
+    );
+    // Inbox is not a channel — it is "show everything" — so it is neither reorderable nor a drop
+    // target: it stands outside the plate the drag measures its slots from, and it has no handler.
+    expect(screen.getByRole("button", { name: "Inbox" })).not.toHaveAttribute(
+      "aria-roledescription",
+    );
+  });
+
+  it("cannot drag the Inbox tile, and cannot drop a channel above it", () => {
+    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    stubTileRects("y");
+    const inbox = screen.getByRole("button", { name: "Inbox" });
+
+    dragTile(inbox, { y: 60 });
+    expect(inbox.style.transform).toBe("");
+    expect(inbox).not.toHaveClass("channel-rail__tile--dragging");
+    expect(renderedOrder()).toEqual(["Gmail", "Slack", "Agent"]);
+
+    // A tile dragged up past everything lands at slot 0 of the plate — under Inbox, which never
+    // gives up the top of the rail.
+    dragTile(screen.getByRole("button", { name: "Agent" }), { y: -260 });
+    expect(renderedOrder()).toEqual(["Agent", "Gmail", "Slack"]);
+    expect(screen.getByRole("button", { name: "Inbox" })).toBeInTheDocument();
+  });
+
+  it("reorders on the x axis in the narrow shell, where the rail is a bottom bar", () => {
+    stubNarrowRail(true);
+    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    stubTileRects("x");
+    const slack = screen.getByRole("button", { name: "Slack" });
+
+    // A vertical drag is not this tier's axis: the bar scrolls, it does not reorder.
+    dragTile(slack, { y: 100 });
+    expect(renderedOrder()).toEqual(["Gmail", "Slack", "Agent"]);
+
+    dragTile(slack, { x: 60 });
+    expect(renderedOrder()).toEqual(["Gmail", "Agent", "Slack"]);
+  });
+
+  it("lifts a touch after the 350ms hold", () => {
+    vi.useFakeTimers();
+    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    stubTileRects("y");
+    const slack = screen.getByRole("button", { name: "Slack" });
+
+    fireEvent.pointerDown(slack, {
+      button: 0,
+      pointerId: 1,
+      pointerType: "touch",
+      clientX: 500,
+      clientY: 500,
+    });
+    act(() => {
+      vi.advanceTimersByTime(349);
+    });
+    expect(slack).not.toHaveClass("channel-rail__tile--dragging");
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    // The lift lands where the tile stands, over --dur-fast — nothing has moved yet.
+    expect(slack).toHaveClass("channel-rail__tile--dragging");
+    expect(slack.style.transform).toBe("scale(1.08)");
+    expect(slack.style.transition).toContain("var(--dur-fast)");
+  });
+
+  it("lets a finger that moves first scroll instead of lifting the tile", () => {
+    vi.useFakeTimers();
+    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    stubTileRects("y");
+    const slack = screen.getByRole("button", { name: "Slack" });
+
+    fireEvent.pointerDown(slack, {
+      button: 0,
+      pointerId: 1,
+      pointerType: "touch",
+      clientX: 500,
+      clientY: 500,
+    });
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    // 20px at 100ms — the finger is scrolling, so the hold is abandoned and never comes back.
+    fireEvent.pointerMove(slack, { pointerId: 1, clientX: 500, clientY: 520 });
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(slack).not.toHaveClass("channel-rail__tile--dragging");
+    expect(slack.style.transform).toBe("");
+    expect(localStorage.getItem(RAIL_ORDER_STORAGE_KEY)).toBeNull();
+  });
+
+  it("reorders from the keyboard with Ctrl+Arrow and announces where the tile went", () => {
+    const { container } = render(
+      <ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />,
+    );
+    const slack = screen.getByRole("button", { name: "Slack" });
+
+    // Without Ctrl the arrows belong to the page, not the rail.
+    fireEvent.keyDown(slack, { key: "ArrowDown" });
+    expect(renderedOrder()).toEqual(["Gmail", "Slack", "Agent"]);
+
+    fireEvent.keyDown(slack, { key: "ArrowDown", ctrlKey: true });
+    expect(renderedOrder()).toEqual(["Gmail", "Agent", "Slack"]);
+    expect(JSON.parse(localStorage.getItem(RAIL_ORDER_STORAGE_KEY) ?? "null")).toEqual([
+      "gmail",
+      "agent",
+      "slack",
+    ]);
+
+    const live = container.querySelector(".channel-rail__announce");
+    expect(live).toHaveAttribute("aria-live", "polite");
+    expect(live).toHaveTextContent("Slack moved to position 3 of 3");
+
+    // At the end of the rail the move is a no-op, and it does not announce a move that did not
+    // happen.
+    fireEvent.keyDown(slack, { key: "ArrowDown", ctrlKey: true });
+    expect(renderedOrder()).toEqual(["Gmail", "Agent", "Slack"]);
+    expect(live).toHaveTextContent("Slack moved to position 3 of 3");
+
+    fireEvent.keyDown(slack, { key: "ArrowUp", ctrlKey: true });
+    expect(renderedOrder()).toEqual(["Gmail", "Slack", "Agent"]);
+    expect(live).toHaveTextContent("Slack moved to position 2 of 3");
+  });
+
+  it("reorders from the keyboard on the x axis in the narrow shell", () => {
+    stubNarrowRail(true);
+    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    const slack = screen.getByRole("button", { name: "Slack" });
+
+    fireEvent.keyDown(slack, { key: "ArrowRight", ctrlKey: true });
+    expect(renderedOrder()).toEqual(["Gmail", "Agent", "Slack"]);
+
+    // ArrowDown is the wide rail's key, not this tier's.
+    fireEvent.keyDown(slack, { key: "ArrowDown", ctrlKey: true });
+    expect(renderedOrder()).toEqual(["Gmail", "Agent", "Slack"]);
   });
 });
