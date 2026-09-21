@@ -1459,6 +1459,36 @@ body {
   background: var(--bg-elevated);
 }
 
+/* US-B27: the palette's search-results rows ([cmdk-item] is already a flex row: title left, meta
+   right). The hub's snippet is up to 160 characters of somebody's mail, so both cells have to be
+   able to shrink — otherwise the row's min-content width becomes the panel's, and a long body
+   pushes the panel past the viewport instead of ellipsizing. */
+.palette-search__title,
+.palette-search__snippet {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.palette-search__snippet {
+  color: var(--text-secondary);
+  font-size: 12px;
+  /* The title leads; the snippet is the echo. */
+  max-width: 60%;
+}
+/* A5 §2.5: a memory with no deep_link cannot be opened, so its row reads as unavailable — cmdk
+   sets aria-disabled and drops the click handler, this is the half the eye sees. */
+[cmdk-item][aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.55;
+}
+/* The slow state ("Searching…") and the empty state ("No results for …") share one band. */
+.palette-search__state {
+  padding: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
 /* US-D02: the tinted pill for group headers and filters in a dense list — measured from
    ref-issue-tracker-density.webp (28px tall, 12px radius, 13px/590 label, leading 8px dot,
    trailing count in grey).
