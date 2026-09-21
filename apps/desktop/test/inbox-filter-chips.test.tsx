@@ -314,14 +314,12 @@ describe("Inbox filter row responsive contract (US-D02b)", () => {
   // Three rules for the touch layout, on two different containers, and none of them can be observed
   // in jsdom — so this case locks the declarations down and shots-responsive.ts measures them.
   // (1) US-D08 §c.3: below 560px of list pane every inactive chip folds to its icon and keeps a
-  // 32px target; that is the list pane's own width, so it lives in the `list` query. (2) The
-  // hover-only Archive/Restore button is `opacity: 0`, so it keeps its box — ~65px of every row's
-  // right column for a control a finger cannot reveal. That one is the *shell* tier: at 768px the
-  // list pane is still ~736px wide, so the `list` query never fires there even though the rail has
-  // already collapsed to a bottom bar. (3) The ask pill's grid column needs its min-content
-  // released, and its orb dropped at phone widths, or the placeholder ellipsizes and the strip can
-  // push the page wider.
-  it("keeps the container queries that fold the chip labels and drop the row action", () => {
+  // 32px target; that is the list pane's own width, so it lives in the `list` query. (2) The row's
+  // swipe lives in the *shell* tier: at 768px the list pane is still ~736px wide, so the `list`
+  // query never fires there even though the rail has already collapsed to a bottom bar. (3) The ask
+  // pill's grid column needs its min-content released, and its orb dropped at phone widths, or the
+  // placeholder ellipsizes and the strip can push the page wider.
+  it("keeps the container queries that fold the chip labels and give the row its swipe", () => {
     const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
     const ruleBlock = (query: string): string | undefined =>
       css.match(new RegExp(`@container ${query} \\{([\\s\\S]*?)\\n\\}`))?.[1];
@@ -345,8 +343,14 @@ describe("Inbox filter row responsive contract (US-D02b)", () => {
 
     const narrowShell = ruleBlock("shell \\(max-width: 899\\.98px\\)");
     expect(narrowShell).toBeDefined();
-    expect(narrowShell).toMatch(/\.inbox-row__action \{\s*display: none;/);
-    // Not global: the wide tier still reveals the action on `:focus-within` for the keyboard.
+    // §c.4: this tier used to switch the hover-only Archive/Restore button off entirely, and this
+    // assertion used to be what kept that rule honest. The swipe replaced it as the tier's way to
+    // archive, so the pill is back — it is the non-gesture twin guard 11 asks for. Its geometry and
+    // its invisible-at-rest state are in inbox-row-rules.test.tsx, next to the rest of the row.
+    expect(narrowShell).toMatch(/\.inbox-row__swipe \{\s*\n\s*position: absolute;/);
+    expect(narrowShell).not.toMatch(/^ {2}\.inbox-row__action \{/m);
+    // Not global either way: the wide tier still reveals the action on `:focus-within` for the
+    // keyboard, and now so does this one.
     expect(css).toContain(".inbox-row:focus-within .inbox-row__action");
 
     const phoneShell = ruleBlock("shell \\(max-width: 419\\.98px\\)");

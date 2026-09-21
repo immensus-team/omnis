@@ -889,20 +889,11 @@ body {
    badge). A 3-column x 2-row grid whose right slot spans both rows and centres vertically
    (measured from kinso — pinned to the row's right edge, 23 §2). */
 .inbox-row {
-  display: grid;
-  /* US-D02b: the middle column must be minmax(0, 1fr) — a bare 1fr has a min-content minimum, so
-     a long title widens the row (horizontal scroll) and wraps to two lines instead of
-     ellipsizing. That one word is most of this fix.
-     US-D08 §c.4: the leading 10px is the unread gutter. It is reserved on every row whether or not
-     there is a dot, so a read row and an unread one keep the same text origin — and that origin is
-     `--row-rule-inset` (16 padding + 10 + 12 + 40 + 12), which is where the hairline below starts.
-     Change one of these four numbers and the token has to move with it; the arithmetic is written
-     out in tokens.css next to --row-rule-inset. */
-  grid-template-columns: 10px 40px minmax(0, 1fr) auto;
-  grid-template-rows: auto auto;
-  column-gap: 12px;
-  row-gap: 4px;
-  align-items: center;
+  /* US-D08 §c.4: the row is a plain box, not the grid it used to be — the swipe translates a
+     content wrapper inside it. Both of the things that live on this box have to stay put while the
+     content moves: the hairline is the list's grammar and divides these boxes, and the archive
+     collapse measures *this* element (a transformed box reports a transformed rect, so measuring
+     the wrapper would measure it mid-swipe). */
   /* U1/U2/U5: generous row height — kinso lowers density with padding well beyond 10px.
      P1 (kinso polish): settled on a 12px vertical rhythm (DESIGN-DIRECTION P1).
      US-D04: the vertical half is a named value because the archive collapse has to take the padding
@@ -926,6 +917,36 @@ body {
      padding, and the two animations would fight over the property. */
   transition: background var(--dur-base) var(--ease-spring), border-radius var(--dur-base)
     var(--ease-spring), box-shadow var(--dur-base) var(--ease-spring);
+}
+
+/* US-D08 §c.4: the half of the row the swipe moves. Everything the grid used to lay out is in here,
+   so the two halves of the row — the divider and the collapse on the row's box, the text on this
+   one — can be positioned independently. */
+.inbox-row__content {
+  display: grid;
+  /* US-D02b: the middle column must be minmax(0, 1fr) — a bare 1fr has a min-content minimum, so
+     a long title widens the row (horizontal scroll) and wraps to two lines instead of
+     ellipsizing. That one word is most of this fix.
+     US-D08 §c.4: the leading 10px is the unread gutter. It is reserved on every row whether or not
+     there is a dot, so a read row and an unread one keep the same text origin — and that origin is
+     `--row-rule-inset` (16 padding + 10 + 12 + 40 + 12), which is where the hairline below starts.
+     Change one of these four numbers and the token has to move with it; the arithmetic is written
+     out in tokens.css next to --row-rule-inset. */
+  grid-template-columns: 10px 40px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  row-gap: 4px;
+  align-items: center;
+  /* The swipe's travel (`transform`, written inline by inbox-row.tsx) and its spring back. Nothing
+     else on this element is transitioned, so the row's own fill and elevation stay on the row's own
+     transition above and the two never fight over a property. */
+  transition: transform var(--dur-swipe) var(--ease-spring);
+}
+
+/* While the finger is down the content follows it exactly. 200ms of easing between the pointer and
+   the thing it is dragging reads as lag, not as motion. */
+.inbox-row--swiping .inbox-row__content {
+  transition: none;
 }
 
 .inbox-row--selected {
@@ -2215,18 +2236,81 @@ body {
     box-shadow: none;
   }
 
-  /* This is the tier where the rail has already collapsed to a bottom bar, i.e. the coarse-pointer
-     layout: `:hover` is not something a finger does, and there is no swipe or long-press standing
-     in for it, so the hover-only Archive/Restore button is not merely hidden here, it is
-     unreachable — and a pill that fades in over the brand mark is worse than nothing on a screen
-     where it can never legitimately appear. Switching it off entirely also keeps the row's grid
-     column free of it, which is what the responsive sweep asserts at these widths.
-     (It does not need switching off to stop taking layout — `.inbox-row__action` is absolute at
-     every width now, so the column is sized by the brand mark alone. This is purely about a
-     control that cannot be operated.) Archiving from a touch layout goes through the thread itself
-     until there is a gesture for it. */
-  .inbox-row__action {
-    display: none;
+  /* US-D08 §c.4: the hover-only Archive/Restore button is no longer switched off in this tier. It
+     was, because `:hover` is not something a finger does and there was no gesture standing in for
+     it — but there is one now, the swipe below, and the pill is the half of guard 11 that a gesture
+     cannot be: focusable, named, and revealed by `:focus-within` the moment a keyboard or a screen
+     reader reaches it. A finger can operate it too (a tap focuses the row).
+     It never takes the title's width either way: it is absolute, so the grid column is still sized
+     by the brand mark alone — which is what shots-responsive.ts measures now that the button is
+     back (the rule that used to be here is what that check used to find). */
+
+  /* §c.4: the swipe, in the one tier that has it — the tier where the rail has already collapsed
+     to a bottom bar, i.e. the coarse-pointer layout. */
+  .inbox-row {
+    /* The translating content would otherwise paint past the row's left edge and widen the page. */
+    overflow: hidden;
+    /* The browser keeps the vertical scroll and only that: without this a horizontal drag is read
+       as a scroll (or as the back gesture at the screen's edge) and arrives as `pointercancel`. */
+    touch-action: pan-y;
+  }
+
+  /* A drag is not a text selection. Without this, dragging a mouse across the summary selects the
+     words *and* swipes the row — and a two-word drag is 88px on a narrow window. */
+  .inbox-row__content {
+    user-select: none;
+  }
+
+  /* What the swipe uncovers: one 56px action with an 11px caption under it (M167), anchored to the
+     row's own 16px right padding. It is first in the DOM so the content paints over it, and it fades
+     in rather than being uncovered — the row has no opaque fill of its own for the content to hide
+     it with, which is what a Mail cell has and this one does not. */
+  .inbox-row__swipe {
+    position: absolute;
+    top: 0;
+    right: 16px;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-swipe) var(--ease-spring);
+  }
+
+  .inbox-row--revealed .inbox-row__swipe {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* The disc and its caption are one button, not two: the caption is under the circle at 11px, and
+     the pair is what the row's travel has to clear. */
+  .inbox-row__swipe-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .inbox-row__swipe-disc {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+
+  .inbox-row__swipe-caption {
+    font-size: 11px;
+    line-height: 1;
+    color: var(--text-secondary);
   }
 
   /* Keeps the fixed bar off the last row and the ask bar — the bar's 56px plus room to
@@ -2527,6 +2611,14 @@ body {
      it, and the list closing the gap is a one-frame change of position, not an animation. */
   .inbox-row--leaving {
     animation-name: fade-out;
+  }
+
+  /* §c.4: the row's swipe settles where it was released instead of travelling — the same override
+     the rail's reorder takes below, and for the same reason. It is a token override on the row
+     rather than a rule on `.inbox-row__content`, so the component's inline `transform` keeps
+     writing the same value and only the duration goes. */
+  .inbox-row {
+    --dur-swipe: 0ms;
   }
 
   /* §c.2: the reorder's neighbours jump to their new slots with no travel at all — and the order

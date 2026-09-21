@@ -1,6 +1,10 @@
 import * as HoverCard from "@radix-ui/react-hover-card";
+import { Archive, RotateCcw } from "lucide-react";
 import { type CSSProperties, type RefObject, useEffect, useRef, useState } from "react";
 import { cn } from "../lib/cn.js";
+import { useNarrowShell } from "../lib/media-query.js";
+import { closeRow, openRow, useRowOpen } from "../lib/open-row.js";
+import { pointerDrag } from "../lib/pointer-drag.js";
 import {
   type AgentRuntimeKind,
   type AgentSessionKinsoState,
@@ -112,6 +116,13 @@ function useCollapseHeight(leaving: boolean): {
   };
 }
 
+/** US-D08 §c.4: how far the row's content travels to reveal its action — and, the same distance,
+ *  how far a release has to have travelled to commit. One number, because the row comes to rest
+ *  exactly where the gesture stops being a look and becomes an archive: a 56px action disc, a 16px
+ *  gap beside it (Mail keeps the button off the row's text) and the row's own 16px right padding,
+ *  which is what the disc is anchored to. Half of it is the rest threshold below. */
+const SWIPE_OPEN_PX = 88;
+
 function pickChips(labels: LabelChip[]): { shown: LabelChip[]; more: number } {
   const scope = labels.find((l) => l.kind === "scope");
   const rest = labels.filter((l) => l !== scope);
@@ -167,6 +178,73 @@ export function InboxRow(props: InboxRowProps) {
   // height it needs land in the same commit (see useCollapseHeight).
   const collapse = useCollapseHeight(props.leaving === true);
   const leaving = props.leaving === true && collapse.style !== undefined;
+
+  // US-D08 §c.4: the swipe. Narrow-only — the tier where the rail is already a bottom bar, i.e. the
+  // coarse-pointer layout — and only on a row that has something to reveal, so a row with no
+  // archive action never moves. The primitive's long-press hold is off (0): the swipe has no
+  // ambiguity to resolve, vertical scrolling stays the browser's until the gesture has actually
+  // started, and a mouse drags the row too, which is how the acceptance screenshots and the
+  // responsive gate drive it.
+  const swipeable = useNarrowShell() && props.onArchive !== undefined;
+  const revealed = useRowOpen(props.id);
+  /** The finger's travel while it is down; null between gestures. The resting offset is not stored
+   *  — it is derived from whether this row is the revealed one, so a row that loses the reveal to
+   *  its neighbour springs back without either row being told about the other. */
+  const [dragX, setDragX] = useState<number | null>(null);
+  const dragging = dragX !== null;
+  const restX = swipeable && revealed ? -SWIPE_OPEN_PX : 0;
+  const x = dragX === null ? restX : Math.min(0, Math.max(-SWIPE_OPEN_PX, restX + dragX));
+
+  // A row that stops being swipeable must not stay revealed — a rotation past 900 cannot be
+  // recovered from, since neither the strip nor the gesture is drawn there any more. And a row that
+  // unmounts must not leave the store pointing at it: the next mount of the same thread id would
+  // then draw itself already open, from a gesture nobody made.
+  useEffect(() => {
+    if (!swipeable) closeRow(props.id);
+    return () => closeRow(props.id);
+  }, [swipeable, props.id]);
+
+  // The gesture ends where the content came to rest, not where the finger stopped. Past the whole
+  // action it is an archive; past half of it the row stays revealed with the action showing (Mail's
+  // resting state — it is what makes "one row open at a time" mean anything); anything shorter
+  // springs back to nothing. Clamping is the whole of the other direction: a swipe begun on a
+  // revealed row closes it on the same arithmetic, with no second code path for a right swipe.
+  const onPointerDown = swipeable
+    ? pointerDrag(
+        {
+          onStart: () => setDragX(0),
+          onMove: (dx) => setDragX(dx),
+          onEnd: (dx) => {
+            setDragX(null);
+            const landed = Math.min(0, Math.max(-SWIPE_OPEN_PX, restX + dx));
+            if (landed <= -SWIPE_OPEN_PX) {
+              // It stays revealed while it collapses — the action must not slide back under the
+              // finger that just pressed it. If the archive goes through, the row unmounts and its
+              // effect clears the store; if it does not, the row is simply still swipeable back.
+              openRow(props.id);
+              props.onArchive?.(props.id);
+              return;
+            }
+            if (landed <= -SWIPE_OPEN_PX / 2) openRow(props.id);
+            else closeRow(props.id);
+          },
+          onCancel: () => setDragX(null),
+        },
+        { axis: "x" },
+      )
+    : undefined;
+
+  /** §c.4: on a revealed row the first press closes the reveal instead of opening the thread — the
+   *  way back that does not depend on remembering the gesture. At 900 and above nothing is ever
+   *  revealed, so this branch is unreachable there. */
+  const activate = (): void => {
+    if (revealed) {
+      closeRow(props.id);
+      return;
+    }
+    props.onSelect(props.id);
+  };
+
   return (
     // US-D02: HoverCard.Trigger is asChild, so it only adds hover handlers to this row div — no
     // wrapper element appears and the row's role="option", click and keyboard behaviour are
@@ -188,76 +266,121 @@ export function InboxRow(props: InboxRowProps) {
             props.selected && "inbox-row--selected",
             props.last && "inbox-row--last",
             leaving && "inbox-row--leaving",
+            dragging && "inbox-row--swiping",
+            x !== 0 && "inbox-row--revealed",
           )}
-          onClick={() => props.onSelect(props.id)}
+          onPointerDown={onPointerDown}
+          onClick={activate}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              props.onSelect(props.id);
+              activate();
             }
           }}
         >
-          {/* US-D08 §c.4: the unread dot is a sibling of the avatar, not of the name. Laying it in
-              the row's own leading column is what keeps every row's text at one x — inside the meta
-              line it shifted the name and the time right by its own width, so unread rows were
-              indented against read ones. */}
-          {props.unread && <span className="inbox-row__unread-dot" aria-label="Unread" />}
-          <RowAvatarView avatar={props.avatar} />
-          <div className="inbox-row__meta">
-            <span className="inbox-row__name" data-unread={props.unread}>
-              {props.name}
-            </span>
-            <span className="inbox-row__timestamp">{props.timestamp}</span>
-          </div>
-          <div className="inbox-row__side">
-            {props.agentState ? (
-              !props.groupedByState && <AgentStatusBadge state={props.agentState} />
-            ) : (
-              <span
-                className="inbox-row__channel-icon"
-                aria-label={`${CHANNEL_LABEL[props.channel]} message`}
-              >
-                <ChannelGlyph channel={props.channel} size={16} />
-              </span>
-            )}
-            {props.hasPendingApproval && (
-              <span className="inbox-row__approval-dot" aria-label="Pending approval" />
-            )}
-            {props.onArchive && (
+          {/* §c.4: what the swipe uncovers — one 56px circular action with an 11px caption under it
+              (M167), right-aligned in the row. First in the DOM so the content paints over it: the
+              row has no opaque fill of its own to hide it with, the way a Mail cell does, so the
+              strip fades instead of relying on the stack, and its own opacity is 0 until the
+              content has moved.
+              Hidden from the a11y tree and out of the tab order on purpose. It is the visual echo
+              of a gesture, not a second control: the same archive is on the row's own button, which
+              is focusable and named, and two buttons answering to "Archive" in one row is how a
+              screen reader ends up offering the same action twice (§e guard 11 wants the twin, not
+              a duplicate). */}
+          {swipeable && (
+            <div className="inbox-row__swipe" aria-hidden="true">
               <button
                 type="button"
-                className="inbox-row__action"
-                // The whole row is a click target, so without stopping propagation archiving
-                // also opens the thread.
+                className="inbox-row__swipe-action"
+                tabIndex={-1}
                 onClick={(e) => {
                   e.stopPropagation();
                   props.onArchive?.(props.id);
                 }}
-                onKeyDown={(e) => e.stopPropagation()}
               >
-                {props.archived ? "Restore" : "Archive"}
-              </button>
-            )}
-          </div>
-          <div className="inbox-row__summary-line">
-            <span className="inbox-row__summary" data-draft={props.isDraft}>
-              {summaryText}
-            </span>
-            <div className="inbox-row__chips">
-              {shown.map((chip) => (
-                <span
-                  key={`${chip.kind}:${chip.name}`}
-                  className="inbox-row__chip"
-                  aria-label={`${chip.kind} label: ${chip.name}`}
-                >
-                  {chip.name}
+                <span className="inbox-row__swipe-disc">
+                  {props.archived ? (
+                    <RotateCcw size={20} aria-hidden="true" />
+                  ) : (
+                    <Archive size={20} aria-hidden="true" />
+                  )}
                 </span>
-              ))}
-              {more > 0 && (
-                <span className="inbox-row__chip-more" aria-label={`${more} more labels`}>
-                  +{more}
+                <span className="inbox-row__swipe-caption">
+                  {props.archived ? "Restore" : "Archive"}
+                </span>
+              </button>
+            </div>
+          )}
+          {/* §c.4: the translating half. The row's grid lives here rather than on `.inbox-row`
+              itself: the hairline and the archive collapse both belong to the row's box, and they
+              must not travel with the content. */}
+          <div
+            className="inbox-row__content"
+            style={x === 0 ? undefined : { transform: `translateX(${x}px)` }}
+          >
+            {/* US-D08 §c.4: the unread dot is a sibling of the avatar, not of the name. Laying it in
+              the row's own leading column is what keeps every row's text at one x — inside the meta
+              line it shifted the name and the time right by its own width, so unread rows were
+              indented against read ones. */}
+            {props.unread && <span className="inbox-row__unread-dot" aria-label="Unread" />}
+            <RowAvatarView avatar={props.avatar} />
+            <div className="inbox-row__meta">
+              <span className="inbox-row__name" data-unread={props.unread}>
+                {props.name}
+              </span>
+              <span className="inbox-row__timestamp">{props.timestamp}</span>
+            </div>
+            <div className="inbox-row__side">
+              {props.agentState ? (
+                !props.groupedByState && <AgentStatusBadge state={props.agentState} />
+              ) : (
+                <span
+                  className="inbox-row__channel-icon"
+                  aria-label={`${CHANNEL_LABEL[props.channel]} message`}
+                >
+                  <ChannelGlyph channel={props.channel} size={16} />
                 </span>
               )}
+              {props.hasPendingApproval && (
+                <span className="inbox-row__approval-dot" aria-label="Pending approval" />
+              )}
+              {props.onArchive && (
+                <button
+                  type="button"
+                  className="inbox-row__action"
+                  // The whole row is a click target, so without stopping propagation archiving
+                  // also opens the thread.
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    props.onArchive?.(props.id);
+                  }}
+                  onKeyDown={(e) => e.stopPropagation()}
+                >
+                  {props.archived ? "Restore" : "Archive"}
+                </button>
+              )}
+            </div>
+            <div className="inbox-row__summary-line">
+              <span className="inbox-row__summary" data-draft={props.isDraft}>
+                {summaryText}
+              </span>
+              <div className="inbox-row__chips">
+                {shown.map((chip) => (
+                  <span
+                    key={`${chip.kind}:${chip.name}`}
+                    className="inbox-row__chip"
+                    aria-label={`${chip.kind} label: ${chip.name}`}
+                  >
+                    {chip.name}
+                  </span>
+                ))}
+                {more > 0 && (
+                  <span className="inbox-row__chip-more" aria-label={`${more} more labels`}>
+                    +{more}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>

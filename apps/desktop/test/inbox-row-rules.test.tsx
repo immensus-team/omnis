@@ -58,12 +58,14 @@ describe("Inbox row hairline (US-D08 §c.4)", () => {
   // moving the token fails here — which is the failure that would otherwise be found by eye, in a
   // screenshot, three slices later.
   it("derives --row-rule-inset from the row's own grid arithmetic", () => {
-    const columns = /grid-template-columns:\s*([^;]+);/.exec(ruleBody(appCss, ".inbox-row"))?.[1];
+    // US-D08 §c.4: the grid is on `.inbox-row__content` since the swipe — that wrapper is what
+    // translates, and the padding and the hairline stayed on the row's own box. The arithmetic is
+    // unchanged; only the rule it is read from moved.
+    const grid = ruleBody(appCss, ".inbox-row__content");
+    const columns = /grid-template-columns:\s*([^;]+);/.exec(grid)?.[1];
     expect(columns?.trim()).toBe("10px 40px minmax(0, 1fr) auto");
 
-    const gap = Number(
-      /column-gap:\s*(\d+)px/.exec(ruleBody(appCss, ".inbox-row"))?.[1] ?? Number.NaN,
-    );
+    const gap = Number(/column-gap:\s*(\d+)px/.exec(grid)?.[1] ?? Number.NaN);
     const [gutter, avatar] = (columns ?? "").split(/\s+/).map((c) => Number.parseFloat(c));
     const padding = Number(
       /padding:\s*var\(--row-pad-y\)\s+(\d+)px/.exec(ruleBody(appCss, ".inbox-row"))?.[1] ??
@@ -114,6 +116,73 @@ describe("Inbox row gutter and avatar shapes (US-D08 §c.4)", () => {
   });
 });
 
+describe("Inbox row swipe (US-D08 §c.4)", () => {
+  const tsx = readFileSync(
+    join(TEST_DIR, "../../../packages/ui/src/components/inbox-row.tsx"),
+    "utf8",
+  );
+
+  /** The declarations of one rule inside the `<900` block, where every rule is indented by two. */
+  function narrowRuleBody(selector: string): string {
+    const block = containerBlock("shell \\(max-width: 899\\.98px\\)");
+    const start = block.indexOf(`\n  ${selector} {`);
+    if (start === -1) throw new Error(`narrow rule not found: ${selector}`);
+    return block.slice(start, block.indexOf("}", start));
+  }
+
+  // M167: a 56px circle with its caption under it. The caption is 11px because it is a label under
+  // an icon, not a second line of row text.
+  it("draws the revealed action as a 56px disc with an 11px caption under it", () => {
+    expect(narrowRuleBody(".inbox-row__swipe-disc")).toContain("width: 56px");
+    expect(narrowRuleBody(".inbox-row__swipe-disc")).toContain("height: 56px");
+    // The one accent, on the action the swipe performs — the same pairing as the active chip.
+    expect(narrowRuleBody(".inbox-row__swipe-disc")).toContain("background: var(--accent)");
+    expect(narrowRuleBody(".inbox-row__swipe-caption")).toContain("font-size: 11px");
+  });
+
+  // The strip is under the content in paint order and the row has no opaque fill of its own to hide
+  // it with, so what keeps it off the screen at rest is its own opacity — with pointer-events
+  // riding along, or an invisible button would be the row's click target.
+  it("keeps the strip invisible and unclickable until the content has moved", () => {
+    const strip = narrowRuleBody(".inbox-row__swipe");
+    expect(strip).toContain("opacity: 0");
+    expect(strip).toContain("pointer-events: none");
+    expect(strip).toContain("position: absolute");
+
+    const revealed = narrowRuleBody(".inbox-row--revealed .inbox-row__swipe");
+    expect(revealed).toContain("opacity: 1");
+    expect(revealed).toContain("pointer-events: auto");
+  });
+
+  // Two statements of one number again, this time across a language: the row's travel is JS
+  // (SWIPE_OPEN_PX) and the geometry it has to clear is CSS. The disc is anchored 16px in from the
+  // row's padding box, so when the content has travelled T its right edge sits T px left of the
+  // disc's right edge; clearing the disc and leaving Mail's 16px of air beside it needs T >= 56+16.
+  // A wider disc with the travel left alone fails here instead of being found in a screenshot with
+  // the button half under the text.
+  it("gives the row enough travel to clear the disc and the air beside it", () => {
+    const travel = Number(/const SWIPE_OPEN_PX = (\d+);/.exec(tsx)?.[1]);
+    const disc = Number(
+      /width:\s*(\d+)px/.exec(narrowRuleBody(".inbox-row__swipe-disc"))?.[1] ?? Number.NaN,
+    );
+    const inset = Number(
+      /right:\s*(\d+)px/.exec(narrowRuleBody(".inbox-row__swipe"))?.[1] ?? Number.NaN,
+    );
+
+    expect(travel).toBeGreaterThanOrEqual(disc + inset);
+  });
+
+  // Three properties that make a horizontal gesture inside a vertical scroller possible at all:
+  // the clip that keeps the translated content from widening the page, the touch-action that keeps
+  // the browser's vertical scroll while giving up the horizontal pan, and the selection that would
+  // otherwise happen at the same time as the drag.
+  it("clips the travel, keeps the vertical scroll and cancels the selection", () => {
+    expect(narrowRuleBody(".inbox-row")).toContain("overflow: hidden");
+    expect(narrowRuleBody(".inbox-row")).toContain("touch-action: pan-y");
+    expect(narrowRuleBody(".inbox-row__content")).toContain("user-select: none");
+  });
+});
+
 describe("Inbox row in the <900 tier (US-D08 §c.4)", () => {
   // Desktop elevates the selected row into a white card; under a floating bar that reads as two
   // stacked sheets, so this tier tints it in place. The hairline stays — it is the list's grammar,
@@ -131,6 +200,15 @@ describe("Inbox row in the <900 tier (US-D08 §c.4)", () => {
     expect(selected).toContain("border-radius: 0");
     // The override must not reach for the pseudo-element — the rule survives the flattening.
     expect(selected).not.toContain("::after");
+  });
+
+  // §c.4: the hover-only Archive pill used to be switched off in this tier, which the sweep in
+  // shots-responsive.ts looked for. The swipe replaced it, so the pill is back — as the half of
+  // guard 11 a gesture cannot be. Line-anchored so a comment that names the old rule is not read as
+  // the rule itself.
+  it("no longer hides the row's action button in this tier", () => {
+    const narrow = containerBlock("shell \\(max-width: 899\\.98px\\)");
+    expect(narrow).not.toMatch(/^ {2}\.inbox-row__action \{/m);
   });
 
   it("raises the row's type one step (§b.4)", () => {

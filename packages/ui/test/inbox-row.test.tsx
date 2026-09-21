@@ -56,14 +56,16 @@ describe("InboxRow (U2 kinso conversation row, one per thread)", () => {
   // indented against every read one.
   it("puts the unread dot in the row's gutter, beside the avatar rather than the name", () => {
     const { container } = render(<InboxRow {...baseProps} unread={true} />);
-    const row = container.querySelector(".inbox-row");
+    // US-D08 §c.4: the grid is on the content wrapper since the swipe — the row's own box carries
+    // the padding and the hairline, and this half is what translates.
+    const content = container.querySelector(".inbox-row__content");
     const dot = container.querySelector(".inbox-row__unread-dot");
 
-    expect(dot?.parentElement).toBe(row);
+    expect(dot?.parentElement).toBe(content);
     expect(container.querySelector(".inbox-row__meta")?.contains(dot)).toBe(false);
     // Order says which grid column it takes: the dot is placed before the avatar, and app.css gives
     // the two of them columns 1 and 2 respectively.
-    expect(row?.firstElementChild).toBe(dot);
+    expect(content?.firstElementChild).toBe(dot);
   });
 
   // US-D08 §c.4: the list says which row is last, because Virtuoso gives every row its own wrapper
