@@ -4,6 +4,8 @@ import {
   COST_REPORT_CRON,
   COST_REPORT_JOB_NAME,
   type Events,
+  FOLLOWUP_MISS_CRON,
+  FOLLOWUP_MISS_JOB_NAME,
   HEALTHCHECK_JOB_NAME,
   type Logger,
   type Scheduler,
@@ -28,7 +30,7 @@ function fakeScheduler(): { scheduler: Scheduler; registered: [string, string][]
 }
 
 describe("registerStartupJobs", () => {
-  it("registers healthcheck, cost_daily and the monthly cost report on the hub scheduler", () => {
+  it("registers the hub's whole job set — healthcheck, costs, the missed-follow-up metric", () => {
     const { scheduler, registered } = fakeScheduler();
     registerStartupJobs(scheduler, {
       pool: {} as Pool,
@@ -40,6 +42,8 @@ describe("registerStartupJobs", () => {
       [HEALTHCHECK_JOB_NAME, "*/5 * * * *"],
       [COST_DAILY_JOB_NAME, "5 0 * * *"],
       [COST_REPORT_JOB_NAME, COST_REPORT_CRON],
+      // US-C17: 22:40 KST, before the 23:00 nightly digest loop reads the key this writes.
+      [FOLLOWUP_MISS_JOB_NAME, FOLLOWUP_MISS_CRON],
     ]);
   });
 });

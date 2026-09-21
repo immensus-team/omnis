@@ -64,6 +64,8 @@ export const en: Dictionary = {
     categoryCount: "{label} {n}",
     viewAll: "View all",
     costReport: "This month's spend: {spent} / {limit} ({percent}%)",
+    // US-C17: the body line the nightly digest states the phase's exit metric with.
+    missedFollowups: "Missed follow-ups: {n}",
     restore: "Restore",
     loading: "Tonight's digest hasn't run yet — it generates at 23:00",
     empty: "Nothing was archived today",
@@ -159,6 +161,14 @@ export const en: Dictionary = {
     autoArchived: "Auto-archived {n}d ago — Restore",
     composerReadOnly: "This channel sends after approval",
     composerPlaceholder: "Type a message",
+    // US-C17: the composer states a capture channel can be in instead of a composer
+    // (composer-state.tsx renders these verbatim — the module's COMPOSER_STATE_COPY).
+    composerState: {
+      kakaoDays: "Sending opens in {n} days",
+      kakaoToday: "Sending opens today once you turn it on in Settings",
+      linkedinSummaryOnly: "Summary only — reply needs the capture host",
+      whatsappPilot: "Sending is off until the pilot check",
+    },
   },
   agentSession: {
     readOnly: "Read-only",

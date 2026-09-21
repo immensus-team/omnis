@@ -5,6 +5,7 @@ import {
   type Scheduler,
   registerCostDailyJob,
   registerCostReportJob,
+  registerFollowupMissJob,
   registerHealthcheckJob,
 } from "@omnis/kernel";
 import type { Pool } from "pg";
@@ -30,6 +31,9 @@ export function registerStartupJobs(scheduler: Scheduler, deps: StartupJobDeps):
   // US-B44 (W4a): monthly cost report → digests.metrics. Registered here, not in startHub, so the
   // set stays in one place as Phase B adds jobs.
   registerCostReportJob(scheduler, { pool: deps.pool, events: deps.events });
+  // US-C17: the missed-follow-up metric, at 22:40 KST — before the nightly digest loop reads it
+  // and puts its line in the night's body.
+  registerFollowupMissJob(scheduler, { pool: deps.pool, logger: deps.logger });
 }
 
 export interface TerminalImportJobDeps {

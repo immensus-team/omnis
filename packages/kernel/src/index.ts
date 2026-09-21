@@ -56,6 +56,13 @@ export {
 } from "./jobs/cost-report.js";
 export type { CostReportRow, MonthlyCostReport } from "./jobs/cost-report.js";
 export {
+  FOLLOWUP_MISS_CRON,
+  FOLLOWUP_MISS_JOB_NAME,
+  registerFollowupMissJob,
+  runFollowupMiss,
+} from "./jobs/followup-miss.js";
+export type { FollowupMissDeps } from "./jobs/followup-miss.js";
+export {
   TASK_REMIND_CRON,
   TASK_REMIND_JOB_NAME,
   registerTaskRemindJob,

@@ -3,6 +3,7 @@ import {
   type ThreadQueryItem,
   findDraftItem,
   threadFlow,
+  threadIsPartial,
   threadSubline,
 } from "../src/screens/Thread";
 
@@ -17,6 +18,38 @@ describe("findDraftItem (A5 §3.2 DraftCard appears only while a status='draft' 
   });
   it("returns undefined when no draft exists", () => {
     expect(findDraftItem(items.filter((i) => i.status !== "draft"))).toBeUndefined();
+  });
+});
+
+describe("threadIsPartial (US-C17: a thread that is only what the capture host previewed)", () => {
+  const ping = (id: string): ThreadQueryItem => ({
+    id,
+    status: "received",
+    body: "New message from …",
+    meta: { partial: true },
+  });
+  const real: ThreadQueryItem = { id: "real", status: "read", body: "Shall we meet Tuesday?" };
+
+  it("is true when every item is a preview ping", () => {
+    expect(threadIsPartial([ping("1"), ping("2")])).toBe(true);
+  });
+
+  it("is false as soon as the conversation itself is here", () => {
+    // The ping gained its conversation later (US-C10 reads the real messages into the same thread).
+    expect(threadIsPartial([ping("1"), real])).toBe(false);
+    expect(threadIsPartial([real])).toBe(false);
+  });
+
+  it("is false for a thread with nothing in it", () => {
+    // `every` on an empty list is vacuously true — a thread with no items is not a summary.
+    expect(threadIsPartial([])).toBe(false);
+  });
+
+  it("is false when meta is missing or a different shape", () => {
+    // An ordinary item carries no marker at all, and the column is json — a value from an older
+    // writer must not read as a ping.
+    expect(threadIsPartial([{ id: "a", status: "read", body: "hi", meta: null }])).toBe(false);
+    expect(threadIsPartial([{ id: "b", status: "read", body: "hi" }])).toBe(false);
   });
 });
 

@@ -74,6 +74,8 @@ export const ko = {
     viewAll: "모두 보기",
     // 월간 비용 리포트(마스터 §14 비용 정책의 UI 노출 지점). 예: "이번 달 비용 리포트: $34 / $60 (57%)".
     costReport: "이번 달 비용 리포트: {spent} / {limit} ({percent}%)",
+    // US-C17: the nightly digest's follow-up metric line.
+    missedFollowups: "놓친 후속 연락: {n}건",
     restore: "되살리기",
     loading: "오늘 밤 다이제스트는 아직 생성 전이에요, 23:00에 생성됩니다",
     // 빈 상태는 §7.2의 "Notes/Digest 빈 = 담백하게" 지침대로 짧게 — 그래서 emptyStates가 아니라 여기 있다.
@@ -190,6 +192,15 @@ export const ko = {
     composerReadOnly: "이 채널은 승인 후 발신",
     // inferred, not in §8/§3 verbatim — Composer는 §3.2가 이름만 대고 플레이스홀더 문구는 주지 않음.
     composerPlaceholder: "메시지를 입력하세요",
+    // US-C17: the states a capture channel shows instead of the composer (composer-state.tsx).
+    // {n} is the days remaining; at 0 the block uses kakaoToday instead. Both locales must keep
+    // the same variable set — the i18n drift test compares them key path by key path.
+    composerState: {
+      kakaoDays: "{n}일 후 발신할 수 있습니다",
+      kakaoToday: "오늘 설정에서 켜면 발신할 수 있습니다",
+      linkedinSummaryOnly: "요약만 — 답장하려면 캡처 호스트가 필요합니다",
+      whatsappPilot: "파일럿 확인 전까지 발신이 꺼져 있습니다",
+    },
   },
   agentSession: {
     readOnly: "읽기 전용",
