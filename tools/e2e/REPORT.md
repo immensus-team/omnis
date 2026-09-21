@@ -1,6 +1,6 @@
 # Phase A End-to-End Smoke Report
 
-Generated: 2026-09-21T05:27:36.985Z · `pnpm e2e:phase-a` (tools/e2e/run.ts)
+Generated: 2026-09-21T11:11:17.745Z · `pnpm e2e:phase-a` (tools/e2e/run.ts)
 
 Stack: PostgreSQL `omnis_e2e` (migrations 0001–0008 + Zero permissions) → zero-cache :4848
 → hub :8787 (HTTP + WS /bridge) → local agent bridge (mock runtime fixtures, host=macbook)
@@ -10,115 +10,115 @@ Every part of the seed takes a real code path: adapter `normalize()` → kernel 
 kernel `approvals.propose`, `classify()` from `@omnis/agents` (T0 rule path, no network calls),
 `ClaudeCodeAdapter` + `apps/local-agent/test` fixture replay.
 
-## Pass 1 (24.7s, items=14)
+## Pass 1 (28.2s, items=14)
 
 | Result | Check | Time | Note |
 | --- | --- | --- | --- |
 | PASS | only the rail carries an aurora when the ask panel is closed | 3ms | 1 surface, variant=mist |
-| PASS | no aurora inside a list row (§4.2) | 3ms | 0 list rows tinted |
-| PASS | opening the ask panel adds exactly one dawn surface | 62ms | 2 surfaces: rail + aurora ask-panel |
-| PASS | every rendered aurora mass still computes blur + drop-shadow (§2.4) | 1ms | 1 mass(es) blurred and rimmed; 1 hidden by variant |
-| PASS | no aurora inside a message body, thread item or draft card (§4.2) | 47ms | 0 message bodies tinted |
-| PASS | every aurora is one of §3.2's three surfaces, outside §4.2's list | 2ms | 2 surface(s) checked against the §3.2 allow-list |
-| PASS | no element carries both .aurora and .glass-surface (§2.7) | 0ms | 0 collisions |
-| PASS | no aurora, or its ancestor, carries a filter (§2.4) | 2ms | every wrapper computes filter: none, no filtered ancestor |
+| PASS | no aurora inside a list row (§4.2) | 4ms | 0 list rows tinted |
+| PASS | opening the ask panel adds exactly one dawn surface | 427ms | 2 surfaces: rail + aurora ask-panel |
+| PASS | every rendered aurora mass still computes blur + drop-shadow (§2.4) | 2ms | 1 mass(es) blurred and rimmed; 1 hidden by variant |
+| PASS | no aurora inside a message body, thread item or draft card (§4.2) | 54ms | 0 message bodies tinted |
+| PASS | every aurora is one of §3.2's three surfaces, outside §4.2's list | 3ms | 2 surface(s) checked against the §3.2 allow-list |
+| PASS | no element carries both .aurora and .glass-surface (§2.7) | 1ms | 0 collisions |
+| PASS | no aurora, or its ancestor, carries a filter (§2.4) | 1ms | every wrapper computes filter: none, no filtered ancestor |
 | PASS | the glass inside an aurora is still glass (§4.4) | 1ms | 2 glass plate(s) blurring inside an aurora |
-| PASS | screen 1 (nothing selected) | 702ms | 320px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 375px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 390px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 414px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 768px: overflow 0px; rail aurora: dissolved, 4/4 layers off |
-| PASS | screen 2 (ask panel open) | 748ms | 320px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 375px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 390px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 414px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 768px: overflow 0px; rail aurora: dissolved, 4/4 layers off |
-| PASS | screen 4 (agents filter) | 750ms | 320px: overflow 0px, worst svg > rect +114.8px; rail aurora: dissolved, 4/4 layers off; 375px: overflow 0px, worst svg > rect +59.8px; rail aurora: dissolved, 4/4 layers off; 390px: overflow 0px, worst svg > rect +44.8px; rail aurora: dissolved, 4/4 layers off; 414px: overflow 0px, worst svg > rect +20.8px; rail aurora: dissolved, 4/4 layers off; 768px: overflow 0px; rail aurora: dissolved, 4/4 layers off |
-| PASS | onboarding is a single void surface | 1ms | 1 surface, variant=void |
-| PASS | every word sits on the scrim card, never on the aurora (§5.3 guard 4) | 1ms | 0 text nodes outside the card |
-| PASS | onboarding does not scroll sideways at the four widths (§5.2) | 634ms | 320px: overflow 0px; 375px: overflow 0px; 390px: overflow 0px; 414px: overflow 0px; 768px: overflow 0px |
-| PASS | the row's hover cluster is what a click lands on at 1440px (§c.7) | 53ms | a click lands on button.inbox-row__action, opacity 1, pointer-events auto |
+| PASS | screen 1 (nothing selected) | 737ms | 320px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 375px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 390px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 414px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 768px: overflow 0px; rail aurora: dissolved, 4/4 layers off |
+| PASS | screen 2 (ask panel open) | 1177ms | 320px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 375px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 390px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 414px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 768px: overflow 0px; rail aurora: dissolved, 4/4 layers off |
+| PASS | screen 4 (agents filter) | 765ms | 320px: overflow 0px, worst svg > rect +114.8px; rail aurora: dissolved, 4/4 layers off; 375px: overflow 0px, worst svg > rect +59.8px; rail aurora: dissolved, 4/4 layers off; 390px: overflow 0px, worst svg > rect +44.8px; rail aurora: dissolved, 4/4 layers off; 414px: overflow 0px, worst svg > rect +20.8px; rail aurora: dissolved, 4/4 layers off; 768px: overflow 0px; rail aurora: dissolved, 4/4 layers off |
+| PASS | onboarding is a single void surface | 2ms | 1 surface, variant=void |
+| PASS | every word sits on the scrim card, never on the aurora (§5.3 guard 4) | 0ms | 0 text nodes outside the card |
+| PASS | onboarding does not scroll sideways at the four widths (§5.2) | 631ms | 320px: overflow 0px; 375px: overflow 0px; 390px: overflow 0px; 414px: overflow 0px; 768px: overflow 0px |
+| PASS | the row's hover cluster is what a click lands on at 1440px (§c.7) | 45ms | a click lands on button.inbox-row__action, opacity 1, pointer-events auto |
 | PASS | no glass layer sits on another at 1440px (§4.4/§e guard 4) | 2ms | 4 glass layers, 0 nested |
-| PASS | the pane's bar clears the header at rest at 1440px (§c.5) | 1ms | 20.0px clear, glass needs 20px |
-| PASS | no glass layer sits on another at 1280px (§4.4/§e guard 4) | 2ms | 4 glass layers, 0 nested |
-| PASS | the pane's bar clears the header at rest at 1280px (§c.5) | 1ms | 20.0px clear, glass needs 20px |
-| PASS | no glass layer sits on another at 1100px (§4.4/§e guard 4) | 2ms | 4 glass layers, 0 nested |
+| PASS | the pane's bar clears the header at rest at 1440px (§c.5) | 2ms | 28.0px clear, glass needs 20px |
+| PASS | no glass layer sits on another at 1280px (§4.4/§e guard 4) | 1ms | 4 glass layers, 0 nested |
+| PASS | the pane's bar clears the header at rest at 1280px (§c.5) | 1ms | 28.0px clear, glass needs 20px |
+| PASS | no glass layer sits on another at 1100px (§4.4/§e guard 4) | 1ms | 4 glass layers, 0 nested |
 | PASS | the pane's bar clears the header at rest at 1100px (§c.5) | 1ms | 0.0px clear, chrome needs 0px |
 | PASS | no glass layer sits on another at 1024px (§4.4/§e guard 4) | 2ms | 4 glass layers, 0 nested |
-| PASS | the pane's bar clears the header at rest at 1024px (§c.5) | 0ms | 0.0px clear, chrome needs 0px |
-| PASS | no glass layer sits on another at 900px (§4.4/§e guard 4) | 2ms | 3 glass layers, 0 nested |
-| PASS | the pane's bar clears the header at rest at 900px (§c.5) | 1ms | 0.0px clear, chrome needs 0px |
-| PASS | no glass layer sits on another at 899px (§4.4/§e guard 4) | 2ms | 5 glass layers, 0 nested |
-| PASS | no glass layer sits on another at 768px (§4.4/§e guard 4) | 3ms | 5 glass layers, 0 nested |
-| PASS | no glass layer sits on another at 390px (§4.4/§e guard 4) | 3ms | 5 glass layers, 0 nested |
-| PASS | the D9 chrome surfaces are the shared glass, with no fill of their own | 2ms | .sheet×1, .thread-toolbar--floating×1, .bottom-bar__piece×2 |
-| PASS | the sheet arrives without moving under reduced motion (§c.6) | 305ms | sheet-in → fade-in under reduce |
-| PASS | the detail body measures 15px/1.5 at 1440px (§b.4) | 1ms | 15px / 22.5px |
-| PASS | the detail body measures 17px/1.5 at 390px (§b.4) | 1ms | 17px / 25.5px |
-| PASS | A1 Inbox lists one row per seeded thread (U2: a row is a thread, not an item) | 13ms | 8 thread rows (item count was 14) |
-| PASS | A2 Inbox rows show a visible channel icon for all three channels | 22ms | Slack message / Gmail message / Google Calendar message |
-| PASS | A2b Inbox rows show the seeded thread titles | 2ms | #omnis-launch / omnis launch sync |
-| PASS | A3 Inbox rows carry label chips | 2ms |  |
-| PASS | A2c kinso shell: channel rail tiles + ask/search bar | 6ms | rail: Inbox/Slack/Gmail/Google Calendar/Agent + ask bar |
-| PASS | A2d a conversation row has avatar + name + relative time + summary | 3ms | time="now" summary="Draft: Yes, I will review it today.…" |
-| PASS | A4 work/personal filter pills change the list | 98ms | all=8 work=[#omnis-launch] personal=[Dana Lee] |
-| PASS | A4b channel rail tile filters the list, Inbox tile restores it | 69ms | all=8 gmail=2 |
-| PASS | A5 Thread screen renders seeded items with status badges | 40ms | 4 status badges |
-| PASS | A6 Agent Session screen shows turns and a ToolCallBadge | 30ms |  |
-| PASS | A7 Approval card shows the pending approval | 42ms |  |
-| PASS | A8 Approve → hub moves the approval to decided | 426ms | pending → decided, through §c.8's prompt |
-| PASS | A9 ⌘K opens the floating AI panel and types into the command list | 24ms | panel + cmdk list reachable by typing |
-| PASS | A-archive archiving a row removes it from the list and restoring brings it back | 675ms | "omnis launch sync" archived → restored (8 rows), 2 audit_log actions recorded |
-| PASS | G5 a new item reaches the UI in ≤2s | 77ms | 33ms ingest → on screen (target ≤2000ms) |
-| PASS | A8b hub recorded audit_log(approval.decided) | 1ms | 1 row(s) |
-| PASS | A8c pending_approvals.state moved to decided(accept) | 0ms | state=decided decision=accept |
-| PASS | A10 classify() recorded a T0 run in agent_runs (no network) | 0ms | 1 run(s), tier=T0 |
-| PASS | A11 local-agent registered over WS /bridge | 0ms | agent_runtimes state=online |
-
-## Pass 2 (24.6s, items=14)
-
-| Result | Check | Time | Note |
-| --- | --- | --- | --- |
-| PASS | only the rail carries an aurora when the ask panel is closed | 3ms | 1 surface, variant=mist |
-| PASS | no aurora inside a list row (§4.2) | 3ms | 0 list rows tinted |
-| PASS | opening the ask panel adds exactly one dawn surface | 50ms | 2 surfaces: rail + aurora ask-panel |
-| PASS | every rendered aurora mass still computes blur + drop-shadow (§2.4) | 1ms | 1 mass(es) blurred and rimmed; 1 hidden by variant |
-| PASS | no aurora inside a message body, thread item or draft card (§4.2) | 67ms | 0 message bodies tinted |
-| PASS | every aurora is one of §3.2's three surfaces, outside §4.2's list | 1ms | 2 surface(s) checked against the §3.2 allow-list |
-| PASS | no element carries both .aurora and .glass-surface (§2.7) | 2ms | 0 collisions |
-| PASS | no aurora, or its ancestor, carries a filter (§2.4) | 2ms | every wrapper computes filter: none, no filtered ancestor |
-| PASS | the glass inside an aurora is still glass (§4.4) | 1ms | 2 glass plate(s) blurring inside an aurora |
-| PASS | screen 1 (nothing selected) | 724ms | 320px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 375px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 390px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 414px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 768px: overflow 0px; rail aurora: dissolved, 4/4 layers off |
-| PASS | screen 2 (ask panel open) | 737ms | 320px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 375px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 390px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 414px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 768px: overflow 0px; rail aurora: dissolved, 4/4 layers off |
-| PASS | screen 4 (agents filter) | 740ms | 320px: overflow 0px, worst svg > rect +114.8px; rail aurora: dissolved, 4/4 layers off; 375px: overflow 0px, worst svg > rect +59.8px; rail aurora: dissolved, 4/4 layers off; 390px: overflow 0px, worst svg > rect +44.8px; rail aurora: dissolved, 4/4 layers off; 414px: overflow 0px, worst svg > rect +20.8px; rail aurora: dissolved, 4/4 layers off; 768px: overflow 0px; rail aurora: dissolved, 4/4 layers off |
-| PASS | onboarding is a single void surface | 1ms | 1 surface, variant=void |
-| PASS | every word sits on the scrim card, never on the aurora (§5.3 guard 4) | 1ms | 0 text nodes outside the card |
-| PASS | onboarding does not scroll sideways at the four widths (§5.2) | 634ms | 320px: overflow 0px; 375px: overflow 0px; 390px: overflow 0px; 414px: overflow 0px; 768px: overflow 0px |
-| PASS | the row's hover cluster is what a click lands on at 1440px (§c.7) | 53ms | a click lands on button.inbox-row__action, opacity 1, pointer-events auto |
-| PASS | no glass layer sits on another at 1440px (§4.4/§e guard 4) | 2ms | 4 glass layers, 0 nested |
-| PASS | the pane's bar clears the header at rest at 1440px (§c.5) | 1ms | 20.0px clear, glass needs 20px |
-| PASS | no glass layer sits on another at 1280px (§4.4/§e guard 4) | 2ms | 4 glass layers, 0 nested |
-| PASS | the pane's bar clears the header at rest at 1280px (§c.5) | 1ms | 20.0px clear, glass needs 20px |
-| PASS | no glass layer sits on another at 1100px (§4.4/§e guard 4) | 2ms | 4 glass layers, 0 nested |
-| PASS | the pane's bar clears the header at rest at 1100px (§c.5) | 0ms | 0.0px clear, chrome needs 0px |
-| PASS | no glass layer sits on another at 1024px (§4.4/§e guard 4) | 1ms | 4 glass layers, 0 nested |
 | PASS | the pane's bar clears the header at rest at 1024px (§c.5) | 1ms | 0.0px clear, chrome needs 0px |
 | PASS | no glass layer sits on another at 900px (§4.4/§e guard 4) | 1ms | 3 glass layers, 0 nested |
 | PASS | the pane's bar clears the header at rest at 900px (§c.5) | 1ms | 0.0px clear, chrome needs 0px |
 | PASS | no glass layer sits on another at 899px (§4.4/§e guard 4) | 3ms | 5 glass layers, 0 nested |
-| PASS | no glass layer sits on another at 768px (§4.4/§e guard 4) | 2ms | 5 glass layers, 0 nested |
-| PASS | no glass layer sits on another at 390px (§4.4/§e guard 4) | 2ms | 5 glass layers, 0 nested |
+| PASS | no glass layer sits on another at 768px (§4.4/§e guard 4) | 4ms | 5 glass layers, 0 nested |
+| PASS | no glass layer sits on another at 390px (§4.4/§e guard 4) | 4ms | 5 glass layers, 0 nested |
 | PASS | the D9 chrome surfaces are the shared glass, with no fill of their own | 2ms | .sheet×1, .thread-toolbar--floating×1, .bottom-bar__piece×2 |
-| PASS | the sheet arrives without moving under reduced motion (§c.6) | 304ms | sheet-in → fade-in under reduce |
-| PASS | the detail body measures 15px/1.5 at 1440px (§b.4) | 2ms | 15px / 22.5px |
+| PASS | the sheet arrives without moving under reduced motion (§c.6) | 305ms | sheet-in → fade-in under reduce |
+| PASS | the detail body measures 15px/1.5 at 1440px (§b.4) | 3ms | 15px / 22.5px |
 | PASS | the detail body measures 17px/1.5 at 390px (§b.4) | 2ms | 17px / 25.5px |
-| PASS | A1 Inbox lists one row per seeded thread (U2: a row is a thread, not an item) | 19ms | 8 thread rows (item count was 14) |
-| PASS | A2 Inbox rows show a visible channel icon for all three channels | 25ms | Slack message / Gmail message / Google Calendar message |
+| PASS | A1 Inbox lists one row per seeded thread (U2: a row is a thread, not an item) | 20ms | 8 thread rows (item count was 14) |
+| PASS | A2 Inbox rows show a visible channel icon for all three channels | 33ms | Slack message / Gmail message / Google Calendar message |
+| PASS | A2b Inbox rows show the seeded thread titles | 2ms | #omnis-launch / omnis launch sync |
+| PASS | A3 Inbox rows carry label chips | 1ms |  |
+| PASS | A2c kinso shell: channel rail tiles + ask/search bar | 7ms | rail: Inbox/Slack/Gmail/Google Calendar/Agent + ask bar |
+| PASS | A2d a conversation row has avatar + name + relative time + summary | 4ms | time="now" summary="Draft: Yes, I will review it today.…" |
+| PASS | A4 work/personal filter pills change the list | 111ms | all=8 work=[#omnis-launch] personal=[Dana Lee] |
+| PASS | A4b channel rail tile filters the list, Inbox tile restores it | 68ms | all=8 gmail=2 |
+| PASS | A5 Thread screen renders seeded items with status badges | 42ms | 4 status badges |
+| PASS | A6 Agent Session screen shows turns and a ToolCallBadge | 31ms |  |
+| PASS | A7 Approval card shows the pending approval | 42ms |  |
+| PASS | A8 Approve → hub moves the approval to decided | 428ms | pending → decided, through §c.8's prompt |
+| PASS | A9 ⌘K opens the floating AI panel and types into the command list | 25ms | panel + cmdk list reachable by typing |
+| PASS | A-archive archiving a row removes it from the list and restoring brings it back | 709ms | "omnis launch sync" archived → restored (8 rows), 2 audit_log actions recorded |
+| PASS | G5 a new item reaches the UI in ≤2s | 76ms | 31ms ingest → on screen (target ≤2000ms) |
+| PASS | A8b hub recorded audit_log(approval.decided) | 2ms | 1 row(s) |
+| PASS | A8c pending_approvals.state moved to decided(accept) | 0ms | state=decided decision=accept |
+| PASS | A10 classify() recorded a T0 run in agent_runs (no network) | 0ms | 1 run(s), tier=T0 |
+| PASS | A11 local-agent registered over WS /bridge | 0ms | agent_runtimes state=online |
+
+## Pass 2 (25.5s, items=14)
+
+| Result | Check | Time | Note |
+| --- | --- | --- | --- |
+| PASS | only the rail carries an aurora when the ask panel is closed | 2ms | 1 surface, variant=mist |
+| PASS | no aurora inside a list row (§4.2) | 3ms | 0 list rows tinted |
+| PASS | opening the ask panel adds exactly one dawn surface | 290ms | 2 surfaces: rail + aurora ask-panel |
+| PASS | every rendered aurora mass still computes blur + drop-shadow (§2.4) | 1ms | 1 mass(es) blurred and rimmed; 1 hidden by variant |
+| PASS | no aurora inside a message body, thread item or draft card (§4.2) | 43ms | 0 message bodies tinted |
+| PASS | every aurora is one of §3.2's three surfaces, outside §4.2's list | 1ms | 2 surface(s) checked against the §3.2 allow-list |
+| PASS | no element carries both .aurora and .glass-surface (§2.7) | 2ms | 0 collisions |
+| PASS | no aurora, or its ancestor, carries a filter (§2.4) | 1ms | every wrapper computes filter: none, no filtered ancestor |
+| PASS | the glass inside an aurora is still glass (§4.4) | 1ms | 2 glass plate(s) blurring inside an aurora |
+| PASS | screen 1 (nothing selected) | 724ms | 320px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 375px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 390px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 414px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 768px: overflow 0px; rail aurora: dissolved, 4/4 layers off |
+| PASS | screen 2 (ask panel open) | 1143ms | 320px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 375px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 390px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 414px: overflow 0px; rail aurora: dissolved, 4/4 layers off; 768px: overflow 0px; rail aurora: dissolved, 4/4 layers off |
+| PASS | screen 4 (agents filter) | 757ms | 320px: overflow 0px, worst svg > rect +114.8px; rail aurora: dissolved, 4/4 layers off; 375px: overflow 0px, worst svg > rect +59.8px; rail aurora: dissolved, 4/4 layers off; 390px: overflow 0px, worst svg > rect +44.8px; rail aurora: dissolved, 4/4 layers off; 414px: overflow 0px, worst svg > rect +20.8px; rail aurora: dissolved, 4/4 layers off; 768px: overflow 0px; rail aurora: dissolved, 4/4 layers off |
+| PASS | onboarding is a single void surface | 2ms | 1 surface, variant=void |
+| PASS | every word sits on the scrim card, never on the aurora (§5.3 guard 4) | 0ms | 0 text nodes outside the card |
+| PASS | onboarding does not scroll sideways at the four widths (§5.2) | 633ms | 320px: overflow 0px; 375px: overflow 0px; 390px: overflow 0px; 414px: overflow 0px; 768px: overflow 0px |
+| PASS | the row's hover cluster is what a click lands on at 1440px (§c.7) | 47ms | a click lands on button.inbox-row__action, opacity 1, pointer-events auto |
+| PASS | no glass layer sits on another at 1440px (§4.4/§e guard 4) | 2ms | 4 glass layers, 0 nested |
+| PASS | the pane's bar clears the header at rest at 1440px (§c.5) | 8ms | 28.0px clear, glass needs 20px |
+| PASS | no glass layer sits on another at 1280px (§4.4/§e guard 4) | 2ms | 4 glass layers, 0 nested |
+| PASS | the pane's bar clears the header at rest at 1280px (§c.5) | 1ms | 28.0px clear, glass needs 20px |
+| PASS | no glass layer sits on another at 1100px (§4.4/§e guard 4) | 1ms | 4 glass layers, 0 nested |
+| PASS | the pane's bar clears the header at rest at 1100px (§c.5) | 2ms | 0.0px clear, chrome needs 0px |
+| PASS | no glass layer sits on another at 1024px (§4.4/§e guard 4) | 1ms | 4 glass layers, 0 nested |
+| PASS | the pane's bar clears the header at rest at 1024px (§c.5) | 1ms | 0.0px clear, chrome needs 0px |
+| PASS | no glass layer sits on another at 900px (§4.4/§e guard 4) | 2ms | 3 glass layers, 0 nested |
+| PASS | the pane's bar clears the header at rest at 900px (§c.5) | 1ms | 0.0px clear, chrome needs 0px |
+| PASS | no glass layer sits on another at 899px (§4.4/§e guard 4) | 7ms | 5 glass layers, 0 nested |
+| PASS | no glass layer sits on another at 768px (§4.4/§e guard 4) | 5ms | 5 glass layers, 0 nested |
+| PASS | no glass layer sits on another at 390px (§4.4/§e guard 4) | 3ms | 5 glass layers, 0 nested |
+| PASS | the D9 chrome surfaces are the shared glass, with no fill of their own | 2ms | .sheet×1, .thread-toolbar--floating×1, .bottom-bar__piece×2 |
+| PASS | the sheet arrives without moving under reduced motion (§c.6) | 305ms | sheet-in → fade-in under reduce |
+| PASS | the detail body measures 15px/1.5 at 1440px (§b.4) | 2ms | 15px / 22.5px |
+| PASS | the detail body measures 17px/1.5 at 390px (§b.4) | 1ms | 17px / 25.5px |
+| PASS | A1 Inbox lists one row per seeded thread (U2: a row is a thread, not an item) | 114ms | 8 thread rows (item count was 14) |
+| PASS | A2 Inbox rows show a visible channel icon for all three channels | 29ms | Slack message / Gmail message / Google Calendar message |
 | PASS | A2b Inbox rows show the seeded thread titles | 2ms | #omnis-launch / omnis launch sync |
 | PASS | A3 Inbox rows carry label chips | 2ms |  |
 | PASS | A2c kinso shell: channel rail tiles + ask/search bar | 6ms | rail: Inbox/Slack/Gmail/Google Calendar/Agent + ask bar |
 | PASS | A2d a conversation row has avatar + name + relative time + summary | 3ms | time="now" summary="Draft: Yes, I will review it today.…" |
-| PASS | A4 work/personal filter pills change the list | 99ms | all=8 work=[#omnis-launch] personal=[Dana Lee] |
+| PASS | A4 work/personal filter pills change the list | 96ms | all=8 work=[#omnis-launch] personal=[Dana Lee] |
 | PASS | A4b channel rail tile filters the list, Inbox tile restores it | 68ms | all=8 gmail=2 |
-| PASS | A5 Thread screen renders seeded items with status badges | 42ms | 4 status badges |
-| PASS | A6 Agent Session screen shows turns and a ToolCallBadge | 31ms |  |
-| PASS | A7 Approval card shows the pending approval | 43ms |  |
-| PASS | A8 Approve → hub moves the approval to decided | 428ms | pending → decided, through §c.8's prompt |
-| PASS | A9 ⌘K opens the floating AI panel and types into the command list | 22ms | panel + cmdk list reachable by typing |
-| PASS | A-archive archiving a row removes it from the list and restoring brings it back | 675ms | "omnis launch sync" archived → restored (8 rows), 2 audit_log actions recorded |
-| PASS | G5 a new item reaches the UI in ≤2s | 52ms | 11ms ingest → on screen (target ≤2000ms) |
+| PASS | A5 Thread screen renders seeded items with status badges | 43ms | 4 status badges |
+| PASS | A6 Agent Session screen shows turns and a ToolCallBadge | 30ms |  |
+| PASS | A7 Approval card shows the pending approval | 42ms |  |
+| PASS | A8 Approve → hub moves the approval to decided | 425ms | pending → decided, through §c.8's prompt |
+| PASS | A9 ⌘K opens the floating AI panel and types into the command list | 25ms | panel + cmdk list reachable by typing |
+| PASS | A-archive archiving a row removes it from the list and restoring brings it back | 690ms | "omnis launch sync" archived → restored (8 rows), 2 audit_log actions recorded |
+| PASS | G5 a new item reaches the UI in ≤2s | 50ms | 11ms ingest → on screen (target ≤2000ms) |
 | PASS | A8b hub recorded audit_log(approval.decided) | 1ms | 1 row(s) |
 | PASS | A8c pending_approvals.state moved to decided(accept) | 0ms | state=decided decision=accept |
 | PASS | A10 classify() recorded a T0 run in agent_runs (no network) | 0ms | 1 run(s), tier=T0 |
