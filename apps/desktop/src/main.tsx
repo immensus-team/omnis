@@ -17,16 +17,20 @@ loadZeroToken()
     console.error("zero auth token unavailable — rows will not sync", e);
   })
   .finally(() => {
-    createRoot(root).render(
-      <StrictMode>{isOnboardingPreview() ? <OnboardingPreview /> : <App />}</StrictMode>,
-    );
+    createRoot(root).render(<StrictMode>{previewElement()}</StrictMode>);
   });
 
-/** US-D06 §4.1.3: onboarding has no first-run flow wired yet, and D6 is an accent story — so the
- *  screen is reachable at `?screen=onboarding` rather than by a route, purely so it can be opened
- *  and screenshotted. Wiring a first-run flow is not D6's job. */
-function isOnboardingPreview(): boolean {
-  return new URLSearchParams(window.location.search).get("screen") === "onboarding";
+/** `?screen=<name>` opens a screen for looking at and for screenshots. There is no URL router in
+ *  the desktop app (src-tauri loads one document), and the rail that switches screens for a person
+ *  is not built yet, so this is how a screen that is not the Inbox is reached.
+ *  - `onboarding` (US-D06 §4.1.3): no first-run flow is wired yet, and wiring one is not D6's job.
+ *  - `today` (US-B28): the shell's Screen switching belongs to whoever builds the rail; this story
+ *    adds the screen and has to be able to photograph it in the real shell. */
+function previewElement() {
+  const screen = new URLSearchParams(window.location.search).get("screen");
+  if (screen === "onboarding") return <OnboardingPreview />;
+  if (screen === "today") return <App screen="today" />;
+  return <App />;
 }
 
 /** The preview's OAuth client rejects: that is what leaves the screen in the resting state a
