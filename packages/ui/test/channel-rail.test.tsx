@@ -231,16 +231,28 @@ describe("ChannelRail reorder (D7 §c.2)", () => {
 
   /** jsdom lays nothing out: every element's rect is 0x0, so the drop slots the drag measures all
    *  collapse onto one point and a test could not tell "moved one slot" from "moved to the end".
-   *  This gives each plate tile the rect it would have in a stacked column (the wide rail, y) or a
-   *  row (the narrow bar, x), 52px apart, centred at 100 + 52i. */
+   *  This models a real stacked column (the wide rail, y) or row (the narrow bar, x): 44px tiles on
+   *  a 52px stride, centred at 100 + 52i.
+   *
+   *  The rect is computed from the tile's index **at call time**, not baked in at install. That is
+   *  what makes the FLIP testable: a real reorder moves the tile's slot, so the rect the component
+   *  reads after the reorder differs from the one it read before by exactly one stride — and the
+   *  compensation the lifted tile needs is that difference.
+   *
+   *  The transform is deliberately not modelled. `captureRects` and the effect's own reading are
+   *  both taken with the tile's current transform already applied, so it cancels out of their
+   *  difference; leaving it out here still reproduces the browser's numbers. */
   function stubTileRects(axis: "x" | "y"): HTMLElement[] {
     const tiles = Array.from(
       document.querySelectorAll<HTMLElement>(".channel-rail__plate .channel-rail__tile"),
     );
-    tiles.forEach((el, i) => {
-      const centre = 100 + i * 52;
-      el.getBoundingClientRect = () =>
-        ({
+    for (const el of tiles) {
+      el.getBoundingClientRect = () => {
+        const live = Array.from(
+          document.querySelectorAll(".channel-rail__plate .channel-rail__tile"),
+        );
+        const centre = 100 + live.indexOf(el) * 52;
+        return {
           left: axis === "x" ? centre - 22 : 0,
           top: axis === "y" ? centre - 22 : 0,
           width: 44,
@@ -250,8 +262,9 @@ describe("ChannelRail reorder (D7 §c.2)", () => {
           x: 0,
           y: 0,
           toJSON: () => ({}),
-        }) as DOMRect;
-    });
+        } as DOMRect;
+      };
+    }
     return tiles;
   }
 
@@ -347,18 +360,40 @@ describe("ChannelRail reorder (D7 §c.2)", () => {
       expect(slack.style.getPropertyValue(property)).toBe("");
     }
 
-    // Across a slot boundary the transform carries a second, inverse term — that is the FLIP
-    // holding the tile still in the same frame its slot moves underneath it, and it is still only
-    // ever a transform. (jsdom lays nothing out, so the inverse here is 0; in a browser it is the
-    // 52px the slot moved.)
+    // Across a slot boundary the transform carries the inverse of the stride the tile's own slot
+    // just moved by: Slack goes from slot 1 to slot 2, so its drawing offset drops by 52 and the
+    // pointer's 60 leaves 8. It is still only ever a transform.
     fireEvent.pointerMove(slack, { pointerId: 1, clientX: 500, clientY: 560 });
-    expect(slack.style.transform).toBe(
-      "translate3d(0px, 0px, 0) translate3d(0px, 60px, 0) scale(1.08)",
-    );
+    expect(slack.style.transform).toBe("translate3d(0px, 8px, 0) scale(1.08)");
 
     fireEvent.pointerUp(slack, { pointerId: 1, clientX: 500, clientY: 560 });
     expect(slack.style.transform).toBe("");
     expect(slack).not.toHaveClass("channel-rail__tile--dragging");
+  });
+
+  it("keeps the lifted tile under the pointer across a slot crossing", () => {
+    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    stubTileRects("y");
+    const slack = screen.getByRole("button", { name: "Slack" });
+
+    // Slot centres are 100 (Gmail), 152 (Slack), 204 (Agent), so Slack passes the next slot at +52.
+    fireEvent.pointerDown(slack, {
+      button: 0,
+      pointerId: 1,
+      pointerType: "mouse",
+      clientX: 500,
+      clientY: 500,
+    });
+    fireEvent.pointerMove(slack, { pointerId: 1, clientX: 500, clientY: 554 });
+    expect(renderedOrder()).toEqual(["Gmail", "Agent", "Slack"]);
+    // Its slot moved a stride under it, so the drawing offset is now 2, not 54: the tile is drawn
+    // at 204 + 2 = 206, which is 152 + 54 — exactly where the pointer is.
+    expect(slack.style.transform).toBe("translate3d(0px, 2px, 0) scale(1.08)");
+
+    // The move that used to break it. Dropping the stride from the composition leaves the tile at
+    // 204 + 58 = 262 instead of 210: a 52px leap, once per crossing, ahead of the finger.
+    fireEvent.pointerMove(slack, { pointerId: 1, clientX: 500, clientY: 558 });
+    expect(slack.style.transform).toBe("translate3d(0px, 6px, 0) scale(1.08)");
   });
 
   it("does not select the channel a drag just ended on, but does on the next click", () => {

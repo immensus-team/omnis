@@ -18,6 +18,13 @@ export function ChannelGlyph({ channel, size = 16 }: { channel: UiChannel; size?
       height={size}
       alt=""
       aria-hidden="true"
+      // An <img> is natively draggable, and Chromium starts an HTML5 image drag once the pointer
+      // passes a few px — which cancels the pointer sequence underneath it. Every caller here is a
+      // drag surface now (the rail's reorder in D7, the row's swipe in D8), and the glyph covers
+      // most of the tile's area, so the native drag has to go: without this, a press on the mark
+      // loses its capture on the first move and the gesture never starts. `-webkit-user-drag`
+      // would be a rail-only patch for a bug that belongs to the image.
+      draggable={false}
       // Gmail (64x51) and Outlook (64x59) are not square — dropped straight into a square slot,
       // Gmail stretches by 25%. The slot stays size x size and the mark fits inside it.
       style={{ objectFit: "contain" }}

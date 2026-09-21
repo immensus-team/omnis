@@ -93,8 +93,28 @@ interface DragState {
   origin: number;
   dx: number;
   dy: number;
+  /** The layout shift the reorder has already moved this tile by, accumulated across the drag's
+   *  crossings. The lifted tile's slot moves under it every time the order changes, so its own
+   *  layout position stops being the base the pointer delta is measured against. The transform is
+   *  written from `comp + pointer`; without this the tile is correct on the crossing frame and then
+   *  leaps a full stride on the next pointermove. */
+  compX: number;
+  compY: number;
   el: HTMLButtonElement | null;
   moved: boolean;
+}
+
+/** Where the lifted tile is drawn while it is held: the pointer's own delta, offset by whatever the
+ *  reorders so far have already moved its slot by. The single writer of the held tile's transform,
+ *  so the two callers (a pointermove, and a crossing that lands between two of them) cannot disagree
+ *  about the composition.
+ *
+ *  Module scope, not the component body: it reads nothing from the render, and a body-scoped copy
+ *  would either be a stale closure or a new identity on every render — which is what the FLIP
+ *  effect below would then have to list as a dependency, re-running the whole inversion each time. */
+function applyLift(d: DragState): void {
+  if (!d.el) return;
+  d.el.style.transform = `translate3d(${d.compX + d.dx}px, ${d.compY + d.dy}px, 0) scale(${LIFT_SCALE})`;
 }
 
 export function ChannelRail({ channels, selected, onSelect }: ChannelRailProps) {
@@ -130,10 +150,11 @@ export function ChannelRail({ channels, selected, onSelect }: ChannelRailProps) 
   /** Layout rects, read immediately *before* a reorder commits — FLIP's First. Null means there is
    *  nothing to invert, which is the state every ordinary render is in. */
   const rectsBefore = useRef<Map<UiChannel, DOMRect> | null>(null);
-  /** The lifted tile's own inline transform, so the FLIP below can compose with it instead of
-   *  dropping the tile out of the pointer's hand mid-animation. `settle` says which of the two
-   *  cases this is: a reorder under the finger (leave the transform for the next pointermove to
-   *  rewrite) or a cancel (play it out, so the tile glides home). */
+  /** The lifted tile carried across a commit, so the FLIP below composes with it instead of
+   *  dropping the tile out of the pointer's hand mid-animation. `dx`/`dy` are the tile's whole
+   *  current offset (`comp + pointer`), not the pointer delta alone. `settle` says which commit
+   *  this is: a reorder under the finger, where the tile is redrawn from the pointer, or a cancel,
+   *  where the offset is played out to nothing so the tile glides home. */
   const lift = useRef<{ id: UiChannel; dx: number; dy: number; settle: boolean } | null>(null);
   /** The tile of the click that must not select: the one a drag *just* ended on. Cleared by the
    *  next pointerdown rather than by a timer, so a click the browser never delivers cannot leave a
@@ -166,25 +187,32 @@ export function ChannelRail({ channels, selected, onSelect }: ChannelRailProps) 
       const previous = before.get(id);
       if (!previous) continue;
       const now = el.getBoundingClientRect();
+      // Both readings carry the tile's current transform, so the difference between them is purely
+      // the layout shift the reorder just caused — which is exactly the amount the held tile has to
+      // compensate for.
       const dx = previous.left - now.left;
       const dy = previous.top - now.top;
-      const held = lifted?.id === id;
+      const d = drag.current;
+      const held = lifted !== null && lifted.id === id;
       if (dx === 0 && dy === 0 && !held) continue;
-      // The lifted tile's rect already includes the transform it is following the pointer with, so
-      // its inverse is composed on top of that transform rather than replacing it.
+      el.style.transition = "none";
+      // `d` is null on the cancel commit — the drag is over and only the carried offset is left to
+      // play out — so the accumulate branch is the one that has to check for it.
+      if (held && !lifted.settle && d !== null) {
+        // A reorder *under* the finger. Fold the shift into the compensation and redraw the tile
+        // from the pointer — the position it holds this frame is not an animation to play out, and
+        // dropping the compensation here is what made it leap a stride on the next move.
+        d.compX += dx;
+        d.compY += dy;
+        applyLift(d);
+        continue;
+      }
+      // A neighbour making room, or a cancelled drag gliding home: invert, then release onto the
+      // settle spring on the next frame.
       const own = held
         ? ` translate3d(${lifted.dx}px, ${lifted.dy}px, 0) scale(${LIFT_SCALE})`
         : "";
-      el.style.transition = "none";
       el.style.transform = `translate3d(${dx}px, ${dy}px, 0)${own}`;
-      if (held && !lifted.settle) {
-        // A reorder *under* the finger. The composed transform is not an animation to play out but
-        // the tile's position for this instant: it holds the tile still while its slot moves
-        // underneath it, and the next pointermove rewrites it from the pointer's own delta. Playing
-        // it out to nothing here would drag the tile back into its slot and out of the finger's
-        // hand on every crossing.
-        continue;
-      }
       requestAnimationFrame(() => {
         el.style.transition = "transform var(--dur-reorder) var(--ease-settle)";
         el.style.transform = "";
@@ -214,6 +242,8 @@ export function ChannelRail({ channels, selected, onSelect }: ChannelRailProps) 
             origin: slots[index] ?? 0,
             dx: 0,
             dy: 0,
+            compX: 0,
+            compY: 0,
             el,
             moved: false,
           };
@@ -233,13 +263,22 @@ export function ChannelRail({ channels, selected, onSelect }: ChannelRailProps) 
           d.dx = dx;
           d.dy = dy;
           d.el.style.transition = "none";
-          d.el.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(${LIFT_SCALE})`;
+          applyLift(d);
 
-          // Which slot the lifted tile's centre is over now: the last slot it has passed.
+          // Which slot the lifted tile is over now — by nearest slot, not by "the last slot centre
+          // the pointer has passed". The difference is a whole slot: comparing against the centres
+          // hands the tile slot i only once the pointer is a full stride past its own, so a
+          // fraction-of-a-stride drag leaves the tile claiming a slot one away from the one it is
+          // drawn on — it lands squarely on top of the neighbour that just made room, instead of
+          // between two of them, and the first 6px of every drag already commits a swap. The
+          // midpoint between two slots is where the two are equally near, which is exactly when the
+          // swap should happen. The slots share an extent, so the midpoints are evenly spaced and
+          // the rule stays symmetric for a drag in either direction.
           const centre = d.origin + (d.axis === "x" ? dx : dy);
           let target = 0;
-          for (let i = 0; i < d.slots.length; i++) {
-            if (centre > (d.slots[i] ?? 0)) target = i;
+          for (let i = 1; i < d.slots.length; i++) {
+            const mid = ((d.slots[i] ?? 0) + (d.slots[i - 1] ?? 0)) / 2;
+            if (centre > mid) target = i;
           }
           if (target === d.index) return;
 
@@ -281,8 +320,10 @@ export function ChannelRail({ channels, selected, onSelect }: ChannelRailProps) 
           if (!d) return;
           if (d.moved) {
             // Back to where it started, on the same spring, and the neighbours ride back with it.
+            // The carried offset is the tile's whole current transform (`comp + pointer`), not the
+            // pointer delta alone: the settle has to start from where the tile is actually drawn.
             captureRects();
-            lift.current = { id: d.id, dx: d.dx, dy: d.dy, settle: true };
+            lift.current = { id: d.id, dx: d.compX + d.dx, dy: d.compY + d.dy, settle: true };
           } else if (d.el) {
             d.el.style.transition = "transform var(--dur-reorder) var(--ease-settle)";
             d.el.style.transform = "";

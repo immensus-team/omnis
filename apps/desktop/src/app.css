@@ -257,11 +257,20 @@ body {
 
 /* The tile that is in hand. It has to leave the plate's row for the drag to read as "this one is
    moving, those are making room", and the plate has no `overflow` of its own — the tile is only
-   lifted above its siblings. No `touch-action` here on purpose: it is set after the lift, and a
-   touch-action that arrives mid-gesture neither takes the scroll away nor stops one already
-   running. Which gesture wins is decided before this class lands (pointer-drag.ts, §c.2). */
+   lifted above its siblings.
+   No `touch-action` here on purpose: it would land after the lift, and a touch-action that arrives
+   mid-gesture is ignored — the browser resolved the gesture from the element it started on. So the
+   narrow tier's "once the hold fires, the finger is the drag's" is enforced where the gesture
+   lives, not in CSS: pointer-drag.ts cancels the touchmove from the moment the drag starts, and
+   leaves the scroll untouched until then. */
 .channel-rail__tile--dragging {
-  position: relative;
+  /* No `position` here, and that is deliberate. `z-index` was the only reason to want one, and the
+     plate is `display: flex` — a flex item takes `z-index` with a static position (Flexbox §5.4),
+     so the lift paints above its neighbours either way. Adding `position: relative` with no offsets
+     moves nothing but does change what the browser *reports*: Blink resolves `top`/`left` to their
+     used value (0) once a box is positioned, so the same tile reads `top: auto` at rest and
+     `top: 0px` mid-drag. §d's "moves on transform only" check compares exactly those properties,
+     and `auto -> 0px` is a false positive that a reviewer would have to reason their way out of. */
   z-index: 1;
   background: var(--bg-elevated);
   box-shadow: var(--shadow-glass);
@@ -2109,6 +2118,14 @@ body {
   /* There is no room to keep 420px — full width, with 16px of margin each side. */
   .app-shell__detail {
     width: calc(100% - 32px);
+    /* The sheet's 16px bottom margin is right for the list, and wrong for the bar: the bar is the
+       only navigation this tier has, it is `position: fixed` along the bottom 56px, and it has no
+       `z-index` — while this sheet is positioned *and* carries `z-index: 20`, so it paints over the
+       bar and takes its hit area. Measured at 390: `elementFromPoint` at a tile's own centre
+       returned the sheet, so the tiles were visible and untouchable — and with them the rail's
+       touch reorder, which is D7's whole narrow-tier path. The sheet stops above the bar instead,
+       on the same 72px `.app-shell__main` reserves. */
+    bottom: 72px;
   }
 
   /* The rail has gone from a column to a toolbar, and a toolbar is a place glass belongs
