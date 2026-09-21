@@ -1,0 +1,2 @@
+# provenance: synthetic — a session whose cwd is outside every allowed root, so the scanner drops it
+{"type":"user","uuid":"b2b2b2b2-0000-4000-8000-000000000001","sessionId":"0b6c1d2e-0000-4000-8000-000000000002","timestamp":"2026-09-20T11:00:00.000Z","cwd":"/etc/private","isSidechain":false,"message":{"role":"user","content":"Outside the allowed roots."}}

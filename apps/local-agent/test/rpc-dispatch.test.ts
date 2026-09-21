@@ -1,6 +1,6 @@
 import { mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
-import { signApproval, withMeta } from "@omnis/protocol";
+import { type Adapter, signApproval, withMeta } from "@omnis/protocol";
 import { describe, expect, it, vi } from "vitest";
 import { createLogger } from "../src/logger.js";
 import { createDispatcher } from "../src/rpc-dispatch.js";
@@ -32,7 +32,7 @@ const adapter = {
   close: async () => {},
 };
 
-const dispatch = () =>
+const dispatch = (captureAdapterFor?: (channel: string) => Adapter | undefined) =>
   createDispatcher({
     registry: new SessionRegistry(),
     adapters: new Map([["codex", adapter]]),
@@ -41,7 +41,13 @@ const dispatch = () =>
     logger: createLogger("@omnis/local-agent", { sink: () => {} }),
     host: "mini",
     token: TOKEN,
+    ...(captureAdapterFor === undefined ? {} : { captureAdapterFor }),
   });
+
+/** capture.send only reaches these three members, and the contract under test is that it reaches
+ *  them at all (handleCaptureSend's own behaviour is capture.test.ts). */
+const captureStub = (send: Adapter["send"]): Adapter =>
+  ({ id: "capture", channel: "kakaotalk", send }) as unknown as Adapter;
 
 describe("rpc dispatcher", () => {
   it("rejects a request whose _meta carries an unknown version", async () => {
@@ -138,5 +144,36 @@ describe("rpc dispatcher", () => {
       ),
     ).rejects.toMatchObject({ code: -32005 });
     expect(spawn).not.toHaveBeenCalled();
+  });
+
+  // US-C12: the dispatcher is the route the hub actually uses, so a signed capture.send has to come
+  // out the far end at the channel's adapter. handleCaptureSend's own rules live in capture.test.ts.
+  const CAPTURE_APPROVAL = "11111111-1111-4111-8111-111111111111";
+
+  it("routes a signed capture.send to the channel's capture adapter (US-C12)", async () => {
+    const send = vi.fn(() =>
+      Promise.resolve({ externalId: "dry-run:chat-1", sentAt: "2026-09-22T09:00:00.000Z" }),
+    );
+    const payload = {
+      channel: "kakaotalk",
+      thread_external_id: "chat-1",
+      text: "on my way",
+      dry_run: true,
+    };
+    const signed = withMeta({
+      ...payload,
+      approval_id: CAPTURE_APPROVAL,
+      sig: signApproval(TOKEN, CAPTURE_APPROVAL, payload),
+    });
+
+    // No [[capture]] block on this host: the dispatcher's adapterFor default is what answers -32002.
+    await expect(dispatch()("capture.send", signed)).rejects.toMatchObject({ code: -32002 });
+
+    const d = dispatch((channel) => (channel === "kakaotalk" ? captureStub(send) : undefined));
+    expect(await d("capture.send", signed)).toEqual({ preview: "on my way", sent: false });
+    expect(send).toHaveBeenCalledWith(
+      { accountId: "kakaotalk", externalId: "chat-1" },
+      { text: "on my way", meta: { approval_id: CAPTURE_APPROVAL, dry_run: true } },
+    );
   });
 });

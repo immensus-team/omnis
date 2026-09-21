@@ -1,0 +1,34 @@
+{
+  "scenario": "room_renamed_new_chat_id",
+  "raw": {
+    "chat_id": "3003",
+    "chat_name": "omnis launch (renamed)",
+    "sender": "Dana Lee",
+    "is_me": false,
+    "text": "renamed the room for the launch",
+    "timestamp": "2026-09-22T09:20:00+09:00"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "3003",
+        "externalId": "e2ab61ad83cd75f1b231df79c21456ce297a684a9987db3b513ab88869386f6c",
+        "kind": "message",
+        "author": { "kind": "person", "id": "Dana Lee" },
+        "body": "renamed the room for the launch",
+        "attachments": [],
+        "sentAt": "2026-09-22T00:20:00.000Z",
+        "status": "received",
+        "sourceHash": "e2ab61ad83cd75f1b231df79c21456ce297a684a9987db3b513ab88869386f6c",
+        "threadMeta": {
+          "externalId": "3003",
+          "kind": "group",
+          "title": "omnis launch (renamed)",
+          "participants": [{ "externalId": "Dana Lee", "displayName": "Dana Lee" }],
+          "lastItemAt": "2026-09-22T00:20:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

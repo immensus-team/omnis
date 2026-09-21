@@ -1,12 +1,6 @@
 import { Pool } from "pg";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import {
-  AUTONOMY_MAX_MINUTES,
-  autonomyAllows,
-  configureAgents,
-  delegateLoop,
-  renderBrief,
-} from "../../src/index.js";
+import { DelegateOutput, configureAgents, delegateLoop, renderBrief } from "../../src/index.js";
 import { returningId } from "./returning-id.js";
 
 const pool = new Pool({
@@ -57,62 +51,13 @@ describe("renderBrief (A4 §5.3)", () => {
   });
 });
 
-describe("autonomyAllows (A4 §4.4, B-D6)", () => {
-  it("is off by default", () => {
-    expect(
-      autonomyAllows({
-        rules: [],
-        runtime: "claude_ds",
-        repo: "/Users/logankim/x",
-        estMinutes: 5,
-        hasEgress: false,
-      }),
-    ).toBe(false);
-  });
-
-  it("still requires approval for long, out-of-repo or egress work", () => {
-    const rules = [{ runtime: "claude_ds", repo: "/Users/logankim/x" }];
-    expect(
-      autonomyAllows({
-        rules,
-        runtime: "claude_ds",
-        repo: "/Users/logankim/x",
-        estMinutes: 5,
-        hasEgress: false,
-      }),
-    ).toBe(true);
-    expect(
-      autonomyAllows({
-        rules,
-        runtime: "claude_ds",
-        repo: "/Users/logankim/x",
-        estMinutes: AUTONOMY_MAX_MINUTES + 1,
-        hasEgress: false,
-      }),
-    ).toBe(false);
-    expect(
-      autonomyAllows({
-        rules,
-        runtime: "claude_ds",
-        repo: "/Users/other",
-        estMinutes: 5,
-        hasEgress: false,
-      }),
-    ).toBe(false);
-    expect(
-      autonomyAllows({
-        rules,
-        runtime: "claude_ds",
-        repo: "/Users/logankim/x",
-        estMinutes: 5,
-        hasEgress: true,
-      }),
-    ).toBe(false);
-  });
-});
+// US-C04: the `autonomyAllows` block that used to live here moved to
+// packages/kernel/test/delegation-rules.test.ts along with the implementation
+// (`delegationAllowed`). Every assertion it made — off by default, over 30 minutes,
+// outside the repo, egress — is in that file's table, plus the guards it did not cover.
 
 describe("delegateLoop (A4 §5)", () => {
-  it("is T2, fires on an unrouted agent task, and cannot propose hermes", () => {
+  it("is T2 and fires on an unrouted agent task", () => {
     expect(delegateLoop.tier).toBe("T2");
     expect(delegateLoop.trigger.on).toBe("task.created");
     expect(delegateLoop.trigger.where).toContain("routing_rule_id IS NULL");
@@ -129,10 +74,17 @@ describe("delegateLoop (A4 §5)", () => {
       "search_memory",
       "propose_delegation",
     ]);
-    expect(delegateLoop.outputSchema.safeParse({ runtime: "hermes" }).success).toBe(false);
+    // US-C07 / C-D6: hermes is a legal runtime now. Asserted on the field, not on a whole object:
+    // safeParse({runtime:"hermes"}) fails on the six missing required fields whatever the enum says.
+    expect(DelegateOutput.shape.runtime.safeParse("hermes").success).toBe(true);
   });
 
   it("creates a pending approval row, never an execution", async () => {
+    // Scoped to this loop's own window: the integration files share one DB and run serially, and unrelated
+    // files (schema-0004/0007, transcript-route) leave their own agent_sessions rows behind, so a global
+    // count(*) only held when this file happened to run first. Scoped, it still fails if the loop ever opens
+    // a session before the approval is granted — which is the invariant this test is named for.
+    const since = new Date();
     const taskId = returningId(
       await pool.query<{ id: string }>(
         "INSERT INTO tasks (title, owner_kind, created_by) VALUES ('delegation candidate','agent','agent') RETURNING id",
@@ -173,7 +125,8 @@ describe("delegateLoop (A4 §5)", () => {
     expect(rows[0]).toMatchObject({ state: "pending", action: "delegate", risk: "normal" });
     expect(rows[0]?.args.brief).toContain("## Acceptance Criteria");
     const sessions = await pool.query<{ n: string }>(
-      "SELECT count(*)::text AS n FROM agent_sessions",
+      "SELECT count(*)::text AS n FROM agent_sessions WHERE started_at >= $1",
+      [since],
     );
     expect(sessions.rows[0]?.n).toBe("0");
   });

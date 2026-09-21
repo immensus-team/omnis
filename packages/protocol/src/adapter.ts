@@ -185,6 +185,11 @@ export interface Outbound {
   bodyHtml?: string;
   attachments?: OutboundAttachment[];
   replyToExternalId?: string;
+  /** US-C12: what a capture-channel send needs beyond the draft itself. `approval_id` is the
+   *  evidence the hub's relay signs and the mini verifies (`verifyApproval`); `dry_run` is the
+   *  KakaoTalk gate's first half (US-C13) — the mini must not type into the window for it.
+   *  Channels that need no such evidence ignore the field. */
+  meta?: Record<string, unknown>;
 }
 export interface SendResult {
   externalId: string;

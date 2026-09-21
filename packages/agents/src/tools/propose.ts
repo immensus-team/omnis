@@ -1,6 +1,7 @@
 // A4 §1.5·A4-D3: a propose tool writes a row and emits nothing.
-// All propose_delegation does is create one pending_approvals row (action='delegate');
-// the actual execution happens in the kernel's approval handler on the runEgress path (A4 §5.4).
+// propose_delegation's normal path is one pending_approvals row (action='delegate'); the actual
+// execution happens in the kernel's approval handler on the runEgress path (A4 §5.4). The one
+// exception is C-D6's disabled hermes target, which writes the task and no card.
 import { type ToolSet, tool } from "ai";
 import { z } from "zod";
 import { getAgentsPool } from "../pool.js";
@@ -48,7 +49,7 @@ export const ProposeTaskInput = z.object({
 });
 export const ProposeDelegationInput = z.object({
   task_id: z.string().uuid(),
-  runtime: z.enum(["claude_code", "codex", "claude_ds", "omnis"]), // B-D7: hermes excluded
+  runtime: z.enum(["claude_code", "codex", "claude_ds", "omnis", "hermes"]), // C-D6: hermes gated
   host: z.enum(["mini", "macbook"]),
   brief: z.string().max(2000),
   acceptance: z.array(z.string()).min(1),
@@ -87,6 +88,16 @@ export type ProposeRouteInput = z.infer<typeof ProposeRouteInput>;
 export type ProposeSelfModelPatchInput = z.infer<typeof ProposeSelfModelPatchInput>;
 
 const OMNIS_RUNTIME = "SELECT id FROM agent_runtimes WHERE runtime = 'omnis' LIMIT 1";
+
+/** C-D6: read straight from the settings kv table — @omnis/agents cannot import @omnis/kernel
+ * (biome contract §1), the same way decision/router.ts reads `agents.decision_provider`. A missing
+ * row means the Phase C default applies: Hermes off. */
+async function hermesDelegationEnabled(): Promise<boolean> {
+  const { rows } = await getAgentsPool().query<{ value: unknown }>(
+    "SELECT value FROM settings WHERE key = 'delegation.hermes_enabled'",
+  );
+  return rows[0]?.value === true;
+}
 
 export const PROPOSE_TOOLS: ToolSet = {
   propose_label: tool({
@@ -180,10 +191,19 @@ export const PROPOSE_TOOLS: ToolSet = {
   }),
 
   propose_delegation: tool({
-    description: "Create a delegation approval card. Nothing runs without approval.",
+    description:
+      "Create a delegation approval card. Nothing runs without approval. A hermes target with " +
+      "delegation.hermes_enabled off stores the task only.",
     inputSchema: ProposeDelegationInput,
     execute: async (i) => {
       const pool = getAgentsPool();
+      // C-D6: the flag is false by default, so a hermes proposal still records the decision as a
+      // task but never becomes a card. Nothing could execute it either way — the hub's
+      // `delegationAllowed` rejects a hermes target by the same flag (US-C04).
+      if (i.runtime === "hermes" && !(await hermesDelegationEnabled())) {
+        await pool.query("UPDATE tasks SET kind = 'delegation' WHERE id = $1", [i.task_id]);
+        return { approval_id: null, state: "disabled" as const };
+      }
       const { rows } = await pool.query<{ id: string }>(
         `INSERT INTO pending_approvals (action, args, description, config, risk, task_id,
                                         thread_id, requested_by)

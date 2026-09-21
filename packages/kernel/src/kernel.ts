@@ -1,4 +1,4 @@
-import type { IngestSink } from "@omnis/protocol";
+import type { IngestSink, NormalizedItem } from "@omnis/protocol";
 import type { Pool } from "pg";
 import { type Approvals, createApprovals } from "./approvals.js";
 import { type Audit, createAudit } from "./audit.js";
@@ -12,6 +12,9 @@ export interface KernelDeps {
   pool: Pool;
   now?: () => Date;
   logger?: Logger;
+  /** Extra `items.meta` at ingest — see createIngestSink. The hub marks LinkedIn notification
+   *  emails `partial` (US-C09); every other caller leaves this unset. */
+  itemMeta?: (e: NormalizedItem) => Record<string, unknown> | undefined;
 }
 
 export interface Kernel {
@@ -47,7 +50,13 @@ export function createKernel(deps: KernelDeps): Kernel {
     approvals,
     killSwitch,
     audit,
-    ingest: { sink: createIngestSink({ pool, logger }) },
+    ingest: {
+      sink: createIngestSink({
+        pool,
+        logger,
+        ...(deps.itemMeta ? { itemMeta: deps.itemMeta } : {}),
+      }),
+    },
     async close() {
       await scheduler.stop();
       await events.close();

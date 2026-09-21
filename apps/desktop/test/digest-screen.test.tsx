@@ -7,11 +7,13 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DIGEST_BANNER,
+  DIGEST_EMPTY_COPY,
   DIGEST_WAITING_COPY,
   archivedCount,
   digestDayLabel,
   digestGroups,
   digestHeading,
+  digestIsBuilt,
   digestState,
   monthlyCostLine,
   restoreStatusLine,
@@ -145,6 +147,19 @@ describe("restoreStatusLine (A5 §3.8: the restore is announced, role=status)", 
     expect(restoreStatusLine(12)).toBe("Restored 12 archived items.");
     expect(restoreStatusLine(1)).toBe("Restored 1 archived item.");
     expect(restoreStatusLine(0)).toBe("Nothing left to restore — those items are already back.");
+  });
+});
+
+describe("digestIsBuilt (US-C17: the row the metric job files before the digest is written)", () => {
+  it("is false when the row is missing or has no body yet", () => {
+    expect(digestIsBuilt(undefined)).toBe(false);
+    // 22:40–23:00 KST: `followup_miss` has created the row and merged its metric into it, and the
+    // loop that writes the body has not run. The screen must not report that night as read.
+    expect(digestIsBuilt({ body: "" })).toBe(false);
+  });
+
+  it("is true once the loop has written a body", () => {
+    expect(digestIsBuilt({ body: JSON.stringify({ headline: "Quiet night" }) })).toBe(true);
   });
 });
 
@@ -339,5 +354,15 @@ describe("Digest screen (A5 §3.8)", () => {
     ROWS.digests = [];
     render(<Digest />);
     expect(screen.getByText(DIGEST_WAITING_COPY)).toBeInTheDocument();
+  });
+
+  it("still waits while only the metric job's row is there", () => {
+    // US-C17: between 22:40 and 23:00 the row exists with a metric and no body. Drawing it would
+    // report "Nothing was auto-archived today" about a night the loop has not read yet.
+    ROWS.digests = [{ ...DIGEST_ROW, body: "", metrics: { followup_miss: 2 } }];
+    render(<Digest />);
+
+    expect(screen.getByText(DIGEST_WAITING_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(DIGEST_EMPTY_COPY)).toBeNull();
   });
 });

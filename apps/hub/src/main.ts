@@ -1,10 +1,11 @@
 import { createGmailAdapter } from "@omnis/adapter-gmail";
 import { createGoogleCalendarAdapter } from "@omnis/adapter-google-calendar";
+import { LINKEDIN_EMAIL_PREFIX } from "@omnis/adapter-linkedin";
 import { createOutlookAdapter } from "@omnis/adapter-outlook";
 import { createSlackAdapter } from "@omnis/adapter-slack";
 import { createTelegramAdapter } from "@omnis/adapter-telegram";
 import { configureAgents, startLoops, summarizeThread } from "@omnis/agents";
-import { createPool } from "@omnis/db";
+import { createPool, query } from "@omnis/db";
 import {
   type Logger,
   assertZeroPublication,
@@ -12,7 +13,7 @@ import {
   createLogger,
   recordAdapterHealth,
 } from "@omnis/kernel";
-import type { Channel } from "@omnis/protocol";
+import type { Channel, HostId, NormalizedItem } from "@omnis/protocol";
 import {
   type AdapterFactories,
   type AdapterStatus,
@@ -21,12 +22,19 @@ import {
   loadAccountRows,
   startAdapterLoops,
 } from "./adapters.js";
-import { type BridgeDeps, createBridgeHub } from "./bridge.js";
+import { type BridgeDeps, type BridgeHub, createBridgeHub } from "./bridge.js";
+import {
+  type CaptureRelayRegistry,
+  type CaptureSendExecutor,
+  captureRelayRegistry,
+  startCaptureSendExecutor,
+} from "./capture-relay.js";
 import { type HubConfig, readConfig } from "./config.js";
 import { type DelegateExecutor, startDelegateExecutor } from "./delegate-exec.js";
 import { createHubServer } from "./http.js";
 import { registerIngestJobs } from "./ingest-job.js";
-import { registerStartupJobs } from "./startup-jobs.js";
+import { linkedinFromGmail } from "./linkedin-email-hook.js";
+import { registerStartupJobs, registerTerminalImportJob } from "./startup-jobs.js";
 import { registerSummaryJob } from "./summarize-job.js";
 
 export interface RunningHub {
@@ -35,14 +43,27 @@ export interface RunningHub {
   close(): Promise<void>;
 }
 
+/** US-C12/C-D3: the capture sidecars run on the mini's GUI session (kmsg needs Accessibility,
+ *  LinkedIn needs a logged-in profile), so `capture.send` always goes to the mini. */
+const CAPTURE_HOST: HostId = "mini";
+
 /** US-B45: the real factory table — the one place that knows every channel package. A channel whose
  *  app-level credentials are missing is simply absent from the table, so its accounts log
  *  "adapter skipped: no factory for channel" at boot instead of failing there (no credentials exist
  *  yet). slack/telegram need none: those adapters read their own Keychain items in connect(). */
-function adapterFactories(config: HubConfig): AdapterFactories {
+function adapterFactories(
+  config: HubConfig,
+  captureRelays: CaptureRelayRegistry,
+  call: BridgeHub["call"],
+): AdapterFactories {
   const factories: AdapterFactories = {
     slack: () => createSlackAdapter({}),
     telegram: () => createTelegramAdapter({}),
+    // US-C12: kakaotalk/linkedin have no client in the hub at all — the relay is a façade over the
+    // mini's sidecar, and its items arrive through bridge.ts's capture.items intake. The relay reads
+    // no secret, but buildAdapters skips an account whose auth_ref is null (adapters.ts), so a
+    // capture account still needs an account_secrets row holding a name nobody reads.
+    ...captureRelays.factories({ call, token: config.bridgeToken, host: CAPTURE_HOST }),
   };
   if (config.googleOAuthClientId !== "" && config.googleOAuthClientSecret !== "") {
     const google = {
@@ -65,7 +86,13 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
   const config = readConfig(env);
   const logger = createLogger("@omnis/hub");
   const pool = createPool(env);
-  const kernel = createKernel({ pool, logger });
+  // US-C09 (A1 §2.9): a LinkedIn notification email is a "new message arrived" ping whose body is
+  // only the preview, so its item is written `meta.partial`. The marker travels as item meta, not as
+  // a channel or a column, because the derived item is an ordinary `linkedin` item in every other
+  // respect — US-C10's Playwright adapter fills the real message in later.
+  const itemMeta = (e: NormalizedItem): Record<string, unknown> | undefined =>
+    e.externalId.startsWith(LINKEDIN_EMAIL_PREFIX) ? { partial: true } : undefined;
+  const kernel = createKernel({ pool, logger, itemMeta });
   // Booting with the Zero schema and the publication out of sync shows the desktop an empty inbox.
   // Break at boot instead.
   await assertZeroPublication(pool);
@@ -92,7 +119,16 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
   // turns to the executor, the executor calls back through the bridge — so the hooks are attached
   // to the deps object once the executor exists. bridge.ts reads them per notification, not at
   // creation, so neither construction order can drop a delegation.
-  const bridgeDeps: BridgeDeps = { kernel, pool, logger, token: config.bridgeToken };
+  // One relay table per process: the factories below register into it, and the bridge routes every
+  // capture.items batch through the same instance the subscribe() loop is pumping.
+  const captureRelays = captureRelayRegistry();
+  const bridgeDeps: BridgeDeps = {
+    kernel,
+    pool,
+    logger,
+    token: config.bridgeToken,
+    captureRelays,
+  };
   const bridge = createBridgeHub(bridgeDeps);
   if (config.bridgeToken === "") {
     logger.warn("OMNIS_BRIDGE_TOKEN is empty — WS /bridge refuses every upgrade with 503");
@@ -103,6 +139,14 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
     bridge,
     token: config.bridgeToken,
     killSwitch: kernel.killSwitch,
+    logger,
+  });
+  // US-C13: the other decided-approval executor. It resolves its relay per send, so it does not care
+  // that buildAdapters has not run yet — a `send` cannot be decided before an account row exists.
+  const captureSendExec: CaptureSendExecutor = startCaptureSendExecutor({
+    pool,
+    kernel,
+    relays: captureRelays,
     logger,
   });
   const hookFailed =
@@ -128,11 +172,14 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
     scheduler: kernel.scheduler,
     bridge,
   });
+  // US-C16: the terminal import rides the same slot, and for the same reason — the row
+  // 0015_phase_c.sql seeds is due immediately, and this handler must not run before listen().
+  registerTerminalImportJob(kernel.scheduler, { pool, bridge, logger });
 
   // US-B45: accounts + account_secrets.auth_ref → live adapters. The hub passes the Keychain item
   // *name* only; each adapter fetches the value (A3-D4). With zero connected accounts this is a
   // no-op and the hub still boots.
-  const factories = adapterFactories(config);
+  const factories = adapterFactories(config, captureRelays, bridge.call);
   logger.info("adapter registry", { configured: Object.keys(factories) });
   const accountRows = await loadAccountRows(pool);
   // The status→ok mapping already covers the recovery path: "healthy" is `!== "down"`, so it reaches
@@ -155,7 +202,19 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
   const adapters = adaptersByChannel(boundAdapters);
   const adapterLoops = startAdapterLoops({
     adapters: boundAdapters,
-    sink: kernel.ingest.sink,
+    // US-C09: wrapped, so a LinkedIn message notification seen by the Gmail pipeline emits one more
+    // item on the `linkedin` account. With no linkedin account row (US-C10 has not run) the hook
+    // forwards everything unchanged.
+    sink: linkedinFromGmail({
+      findLinkedInAccount: async () => {
+        const rows = await query<{ id: string }>(
+          pool,
+          "SELECT id FROM accounts WHERE channel = 'linkedin' ORDER BY created_at, id LIMIT 1",
+        );
+        return rows[0]?.id ?? null;
+      },
+      sink: kernel.ingest.sink,
+    }),
     logger,
     recordAdapterHealth: reportAdapterHealth,
   });
@@ -202,8 +261,9 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
         stopIngestWatch();
         stopSummaryJob();
         stopLoops();
-        // Drop the approval NOTIFY subscription before the pool goes away.
+        // Drop the approval NOTIFY subscriptions before the pool goes away.
         delegateExec.stop();
+        captureSendExec.stop();
         // 3) Stop the scheduler and wait for an in-flight tick to release claimed_at (Task 14's stop()).
         // 4) Drop the LISTEN connection.
         await kernel.close();

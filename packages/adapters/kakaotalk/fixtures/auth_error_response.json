@@ -1,0 +1,5 @@
+{
+  "scenario": "auth_error_response",
+  "raw": { "error": "KakaoTalk is not logged in — open KakaoTalk.app and sign in again" },
+  "expected": { "errorKind": "auth_expired" }
+}

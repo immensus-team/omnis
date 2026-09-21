@@ -33,6 +33,7 @@ export * from "./components/status-pill.js";
 // loop-r2-05: the shell's line about whether it can see the hub. It lives here rather than in the
 // desktop app because both apps draw the same shell chrome and only one of them has a Zero socket.
 export * from "./components/connection-banner.js";
+export * from "./components/composer-state.js";
 export * from "./components/session-header.js";
 export * from "./components/group-header.js";
 export * from "./components/filter-chip-bar.js";
@@ -46,7 +47,12 @@ export * from "./components/approval-stack.js";
 // US-B33: the Settings screen names each connected account's channel and draws its mark. Both
 // already exist (the rail and every inbox row render from them), so they are fronted here rather
 // than copied into the app.
-export { CHANNEL_LABEL } from "./lib/row-meta.js";
+//
+// US-C05: RUNTIME_LABEL is fronted for the same reason — the Settings delegation editor names a
+// runtime, and RUNTIME_LABEL is the app's one set of runtime names (the inbox rows and the agent
+// session badges already render from it). A second map in the app would be a second answer to
+// "what is claude_ds called".
+export { CHANNEL_LABEL, RUNTIME_LABEL } from "./lib/row-meta.js";
 export * from "./components/channel-glyph.js";
 export * from "./components/detail-pane.js";
 export { ChevronRight as ChevronRightIcon } from "lucide-react";

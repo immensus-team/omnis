@@ -2,5 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "outDir": "dist", "rootDir": ".", "composite": true },
   "include": ["src/**/*.ts", "test/**/*.ts"],
-  "references": [{ "path": "../../packages/protocol" }]
+  "references": [
+    { "path": "../../packages/adapters/kakaotalk" },
+    { "path": "../../packages/adapters/linkedin" },
+    { "path": "../../packages/protocol" }
+  ]
 }

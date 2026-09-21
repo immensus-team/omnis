@@ -3,6 +3,7 @@
 import { query } from "@omnis/db";
 import type { Kernel, Logger, PendingApproval } from "@omnis/kernel";
 import type { KillSwitch } from "@omnis/kernel";
+import { delegationAllowed, getSetting, parseDelegationRules } from "@omnis/kernel";
 import {
   BRIDGE_ERRORS,
   BridgeError,
@@ -26,6 +27,9 @@ export interface DelegateExecDeps {
 
 export interface DelegateExecutor {
   execute(approvalId: string): Promise<void>;
+  /** C-D5/US-C04: decide a pending delegate approval when an open allow rule covers it. Returns
+   *  without deciding when any A4 §4.4 guard applies — the approval then waits for a human. */
+  applyRules(approvalId: string): Promise<void>;
   onTurnCompleted(host: HostId, p: Record<string, unknown>): Promise<void>;
   /** Called when a host connects, to re-drive the approvals skipped while it was offline.
    *  The plan's DelegateExecutor did not list it; bridge.ts needs a connect hook for A2 §5.4's
@@ -78,14 +82,18 @@ export function startDelegateExecutor(deps: DelegateExecDeps): DelegateExecutor 
 
   /** Direct row read, not `approvals.list()`: list is capped (50 by default) and a decided
    *  approval outside that window would sit unexecuted forever. */
-  async function loadDecided(id: string): Promise<PendingApproval | null> {
+  async function loadApproval(id: string): Promise<PendingApproval | null> {
     const rows = await query<PendingApproval>(
       pool,
       "SELECT * FROM pending_approvals WHERE id = $1",
       [id],
     );
-    const row = rows[0];
-    return row !== undefined && row.state === "decided" ? row : null;
+    return rows[0] ?? null;
+  }
+
+  async function loadDecided(id: string): Promise<PendingApproval | null> {
+    const row = await loadApproval(id);
+    return row !== null && row.state === "decided" ? row : null;
   }
 
   /** Claim then fail. A claim that loses the race means another caller owns the outcome — the
@@ -170,6 +178,80 @@ export function startDelegateExecutor(deps: DelegateExecDeps): DelegateExecutor 
   function failureReason(p: Record<string, unknown>): string {
     const err = p.error as { message?: unknown } | undefined;
     return typeof err?.message === "string" && err.message !== "" ? err.message : "turn failed";
+  }
+
+  /** The only provenance a delegation carries: the task's source item. `source_item_id` is what
+   *  A2-D11 means by "originating from the inbox", and that item's `meta.injection_flags` is the
+   *  same signal A4 §4.4 (and auto-archive) treats as a stop. */
+  async function provenance(a: PendingApproval): Promise<{
+    injectionFlagged: boolean;
+    fromInboxItem: boolean;
+  }> {
+    const fromApproval = a.item_id !== null;
+    if (a.task_id === null) return { injectionFlagged: false, fromInboxItem: fromApproval };
+    const rows = await query<{ source_item_id: string | null; flagged: boolean }>(
+      pool,
+      `SELECT tk.source_item_id,
+              COALESCE(jsonb_array_length(it.meta->'injection_flags'), 0) > 0 AS flagged
+         FROM tasks tk LEFT JOIN items it ON it.id = tk.source_item_id
+        WHERE tk.id = $1`,
+      [a.task_id],
+    );
+    const row = rows[0];
+    if (row === undefined) return { injectionFlagged: false, fromInboxItem: fromApproval };
+    return {
+      injectionFlagged: row.flagged,
+      fromInboxItem: fromApproval || row.source_item_id !== null,
+    };
+  }
+
+  /** C-D5: when an open allow rule covers a pending delegate approval, the rule decides it instead
+   *  of waiting for Logan. It goes through `approvals.decide`, so the row, the NOTIFY it emits and
+   *  the execution path are exactly a human's — only the audit actor differs (`system` with
+   *  `decided_by = "rule:<index>"`). Every A4 §4.4 guard falls back to a human, so the negative
+   *  path here is simply "leave it pending". */
+  async function applyRules(approvalId: string): Promise<void> {
+    const a = await loadApproval(approvalId);
+    if (a === null || a.action !== "delegate" || a.state !== "pending") return;
+    const args = a.args as Record<string, unknown>;
+    const [rulesRaw, hermesEnabled, facts] = await Promise.all([
+      getSetting<unknown>(pool, "delegation.allow_rules", []),
+      getSetting<unknown>(pool, "delegation.hermes_enabled", false),
+      provenance(a),
+    ]);
+    const verdict = delegationAllowed({
+      rules: parseDelegationRules(rulesRaw),
+      hermesEnabled: hermesEnabled === true,
+      runtime: typeof args.runtime === "string" ? args.runtime : "",
+      host: typeof args.host === "string" ? args.host : "",
+      workdir: typeof args.workdir === "string" ? args.workdir : null,
+      estMinutes: typeof args.est_minutes === "number" ? args.est_minutes : null,
+      // No producer writes this yet — propose_delegation's input schema has no egress field. The
+      // slot exists because A4 §4.4 names egress as a guard; a brief that can carry one must not
+      // have it silently dropped.
+      hasEgress: args.egress === true,
+      ...facts,
+    });
+    if (!verdict.allowed) {
+      logger.debug("delegation rule did not allow", { approvalId, reason: verdict.reason });
+      return;
+    }
+    try {
+      await deps.kernel.approvals.decide(
+        approvalId,
+        { decision: "accept" },
+        { kind: "rule", index: verdict.index },
+      );
+    } catch (e) {
+      // A human (or another hub process) decided it first — the guarded UPDATE in decide() is
+      // the mutex between them, and losing it is not an error.
+      logger.debug("delegation rule lost the race", {
+        approvalId,
+        err: e instanceof Error ? e.message : String(e),
+      });
+      return;
+    }
+    logger.info("delegation allowed by rule", { approvalId, index: verdict.index });
   }
 
   async function execute(approvalId: string): Promise<void> {
@@ -269,9 +351,22 @@ export function startDelegateExecutor(deps: DelegateExecDeps): DelegateExecutor 
   }
 
   // A3 §6.2: the DB trigger sends the approval NOTIFY, so a decision taken anywhere (the desktop,
-  // another hub process, a future rule) reaches this executor without a caller.
+  // another hub process, a rule) reaches this executor without a caller.
   const unsubscribe = deps.kernel.events.subscribe("omnis_approval", (p) => {
-    if (p.state !== "decided" || typeof p.id !== "string") return;
+    if (typeof p.id !== "string") return;
+    // C-D5: a *pending* delegate approval may not need a human at all. NOTIFY is at-most-once, so
+    // an approval inserted while no hub was listening stays pending until a human presses — which
+    // is the safe direction and the reason there is no startup sweep here.
+    if (p.state === "pending") {
+      void applyRules(p.id).catch((e: unknown) => {
+        logger.error("delegate executor rules threw", {
+          approvalId: p.id,
+          err: e instanceof Error ? e.message : String(e),
+        });
+      });
+      return;
+    }
+    if (p.state !== "decided") return;
     void execute(p.id).catch((e: unknown) => {
       logger.error("delegate executor threw", {
         approvalId: p.id,
@@ -282,6 +377,7 @@ export function startDelegateExecutor(deps: DelegateExecDeps): DelegateExecutor 
 
   return {
     execute,
+    applyRules,
     onTurnCompleted,
     redrive,
     stop() {

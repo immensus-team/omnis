@@ -1,0 +1,7 @@
+# provenance: synthetic — Claude Code transcript shape, per the plan's US-C14 fixture (not a real session)
+{"type":"user","uuid":"a1a1a1a1-0000-4000-8000-000000000001","sessionId":"0b6c1d2e-0000-4000-8000-000000000001","timestamp":"2026-09-20T10:00:00.000Z","cwd":"/repo/omnis","isSidechain":false,"message":{"role":"user","content":"Wire the import scanner."}}
+{"type":"assistant","uuid":"a1a1a1a1-0000-4000-8000-000000000002","sessionId":"0b6c1d2e-0000-4000-8000-000000000001","timestamp":"2026-09-20T10:00:05.000Z","cwd":"/repo/omnis","isSidechain":false,"message":{"role":"assistant","content":[{"type":"text","text":"Reading the plan first."},{"type":"tool_use","id":"toolu_01","name":"Read","input":{"file_path":"docs/plan.md"}},{"type":"tool_use","id":"toolu_02","name":"Bash","input":{"command":"ls"}}]}}
+{"type":"user","uuid":"a1a1a1a1-0000-4000-8000-000000000003","sessionId":"0b6c1d2e-0000-4000-8000-000000000001","timestamp":"2026-09-20T10:00:07.000Z","cwd":"/repo/omnis","isSidechain":true,"message":{"role":"user","content":"Sidechain line that must be skipped."}}
+this line is not JSON at all
+{"type":"summary","summary":"Not a turn.","leafUuid":"a1a1a1a1-0000-4000-8000-000000000002"}
+{"type":"assistant","uuid":"a1a1a1a1-0000-4000-8000-000000000004","sessionId":"0b6c1d2e-0000-4000-8000-000000000001","timestamp":"2026-09-20T10:00:09.000Z","cwd":"/repo/omnis","isSidechain":false,"message":{"role":"assistant","content":"Plain string content with sk-abcdefghij0123456789ABCDEF and ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 and OMNIS_TEST_TOKEN_KNOWN_VALUE."}}

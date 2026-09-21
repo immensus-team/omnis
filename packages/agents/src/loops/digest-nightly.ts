@@ -24,6 +24,9 @@ export interface NightlyDigest {
   still_open: BriefItem[];
   cost: { month_to_date_usd: number; cap_usd: number; tier_state: string };
   agents: { runs: number; failed: number; delegated: number };
+  /** US-C17: "Missed follow-ups: N" — the count the `followup_miss` job filed on today's row at
+   *  22:40 KST, read back here so the night's body states the phase's exit metric itself. */
+  missed_followups: number;
 }
 
 /** The 7-day window is decided by meta.archived_by.at, so the token is not stored in the digest —
@@ -112,6 +115,19 @@ async function handledToday(pool: Pool, now: Date): Promise<NightlyDigest["handl
   return { count: total, by_channel: by };
 }
 
+/** US-C17: `digests.metrics.followup_miss`, which `runFollowupMiss` merged into today's row twenty
+ *  minutes before this loop runs. No row, or no key, reads as 0 — the sweep found nothing to count.
+ *  The date expression is the one the INSERT below writes `for_date` with, so the two cannot drift
+ *  onto different days around a KST midnight. */
+async function missedFollowups(pool: Pool): Promise<number> {
+  const { rows } = await pool.query<{ missed: string | null }>(
+    `SELECT metrics->>'followup_miss' AS missed
+       FROM digests
+      WHERE kind = 'nightly' AND for_date = (now() AT TIME ZONE 'Asia/Seoul')::date`,
+  );
+  return Number(rows[0]?.missed ?? 0);
+}
+
 async function agentStats(pool: Pool, now: Date): Promise<NightlyDigest["agents"]> {
   const { rows } = await pool.query<{ runs: string; failed: string; delegated: string }>(
     `SELECT count(*)::text AS runs,
@@ -154,13 +170,18 @@ export const nightlyDigestLoop: LoopSpec<NightlyDigestOutputT> = {
       still_open: [],
       cost,
       agents: await agentStats(pool, ctx.now),
+      missed_followups: await missedFollowups(pool),
     };
     const itemIds = digest.auto_archived.flatMap((g) => g.samples.map((s) => s.ref.id));
+    // `metrics` is a shared bag this loop does not own: US-C17's followup_miss job (22:40 KST) and
+    // US-B44's monthly cost report both merge keys into it, so this row's own two keys join theirs
+    // instead of replacing the lot.
     await pool.query(
       `INSERT INTO digests (kind, for_date, body, item_ids, metrics)
        VALUES ('nightly', (now() AT TIME ZONE 'Asia/Seoul')::date, $1, $2::uuid[], $3::jsonb)
        ON CONFLICT (kind, for_date)
-         DO UPDATE SET body = EXCLUDED.body, item_ids = EXCLUDED.item_ids, metrics = EXCLUDED.metrics`,
+         DO UPDATE SET body = EXCLUDED.body, item_ids = EXCLUDED.item_ids,
+                       metrics = digests.metrics || EXCLUDED.metrics`,
       [
         JSON.stringify(digest),
         itemIds,

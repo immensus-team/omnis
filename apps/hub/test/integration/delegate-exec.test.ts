@@ -302,8 +302,8 @@ describe("hub delegation executor (US-C03)", () => {
     await exec.execute(id);
 
     // Wait for the terminal state, not "anything but decided": the executor claims the row
-    // (→ executing) before it reads the kill switch, so a first poll can land on that
-    // intermediate state and race the failure it means to assert.
+    // (→ executing) before it reads the kill switch, so polling on `!== "decided"` can catch that
+    // transient step and race the failure it means to assert.
     await until(async () => ((await approvalRow(id)).state === "failed" ? true : null));
     const row = await approvalRow(id);
     expect(row.state).toBe("failed");

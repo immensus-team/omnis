@@ -1,0 +1,13 @@
+# provenance: synthetic-from-docs
+# A Hermes /v1/responses SSE transcript carrying a command-approval request.
+# Both the approval event name and the response endpoint are UNVERIFIED until S-A2-5 (Task 27) pins the
+# real surface (C-D6). Until then the bridge matches by suffix (`*approval.requested` / `*approval_request`)
+# and requires `id` + `command` on the event, the same shape-agnostic rule it already uses for deltas.
+# The deltas and the terminal events sit *after* the approval on purpose: a blocked read loop would lose them.
+: keepalive
+data: {"type":"response.output_text.delta","delta":"Checking the deploy script."}
+data: {"type":"response.approval.requested","id":"apr_01J8ZQ","command":"git push origin main","description":"Push the release commit to origin/main"}
+: keepalive
+data: {"type":"response.output_text.delta","delta":" Waiting for approval."}
+data: {"type":"response.output_text.done","text":"Checking the deploy script. Waiting for approval."}
+data: {"type":"response.completed"}

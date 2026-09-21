@@ -4,6 +4,7 @@
   "include": ["src"],
   "references": [
     { "path": "../../packages/adapters/gmail" },
+    { "path": "../../packages/adapters/linkedin" },
     { "path": "../../packages/adapters/google-calendar" },
     { "path": "../../packages/adapters/outlook" },
     { "path": "../../packages/adapters/slack" },

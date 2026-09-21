@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import {
+  type Adapter,
   type AgentRuntime,
   BRIDGE_ERRORS,
   BRIDGE_METHODS,
@@ -8,6 +11,7 @@ import {
   type HostId,
   type HumanInterrupt,
   type HumanResponse,
+  ImportScanParams,
   IngestReadParams,
   IngestScanParams,
   JSONRPC_ERRORS,
@@ -21,7 +25,10 @@ import {
   TurnStartParams,
   assertProtocolVersion,
 } from "@omnis/protocol";
+import { handleCaptureSend } from "./capture.js";
 import { runDelegation } from "./delegate.js";
+import { scanClaudeProjects } from "./import/claude-jsonl.js";
+import { scanCodexSessions } from "./import/codex-rollout.js";
 import { handleIngestRead, handleIngestScan } from "./ingest.js";
 import type { Logger } from "./logger.js";
 import { assertPathAllowed } from "./paths.js";
@@ -62,9 +69,18 @@ export interface DispatchDeps {
   host: HostId;
   runtimes?: AgentRuntime[];
   sinkFor?: (s: SessionRecord, turnId: string) => EventSink;
+  /** US-C12: the capture sidecar's adapters, by channel (`startCapture`'s handle). A host with no
+   *  `[[capture]]` block leaves it out and `capture.send` answers RUNTIME_UNAVAILABLE. */
+  captureAdapterFor?: (channel: string) => Adapter | undefined;
   beforeTurn?: (turnId: string) => void;
   afterTurn?: (turnId: string) => void;
   turnCap?: TurnCap;
+  /** US-C14: where `sessions.import_scan` looks. The defaults are a real host's layout; tests point
+   *  `claudeHome` at a fixture tree. */
+  claudeHome?: string;
+  codexHome?: string;
+  /** Secret values this process already holds (the bridge token) — masked out of imported turn text. */
+  importSecrets?: string[];
 }
 
 /** Same rule as `turn.start`: a host with no sink wired is a bug, and the runtime must not be started for it. */
@@ -195,6 +211,42 @@ export function createDispatcher(
           logger: deps.logger,
         });
       }
+
+      // US-C14/US-C15 (C-D7): read-only and pull-based. Each scanner opens nothing but its own
+      // vendor's transcript path, and keeps only sessions whose cwd is inside this host's
+      // allowed_roots. C-D7 flattens those to the union across runtimes — unlike `session.create`,
+      // which is per-runtime, so a Codex rollout under a Claude-only root is still imported.
+      case "sessions.import_scan": {
+        const p = ImportScanParams.parse(params);
+        const since = p.since === null ? null : new Date(p.since);
+        const scanDeps = {
+          claudeHome: deps.claudeHome ?? join(homedir(), ".claude"),
+          codexHome: deps.codexHome ?? join(homedir(), ".codex"),
+          allowedRoots: [...new Set([...deps.allowedRoots.values()].flat())],
+          secrets: deps.importSecrets ?? [],
+        };
+        // Each scanner capped itself at `max_sessions` by *file mtime*, its own freshness signal; this
+        // re-caps the merged list by `started_at`, because mtime is not part of `ImportedSession`. The
+        // two keys disagree for a long-lived session whose file was written recently: it can lose its
+        // own scanner's cap to a shorter, newer-mtime session and then lose the merge to a session that
+        // merely started later. So a small `max_sessions` approximates which sessions are freshest;
+        // which sessions a repeated scan eventually reaches is US-C16's `since` cursor.
+        const sessions = [
+          ...(await scanClaudeProjects(since, p.max_sessions, scanDeps)),
+          ...(await scanCodexSessions(since, p.max_sessions, scanDeps)),
+        ]
+          .sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at))
+          .slice(0, p.max_sessions);
+        return { sessions };
+      }
+
+      case "capture.send":
+        // US-C12: the hub signed this draft with the approval id (A2 §5.1) — handleCaptureSend
+        // verifies that before any adapter sees it.
+        return handleCaptureSend(params, {
+          token: deps.token,
+          adapterFor: deps.captureAdapterFor ?? (() => undefined),
+        });
 
       case "delegate.run":
         // A2 §5.1: the trust boundary is the HMAC the hub put over the brief — runDelegation checks it,

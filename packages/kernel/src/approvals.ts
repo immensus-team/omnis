@@ -47,9 +47,14 @@ export interface PendingApproval {
   fail_reason: string | null;
 }
 
+/** Who decided. A `rule` decision is still a decision — same row, same NOTIFY, same execution
+ *  path — but the audit row records it as `system` so the trail can answer "why did this run
+ *  without me?" (C-D5, master §19 Q10). */
+export type ApprovalActor = { kind: "me" } | { kind: "rule"; index: number };
+
 export interface Approvals {
   propose(i: unknown): Promise<string>;
-  decide(id: string, r: unknown): Promise<void>;
+  decide(id: string, r: unknown, actor?: ApprovalActor): Promise<void>;
   list(f?: {
     state?: ApprovalState;
     thread_id?: string;
@@ -116,7 +121,7 @@ export function createApprovals(deps: ApprovalsDeps): Approvals {
       return row.id;
     },
 
-    async decide(id, r) {
+    async decide(id, r, actor = { kind: "me" }) {
       const v = HumanResponse.parse(r);
       const now = (deps.now ?? ((): Date => new Date()))();
 
@@ -178,15 +183,23 @@ export function createApprovals(deps: ApprovalsDeps): Approvals {
         });
       }
       await deps.audit?.record({
-        actor: "me",
+        actor: actor.kind === "me" ? "me" : "system",
         action: "approval.decided",
         target_table: "pending_approvals",
         target_id: id,
         before: { state: before.state },
-        after: { state: "decided", decision: v.decision },
+        after: {
+          state: "decided",
+          decision: v.decision,
+          ...(actor.kind === "rule" ? { decided_by: `rule:${actor.index}` } : {}),
+        },
         approval_id: id,
       });
-      logger.info("approval decided", { id, decision: v.decision });
+      logger.info("approval decided", {
+        id,
+        decision: v.decision,
+        ...(actor.kind === "rule" ? { by: `rule:${actor.index}` } : {}),
+      });
     },
 
     async list(f) {

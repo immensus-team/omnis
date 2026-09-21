@@ -1,8 +1,11 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { createKakaoTalkAdapter } from "@omnis/adapter-kakaotalk";
+import { createLinkedInAdapter } from "@omnis/adapter-linkedin";
 import type { HostId, RuntimeKind } from "@omnis/protocol";
 import WebSocket from "ws";
+import { type CaptureHandle, startCapture } from "./capture.js";
 import { loadConfig } from "./config.js";
 import { hostProfile } from "./host-config.js";
 import { HubClient, type SocketLike } from "./hub-client.js";
@@ -85,6 +88,14 @@ export async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<void
   const allowedRoots = new Map(built.map((b) => [b.kind, b.allowedRoots] as const));
   const runtimeIds = new Map<RuntimeKind, string>();
 
+  // US-C12: the capture sidecar. Both adapters are built with no client — the real kmsg/Playwright
+  // clients are W2 stories (US-C20, US-C25) — so their subscribe() fails and capture.ts keeps
+  // retrying every 30s while reporting `disconnected` to the hub's health path. Nothing is captured
+  // until those clients land, which is exactly what "wiring is proven by the fake-adapter tests" means.
+  // The dispatcher needs the sidecar, the sidecar notifies through the client, and the client is
+  // built with the dispatcher — so the handle is held in a cell filled once `client` exists. A bare
+  // `let` would be equivalent; this shape is the one that says so.
+  const capture: { handle?: CaptureHandle } = {};
   const client: HubClient = new HubClient({
     url: config.hub_url,
     token,
@@ -101,12 +112,29 @@ export async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<void
       logger,
       host: config.host,
       turnCap: new TurnCap({ max: hostProfile(config.host).maxActiveTurns }),
+      // US-C14: the one secret value this process holds is masked out of imported terminal transcripts.
+      importSecrets: [token],
       // runtime event → hub notification → items (A2 §4.1). The client already exists by the time this closure fires.
       sinkFor: (session, turnId): EventSink =>
         createHubSink({ client, session, turnId, logger, outbox, registry }),
+      // Bound below, once startCapture has the client to notify through.
+      captureAdapterFor: (channel) => capture.handle?.adapterFor(channel),
     }),
     // Every reconnect re-registers; the hub upsert tolerates it and hands back the row id each time.
     onOpen: () => handleHubOpen({ client, host: config.host, built, runtimeIds, outbox, logger }),
+  });
+  capture.handle = startCapture(config.capture, {
+    makeAdapter: (channel) =>
+      channel === "kakaotalk" ? createKakaoTalkAdapter({}) : createLinkedInAdapter({}),
+    // A2 §2.2, the hub-sink rule: the socket when it is open, the outbox when it is not.
+    notify: (method, params) => {
+      try {
+        client.notify(method, params);
+      } catch {
+        outbox.append({ method, params });
+      }
+    },
+    logger,
   });
   await client.start();
 }

@@ -1,0 +1,34 @@
+{
+  "scenario": "text_message",
+  "raw": {
+    "chat_id": "1001",
+    "chat_name": "omnis launch",
+    "sender": "Dana Lee",
+    "is_me": false,
+    "text": "sync tomorrow at 10am",
+    "timestamp": "2026-09-22T09:14:03+09:00"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "1001",
+        "externalId": "745a0a911630ce57b34a932ef7fed1fd95e5d028e4102db1a6a486fc137870e0",
+        "kind": "message",
+        "author": { "kind": "person", "id": "Dana Lee" },
+        "body": "sync tomorrow at 10am",
+        "attachments": [],
+        "sentAt": "2026-09-22T00:14:03.000Z",
+        "status": "received",
+        "sourceHash": "745a0a911630ce57b34a932ef7fed1fd95e5d028e4102db1a6a486fc137870e0",
+        "threadMeta": {
+          "externalId": "1001",
+          "kind": "group",
+          "title": "omnis launch",
+          "participants": [{ "externalId": "Dana Lee", "displayName": "Dana Lee" }],
+          "lastItemAt": "2026-09-22T00:14:03.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

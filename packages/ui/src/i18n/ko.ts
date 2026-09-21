@@ -74,6 +74,8 @@ export const ko = {
     viewAll: "모두 보기",
     // 월간 비용 리포트(마스터 §14 비용 정책의 UI 노출 지점). 예: "이번 달 비용 리포트: $34 / $60 (57%)".
     costReport: "이번 달 비용 리포트: {spent} / {limit} ({percent}%)",
+    // US-C17: the nightly digest's follow-up metric line.
+    missedFollowups: "놓친 후속 연락: {n}건",
     restore: "되살리기",
     loading: "오늘 밤 다이제스트는 아직 생성 전이에요, 23:00에 생성됩니다",
     // 빈 상태는 §7.2의 "Notes/Digest 빈 = 담백하게" 지침대로 짧게 — 그래서 emptyStates가 아니라 여기 있다.
@@ -112,6 +114,21 @@ export const ko = {
       // 켤 때 뜨는 경고 다이얼로그 본문은 §8 표 문구(approvals.autonomyOnWarning)를 재사용한다 —
       // §3.9는 "이 채널/사람에게는 …"으로 조금 더 길지만 표가 정본이라 중복 정의하지 않는다.
       allowToggle: "자율 허용",
+    },
+    // US-C05 / A4 §4.4: 자율 실행 탭의 위임 허용 규칙 편집기. 다이얼로그의 Cancel 버튼은 여기서
+    // 중복 정의하지 않는다 — common.dialog.cancel이 같은 단어이고, 한 문자열에 키가 둘이면 둘이
+    // 갈라지는 순간이 온다.
+    delegation: {
+      title: "위임",
+      empty: "승인 없이 실행되는 런타임은 없습니다.",
+      add: "규칙 추가",
+      runtime: "런타임",
+      host: "호스트",
+      repo: "저장소 경로",
+      remove: "삭제",
+      warning: "이 저장소에서 이 런타임으로 보내는 위임은 승인 없이 실행됩니다. 계속할까요?",
+      allow: "허용",
+      hermesHint: "Hermes 승인 확인이 먼저 필요합니다",
     },
     modelTiers: {
       spentHeading: "이번 달 현재 지출",
@@ -175,6 +192,15 @@ export const ko = {
     composerReadOnly: "이 채널은 승인 후 발신",
     // inferred, not in §8/§3 verbatim — Composer는 §3.2가 이름만 대고 플레이스홀더 문구는 주지 않음.
     composerPlaceholder: "메시지를 입력하세요",
+    // US-C17: the states a capture channel shows instead of the composer (composer-state.tsx).
+    // {n} is the days remaining; at 0 the block uses kakaoToday instead. Both locales must keep
+    // the same variable set — the i18n drift test compares them key path by key path.
+    composerState: {
+      kakaoDays: "{n}일 후 발신할 수 있습니다",
+      kakaoToday: "오늘 설정에서 켜면 발신할 수 있습니다",
+      linkedinSummaryOnly: "요약만 — 답장하려면 캡처 호스트가 필요합니다",
+      whatsappPilot: "파일럿 확인 전까지 발신이 꺼져 있습니다",
+    },
   },
   agentSession: {
     readOnly: "읽기 전용",

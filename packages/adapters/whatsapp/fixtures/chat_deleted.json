@@ -1,0 +1,10 @@
+{
+  "scenario": "chat.deleted — like message.deleted it is an IDs-only frame and yields no item; v1 does not archive or remove a thread from a Beeper deletion",
+  "raw": {
+    "type": "chat.deleted",
+    "seq": 44,
+    "ts": 1758531100000,
+    "ids": ["!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost"]
+  },
+  "expected": { "items": [] }
+}

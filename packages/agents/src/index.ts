@@ -146,14 +146,7 @@ export {
   type TaskOutputT,
 } from "./loops/task.js";
 export { renderBrief, type BriefInput } from "./delegate/brief.js";
-export {
-  AUTONOMY_MAX_MINUTES,
-  DelegateOutput,
-  autonomyAllows,
-  delegateLoop,
-  type AutonomyRule,
-  type DelegateOutputT,
-} from "./loops/delegate.js";
+export { DelegateOutput, delegateLoop, type DelegateOutputT } from "./loops/delegate.js";
 export {
   DRAFT_PLACEHOLDER_MS,
   DRAFT_SLA_MS,

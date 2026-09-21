@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- US-C18 (A1 §2.8). Keeps KakaoTalk.app alive in the mini's GUI session, where the capture sidecar reads
+     its UI through the AX API. `/usr/bin/open -g` never steals focus and is idempotent, so the 5-minute
+     interval only ever re-launches the app after a crash. install.sh copies this file into
+     ~/Library/LaunchAgents but does NOT load it — US-C21 bootstraps it when the channel goes live. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.omnis.kakaotalk</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/open</string>
+    <string>-g</string>
+    <string>-a</string>
+    <string>KakaoTalk</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>StartInterval</key><integer>300</integer>
+  <key>LimitLoadToSessionType</key><string>Aqua</string>
+</dict>
+</plist>

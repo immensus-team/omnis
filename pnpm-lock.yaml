@@ -145,6 +145,9 @@ importers:
       '@omnis/adapter-google-calendar':
         specifier: workspace:*
         version: link:../../packages/adapters/google-calendar
+      '@omnis/adapter-linkedin':
+        specifier: workspace:*
+        version: link:../../packages/adapters/linkedin
       '@omnis/adapter-outlook':
         specifier: workspace:*
         version: link:../../packages/adapters/outlook
@@ -185,6 +188,12 @@ importers:
 
   apps/local-agent:
     dependencies:
+      '@omnis/adapter-kakaotalk':
+        specifier: workspace:*
+        version: link:../../packages/adapters/kakaotalk
+      '@omnis/adapter-linkedin':
+        specifier: workspace:*
+        version: link:../../packages/adapters/linkedin
       '@omnis/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -292,6 +301,32 @@ importers:
         specifier: 2.1.9
         version: 2.1.9(@types/node@22.7.5)(jsdom@25.0.1)(terser@5.51.2)
 
+  packages/adapters/kakaotalk:
+    dependencies:
+      '@omnis/protocol':
+        specifier: workspace:*
+        version: link:../../protocol
+    devDependencies:
+      typescript:
+        specifier: 5.6.3
+        version: 5.6.3
+      vitest:
+        specifier: 2.1.9
+        version: 2.1.9(@types/node@22.7.5)(jsdom@25.0.1)(terser@5.51.2)
+
+  packages/adapters/linkedin:
+    dependencies:
+      '@omnis/protocol':
+        specifier: workspace:*
+        version: link:../../protocol
+    devDependencies:
+      typescript:
+        specifier: 5.6.3
+        version: 5.6.3
+      vitest:
+        specifier: 2.1.9
+        version: 2.1.9(@types/node@22.7.5)(jsdom@25.0.1)(terser@5.51.2)
+
   packages/adapters/outlook:
     dependencies:
       '@microsoft/microsoft-graph-client':
@@ -332,6 +367,19 @@ importers:
       '@mtcute/node':
         specifier: 0.29.1
         version: 0.29.1(ws@8.21.3)
+      '@omnis/protocol':
+        specifier: workspace:*
+        version: link:../../protocol
+    devDependencies:
+      typescript:
+        specifier: 5.6.3
+        version: 5.6.3
+      vitest:
+        specifier: 2.1.9
+        version: 2.1.9(@types/node@22.7.5)(jsdom@25.0.1)(terser@5.51.2)
+
+  packages/adapters/whatsapp:
+    dependencies:
       '@omnis/protocol':
         specifier: workspace:*
         version: link:../../protocol

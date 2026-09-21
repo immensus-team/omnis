@@ -1,0 +1,48 @@
+{
+  "scenario": "an edited message upserts the same id, so sourceHash is unchanged and the kernel's source_hash uniqueness makes the edit a no-op on the timeline (the fixup is a Phase-B concern, not a duplicate row)",
+  "raw": {
+    "type": "message.upserted",
+    "data": {
+      "id": "1343993",
+      "accountID": "local-whatsapp_ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc",
+      "chatID": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+      "senderID": "@15550101002:local-whatsapp.localhost",
+      "senderName": "Dana Lee",
+      "sortKey": "455171049984",
+      "timestamp": "2026-09-22T09:14:03.621Z",
+      "editedTimestamp": "2026-09-22T09:15:10.000Z",
+      "type": "TEXT",
+      "text": "Are we still on for tomorrow at 10:30?",
+      "isDeleted": false,
+      "attachments": []
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+        "externalId": "1343993",
+        "kind": "message",
+        "author": { "kind": "person", "id": "@15550101002:local-whatsapp.localhost" },
+        "body": "Are we still on for tomorrow at 10:30?",
+        "attachments": [],
+        "sentAt": "2026-09-22T09:14:03.621Z",
+        "status": "received",
+        "sourceHash": "1343993",
+        "threadMeta": {
+          "externalId": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+          "kind": "dm",
+          "title": null,
+          "participants": [
+            {
+              "externalId": "@15550101002:local-whatsapp.localhost",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2026-09-22T09:14:03.621Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

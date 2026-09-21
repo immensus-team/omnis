@@ -1,0 +1,84 @@
+{
+  "scenario": "a REST listMessages row (bare message, not an event envelope) with an image attachment and no text — the attachment is the item's whole content",
+  "raw": {
+    "id": "1344010",
+    "accountID": "local-whatsapp_ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc",
+    "chatID": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+    "senderID": "@15550101002:local-whatsapp.localhost",
+    "senderName": "Dana Lee",
+    "sortKey": "455171051200",
+    "timestamp": "2026-09-22T09:20:11.500Z",
+    "type": "IMAGE",
+    "text": "",
+    "isSender": false,
+    "isDeleted": false,
+    "attachments": [
+      {
+        "type": "img",
+        "id": "mxc://local-whatsapp.localhost/AbCdEf0123456789",
+        "srcURL": "http://localhost:23373/v1/assets/mxc%3A%2F%2Flocal-whatsapp.localhost%2FAbCdEf0123456789",
+        "mimeType": "image/jpeg",
+        "fileName": "screenshot.jpg",
+        "fileSize": 184320,
+        "size": { "width": 1170, "height": 2532 }
+      }
+    ],
+    "chat": {
+      "id": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+      "accountID": "local-whatsapp_ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc",
+      "network": "whatsapp",
+      "title": "Dana Lee",
+      "type": "single",
+      "unreadCount": 1,
+      "participants": {
+        "hasMore": false,
+        "total": 2,
+        "items": [
+          {
+            "id": "@ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc:local-whatsapp.localhost",
+            "fullName": "Logan Kim",
+            "isSelf": true
+          },
+          { "id": "@15550101002:local-whatsapp.localhost", "fullName": "Dana Lee" }
+        ]
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+        "externalId": "1344010",
+        "kind": "message",
+        "author": { "kind": "person", "id": "@15550101002:local-whatsapp.localhost" },
+        "body": "",
+        "attachments": [
+          {
+            "kind": "image",
+            "url": "http://localhost:23373/v1/assets/mxc%3A%2F%2Flocal-whatsapp.localhost%2FAbCdEf0123456789",
+            "mimeType": "image/jpeg",
+            "sizeBytes": 184320,
+            "caption": "screenshot.jpg"
+          }
+        ],
+        "sentAt": "2026-09-22T09:20:11.500Z",
+        "status": "received",
+        "sourceHash": "1344010",
+        "threadMeta": {
+          "externalId": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+          "kind": "dm",
+          "title": "Dana Lee",
+          "participants": [
+            {
+              "externalId": "@ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc:local-whatsapp.localhost",
+              "displayName": "Logan Kim"
+            },
+            { "externalId": "@15550101002:local-whatsapp.localhost", "displayName": "Dana Lee" }
+          ],
+          "lastItemAt": "2026-09-22T09:20:11.500Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

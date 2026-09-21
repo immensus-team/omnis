@@ -91,8 +91,16 @@ async function upsertThread(
 /** The only entry point adapters push into (contract §3.3 IngestSink).
  *  US-B03: fills author_person_id and threads.participants. author_is_me stays false for now
  *  because the kernel does not yet have the user's identity list (US-B34 onboarding fills it). */
-export function createIngestSink(deps: { pool: Pool; logger: Logger }): IngestSink {
-  const { pool, logger } = deps;
+export function createIngestSink(deps: {
+  pool: Pool;
+  logger: Logger;
+  /** Extra `items.meta` for an item, written in the INSERT's own transaction. `NormalizedItem` has no
+   *  meta field, so an item that must be marked at ingest (US-C09: a LinkedIn notification email is
+   *  a `partial` "new message arrived" ping, preview only) is marked here instead of by a follow-up
+   *  UPDATE — a row is never readable without its marker, and no column is added. */
+  itemMeta?: (e: NormalizedItem) => Record<string, unknown> | undefined;
+}): IngestSink {
+  const { pool, logger, itemMeta } = deps;
   const channelCache = new Map<string, Channel>();
   return async (accountId, e) => {
     if (!isItem(e)) {
@@ -150,8 +158,9 @@ export function createIngestSink(deps: { pool: Pool; logger: Logger }): IngestSi
       await query(
         c,
         `INSERT INTO items (thread_id, account_id, external_id, kind, status, author_person_id,
-                            author_agent_id, subject, body, body_html, attachments, sent_at, source_hash)
-           VALUES ($1,$2,$3,$4,'received',$5,$6,$7,$8,$9,$10::jsonb,$11,$12)
+                            author_agent_id, subject, body, body_html, attachments, sent_at, source_hash,
+                            meta)
+           VALUES ($1,$2,$3,$4,'received',$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13::jsonb)
            ON CONFLICT (account_id, source_hash) WHERE source_hash IS NOT NULL DO NOTHING`,
         [
           threadId,
@@ -166,6 +175,7 @@ export function createIngestSink(deps: { pool: Pool; logger: Logger }): IngestSi
           JSON.stringify(e.attachments),
           e.sentAt,
           e.sourceHash,
+          JSON.stringify(itemMeta?.(e) ?? {}),
         ],
       );
 

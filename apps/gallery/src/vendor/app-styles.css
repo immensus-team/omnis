@@ -1854,6 +1854,9 @@ h1[tabindex="-1"]:focus {
 .thread-screen__item,
 .agent-session-screen__turn,
 .agent-session-screen__system-log,
+/* US-C16: the read-only badge is one more block of this timeline's rhythm, not a surface with
+   spacing of its own — the header above it already owns the 16px under the hairline. */
+  .agent-session-screen__readonly,
 .tool-call-badge,
 .approval-card,
 .reply-composer,
@@ -6308,6 +6311,15 @@ button.today-screen__event-title:focus-visible {
   border-radius: 8px;
   background: var(--bg-elevated);
   font-size: 13px;
+}
+
+/* US-C05: one delegation rule, read as the sentence it is ("Claude Code on the MacBook in
+   /Users/…"). `anywhere` and `min-width: 0` are both load-bearing: an absolute path is one
+   unbroken run and a flex item's automatic minimum size would hold it at its full width, which is
+   SKILLS.md gate 11 — one sideways scrollbar at 320/375/414/768 and the task fails. */
+.settings-screen__rule {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* The switch is the native-looking one this app already draws elsewhere: a track and a knob, state

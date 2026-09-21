@@ -1,0 +1,30 @@
+{
+  "scenario": "job_alert_ignored",
+  "provenance": "synthetic-from-docs",
+  "note": "A job alert carries a profile URL and a LinkedIn sender address, so only the alert patterns reject it. Recruiter alerts are the highest-volume mail LinkedIn sends; treating them as messages would bury the inbox.",
+  "raw": {
+    "threadExternalId": "19bc4f2a3d5e6f73",
+    "externalId": "19bc4f2a3d5e6f73",
+    "kind": "email",
+    "author": { "kind": "person", "id": "jobalerts-noreply@linkedin.com" },
+    "body": "Subject: New jobs for you at Acme Robotics\n\nDana Lee, 5 new jobs match your profile.\n\nApply now: https://www.linkedin.com/jobs/view/4012345678/\n\nhttps://www.linkedin.com/in/dana-lee-8b1c2",
+    "attachments": [],
+    "sentAt": "2026-09-22T09:35:00.000Z",
+    "status": "received",
+    "sourceHash": "<li-jobs-001@linkedin.com>",
+    "threadMeta": {
+      "externalId": "19bc4f2a3d5e6f73",
+      "kind": "email",
+      "title": "New jobs for you at Acme Robotics",
+      "participants": [
+        { "externalId": "jobalerts-noreply@linkedin.com", "displayName": "LinkedIn" },
+        { "externalId": "logan@example.com", "displayName": "Logan Kim" }
+      ],
+      "lastItemAt": "2026-09-22T09:35:00.000Z",
+      "archivedAt": null
+    }
+  },
+  "expected": {
+    "item": null
+  }
+}

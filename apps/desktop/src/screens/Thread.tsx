@@ -6,6 +6,7 @@ import {
   AttachmentCardView,
   type AttachmentItem,
   ChannelGlyph,
+  ComposerState,
   DraftCard,
   InfoIcon,
   type KeyValueRow,
@@ -21,6 +22,7 @@ import {
   ToolCallBadge,
   type ToolCallState,
   type UiItemStatus,
+  composerBlockFor,
   toast,
   useFloatingPane,
   useNarrowShell,
@@ -49,6 +51,9 @@ export interface ThreadQueryItem {
   sent_at?: number;
   attachments?: AttachmentItem[];
   tool?: { name: string; state?: ToolCallState } | null;
+  /** items.meta — US-C17 reads `meta.partial`, the marker US-C09 stamps on a LinkedIn notification
+   *  email (a "new message arrived" preview, not the message). */
+  meta?: { partial?: boolean } | null;
   /** items.author (zero-schema's `related("author")` → persons). */
   author?: { display_name: string } | null;
 }
@@ -84,6 +89,15 @@ export function foldDraft<T extends ThreadQueryItem>(
     inThread.find((a) => a.item_id === draft.id) ??
     inThread.find((a) => typeof a.args?.body === "string" && a.args.body === draft.body);
   return { draft, draftApproval };
+}
+
+/** US-C17: is this thread only what the capture host previewed? A LinkedIn notification email is
+ *  ingested as a `partial` ping (US-C09 marks it at ingest), and a thread whose every item is one of
+ *  those has no message in it to reply to — the words are on the host. One real message is enough to
+ *  make the thread ordinary again, which is why this is `every` and not `some`: a ping that later
+ *  gained the conversation it was pinging about must stop saying "summary only". */
+export function threadIsPartial(items: ThreadQueryItem[]): boolean {
+  return items.length > 0 && items.every((item) => item.meta?.partial === true);
 }
 
 /** US-D03: the detail header's segments (the reference's "Price | PPSF" control turned into the
@@ -259,9 +273,8 @@ export function Thread({
   const participantNames = (thread?.participants ?? [])
     .map((id) => personById.get(id))
     .filter((name): name is string => Boolean(name));
-  const channel =
-    (accounts.find((a) => a.id === thread?.account_id)?.channel as keyof typeof CHANNEL_LABEL) ??
-    null;
+  const account = accounts.find((a) => a.id === thread?.account_id);
+  const channel = (account?.channel as keyof typeof CHANNEL_LABEL) ?? null;
   // The title follows the inbox row's chain (thread title -> participant -> channel handle), so the
   // pane and the row it opened from name the same conversation the same way.
   const title = thread?.title || participantNames[0] || thread?.external_id || "Thread";
@@ -295,6 +308,27 @@ export function Thread({
     const flowApprovals = (approvals ?? []).filter((a) => a.id !== draftApproval?.id);
     return threadFlow(flowItems, flowApprovals, threadId);
   }, [typedItems, approvals, threadId, draft, draftApproval]);
+
+  // US-C17: what the composer would be able to do, decided before it is drawn. A capture channel
+  // whose send is closed draws `ComposerState` where the composer goes, instead of a box that fails
+  // at the far end of an approval. (The composer is loop-r2-03's and is not on this branch: until it
+  // lands, no channel can send from this pane, so the block is a state of that slot rather than a
+  // claim that the channels without one can.)
+  //
+  // `accounts.capabilities` is the adapter's own self-description, replicated as a json column — the
+  // capture relay is what reports it for kakaotalk/linkedin/whatsapp (captureCapabilities in
+  // apps/hub/src/capture-relay.ts), and the kernel's own KakaoTalk gate (US-C13) is the producer for
+  // `kakaoDaysRemaining`. Nothing writes either for a capture account yet, so a channel that has not
+  // said `write: true` reads as closed: for these three channels that is also what is true today —
+  // the mini's kmsg adapter sends nothing until its gate opens.
+  const caps = (account?.capabilities ?? {}) as { write?: boolean; kakaoDaysRemaining?: unknown };
+  const composerBlock = composerBlockFor({
+    channel: channel ?? "",
+    canWrite: caps.write === true,
+    partial: threadIsPartial(typedItems),
+    kakaoDaysRemaining:
+      typeof caps.kakaoDaysRemaining === "number" ? caps.kakaoDaysRemaining : null,
+  });
 
   // The thread's own facts, in the one component allowed to draw hairlines.
   // The Label action's panel: the thread's labels through thread_labels (items have no labels
@@ -617,6 +651,11 @@ export function Thread({
                 onCancel={() => setComposing(null)}
               />
             )}
+            {/* US-C17: the slot the composer belongs in. The composer itself is loop-r2-03's and is
+                not on this branch, so today this is where every conversation ends; the contract the
+                story fixes is that a non-null block is exactly the case where nothing may be typed,
+                so the composer lands here, behind this same condition, rather than beside it. */}
+            {composerBlock !== null && <ComposerState block={composerBlock} />}
           </>
         )}
       </div>

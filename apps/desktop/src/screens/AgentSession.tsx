@@ -3,6 +3,7 @@ import {
   ApprovalStack,
   type ApprovalStackItem,
   SessionHeader,
+  StatusPill,
   ToolCallBadge,
   type ToolCallState,
 } from "@omnis/ui";
@@ -57,6 +58,19 @@ interface RuntimeRow {
  *  line (§9 checklist). */
 export function isSystemExecutionLog(item: SessionQueryItem): boolean {
   return item.kind === "system";
+}
+
+/** US-C16 (C-D7): the badge an imported transcript carries. Exact copy — it names both halves of
+ *  what the row is: what it is for (reading) and where it came from (a terminal, not this app). */
+export const READ_ONLY_SESSION_LABEL = "Read-only · opened in a terminal";
+
+/** US-C16: is this thread one of the sessions the terminal import opened? `threads.external_id` is
+ *  the session key (`agent:<runtime>:<host>:<purpose>`, A2-D1) and the import's whole purpose
+ *  segment is `term-<source id>`, so the key is the only marker needed — no column, no second
+ *  source of truth that could disagree with it. */
+export function isImportedSessionKey(sessionKey: string | undefined): boolean {
+  if (sessionKey === undefined) return false;
+  return (sessionKey.split(":")[3] ?? "").startsWith("term-");
 }
 
 /** loop-r1-07: whether a tool call has anything to expand. The hub writes `meta.input ?? {}`, so an
@@ -178,7 +192,9 @@ export function AgentSession({
   );
   const runtime = (runtimeRows as unknown as RuntimeRow[])[0];
   const [threadRows] = useQuery(zero.query.threads.where("id", "=", sessionThreadId));
-  const title = (threadRows as unknown as { title?: string | null }[])[0]?.title ?? null;
+  const thread = (threadRows as unknown as { title?: string | null; external_id?: string }[])[0];
+  const title = thread?.title ?? null;
+  const readOnly = isImportedSessionKey(thread?.external_id);
 
   const typedItems = items as unknown as SessionQueryItem[];
   const waiting = (approvals ?? []).filter((a) => a.thread_id === sessionThreadId);
@@ -205,6 +221,15 @@ export function AgentSession({
   return (
     <div className="agent-session-screen">
       {header}
+      {/* US-C16 (C-D7): an imported transcript says so, right under the header that names it. This
+          screen draws no composer for any session — a live one has nothing to send either until the
+          story that owns sending lands — so the badge is the whole of the read-only surface, and
+          `turn.start` is refused at the hub for the session itself rather than only here. */}
+      {readOnly && (
+        <p className="agent-session-screen__readonly">
+          <StatusPill tone="neutral" label={READ_ONLY_SESSION_LABEL} />
+        </p>
+      )}
       {/* loop-r1-07: the queue used to sit *above* this screen (App.tsx), which is what an agent
           session with a pending approval looked like: a card, and then a "Blocked" session that
           never said what it was blocked on. It is the same stack, in the place the thread screen

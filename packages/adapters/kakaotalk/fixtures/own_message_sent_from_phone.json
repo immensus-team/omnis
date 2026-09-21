@@ -1,0 +1,34 @@
+{
+  "scenario": "own_message_sent_from_phone",
+  "raw": {
+    "chat_id": "1001",
+    "chat_name": "omnis launch",
+    "sender": "Logan Kim",
+    "is_me": true,
+    "text": "sent from my phone",
+    "timestamp": "2026-09-22T09:22:11+09:00"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "1001",
+        "externalId": "6cd7751503b62b2b7a9cac70926a70d64dcdb9574359fec069db867e5c272dc5",
+        "kind": "message",
+        "author": { "kind": "person", "id": "me" },
+        "body": "sent from my phone",
+        "attachments": [],
+        "sentAt": "2026-09-22T00:22:11.000Z",
+        "status": "received",
+        "sourceHash": "6cd7751503b62b2b7a9cac70926a70d64dcdb9574359fec069db867e5c272dc5",
+        "threadMeta": {
+          "externalId": "1001",
+          "kind": "group",
+          "title": "omnis launch",
+          "participants": [{ "externalId": "me", "displayName": "Logan Kim" }],
+          "lastItemAt": "2026-09-22T00:22:11.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

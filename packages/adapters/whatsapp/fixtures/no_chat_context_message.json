@@ -1,0 +1,44 @@
+{
+  "scenario": "a message.upserted whose chat was never listed (the adapter's chat cache missed it). The item is still emitted — dropping it would lose the message until the next REST poll — but threadMeta can only be the sender, and kind falls back to 'dm'. This is the pinned ceiling of the cache design: threads.kind is written on insert only (packages/kernel/src/ingest.ts:79), so a group whose very first delivery is a cache miss stays a dm until Phase B re-pins it. connect() lists the chats precisely to keep this window to the seconds after startup",
+  "raw": {
+    "type": "message.upserted",
+    "data": {
+      "id": "1344100",
+      "accountID": "local-whatsapp_ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc",
+      "chatID": "!whatsapp_15550101234:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+      "senderID": "@15550101234:local-whatsapp.localhost",
+      "senderName": "Priya Nair",
+      "sortKey": "455171080000",
+      "timestamp": "2026-09-22T11:00:00.000Z",
+      "type": "TEXT",
+      "text": "Sending the deck over now.",
+      "isDeleted": false,
+      "attachments": []
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "!whatsapp_15550101234:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+        "externalId": "1344100",
+        "kind": "message",
+        "author": { "kind": "person", "id": "@15550101234:local-whatsapp.localhost" },
+        "body": "Sending the deck over now.",
+        "attachments": [],
+        "sentAt": "2026-09-22T11:00:00.000Z",
+        "status": "received",
+        "sourceHash": "1344100",
+        "threadMeta": {
+          "externalId": "!whatsapp_15550101234:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+          "kind": "dm",
+          "title": null,
+          "participants": [
+            { "externalId": "@15550101234:local-whatsapp.localhost", "displayName": "Priya Nair" }
+          ],
+          "lastItemAt": "2026-09-22T11:00:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

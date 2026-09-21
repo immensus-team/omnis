@@ -2,11 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { createPool, one, query } from "@omnis/db";
 import { type Kernel, createKernel, createLogger } from "@omnis/kernel";
-import { PROTOCOL_VERSION, RuntimeRegisteredResult } from "@omnis/protocol";
+import { type NormalizedItem, PROTOCOL_VERSION, RuntimeRegisteredResult } from "@omnis/protocol";
 import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 import { type BridgeHub, createBridgeHub } from "../../src/bridge.js";
+import { type CaptureRelayRegistry, captureRelayRegistry } from "../../src/capture-relay.js";
 import { readConfig } from "../../src/config.js";
 import { createHubServer } from "../../src/http.js";
 
@@ -15,18 +16,23 @@ const TOKEN = "test-bridge-token";
 let pool: Pool;
 let kernel: Kernel;
 let bridge: BridgeHub;
+let captureRelays: CaptureRelayRegistry;
 let server: ReturnType<typeof createHubServer>;
 let base: string;
 
 beforeAll(async () => {
   pool = createPool();
   kernel = createKernel({ pool, logger: createLogger("@omnis/hub") });
+  // US-C12: the same registry object main.ts hands the bridge and the adapter factories, so a
+  // capture.items batch lands on the very relay the subscribe() loop pumps.
+  captureRelays = captureRelayRegistry();
   bridge = createBridgeHub({
     kernel,
     pool,
     logger: createLogger("@omnis/hub"),
     token: TOKEN,
     heartbeatMs: 250,
+    captureRelays,
   });
   server = createHubServer({
     kernel,
@@ -354,12 +360,15 @@ describe("heartbeat", () => {
       version: "1.0.0",
       capabilities: {},
     });
+    // Wait for *this* registration, not merely "some row is online": other integration files seed
+    // claude_ds@macbook as online in their beforeAll, and matching that row would let terminate()
+    // race runtime.registered — the upsert would then write online back over markOffline.
     await until(async () => {
-      const rows = await query<{ state: string }>(
+      const rows = await query<{ state: string; version: string | null }>(
         pool,
-        "SELECT state FROM agent_runtimes WHERE runtime = 'claude_ds' AND host = 'macbook'",
+        "SELECT state, version FROM agent_runtimes WHERE runtime = 'claude_ds' AND host = 'macbook'",
       );
-      return rows[0]?.state === "online" ? true : null;
+      return rows[0]?.state === "online" && rows[0]?.version === "1.0.0" ? true : null;
     });
 
     client.ws.terminate();
@@ -371,5 +380,69 @@ describe("heartbeat", () => {
       return rows[0]?.state === "offline" ? true : null;
     });
     expect(bridge.hosts()).toEqual([]);
+  });
+});
+
+// US-C12: the intake itself is unit-tested in test/capture-relay.test.ts, but the hop that carries a
+// batch off the socket is bridge.ts's own route — this is the only test that proves the mini's
+// capture.items notification reaches the relay the adapter loop is subscribed to.
+describe("capture.items over the bridge (US-C12)", () => {
+  const NOW = "2026-09-22T09:00:00.000Z";
+  /** A normalized item as the sidecar batches it, with a distinguishable id per call. */
+  const item = (externalId: string, sourceHash: string): NormalizedItem => ({
+    threadExternalId: "chat-1",
+    externalId,
+    kind: "message",
+    author: { kind: "person", id: "them" },
+    body: "are we still on for 10?",
+    attachments: [],
+    sentAt: NOW,
+    status: "received",
+    sourceHash,
+  });
+
+  it("hands a valid batch to the channel's relay and keeps the rejects out of it", async () => {
+    // Calling the factory is what registers the relay the intake looks up by channel — the same
+    // order buildAdapters runs in at boot.
+    captureRelays.factories({ call: bridge.call, token: TOKEN, host: "macbook" }).kakaotalk?.();
+    const relay = captureRelays.get("kakaotalk");
+    if (relay === undefined) throw new Error("the kakaotalk factory registered no relay");
+    // Bound to its account the way the adapter loop binds it at connect(): without this the relay
+    // accepts any account and the wrong-account batch below would queue.
+    await relay.connect({
+      channel: "kakaotalk",
+      accountExternalId: "kakaotalk:me",
+      keychainService: "omnis.capture.kakaotalk",
+      keychainAccount: "omnis",
+    });
+
+    const client = await connect({});
+    const iterator = relay.subscribe()[Symbol.asyncIterator]();
+
+    // Three batches in arrival order. A notification has no reply, so a bad one is logged and
+    // dropped rather than answered — and neither may reach the queue.
+    client.notify("capture.items", {
+      channel: "kakaotalk",
+      account_external_id: "kakaotalk:me",
+      events: [{ kind: "message" }], // fails the contract union: no author/body/sentAt/sourceHash
+    });
+    client.notify("capture.items", {
+      channel: "kakaotalk",
+      account_external_id: "kakaotalk:work", // not the account this relay serves
+      events: [item("m-other", "hash-other")],
+    });
+    client.notify("capture.items", {
+      channel: "kakaotalk",
+      account_external_id: "kakaotalk:me",
+      events: [item("m-1", "hash-1")],
+    });
+
+    // Notifications are queued in arrival order, so the first event to come out is the valid
+    // batch's — and it is that item, not the wrong-account one. A batch that never made it leaves
+    // this await hanging until the default test timeout fails it.
+    expect((await iterator.next()).value).toEqual(item("m-1", "hash-1"));
+    // The malformed batch did not tear the connection down on its way out.
+    expect(client.ws.readyState).toBe(WebSocket.OPEN);
+    client.ws.close();
   });
 });

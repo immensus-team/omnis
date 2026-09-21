@@ -8,7 +8,20 @@ export {
 } from "./archive.js";
 export type { ArchivedByMeta, ArchivedGroup } from "./archive.js";
 export { ApprovalStateError, createApprovals } from "./approvals.js";
-export type { ApprovalConfig, Approvals, ApprovalsDeps, PendingApproval } from "./approvals.js";
+export type {
+  ApprovalActor,
+  ApprovalConfig,
+  Approvals,
+  ApprovalsDeps,
+  PendingApproval,
+} from "./approvals.js";
+export {
+  AUTONOMY_MAX_MINUTES,
+  DelegationRule,
+  delegationAllowed,
+  parseDelegationRules,
+} from "./delegation-rules.js";
+export type { DelegationFacts, DelegationRuleT, DelegationVerdict } from "./delegation-rules.js";
 export { countUnapprovedSends, createAudit } from "./audit.js";
 export type { Audit, AuditEntry } from "./audit.js";
 export { nextRunAt } from "./cron.js";
@@ -42,6 +55,13 @@ export {
   registerCostReportJob,
 } from "./jobs/cost-report.js";
 export type { CostReportRow, MonthlyCostReport } from "./jobs/cost-report.js";
+export {
+  FOLLOWUP_MISS_CRON,
+  FOLLOWUP_MISS_JOB_NAME,
+  registerFollowupMissJob,
+  runFollowupMiss,
+} from "./jobs/followup-miss.js";
+export type { FollowupMissDeps } from "./jobs/followup-miss.js";
 export {
   TASK_REMIND_CRON,
   TASK_REMIND_JOB_NAME,
@@ -82,6 +102,8 @@ export { createKernel } from "./kernel.js";
 export type { Kernel, KernelDeps } from "./kernel.js";
 export { SETTING_DEFAULTS, getAllSettings, getSetting, setSetting } from "./settings.js";
 export type { SettingKey } from "./settings.js";
+export { KAKAO_STABLE_DAYS, kakaoSendState, kakaoSendStep } from "./kakao-send.js";
+export type { KakaoSendReason, KakaoSendState, KakaoSendStep } from "./kakao-send.js";
 
 export {
   POLICY,

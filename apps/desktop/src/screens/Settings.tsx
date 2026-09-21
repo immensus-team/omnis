@@ -19,6 +19,7 @@ import {
   setKillSwitch,
 } from "../api/settings.js";
 import { type ZeroClient, useZeroClient } from "../zero-client.js";
+import { DelegationRules } from "./settings/DelegationRules.js";
 
 // ─── the four sub-nav sections (A5 §3.9) ────────────────────────────────────────────────────────
 
@@ -537,6 +538,20 @@ export function Settings() {
                 </ul>
               </div>
 
+              {/* US-C05: A4 §4.4's delegation rules, the second half of "what may run without
+                  asking". They are their own key (`delegation.allow_rules`), not entries in
+                  `autonomy.rules` above: the hub's delegate executor reads them through the kernel's
+                  `parseDelegationRules`, and the channel switches on this screen write the whole
+                  `autonomy.rules` array — two writers on one key is how a rule goes missing. The
+                  component owns the parsing of whatever the column holds. */}
+              <DelegationRules
+                rules={settings["delegation.allow_rules"]}
+                hermesEnabled={settings["delegation.hermes_enabled"] === true}
+                onSave={async (next) => {
+                  await write("delegation.allow_rules", next, "Delegation rules saved.");
+                }}
+              />
+
               <div className="settings-screen__field">
                 <h2 className="settings-screen__label">Ingest allowlist</h2>
                 <p className="settings-screen__hint">
@@ -781,6 +796,34 @@ export function Settings() {
                         "notify.vip_override",
                         settings["notify.vip_override"] === false,
                         "VIP override saved.",
+                      )
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* US-C16 (C-D7): reading someone's terminals is opt-in whatever the mode, so this
+                  ships off (`SETTING_DEFAULTS`, 0015_phase_c.sql) and reads as off until a stored
+                  `true` says otherwise. */}
+              <div className="settings-screen__field">
+                <h2 className="settings-screen__label">Terminal sessions</h2>
+                <p className="settings-screen__hint">
+                  Imports Claude Code and Codex transcripts from your hosts every five minutes. They
+                  arrive as read-only sessions, and nothing is sent back to them.
+                </p>
+                <div className="settings-screen__switch-row">
+                  <span>Show terminal sessions (read-only)</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={settings["import.terminal_sessions"] === true}
+                    aria-label="Show terminal sessions (read-only)"
+                    className="settings-screen__switch"
+                    onClick={() =>
+                      void write(
+                        "import.terminal_sessions",
+                        settings["import.terminal_sessions"] !== true,
+                        "Terminal import saved.",
                       )
                     }
                   />

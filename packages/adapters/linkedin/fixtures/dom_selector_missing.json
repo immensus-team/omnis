@@ -1,0 +1,12 @@
+{
+  "scenario": "selector_missing",
+  "provenance": "synthetic-from-docs",
+  "note": "A1 §2.9's first failure mode: a LinkedIn UI update stops a selector from matching, and the extractor answers with the selector it could not find. This is fatal_protocol — the adapter reports health() = degraded, keeps polling on its normal 5-15 minute schedule with no retry burst, and waits for a manual deploy rather than trying to recover.",
+  "raw": {
+    "error": {
+      "selector": "div.msg-s-message-list-container",
+      "message": "element not found"
+    }
+  },
+  "expected": { "errorKind": "fatal_protocol" }
+}

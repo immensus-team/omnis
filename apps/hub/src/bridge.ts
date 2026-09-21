@@ -23,6 +23,7 @@ import {
 } from "@omnis/protocol";
 import type { Pool } from "pg";
 import { type WebSocket, WebSocketServer } from "ws";
+import { type CaptureRelayRegistry, intakeCaptureItems } from "./capture-relay.js";
 import {
   HERDR_STATE,
   type SessionRow,
@@ -30,6 +31,7 @@ import {
   ensureSession,
   hasPendingApproval,
   paletteTool,
+  purposeOf,
   runtimeOf,
   setSessionState,
   writeAgentItem,
@@ -68,6 +70,9 @@ export interface BridgeDeps {
   /** US-C03: called once a host's bridge is attached. The delegation executor re-drives the
    *  approvals that were left decided while that host was offline (A2 §5.4). */
   onHostConnected?: (host: HostId) => void;
+  /** US-C12: the capture relays (capture-relay.ts), keyed by channel. Without one, every
+   *  `capture.items` notification is logged and dropped. */
+  captureRelays?: CaptureRelayRegistry;
 }
 
 export interface BridgeHub {
@@ -429,6 +434,12 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
       await onTurnNotification(conn.host, method, params);
       return null;
     }
+    if (method === "capture.items") {
+      // US-C12: the sidecar's batch → the channel's relay → the same ingest sink every other
+      // adapter feeds. A rejected batch is logged inside the intake; a notification has no reply.
+      await intakeCaptureItems(params, { relays: deps.captureRelays, logger });
+      return null;
+    }
     if (method === "approval.requested") {
       return await onApprovalRequested(conn.host, params);
     }
@@ -563,6 +574,19 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
       throw new BridgeError(
         BRIDGE_ERRORS.CAPABILITY_UNSUPPORTED,
         `${method} is Phase B (contract §8)`,
+      );
+    }
+    // US-C16 (C-D7): `term-*` sessions are imported terminal transcripts — a record of a terminal
+    // that already exited, with no runtime behind it to start a turn. Refused here, before the
+    // connectivity check, because this is a property of the session rather than of the host being
+    // attached: a host that came online must not become a way to type into a read-only transcript.
+    if (
+      method === "turn.start" &&
+      purposeOf(String(params.session_key ?? "")).startsWith("term-")
+    ) {
+      throw new BridgeError(
+        BRIDGE_ERRORS.CAPABILITY_UNSUPPORTED,
+        `${String(params.session_key)} is an imported session and is read-only`,
       );
     }
     // Check connectivity first — do not create session rows or throw on parameters for a host that

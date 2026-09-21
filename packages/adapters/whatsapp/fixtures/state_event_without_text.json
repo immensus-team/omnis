@@ -1,0 +1,20 @@
+{
+  "scenario": "a NOTICE upsert with neither text nor attachments (a state change such as a group icon edit). Emitting an item with an empty body and no media would put a blank row in the inbox, so it is dropped the same way telegram and slack drop theirs",
+  "raw": {
+    "type": "message.upserted",
+    "data": {
+      "id": "2200800",
+      "accountID": "local-whatsapp_ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc",
+      "chatID": "!whatsapp_120363021234567890:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+      "senderID": "@15550109999:local-whatsapp.localhost",
+      "senderName": "Sam Okafor",
+      "sortKey": "455171070000",
+      "timestamp": "2026-09-22T10:05:00.000Z",
+      "type": "NOTICE",
+      "text": "",
+      "isDeleted": false,
+      "attachments": []
+    }
+  },
+  "expected": { "items": [] }
+}
