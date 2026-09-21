@@ -45,8 +45,11 @@ body {
      notched phone does not paint the title under the status bar. */
   min-height: 52px;
   padding-top: env(safe-area-inset-top);
-  padding-left: max(16px, env(safe-area-inset-left));
-  padding-right: max(16px, env(safe-area-inset-right));
+  /* The title lines up with the list under it, because at 1440 a heading alone at the canvas edge
+     reads as belonging to nothing. The chrome still spans the window — only what it holds is
+     capped, the same rule .web-shell__body follows. */
+  padding-left: max(16px, env(safe-area-inset-left), calc((100% - 720px) / 2));
+  padding-right: max(16px, env(safe-area-inset-right), calc((100% - 720px) / 2));
 }
 
 .web-shell__title {
@@ -76,8 +79,11 @@ body {
   gap: 4px;
   padding: 6px 8px;
   padding-bottom: max(6px, env(safe-area-inset-bottom));
-  padding-left: max(8px, env(safe-area-inset-left));
-  padding-right: max(8px, env(safe-area-inset-right));
+  /* The five slots stay on the reading column at wide widths: stretched across a 1440 window they
+     are five islands 280px apart, which is a phone bar that got lost rather than a desktop nav.
+     Capping the padding and not the bar keeps the glass full-bleed — chrome spans, content caps. */
+  padding-left: max(8px, env(safe-area-inset-left), calc((100% - 720px) / 2));
+  padding-right: max(8px, env(safe-area-inset-right), calc((100% - 720px) / 2));
   border: none;
   border-top: var(--hairline);
   border-radius: 0;

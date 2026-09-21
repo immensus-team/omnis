@@ -144,6 +144,7 @@ bash ops/mini/install.sh    # hub · zero-cache · local-agent LaunchAgents
 
 ```bash
 pnpm --filter @omnis/desktop dev    # pnpm tauri:dev for the real shell
+pnpm --filter @omnis/web dev        # the PWA, at 127.0.0.1:5173 — see apps/web/README.md to install it on an iPhone
 ```
 
 **3 · Verify**
