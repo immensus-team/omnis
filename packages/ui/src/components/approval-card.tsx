@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { cn } from "../lib/cn.js";
 import { Button } from "./button.js";
+import { CONFIRM_COPY, ConfirmPrompt } from "./confirm-prompt.js";
 import { OpaqueSurface } from "./glass-surface.js";
 
 export type ApprovalCardAction =
@@ -45,14 +47,16 @@ export interface ApprovalCardViewProps {
 
 export function ApprovalCardView({ interrupt, onDecide, className }: ApprovalCardViewProps) {
   const { config } = interrupt;
+  /** US-D09 §c.8: approving is the one decision here that goes out to the tool and cannot be taken
+   *  back from this screen, so it asks first — and the prompt repeats the description rather than a
+   *  pronoun, because the card behind it is dimmed and the question has to stand on its own. */
+  const [confirming, setConfirming] = useState(false);
   return (
     <OpaqueSurface className={cn("approval-card", className)}>
       <p className="approval-card__title">{ACTION_LABEL[interrupt.action]} needs your approval</p>
       <p className="approval-card__description">{interrupt.description}</p>
       <div className="approval-card__actions">
-        {config.allow_accept && (
-          <Button onClick={() => onDecide("accept", undefined)}>Approve</Button>
-        )}
+        {config.allow_accept && <Button onClick={() => setConfirming(true)}>Approve</Button>}
         {config.allow_edit && (
           <Button variant="ghost" onClick={() => onDecide("edit", interrupt.args)}>
             Edit &amp; approve
@@ -69,6 +73,16 @@ export function ApprovalCardView({ interrupt, onDecide, className }: ApprovalCar
           </Button>
         )}
       </div>
+      {/* The one decision that leaves this screen for good is the one marked destructive, so its
+          pill can leave the accent; the others are still recoverable by deciding again. */}
+      <ConfirmPrompt
+        open={confirming}
+        onOpenChange={setConfirming}
+        {...CONFIRM_COPY.approve(interrupt.description)}
+        confirmLabel="Approve"
+        destructive={interrupt.action === "delete"}
+        onConfirm={() => onDecide("accept", undefined)}
+      />
     </OpaqueSurface>
   );
 }
