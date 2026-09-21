@@ -3,12 +3,14 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
-  // zero-client.ts가 읽는 import.meta.env.OMNIS_ZERO_URL은 기본 envPrefix("VITE_")로는
-  // 번들에 주입되지 않는다 — 계약 §7이 못박은 오버라이드가 조용히 죽는다.
+  // import.meta.env.OMNIS_ZERO_URL (read by zero-client.ts) is not injected into the bundle under
+  // the default envPrefix ("VITE_"), which is how the override contract §7 pins down dies without
+  // a word.
   envPrefix: ["VITE_", "OMNIS_"],
   clearScreen: false,
-  // 허브(127.0.0.1:8787)는 dev 서버와 다른 오리진이고 CORS 헤더를 주지 않는다(계약 §5의 127.0.0.1 경계).
-  // dev에서는 같은 오리진으로 프록시하고, 클라이언트는 OMNIS_HUB_HTTP_URL=""로 상대 경로를 쓴다.
+  // The hub (127.0.0.1:8787) is a different origin from the dev server and hands out no CORS
+  // headers (contract §5's 127.0.0.1 boundary). In dev it is proxied onto the same origin, and the
+  // clients use relative paths (OMNIS_HUB_HTTP_URL="").
   server: {
     port: 5173,
     strictPort: true,
@@ -18,6 +20,10 @@ export default defineConfig({
       "/approvals": "http://127.0.0.1:8787",
       "/health": "http://127.0.0.1:8787",
       "/kill-switch": "http://127.0.0.1:8787",
+      // US-B27: the palette's search mode. Without this entry the app's GET /search lands on the
+      // Vite server (a 404 — the request never reaches the hub) and the panel can only ever show
+      // its "No results" state, however good the hub's answer is.
+      "/search": "http://127.0.0.1:8787",
     },
   },
 });
