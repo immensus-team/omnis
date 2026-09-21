@@ -126,6 +126,14 @@ describe("US-D04 reduced motion keeps the fade and drops the travel", () => {
     ".inbox-row--leaving",
   ];
 
+  it("lands the rail's reorder in the same slots with no travel", () => {
+    // D7 §c.2: under reduced motion the neighbours jump. The rail's FLIP writes one transform either
+    // way — the only thing reduced motion changes is the duration token it rides, which is why this
+    // is a token override rather than a second code path in channel-rail.tsx.
+    expect(reducedMotionBlock(appCss)).toMatch(/\.channel-rail\s*\{[^}]*--dur-reorder:\s*0ms/);
+    expect(appCss).toMatch(/--dur-reorder:\s*220ms/);
+  });
+
   it("re-points every moving animation at a fade, and defines the names it points at", () => {
     const reduced = reducedMotionBlock(appCss);
     for (const selector of MOVING_SURFACES) {

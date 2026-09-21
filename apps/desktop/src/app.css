@@ -237,6 +237,62 @@ body {
   color: var(--text-secondary);
 }
 
+/* D7 §c.2: the reorder's two tokens. Every other rung of the motion ladder lives in tokens.css;
+   these two are declared here instead because tokens.css's reduced-motion block must carry no `0ms`
+   rung at all — motion.test.tsx asserts it, and a zero duration is what a rung collapses *to*, not
+   what it is. --dur-reorder is exactly that case: 220ms of travel that becomes 0ms under reduce.
+   Scoped to the rail, so both inherit down to the tiles and the rail does not grow a second use
+   before a second surface needs one. */
+.channel-rail {
+  --dur-reorder: 220ms;
+  --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* §c.2: the plate's tiles are the reorderable ones, and the grab cursor is the one affordance that
+   says so. The Inbox tile is outside the plate (it is "show everything", not a channel) and keeps
+   the plain pointer — the plate is also exactly the set the drop slots are measured over. */
+.channel-rail__plate .channel-rail__tile {
+  cursor: grab;
+}
+
+/* The tile that is in hand. It has to leave the plate's row for the drag to read as "this one is
+   moving, those are making room", and the plate has no `overflow` of its own — the tile is only
+   lifted above its siblings. No `touch-action` here on purpose: it is set after the lift, and a
+   touch-action that arrives mid-gesture neither takes the scroll away nor stops one already
+   running. Which gesture wins is decided before this class lands (pointer-drag.ts, §c.2). */
+.channel-rail__tile--dragging {
+  position: relative;
+  z-index: 1;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-glass);
+  cursor: grabbing;
+  /* A drag across the rail must not paint a text selection under the finger. */
+  user-select: none;
+}
+
+/* "This is the current view" and "this is being dragged" are different states, and the ring has to
+   survive the lift. Written as two classes so it beats both rules above on specificity rather than
+   on source order. */
+.channel-rail__tile--dragging.channel-rail__tile--active {
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow-glass);
+}
+
+/* §c.2: the announcement the keyboard reorder makes. The rail's tiles are icon-only, so this is the
+   only place the reorder can say what it did — visually hidden, but the same 1px clipped box the
+   rest of the app hides spoken-only text in, and out of flow so it cannot push the rail's column
+   around. */
+.channel-rail__announce {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 .app-shell__main {
   display: flex;
   flex-direction: column;
@@ -2349,5 +2405,13 @@ body {
      it, and the list closing the gap is a one-frame change of position, not an animation. */
   .inbox-row--leaving {
     animation-name: fade-out;
+  }
+
+  /* §c.2: the reorder's neighbours jump to their new slots with no travel at all — and the order
+     they land in is the same one the full-motion rail lands in. Nothing branches in the component:
+     the FLIP writes the same transform either way and only the duration token changes, which is why
+     this is a token override and not a second code path. */
+  .channel-rail {
+    --dur-reorder: 0ms;
   }
 }
