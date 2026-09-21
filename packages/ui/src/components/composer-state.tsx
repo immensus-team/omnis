@@ -7,7 +7,11 @@ import { StatusPill } from "./status-pill.js";
  * gate (US-C13), a LinkedIn thread that only ever arrived as a "new message arrived" preview needs
  * the capture host (US-C09), and WhatsApp is closed until its pilot check (US-C24). A composer that
  * draws itself anyway fails at the far end of an approval; this block is the honest alternative, and
- * it is what the pane renders *instead of* the composer.
+ * it stands in the composer's slot — the pane draws it *instead of* one, and a non-null block is the
+ * case where there is nothing to type into.
+ *
+ * The composer itself is US-C17's sibling story (loop-r2-03) and is not on this branch, so no
+ * channel sends from the pane yet: this says "this channel cannot", never "the others can".
  *
  * `null` is the fourth state: this channel has nothing to announce, so the composer is the whole
  * story. Every screen that asks draws nothing extra on it.
@@ -34,7 +38,9 @@ export const COMPOSER_STATE_COPY = {
  *  `kakaoDaysRemaining` is the kernel gate's `daysRemaining` (kakao-send.ts). It is `null` while no
  *  stable read has been observed: there is no countdown to state yet, and the opt-in line is the one
  *  that names Settings — where the read connection itself is turned on — so `null` reads as day 0
- *  rather than as an invented number of days. */
+ *  rather than as an invented number of days. (The 14-day gate then starts counting from the moment
+ *  that connection comes up, so "opens today" is the plan's copy for a state that is really "not
+ *  started"; the interface fixes four lines, and this is the one that names the missing step.) */
 export function composerBlockFor(i: {
   channel: string;
   canWrite: boolean;
@@ -66,9 +72,9 @@ function lineFor(block: Exclude<ComposerBlock, null>): string {
   }
 }
 
-/** The block, drawn as a pill: it stands where the composer would, so it reads as a state of that
- *  slot rather than as one more message in the conversation. All three states mean the same thing to
- *  the reader — this composer will not send — so they share one tone. */
+/** The block, drawn as a pill: it stands in the composer's slot, so it reads as a state of that slot
+ *  rather than as one more message in the conversation. All three states mean the same thing to the
+ *  reader — this composer will not send — so they share one tone. */
 export function ComposerState({
   block,
   className,

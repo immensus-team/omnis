@@ -29,6 +29,7 @@ async function seedMeeting(
   start: Date,
   end: Date,
   attendees: unknown[],
+  status = "confirmed",
 ): Promise<string> {
   const thread = await one<{ id: string }>(
     c,
@@ -44,9 +45,10 @@ async function seedMeeting(
   );
   const event = await one<{ id: string }>(
     c,
-    `INSERT INTO calendar_events (item_id, account_id, external_id, start_at, end_at, attendees)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb) RETURNING id`,
-    [item.id, accountId, externalId, start, end, JSON.stringify(attendees)],
+    `INSERT INTO calendar_events
+       (item_id, account_id, external_id, start_at, end_at, attendees, status)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7) RETURNING id`,
+    [item.id, accountId, externalId, start, end, JSON.stringify(attendees), status],
   );
   return event.id;
 }
@@ -101,6 +103,18 @@ beforeAll(async () => {
     eventIds.recent = await seedMeeting(c, "c17-ev-recent", END_TOO_RECENT, END_TOO_RECENT, [
       { email: "cai@davich.test", person_id: caiId },
     ]);
+    // Cancelled, same shape as the bo meeting: an outside attendee and no reply. A3 §12 5b's own
+    // query filters this (packages/db/test/integration/calendar-queries.test.ts), and for good
+    // reason — nobody follows up on a meeting that did not happen, so counting it would file a
+    // permanent miss the phase's "= 0 for 14 nights" gate could never clear.
+    eventIds.cancelled = await seedMeeting(
+      c,
+      "c17-ev-cancelled",
+      END,
+      END,
+      [{ email: "bo@davich.test", person_id: boId }, { email: "logan@onward.lab" }],
+      "cancelled",
+    );
 
     // The one follow-up that happened: I replied to Ana two hours after the meeting ended.
     await query(
@@ -147,6 +161,7 @@ describe("runFollowupMiss (US-C17, A3 §12 5b)", () => {
     expect(result.meetingIds).not.toContain(eventIds.ana); // replied two hours later
     expect(result.meetingIds).not.toContain(eventIds.internal); // nobody to follow up with
     expect(result.meetingIds).not.toContain(eventIds.recent); // ended 47h ago — not judged yet
+    expect(result.meetingIds).not.toContain(eventIds.cancelled); // cancelled — cannot be followed up
   });
 
   it("merges followup_miss into today's nightly row without touching the other metrics", async () => {
@@ -173,5 +188,37 @@ describe("runFollowupMiss (US-C17, A3 §12 5b)", () => {
 
     expect(result).toEqual({ misses: 0, meetingIds: [] });
     await query(pool, "DELETE FROM digests WHERE kind = 'nightly' AND for_date = '2026-06-01'");
+  });
+
+  it("creates today's row when the digest has not run yet, so the count has somewhere to land", async () => {
+    // 2026-03-11 09:30 KST — both meetings of END are still inside its window (nothing has cleared
+    // them yet), and no row exists for that day.
+    const now = new Date("2026-03-11T00:30:00Z");
+    const result = await runFollowupMiss(pool, now);
+    const row = await one<{ metrics: Record<string, unknown>; body: string }>(
+      pool,
+      "SELECT metrics, body FROM digests WHERE kind = 'nightly' AND for_date = '2026-03-11'",
+    );
+
+    expect(result.misses).toBeGreaterThan(0);
+    expect(row.metrics.followup_miss).toBe(result.misses);
+    // The body is the digest loop's to write, twenty minutes from now; the metric job only files the
+    // number. An empty body is how that row reads, and Digest.tsx is what has to tell it apart from
+    // a built digest.
+    expect(row.body).toBe("");
+    await query(pool, "DELETE FROM digests WHERE kind = 'nightly' AND for_date = '2026-03-11'");
+  });
+
+  it("leaves the day rowless when there is nothing to report", async () => {
+    // The screen's gate is "does tonight's row exist" — Digest.tsx reads a present row as a built
+    // digest and renders its (here empty) body. So a night with nothing to count must not create
+    // one: an absent key reads as 0 everywhere it is read, which is the same answer.
+    await runFollowupMiss(pool, new Date("2026-06-02T13:00:00Z"));
+    const rows = await query(
+      pool,
+      "SELECT 1 FROM digests WHERE kind = 'nightly' AND for_date = '2026-06-02'",
+    );
+
+    expect(rows).toHaveLength(0);
   });
 });

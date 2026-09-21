@@ -165,6 +165,15 @@ export const DIGEST_WAITING_COPY =
 
 export const DIGEST_EMPTY_COPY = "Nothing was auto-archived today.";
 
+/** Is tonight's digest built? The row exists from 22:40 — US-C17's `followup_miss` job files its
+ *  metric on it twenty minutes before the loop that writes the body — so "a row is there" is not the
+ *  same question as "the digest has run". The body is what makes it a digest: empty means the night
+ *  has not been summarized yet, and the answer is the schedule copy rather than "nothing was
+ *  auto-archived today", which would be a report of a night that has not been read. */
+export function digestIsBuilt<T extends { body: string }>(digest: T | undefined): digest is T {
+  return digest !== undefined && digest.body !== "";
+}
+
 export interface DigestProps {
   /** US-B32 (the plan's step 7): the seam the Thread header's banner and a toast library would
    *  subscribe to. Nothing in the app passes it yet — the Thread banner is §3.2's story — so it is
@@ -244,7 +253,7 @@ export function Digest({ onRestored }: DigestProps) {
         </p>
       )}
 
-      {digest === undefined ? (
+      {digest === undefined || !digestIsBuilt(digest) ? (
         <p className="digest-screen__waiting">{DIGEST_WAITING_COPY}</p>
       ) : (
         <>

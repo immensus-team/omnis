@@ -219,8 +219,10 @@ export function Thread({
   );
 
   // US-C17: what the composer would be able to do, decided before it is drawn. A capture channel
-  // whose send is closed draws `ComposerState` in the composer's place instead of a box that fails
-  // at the far end of an approval.
+  // whose send is closed draws `ComposerState` where the composer goes, instead of a box that fails
+  // at the far end of an approval. (The composer is loop-r2-03's and is not on this branch: until it
+  // lands, no channel can send from this pane, so the block is a state of that slot rather than a
+  // claim that the channels without one can.)
   //
   // `accounts.capabilities` is the adapter's own self-description, replicated as a json column — the
   // capture relay is what reports it for kakaotalk/linkedin/whatsapp (captureCapabilities in
@@ -448,8 +450,10 @@ export function Thread({
                 }}
               />
             )}
-            {/* US-C17: the composer slot, in the absence of a composer. The two are exclusive by
-                construction — a non-null block is exactly the case where nothing may be typed. */}
+            {/* US-C17: the slot the composer belongs in. The composer itself is loop-r2-03's and is
+                not on this branch, so today this is where every conversation ends; the contract the
+                story fixes is that a non-null block is exactly the case where nothing may be typed,
+                so the composer lands here, behind this same condition, rather than beside it. */}
             {composerBlock !== null && <ComposerState block={composerBlock} />}
           </>
         )}

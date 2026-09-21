@@ -142,4 +142,72 @@ describe("nightlyDigestLoop (A4 §6.4·§9.4)", () => {
     const parsed = JSON.parse(rows[0]?.body ?? "{}") as { cost: { cap_usd: number } };
     expect(parsed.cost).toEqual({ month_to_date_usd: 0, cap_usd: 60, tier_state: "normal" });
   });
+
+  it("keeps the metric US-C17's job merged into the day's row, and states it in the body", async () => {
+    // `followup_miss` (22:40 KST) files its number on today's row before this loop runs at 23:00, and
+    // the loop reads it back for the body's line. `metrics` is a shared bag: if this upsert replaced
+    // it instead of merging, the phase's exit metric would be lost every night after it was counted.
+    const day = await pool.query<{ d: string }>(
+      "SELECT (now() AT TIME ZONE 'Asia/Seoul')::date::text AS d",
+    );
+    await pool.query(
+      `INSERT INTO digests (kind, for_date, body, metrics)
+       VALUES ('nightly', $1, '', '{"followup_miss":3}'::jsonb)`,
+      [day.rows[0]?.d],
+    );
+    await nightlyDigestLoop.apply(
+      {
+        loop: "digest",
+        run_id: "00000000-0000-0000-0000-00000000dddd",
+        output: {
+          headline: "Quiet.",
+          one_liner: "",
+          confidence: 0.9,
+          rationale: "",
+          injection_flags: [],
+        },
+        confidence: 0.9,
+        rationale: "",
+        escalate: false,
+        injection_flags: [],
+        unresolved: [],
+      },
+      { trigger_kind: "cron", trigger_ref: "nightly_digest", now: new Date(), payload: {} },
+    );
+    const { rows } = await pool.query<{ metrics: Record<string, unknown>; body: string }>(
+      `SELECT metrics, body FROM digests WHERE kind = 'nightly'`,
+    );
+
+    expect(rows[0]?.metrics.followup_miss).toBe(3);
+    expect(JSON.parse(rows[0]?.body ?? "{}")).toMatchObject({ missed_followups: 3 });
+  });
+
+  it("reads a missing metric as zero rather than inventing one", async () => {
+    await nightlyDigestLoop.apply(
+      {
+        loop: "digest",
+        run_id: "00000000-0000-0000-0000-00000000eeee",
+        output: {
+          headline: "Quiet.",
+          one_liner: "",
+          confidence: 0.9,
+          rationale: "",
+          injection_flags: [],
+        },
+        confidence: 0.9,
+        rationale: "",
+        escalate: false,
+        injection_flags: [],
+        unresolved: [],
+      },
+      { trigger_kind: "cron", trigger_ref: "nightly_digest", now: new Date(), payload: {} },
+    );
+    const { rows } = await pool.query<{ body: string }>(
+      "SELECT body FROM digests WHERE kind = 'nightly'",
+    );
+
+    // No row from the metric job (a night with nothing to count) — the line still has to exist and
+    // read as zero, which is what an absent key means.
+    expect(JSON.parse(rows[0]?.body ?? "{}")).toMatchObject({ missed_followups: 0 });
+  });
 });
