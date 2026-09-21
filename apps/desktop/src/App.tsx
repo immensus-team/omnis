@@ -605,6 +605,63 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
     if (next === "inbox") setRailChannel(null);
   }, []);
 
+  /** loop-r2-08/L2-09: the Inbox's selection, kept here rather than in the Inbox. The screen
+   *  unmounts when the shell switches away from it and React state does not outlive that, so
+   *  `g t` then `g i` used to come back with nothing selected and `j` landed on row 1 instead of
+   *  the row the user left. A ref, not state: nothing renders from it — the Inbox is handed it as
+   *  its *initial* selection and reports every later move back — so a copy in state would be a
+   *  second owner of a value that is already on screen. */
+  const lastInboxSelection = useRef<string | null>(null);
+  const onInboxSelectionChange = useCallback((id: string | null) => {
+    lastInboxSelection.current = id;
+  }, []);
+
+  /** loop-r2-08/L2-09, L2-14: focus has to land somewhere when the screen changes. Every way of
+   *  changing it routes through `goTo` — `g` + a letter, a rail tile, a palette "Go to …" — and
+   *  before this all three left `document.activeElement` on `<body>` (or on the rail button that was
+   *  clicked), so the next Tab restarted at the top of the document and a screen reader announced
+   *  nothing about the screen that had just arrived.
+   *
+   *  Two targets, in this order. The Inbox row the shell remembers, when the screen is the Inbox and
+   *  that row is on screen; otherwise the new screen's own `h1`, which every screen now has one of
+   *  and which each takes `tabIndex={-1}` for (that is what makes a heading focusable without
+   *  adding a tab stop — app.css suppresses the ring on this focus and keeps it for Tab).
+   *
+   *  Two guards, both load-bearing:
+   *  - the ref compares the screen against the one focus was last moved for. A *first* render must
+   *    not move it at all — a cold load that focused the heading would take the first Tab stop away
+   *    from the skip link, and would announce a screen the user has not navigated to. Comparing
+   *    values rather than flipping a "first render" boolean is what survives StrictMode's
+   *    mount/unmount/remount, which re-runs this effect without the screen having changed.
+   *  - `requestAnimationFrame` waits for the new screen to have mounted. On the Inbox that is not
+   *    politeness: the rows live in the virtualiser, which mounts them in its own layout effect, so
+   *    a synchronous query on this commit would find no row and the focus would not move.
+   *
+   *  The frame is cancelled on the way out — on a second screen switch, and on unmount. A frame
+   *  that outlives the screen it was asked for focuses whatever is on screen when it lands, and
+   *  the case that makes that a bug rather than a near miss is the palette: a "Go to Tasks" row
+   *  both changes the screen *and* closes the palette, so a frame arriving late would move the
+   *  focus off the ask input, whose `onBlur` closes the panel — measured as a search whose results
+   *  never appeared, because a previous test's frame had closed the panel under it. */
+  const focusMovedForScreen = useRef<ShellScreen>(screen);
+  useEffect(() => {
+    if (focusMovedForScreen.current === screen) return;
+    focusMovedForScreen.current = screen;
+    const frame = requestAnimationFrame(() => {
+      const remembered = screen === "inbox" ? lastInboxSelection.current : null;
+      if (remembered !== null) {
+        const row = document.querySelector(`[data-thread-id="${remembered}"]`);
+        if (row instanceof HTMLElement) {
+          row.focus({ preventScroll: true });
+          return;
+        }
+      }
+      const heading = document.querySelector(".app-shell__main h1");
+      if (heading instanceof HTMLElement) heading.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [screen]);
+
   // A5 §2.4's go-to half of the keymap. Inbox.tsx registers its own for the row actions (archive,
   // unarchive, …) and the two handle disjoint action names, so `g` followed by a letter resolves
   // here and a bare `e` there, with neither hook needing to know about the other.
@@ -1034,6 +1091,10 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
     ) : (
       <Inbox
         onOpen={setOpen}
+        // loop-r2-08/L2-09: where the selection starts, and where every move of it is reported
+        // back to. The screen owns the selection while it is mounted; this is how it outlives it.
+        initialSelectedId={lastInboxSelection.current}
+        onSelectedIdChange={onInboxSelectionChange}
         channelFilter={railChannel}
         onChannelFilterChange={setRailChannel}
         filtersOpen={filtersOpen}

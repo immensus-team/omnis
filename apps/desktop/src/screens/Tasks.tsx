@@ -348,7 +348,11 @@ export function Tasks({ now: nowProp, onOpenSource, onOpenDelegation, onToggleDo
       )}
 
       <header className="tasks-screen__head">
-        <h1 className="tasks-screen__title">Tasks</h1>
+        {/* loop-r2-08: `tabIndex={-1}` so the shell can move the focus here on a screen switch
+            (`goTo`). Nothing about the heading's look changes — the styles hang off the class. */}
+        <h1 className="tasks-screen__title" tabIndex={-1}>
+          Tasks
+        </h1>
         <SegmentedControl
           className="tasks-screen__views"
           label="Task views"

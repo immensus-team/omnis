@@ -257,7 +257,11 @@ export function Notes() {
       )}
 
       <header className="notes-screen__head">
-        <h1 className="notes-screen__title">Notes</h1>
+        {/* loop-r2-08: focusable so the shell can land the focus on a screen switch — see
+            App.tsx's heading-focus effect. */}
+        <h1 className="notes-screen__title" tabIndex={-1}>
+          Notes
+        </h1>
       </header>
 
       {/* A5 §3.7: one line, Enter to save. A plain `<form>` because the browser's own Enter-submits

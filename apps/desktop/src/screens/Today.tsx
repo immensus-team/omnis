@@ -244,7 +244,9 @@ export function Today({
         </p>
       )}
 
-      <h1 className="today-screen__greeting">
+      {/* loop-r2-08: focusable so the shell can land the focus on a screen switch — see
+          App.tsx's heading-focus effect. */}
+      <h1 className="today-screen__greeting" tabIndex={-1}>
         {greetingLine(userName, pendingCount, approvals.length, now)}
       </h1>
 

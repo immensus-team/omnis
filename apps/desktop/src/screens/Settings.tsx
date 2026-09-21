@@ -442,7 +442,11 @@ export function Settings() {
   return (
     <OpaqueSurface className="settings-screen" data-state={state}>
       <header className="settings-screen__head">
-        <h1 className="settings-screen__title">Settings</h1>
+        {/* loop-r2-08: focusable so the shell can land the focus on a screen switch — see
+            App.tsx's heading-focus effect. */}
+        <h1 className="settings-screen__title" tabIndex={-1}>
+          Settings
+        </h1>
       </header>
 
       {banner !== "" && (

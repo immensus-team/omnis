@@ -365,6 +365,47 @@ function InlinePalette({
   const inputRef = useRef<HTMLInputElement>(null);
   const narrow = useNarrowShell();
   const closing = useClosingSpring(open);
+  /** loop-r2-08/L2-14, NC2-11: what had the focus when the panel opened, so Escape can put it back.
+   *  It is captured *before* the autofocus below (this effect is declared first, and React runs
+   *  effects in declaration order), which is the only moment the answer exists: one tick later the
+   *  caret is on the ask input and the element the user was reading is unreachable.
+   *
+   *  "Unless it is the ask input itself": a pointer press on the bar focuses the input natively
+   *  before `onFocus` opens the panel, so by the time this runs the input *is* the active element —
+   *  and storing it would make Escape focus what it is already focused on, which is the same as
+   *  leaving focus where the (now closed) panel put it. The previous answer is kept instead: press
+   *  the bar while reading a thread and Escape still returns to the thread's row. */
+  const openerRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== inputRef.current) openerRef.current = active;
+  }, [open]);
+
+  /** loop-r2-08/L2-14: Escape gives the focus back. Without this, closing the panel dropped it to
+   *  `<body>` — the input was the only thing that had it, and the panel's own tree is gone from the
+   *  next render — so a keyboard user who opened ⌘K over a row had to Tab in from the top of the
+   *  document to get back to the list.
+   *
+   *  Blur first: the input is about to stop existing, and on a surface that keeps the caret in the
+   *  closed bar (the inline mode's bar is always in the DOM above 900) leaving it there would make
+   *  the bar look focused while the panel it was open for is gone.
+   *
+   *  The fallback is the list's own selected row, for the case the opener is gone: the palette can
+   *  open from a row that a `g`-key has since replaced, and a `focus()` on a detached node is a
+   *  silent no-op that leaves the focus on `<body>` again — the bug, quietly restored. The row is
+   *  found exactly the way the Inbox finds it (`[role="option"]` with `aria-selected="true"`), so
+   *  the two cannot disagree about which row "the selected one" is. */
+  function returnFocusAfterClose(): void {
+    const opener = openerRef.current;
+    openerRef.current = null;
+    inputRef.current?.blur();
+    if (opener?.isConnected === true) {
+      opener.focus();
+      return;
+    }
+    document.querySelector<HTMLElement>('[role="option"][aria-selected="true"]')?.focus();
+  }
   /** loop-r2-04 (L2-13): a press on the bar is what opens the panel, and this is the flag that tells
    *  the press's focus from a focus nobody pressed for. Tab onto the bar used to open the panel,
    *  which then stayed up after the caret left and swallowed the clicks on the pills under it; so
@@ -434,6 +475,7 @@ function InlinePalette({
         if (e.key === "Escape") {
           e.preventDefault();
           onOpenChange(false);
+          returnFocusAfterClose();
           return;
         }
         // loop-r1-08 (L-15): Enter runs the highlighted row. cmdk's own Enter dispatches to

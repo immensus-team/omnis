@@ -121,6 +121,29 @@ export function inboxRowTitle(row: {
   return row.personName || row.threadTitle || row.channelHandle || "(no title)";
 }
 
+/** The width of the title a toast quotes. A thread title is unbounded — the hub takes whatever the
+ *  channel sent, and an email subject can run to a paragraph — while the toast is one line in the
+ *  corner of the window. 40 characters is what fits beside the Undo button at 390px without the
+ *  sentence wrapping, and the ellipsis is a real character so "…" is what is truncated, not "..." . */
+export const TOAST_TITLE_MAX = 40;
+
+export function truncateTitle(title: string): string {
+  return title.length <= TOAST_TITLE_MAX ? title : `${title.slice(0, TOAST_TITLE_MAX).trimEnd()}…`;
+}
+
+/** loop-r2-08: how many archives/restores the undo stack holds. Twenty is a working session's worth
+ *  of triage and nothing like a journal; see `undoStack` in `Inbox` for why it is capped at all. */
+export const UNDO_STACK_MAX = 20;
+
+/** One archive or restore, as the undo of it needs to know it: whose row, what state it was moved
+ *  *to* (the undo is the opposite), and the title its toast quoted — read at the write, because the
+ *  row is out of the list a frame later. */
+export interface UndoEntry {
+  id: string;
+  archived: boolean;
+  title: string;
+}
+
 function firstLine(body: string): string {
   const idx = body.indexOf("\n");
   return (idx === -1 ? body : body.slice(0, idx)).trim();
@@ -310,6 +333,8 @@ export function InboxSkeleton() {
 
 export function Inbox({
   onOpen,
+  initialSelectedId = null,
+  onSelectedIdChange,
   channelFilter = null,
   onChannelFilterChange,
   filtersOpen = false,
@@ -320,6 +345,12 @@ export function Inbox({
   connectionOk = true,
 }: {
   onOpen?: (target: OpenTarget) => void;
+  /** loop-r2-08/L2-09: the selection the shell remembered from the last time this screen was up.
+   *  It is the *initial* value only — from the first render on, this screen owns the selection and
+   *  reports every move back through `onSelectedIdChange`, so there is never a second owner. */
+  initialSelectedId?: string | null;
+  /** Where the selection goes when it moves, for the shell to remember across a screen switch. */
+  onSelectedIdChange?: (id: string | null) => void;
   /** U1 channel rail selection. null = everything (the Inbox tile). ANDed with the pill filters
    *  (work/personal/...). */
   channelFilter?: UiChannel | null;
@@ -350,7 +381,7 @@ export function Inbox({
 }) {
   const zero = useZeroClient();
   const [filter, setFilter] = useState<InboxFilter>("all");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [view, setView] = useState<"inbox" | "archived">("inbox");
   // Optimistic override: keeps the row from sitting there unchanged until the hub round trip and
   // Zero replication arrive.
@@ -550,14 +581,38 @@ export function Inbox({
     });
   }, []);
 
-  /** loop-r1-06: the archive whose Undo is still on screen — `z` and ⌘Z are the toast's keyboard
-   *  twin, and they have to name the same row the button would. It is armed by the toggle below and
-   *  disarmed by that toggle's toast leaving (the deferred passed to `notify`), so the keys are live
-   *  exactly as long as the button is rather than forever. */
-  const lastToggle = useRef<{ id: string; archived: boolean } | null>(null);
+  /** loop-r2-08/L2-10, NC2-09: the archives and restores this screen can still take back, oldest
+   *  first. It replaced a single `lastToggle` ref that `undoArchive` *re-armed with the inverse* of
+   *  the write it had just undone — so `e`, ⌘Z, `z` archived the thread again (the second undo undid
+   *  the undo), and the whole thing was disarmed when its toast expired, which is why both testers
+   *  who pressed ⌘Z twice got one thread back instead of two. A stack is what the keys mean: the
+   *  last few writes in the order they happened, each undo taking the one on top.
+   *
+   *  Capped at 20: this is a convenience for the last few actions, not a journal, and an uncapped
+   *  stack would hold a title and an id for every archive of a long session. The oldest entry is
+   *  dropped, so it is the twentieth-oldest undo that quietly stops being available, never the
+   *  newest.
+   *
+   *  Nothing disarms it but an undo: `z` and ⌘Z are live until they are spent, not until the toast
+   *  goes. That is the point of the rewrite — the toast's own lifetime is a UI fact and the undo
+   *  stack is a data fact, and tying the second to the first was the bug. */
+  const undoStack = useRef<UndoEntry[]>([]);
 
   const toggleArchive = useCallback(
-    function toggle(threadId: string, archived: boolean) {
+    /** `undoEntry` is present iff this call *is* the undo of a write: the entry it takes back. Its
+     *  absence is what makes this a new write, so the two cases cannot be confused — and passing it
+     *  rather than reading the top of the stack is what keeps the toast's button and the keyboard
+     *  from undoing two different things (see below). */
+    function toggle(threadId: string, archived: boolean, undoEntry?: UndoEntry) {
+      /** What this write would be undone *to*, and the title its toast quotes. Built here rather
+       *  than where it is pushed because the failure path below needs it too: a write the hub
+       *  refused must not leave an entry behind. */
+      const entry: UndoEntry = {
+        id: threadId,
+        archived,
+        title: truncateTitle(threadRows.find((r) => r.id === threadId)?.title ?? "(no title)"),
+      };
+
       // US-D04: the row is held in the list for one leave animation. The server call goes out
       // immediately rather than after the animation — the round trip overlaps the 240ms instead of
       // queueing behind it, and the optimistic state below still lands on the same frame as the
@@ -590,44 +645,66 @@ export function Inbox({
           next.delete(threadId);
           return next;
         });
+        // The write did not happen, so there is nothing to take back: the entry goes with it. The
+        // old toggle disarmed itself here through the toast's deferred work; with no deferred there
+        // is nothing to run, and this is the same disarm said in the stack's own terms.
+        undoStack.current = undoStack.current.filter((e) => e !== entry);
         // loop-r1-06: a failed write used to be a `console.error` and nothing else — the row
         // reappeared with no explanation, which reads as a glitch rather than as a failure. Retry
         // re-attempts the same write, not the rollback.
         notify?.({
           message: archived ? "Couldn't archive. It's back in your inbox." : "Couldn't restore it.",
-          action: { label: "Retry", onAction: () => toggle(threadId, archived) },
+          action: { label: "Retry", onAction: () => toggle(threadId, archived, undoEntry) },
         });
       });
 
+      if (undoEntry === undefined) {
+        // A write: it becomes the newest thing that can be taken back. The stack is replaced rather
+        // than mutated so that the cap and the identity test below both read one array.
+        undoStack.current = [...undoStack.current, entry].slice(-UNDO_STACK_MAX);
+      } else {
+        // An undo: it *consumes* the entry it was asked to take back, by identity — so the toast's
+        // button (which passes its own entry) and the key (which passes the top of the stack) can
+        // never both take the same one, and neither re-arms what it just undid.
+        undoStack.current = undoStack.current.filter((e) => e !== undoEntry);
+        // The restored row is where the user is looking, so the selection follows it. In the
+        // Archived view the row is leaving that list, but the selection it leaves behind is still
+        // this thread: the next `u` needs a row, and `tabStopId` falls back to the first row when
+        // this one is not on screen.
+        setSelectedId(undoEntry.id);
+        // Deferred a frame for the same reason `moveTo` is: the row only returns to the list on
+        // this commit, and the virtualiser mounts it a layout effect later.
+        requestAnimationFrame(() => {
+          const row = document.querySelector(`[data-thread-id="${undoEntry.id}"]`);
+          if (row instanceof HTMLElement) row.focus({ preventScroll: true });
+        });
+      }
+
       // The toast goes up with the optimistic state rather than with the reply: the row has already
       // left, and the point of the Undo is to catch the second thought that arrives while the write
-      // is still in flight. "Archived" and "Moved to Inbox" say where the row went, which is the
-      // one thing the row itself can no longer say.
-      const armed = { id: threadId, archived };
-      lastToggle.current = armed;
-      notify?.(
-        {
-          message: archived ? "Archived" : "Moved to Inbox",
-          action: { label: "Undo", onAction: () => toggle(threadId, !archived) },
+      // is still in flight. It names the thread, because "Archived" alone said nothing a person with
+      // two archives in a row could act on (L2-10, NC2-09) — the undo 04 handed over from the
+      // palette's focus return is the other half of the same finding.
+      notify?.({
+        message: archived ? `Archived "${entry.title}"` : `Moved "${entry.title}" to Inbox`,
+        action: {
+          label: "Undo",
+          // Its *own* entry, whether this call was a write or an undo. Undoing "whatever is on top"
+          // is what made a button press and a key press two different actions.
+          onAction: () => toggle(entry.id, !entry.archived, entry),
         },
-        {
-          run: () => {
-            // Identity, not truthiness: a newer toggle has armed the ref for its own toast by now,
-            // and this one going away must not disarm that.
-            if (lastToggle.current === armed) lastToggle.current = null;
-          },
-        },
-      );
+      });
     },
-    [notify],
+    [notify, threadRows],
   );
 
-  /** The undo the toast is offering, whichever key or button asked for it. Nothing armed means
-   *  nothing to take back — the toast has gone, and with it the right to undo. */
+  /** The keyboard's undo — `z` and ⌘Z, the toast's twin. It takes the newest entry off the stack and
+   *  hands it to `toggleArchive` to consume. An empty stack means nothing to take back, and then the
+   *  keys do nothing at all: a third ⌘Z after two restores posts no request. */
   const undoArchive = useCallback(() => {
-    const last = lastToggle.current;
-    if (last === null) return;
-    toggleArchive(last.id, !last.archived);
+    const entry = undoStack.current[undoStack.current.length - 1];
+    if (entry === undefined) return;
+    toggleArchive(entry.id, !entry.archived, entry);
   }, [toggleArchive]);
 
   // The leave timers outlive a row that unmounts first (archiving the last row and switching views,
@@ -772,6 +849,15 @@ export function Inbox({
     [listItems],
   );
 
+  /** loop-r2-08/L2-09: every move of the selection is reported to the shell, which is what lets
+   *  `g t` then `g i` come back to the row the user left. It fires on mount too, with the value the
+   *  shell itself handed in — a write of the same value back, which is a no-op on the shell's ref.
+   *  (Making that harmless is cheaper than making it conditional, and the conditional version is
+   *  the one that silently skips the first real move.) */
+  useEffect(() => {
+    onSelectedIdChange?.(selectedId);
+  }, [selectedId, onSelectedIdChange]);
+
   /** loop-r1-03/L-02, NC-02: archive (or restore) and move on. Both `e`/`u` and the row's own
    *  Archive button come through here, so the keyboard and the mouse cannot disagree about where
    *  the selection lands; the bug was that it stayed on the row that had just left, so the next `e`
@@ -784,9 +870,23 @@ export function Inbox({
     (threadId: string, archived: boolean) => {
       const next = neighbourAfter(rowIds, threadId);
       toggleArchive(threadId, archived);
-      if (threadId === selectedId) moveTo(next);
+      if (threadId !== selectedId) return;
+      moveTo(next);
+      // loop-r2-08/L2-28: the last restore leaves nothing to advance to, and a list with no rows
+      // has no row to hold the focus — it landed on `<body>`, so the next Tab restarted at the top
+      // of the document. The screen's own `h1` is where a screen with no content puts it, which is
+      // the same target a screen switch uses (App.tsx). Deferred a frame because the heading is
+      // skipped when the view swaps; `preventScroll` keeps the jump out of it.
+      // Only the Archived view: it is the one the finding names, and its empty state is the one the
+      // user just created themselves.
+      if (next === null && view === "archived") {
+        requestAnimationFrame(() => {
+          const heading = document.querySelector(".inbox-card__title");
+          if (heading instanceof HTMLElement) heading.focus({ preventScroll: true });
+        });
+      }
     },
-    [rowIds, selectedId, toggleArchive, moveTo],
+    [rowIds, selectedId, view, toggleArchive, moveTo],
   );
 
   useKeymap(
@@ -904,7 +1004,14 @@ export function Inbox({
   return (
     <OpaqueSurface className="inbox-card">
       <div className="inbox-card__header">
-        <h2 className="inbox-card__title">{view === "archived" ? "Archived" : "Inbox"}</h2>
+        {/* loop-r2-08/L2-09: this is the screen's own title, so it is the screen's `h1` — it was
+            the only screen whose title was an `h2`, which is why `g i` had no heading to land on.
+            The styles hang off the class, so the rendered size is unchanged. `tabIndex={-1}` makes
+            it a programmatic focus target (the shell focuses it on a screen switch, and the
+            Archived view focuses it when the last restore empties the list). */}
+        <h1 className="inbox-card__title" tabIndex={-1}>
+          {view === "archived" ? "Archived" : "Inbox"}
+        </h1>
         {/* loop-r1-02/L-04: the queue's entry point. It is a fourth segment of the subline rather
             than a control of its own, because that is where Mail puts "N unread" and a person
             looking for what is waiting looks there. It is inline, so the line keeps the height of

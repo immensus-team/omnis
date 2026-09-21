@@ -249,7 +249,9 @@ export function Digest({ onRestored }: DigestProps) {
       ) : (
         <>
           <header className="digest-screen__head">
-            <h1 className="digest-screen__title">
+            {/* loop-r2-08: focusable so the shell can land the focus on a screen switch — see
+                App.tsx's heading-focus effect. */}
+            <h1 className="digest-screen__title" tabIndex={-1}>
               {digestHeading(digest.for_date, archivedCount(digest.metrics, groups))}
             </h1>
           </header>
