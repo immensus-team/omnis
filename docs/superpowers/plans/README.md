@@ -129,3 +129,8 @@ they were actually executed (W4 was split into W4a backend surfaces and W4b scre
   check), 7 Playwright tests per pass; report and screenshots in
   [`tools/e2e/REPORT.md`](../../../tools/e2e/REPORT.md).
 - `pnpm e2e:phase-b` — the Phase B smoke entry point (same runner, `--phase b`).
+
+## Phase C plans (2026-09-22)
+
+- **Backlog** — [`2026-09-22-phase-c-backlog.md`](2026-09-22-phase-c-backlog.md): 32 stories (US-C00–C31). W1 (C00–C18) is fixture-first and runnable now; W2 (C19–C31) is live and each story names its gate (②③④, ⑦, ⑩, A1-⑧/⑨, S-A2-4, S-A2-5, S-C1).
+- **Plan** — [`2026-09-22-phase-c-plan.md`](2026-09-22-phase-c-plan.md): one task per story, DeepSeek implements, Opus reviews.
