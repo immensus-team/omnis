@@ -693,8 +693,8 @@ export function Inbox({
   // (pending_approvals' `.where(state, pending)` above), so there is always exactly one group and
   // a header band would repeat the name of the tab just chosen without carrying any information —
   // the number goes on the tab pill, and it is the shell's number (see below). Archived stays flat
-  // too: laying
-  // state groups over its own sort axis (archive time, newest first) makes the two fight.
+  // too: laying state groups over its own sort axis (archive time, newest first) makes the two
+  // fight.
   const grouped = view === "inbox" && filter === "agents";
   const listItems = useMemo<FlatItem[]>(() => {
     if (!grouped) return filtered.map((row) => ({ kind: "row", row }));
