@@ -8,7 +8,14 @@
         and the list is the screen.
      2. Its chrome is held clear of the notch and the home indicator (UX-28). That is what
         index.html's `viewport-fit=cover` turns on: without it every env() below resolves to 0 and
-        the tab bar sits on the home indicator. */
+        the tab bar sits on the home indicator.
+
+   Known gap, recorded rather than silently changed: the HIG's mobile default text size is 17pt, and
+   the row grammar this app reuses is the desktop's scale (15px name, 14px summary, 12px timestamp —
+   DESIGN-DIRECTION P1 pins those numbers). They clear the 11pt minimum and the contrast floor with
+   room to spare, but a phone-sized bump would have to happen in the shared row grammar rather than
+   as a shell override that leaves the rows themselves unchanged. See the audit note in
+   docs/design/screens/w4b/inbox-390.png's commit. */
 
 html,
 body {
@@ -146,6 +153,14 @@ body {
 
 .install-card__step {
   margin-bottom: 4px;
+}
+
+/* HIG (mobile): a control's default size is 44x44pt. @omnis/ui's Button is desktop-sized (14px text
+   with 6px of vertical padding, ~33px tall), which is fine at 1440 and short of the phone's default
+   target for the one control the install guide asks a person to tap. The shots tool measures this
+   rather than trusting it — see assertTapTargets in tools/e2e/shots-w4b-web.ts. */
+.install-card__dismiss {
+  min-height: 44px;
 }
 
 /* The Inbox tab's body: the list as one card on the canvas. Same recipe as the desktop's

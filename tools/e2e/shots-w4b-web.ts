@@ -147,6 +147,34 @@ async function openInbox(page: Page, expected: Expected): Promise<void> {
   await assertRowMarks(page, expected);
 }
 
+/** HIG (mobile): a control's default size is 44x44pt, its minimum 28. Tap-target size is the one
+ *  thing a screenshot cannot show, so it is measured on the phone frame instead — and it is the check
+ *  that keeps @omnis/ui's desktop-sized Button (14px text, 6px padding) honest where the shell has to
+ *  grow it to the phone's default. */
+const MIN_TAP_TARGET = 44;
+
+async function assertTapTargets(page: Page): Promise<void> {
+  const probes: [string, string][] = [
+    ["the install card's Got it", ".install-card__dismiss"],
+    ["a tab slot", ".tab-bar__tab"],
+    ["an inbox row", '[role="option"]'],
+  ];
+  const measured: string[] = [];
+  for (const [label, selector] of probes) {
+    const box = await page.locator(selector).first().boundingBox();
+    if (box === null) throw new Error(`${label} (${selector}) is not on the frame`);
+    measured.push(`${label} ${box.height.toFixed(1)}px`);
+    if (box.height < MIN_TAP_TARGET) {
+      throw new Error(
+        `${label} is ${box.height.toFixed(1)}px tall at this width — under the ${String(MIN_TAP_TARGET)}px mobile default (${selector})`,
+      );
+    }
+  }
+  // The numbers, not just the pass: a target that shrinks to 44.0 exactly is one CSS edit away from
+  // being under the line, and the log is where that shows up before a person's thumb finds it.
+  console.log(`  tap targets at ${String(page.viewportSize()?.width)}px — ${measured.join(", ")}`);
+}
+
 /** One frame plus the overflow reading, as every other shot tool takes it. */
 async function shoot(page: Page, label: string): Promise<void> {
   // The pointer was left wherever the last click put it, and a row under it draws its hover card —
@@ -199,6 +227,7 @@ async function pass(
       // of the list under a heading.
       await page.waitForSelector(".install-card__step", { timeout: 5_000 });
     }
+    if (size.width <= 480) await assertTapTargets(page);
     await shoot(page, label);
   } finally {
     await page.close();
