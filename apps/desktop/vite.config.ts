@@ -37,6 +37,15 @@ export default defineConfig({
       // US-D10 writes the same two keys the detail pane's layout lives in, through the same prefix.
       "/settings": hub,
       "/cost": hub,
+      // US-B31/B32: `api/notes.ts`, `api/digest.ts` and `api/tasks.ts` call these three families —
+      // POST /notes and /notes/:id/route, POST /items/:id/unarchive, POST /digests/:id/undo, and
+      // POST /tasks (the Tasks screen's quick-add). A write that misses this table is the failure
+      // this file's header describes with the worst consequence: unlike a settings read, a dropped
+      // POST does not fall back to a default, it is simply lost.
+      "/notes": hub,
+      "/items": hub,
+      "/digests": hub,
+      "/tasks": hub,
     },
   },
 });
