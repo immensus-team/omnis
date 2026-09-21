@@ -15,6 +15,10 @@ export interface ArchivedByMeta {
   run_id: string;
   /** Reference time for the 7-day undo window. items has no archived-at column (A4 §9.3). */
   at: string;
+  /** US-B32: the nightly digest's per-reason token, so one restore can reach a whole category
+   *  (`undoArchive`'s undoToken path). The archiver stamps it (packages/agents auto-archive) and the
+   *  digest recomputes the same string — see `undoTokenFor`. Absent on rows archived before B32. */
+  undo_token?: string;
 }
 
 export async function archiveItem(pool: Pool, itemId: string, meta: ArchivedByMeta): Promise<void> {

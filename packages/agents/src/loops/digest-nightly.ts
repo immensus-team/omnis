@@ -26,9 +26,23 @@ export interface NightlyDigest {
   agents: { runs: number; failed: number; delegated: number };
 }
 
-/** The 7-day window is decided by meta.archived_by.at, so the token is not stored — it is recomputable. */
+/** The 7-day window is decided by meta.archived_by.at, so the token is not stored in the digest —
+ *  it is recomputable from the digest id and the reason. The archiver (auto-archive.ts) recomputes
+ *  exactly this and stamps it on the item it archives, which is what lets the Digest screen's
+ *  "Restore all" reach a whole group through kernel `undoArchive`'s token path. */
 export function undoTokenFor(digestId: string, reason: string): string {
   return createHash("sha256").update(`${digestId}::${reason}`).digest("hex").slice(0, 16);
+}
+
+/** The KST calendar day, "YYYY-MM-DD". The digest is filed under this day (`for_date` — the INSERT
+ *  below casts `now() AT TIME ZONE 'Asia/Seoul'`), and an item archived at 00:30 KST belongs to the
+ *  same day's digest, so the date both sides hash has to be the KST one. Reading the UTC date here
+ *  would tokenize everything archived in the day's first nine hours under the previous day, and
+ *  those items would fall out of their group's restore. */
+export function digestIdFor(day: Date): string {
+  // en-CA renders as YYYY-MM-DD.
+  const kst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(day);
+  return `${kst}:nightly`;
 }
 
 /** headline and one_liner are the only two sentences the model writes (A4 §6.4). */
@@ -129,7 +143,7 @@ export const nightlyDigestLoop: LoopSpec<NightlyDigestOutputT> = {
     const pool = getAgentsPool();
     const dayStart = new Date(ctx.now);
     dayStart.setHours(0, 0, 0, 0);
-    const digestId = `${ctx.now.toISOString().slice(0, 10)}:nightly`;
+    const digestId = digestIdFor(ctx.now);
     const cost = (ctx.payload.cost as NightlyDigest["cost"] | undefined) ?? ZERO_COST;
 
     const digest: NightlyDigest = {

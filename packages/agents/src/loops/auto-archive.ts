@@ -6,6 +6,7 @@ import { buildContext } from "../context/assemble.js";
 import { registerLoop } from "../loop/registry.js";
 import type { LoopSpec, TriggerContext } from "../loop/spec.js";
 import { getAgentsPool } from "../pool.js";
+import { digestIdFor, undoTokenFor } from "./digest-nightly.js";
 
 export const T1_ARCHIVE_CONFIDENCE_MIN = 0.85;
 
@@ -130,19 +131,40 @@ async function t0Verdict(itemId: string): Promise<AutoArchiveOutputT | null> {
   };
 }
 
-async function applyArchive(itemId: string, out: AutoArchiveOutputT, runId: string): Promise<void> {
+async function applyArchive(
+  itemId: string,
+  out: AutoArchiveOutputT,
+  runId: string,
+  now: Date,
+): Promise<void> {
   if (!out.archive) return;
   // "When in doubt, do not archive" (A4 §9.2) is what this threshold means.
   if (out.tier === "T1" && out.confidence < T1_ARCHIVE_CONFIDENCE_MIN) return;
   // ponytail: @omnis/agents cannot depend on @omnis/kernel, so it cannot call archiveItem directly.
   // The same single UPDATE statement lives here (intentional duplication per contract §12).
+  //
+  // US-B32: the undo token is stamped here rather than stored on the digest, because the digest has
+  // not been generated yet when this runs (A4 §9.1 archives during the day, the digest is written at
+  // 23:00). It is recomputable — undoTokenFor(digestIdFor(now), reason) — so the archiver and the
+  // digest arrive at the same string without a shared row, and "Restore all" can reach a whole
+  // category through kernel undoArchive's token path. `now` is the trigger's clock, not the DB's:
+  // the token has to name the same KST day the digest will be filed under.
   await getAgentsPool().query(
     `UPDATE items SET status = 'archived',
         meta = meta || jsonb_build_object('archived_by', jsonb_build_object(
           'rule_ids', $2::jsonb, 'reason', $3::text, 'tier', $4::text,
-          'confidence', $5::real, 'run_id', $6::text, 'at', now()::text))
+          'confidence', $5::real, 'run_id', $6::text, 'at', now()::text,
+          'undo_token', $7::text))
       WHERE id = $1 AND status = 'received'`,
-    [itemId, JSON.stringify(out.rule_ids), out.reason, out.tier, out.confidence, runId],
+    [
+      itemId,
+      JSON.stringify(out.rule_ids),
+      out.reason,
+      out.tier,
+      out.confidence,
+      runId,
+      undoTokenFor(digestIdFor(now), out.reason),
+    ],
   );
 }
 
@@ -204,7 +226,7 @@ export const autoArchiveLoop: LoopSpec<AutoArchiveOutputT> = {
 
   async apply(result, ctx) {
     if (ctx.item_id === undefined) return;
-    await applyArchive(ctx.item_id, result.output, result.run_id);
+    await applyArchive(ctx.item_id, result.output, result.run_id, ctx.now);
   },
 };
 

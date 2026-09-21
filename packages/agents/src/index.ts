@@ -160,6 +160,7 @@ export {
 export {
   NIGHTLY_DIGEST_CRON,
   NightlyDigestOutput,
+  digestIdFor,
   nightlyDigestLoop,
   nightlyGroups,
   undoTokenFor,
