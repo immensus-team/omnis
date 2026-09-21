@@ -32,4 +32,12 @@ describe("TOOL_LABELS / ToolCallBadge (A5-D11)", () => {
     // @ts-expect-error deliberately invalid tool for the failure-path assertion
     expect(() => render(<ToolCallBadge tool="delete" state="done" />)).toThrow(/unknown tool/);
   });
+
+  // US-D09 §c.5 / ACCENT §4.4: a tool call is an event in the message body, not chrome, so the badge
+  // is an opaque surface and never glass. The same `.opaque-surface` the approval card beside it
+  // carries, which is what the reviewer's DOM inspection looks for.
+  it("is an opaque surface, so a tool call in the body is never glass", () => {
+    render(<ToolCallBadge tool="read" state="done" resultSummary="3 files" />);
+    expect(screen.getByText("Reading").closest(".tool-call-badge")).toHaveClass("opaque-surface");
+  });
 });
