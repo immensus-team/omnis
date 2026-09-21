@@ -93,6 +93,19 @@ export interface InboxRowProps {
    *  `<div data-index>`, so the row is an only child and `:last-child` is true of all of them (see
    *  the rule in app.css). */
   last?: boolean;
+  /** loop-r1-03/NC-18: the roving tab stop. `false` takes this row out of the tab order
+   *  (`tabIndex={-1}`) — the desktop list passes it for every row but the selected one, so the list
+   *  is a single tab stop and `j`/`k` and the arrow keys move *within* it instead of Tab walking
+   *  row → "More actions" → "Archive" → next row (27 Tabs to the pane).
+   *  Left out, the row keeps the tabIndex=0 it has always had: the PWA list and the gallery demo
+   *  have no roving stop yet (loop-r1-04 owns the PWA rows), and a row that silently lost its
+   *  focusability would be a worse bug than an extra tab stop. */
+  tabStop?: boolean;
+  /** loop-r1-03: focus and selection are the same thing — the row reports that it was focused so
+   *  the list can move its selection to it without opening anything. Enter and a click still open
+   *  the thread (that is `onSelect`); this is the passive half, and it is what a Tab into the list,
+   *  an Escape's focus restore and a row clicked in another window all arrive through. */
+  onFocusRow?: (id: string) => void;
 }
 
 /** US-D04: the archive collapse animates `height`, and `height: auto` only interpolates where
@@ -336,7 +349,11 @@ export function InboxRow(props: InboxRowProps) {
           // shell has no other way to find it — the rows live in a virtualiser it does not hold a
           // reference to.
           data-thread-id={props.id}
-          tabIndex={0}
+          // loop-r1-03/NC-18: one tab stop for the whole list, on the selected row (or the first,
+          // until something is selected). Everything else here is reachable with j/k, the arrows,
+          // Home/End and Enter — which is the list's own grammar rather than a second one.
+          tabIndex={props.tabStop === false ? -1 : 0}
+          onFocus={() => props.onFocusRow?.(props.id)}
           aria-selected={props.selected}
           className={cn(
             "inbox-row",
@@ -437,6 +454,12 @@ export function InboxRow(props: InboxRowProps) {
                       className="inbox-row__more"
                       // Guard 9: an icon-only control is named.
                       aria-label="More actions"
+                      // loop-r1-03/NC-18: the row is the tab stop, not its three controls. The
+                      // menu is still reachable — with the mouse (hover reveals the cluster) and
+                      // through the row's own Enter, which already opens the thread it acts on —
+                      // and archive itself never needed the menu: `e` and `u` do it from the
+                      // keyboard without a pointer at all.
+                      tabIndex={-1}
                       // The whole row is a click target, so without stopping propagation opening
                       // the menu also opens the thread behind it.
                       onClick={(e) => e.stopPropagation()}
@@ -451,6 +474,10 @@ export function InboxRow(props: InboxRowProps) {
                   <button
                     type="button"
                     className="inbox-row__action"
+                    // loop-r1-03/NC-18: out of the tab order with the rest of the row's controls —
+                    // the row is the stop. Clickable as it has always been, and `e`/`u` archive and
+                    // restore the selected row without it.
+                    tabIndex={-1}
                     // The whole row is a click target, so without stopping propagation archiving
                     // also opens the thread.
                     onClick={(e) => {

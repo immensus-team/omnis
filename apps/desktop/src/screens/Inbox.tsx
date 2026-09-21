@@ -31,8 +31,16 @@ import {
   agentSessionKinsoState,
 } from "@omnis/ui/lib/row-meta";
 import { useQuery } from "@rocicorp/zero/react";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Virtuoso } from "react-virtuoso";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { setThreadArchived } from "../api/threads.js";
 import { useKeymap } from "../hooks/use-keymap.js";
 import { useZeroClient } from "../zero-client.js";
@@ -216,6 +224,33 @@ export function groupByAgentState<T extends { agentState: AgentPillState | null 
     }),
     ungrouped,
   };
+}
+
+/** loop-r1-03/L-01: one step along the row order. A null `selectedId` — or one that is no longer in
+ *  the list, e.g. the filter changed under it — reads as "nothing selected", and then **both**
+ *  directions land on the first row: `k` with nothing selected does not jump to the bottom.
+ *  At either end the selection stays put rather than wrapping; there is no loop to fall off.
+ *  Pure, so the movement rule can be stated without a DOM. */
+function stepRow(
+  rowIds: readonly string[],
+  selectedId: string | null,
+  delta: 1 | -1,
+): string | null {
+  if (rowIds.length === 0) return null;
+  const at = selectedId === null ? -1 : rowIds.indexOf(selectedId);
+  if (at === -1) return rowIds[0] ?? null;
+  return rowIds[at + delta] ?? selectedId;
+}
+
+/** loop-r1-03/L-02, NC-02: the row that takes the selection when `id` leaves the list — the one
+ *  after it, or the one before it when it was last, or null when it was the only row. This is the
+ *  whole of "`e` lands on the next thread": read from the list *as it still is*, because the
+ *  archiving row is held in it for one leave animation (US-D04), so the id after it is the row the
+ *  eye sees directly below rather than one that has already moved up. */
+function neighbourAfter(rowIds: readonly string[], id: string): string | null {
+  const at = rowIds.indexOf(id);
+  if (at === -1) return null;
+  return rowIds[at + 1] ?? rowIds[at - 1] ?? null;
 }
 
 /** One U2 row. Built by the threadRows memo and referenced again by the grouping flattener
@@ -509,17 +544,6 @@ export function Inbox({
     [],
   );
 
-  useKeymap(
-    useCallback(
-      (action: string) => {
-        if (selectedId === null) return;
-        if (action === "archive") toggleArchive(selectedId, true);
-        if (action === "unarchive") toggleArchive(selectedId, false);
-      },
-      [selectedId, toggleArchive],
-    ),
-  );
-
   const channelFiltered = useMemo(
     () => (channelFilter ? threadRows.filter((r) => r.channel === channelFilter) : threadRows),
     [threadRows, channelFilter],
@@ -605,6 +629,125 @@ export function Inbox({
       ...ungrouped.map((row) => ({ kind: "row" as const, row })),
     ];
   }, [filtered, grouped]);
+
+  /** loop-r1-03/L-01: the row order — the ids of the `listItems` entries that are rows, in display
+   *  order. Group headers are skipped, so "the next row" is never a header band, and the order read
+   *  is the *displayed* one rather than the thread list's own: needs-attention rows float to the top
+   *  of the inbox and the archived view sorts by archive time, so neither matches the query order.
+   *  This is the list's axis for `j`/`k`, the arrows, Home/End and the archive advance. */
+  const rowIds = useMemo(
+    () => listItems.flatMap((item) => (item.kind === "row" ? [item.row.id] : [])),
+    [listItems],
+  );
+
+  /** loop-r1-03: the scroller, so `moveTo` can bring a row the window has not reached into view
+   *  before it puts the focus on it. The rows live inside the virtualiser, so this ref is the only
+   *  way to address one by index — the screen holds no other handle on the list. */
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
+
+  /** loop-r1-03: the one way the selection moves, and it does three things: select, scroll the row
+   *  into view, and put the focus on it.
+   *
+   *  The scroll finds the row's index in `listItems` — the flat stream, not `rowIds` — because that
+   *  is what Virtuoso's `scrollIntoView` addresses: a group header occupies an index too, and an
+   *  offset taken from the rows alone would land one item short for every header above it.
+   *
+   *  The focus is deferred to the next frame, and that is load-bearing rather than polite. Moving
+   *  past the bottom of the window selects a row the virtualiser has not mounted yet — it mounts it
+   *  in the same commit — so `querySelector` this frame would find nothing, the focus would not
+   *  move, and with a roving tab stop the next Tab would start from somewhere else entirely.
+   *
+   *  Moving does **not** open the pane. Enter and a click do that, through the row's own `onSelect`,
+   *  and that is the difference between reading the queue with `j` and opening three threads. */
+  const moveTo = useCallback(
+    (id: string | null) => {
+      setSelectedId(id);
+      if (id === null) return;
+      const index = listItems.findIndex((item) => item.kind === "row" && item.row.id === id);
+      // behavior "auto": the selection moves instantly. A smooth scroll would still be travelling
+      // when the next `j` lands, so the row under the focus and the row under the eye would part.
+      if (index !== -1) virtuosoRef.current?.scrollIntoView({ index, behavior: "auto" });
+      requestAnimationFrame(() => {
+        const row = document.querySelector(`[data-thread-id="${id}"]`);
+        if (row instanceof HTMLElement) row.focus();
+      });
+    },
+    [listItems],
+  );
+
+  /** loop-r1-03/L-02, NC-02: archive (or restore) and move on. Both `e`/`u` and the row's own
+   *  Archive button come through here, so the keyboard and the mouse cannot disagree about where
+   *  the selection lands; the bug was that it stayed on the row that had just left, so the next `e`
+   *  posted the same id again. The neighbour is read from `rowIds` as it *still* is — the leaving
+   *  row is held in the list for its 240ms animation (US-D04), so the id after it is the row the
+   *  eye sees directly below rather than one that has already moved up.
+   *  The advance only happens when the row that left is the selected one: archiving some other row
+   *  from the mouse must not steal the selection from the thread being read. */
+  const archiveAndAdvance = useCallback(
+    (threadId: string, archived: boolean) => {
+      const next = neighbourAfter(rowIds, threadId);
+      toggleArchive(threadId, archived);
+      if (threadId === selectedId) moveTo(next);
+    },
+    [rowIds, selectedId, toggleArchive, moveTo],
+  );
+
+  useKeymap(
+    useCallback(
+      (action: string) => {
+        // The movement keys read "nothing selected" as "start at the top" and are answered before
+        // the guard below: `j` on a list nobody has clicked into has to land on the first row, or
+        // the keyboard could never enter the list at all (L-01).
+        if (action === "next-row") {
+          moveTo(stepRow(rowIds, selectedId, 1));
+          return;
+        }
+        if (action === "prev-row") {
+          moveTo(stepRow(rowIds, selectedId, -1));
+          return;
+        }
+        // Nothing happens when nothing is selected: archive and restore are the selection's own
+        // keys, and `j` is what gives them something to act on.
+        if (selectedId === null) return;
+        // `e` archives in the inbox and `u` restores in the Archived view. Each is scoped to its own
+        // view rather than acting in both: `e` on an already-archived row is a write the server does
+        // not need, and this story is triage rather than a second Restore binding (L-02).
+        if (action === "archive" && view === "inbox") archiveAndAdvance(selectedId, true);
+        if (action === "unarchive" && view === "archived") archiveAndAdvance(selectedId, false);
+      },
+      [rowIds, selectedId, view, moveTo, archiveAndAdvance],
+    ),
+  );
+
+  /** loop-r1-03/L-19: the arrow keys, Home and End belong to the *list*, so they are handled on the
+   *  list rather than in the global keymap, which listens on `window`. A window-level ArrowDown
+   *  cannot tell a press made with the focus on a row from one made inside the filter pills'
+   *  popover or the "+ Label" menu, and the arrows have to keep working as those surfaces' own key
+   *  (arrow movement across the radio pills is a finding of its own). `onKeyDown` here only sees
+   *  presses made with the focus inside the list, which is exactly the scope this story asks for.
+   *  Only these four keys are claimed, so Enter still reaches the row that owns it. */
+  const onListKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>): void => {
+    const step = (delta: 1 | -1): void => {
+      e.preventDefault();
+      moveTo(stepRow(rowIds, selectedId, delta));
+    };
+    if (e.key === "ArrowDown") step(1);
+    else if (e.key === "ArrowUp") step(-1);
+    else if (e.key === "Home") {
+      e.preventDefault();
+      moveTo(rowIds[0] ?? null);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      moveTo(rowIds[rowIds.length - 1] ?? null);
+    }
+  };
+
+  /** loop-r1-03/NC-18: the row that holds the list's single tab stop — the selected one, or the
+   *  first when nothing is selected or the selection is no longer in the list (the filter changed
+   *  under it). Derived rather than stored, so it cannot disagree with what is on screen: `rowIds`
+   *  is the same array the movement and the keys read. */
+  const tabStopId =
+    selectedId !== null && rowIds.includes(selectedId) ? selectedId : (rowIds[0] ?? null);
 
   // The needs-approval tab's count. It only means anything if it is the same number whether or
   // not the tab is selected, so it is counted **before** the pill filter — from `channelFiltered`,
@@ -730,54 +873,71 @@ export function Inbox({
             press. */}
         {labels.length > 0 && <FilterChipBar chips={[]} addOptions={addOptions} />}
       </div>
-      <Virtuoso
-        role="listbox"
-        style={{ flex: "1 1 0", minHeight: 0 }}
-        data={listItems}
-        itemContent={(index, item) =>
-          item.kind === "header" ? (
-            <GroupHeader pill={item.pill} count={item.count} />
-          ) : (
-            <InboxRow
-              // US-D08 §c.4: only the row at the end of the list drops its hairline. The index is
-              // the flat list index, and the last item is always a row — a group header is only
-              // ever emitted above the rows it counts.
-              last={index === listItems.length - 1}
-              id={item.row.id}
-              name={item.row.title}
-              summary={item.row.summary}
-              isDraft={item.row.isDraft}
-              avatar={item.row.avatar}
-              channel={item.row.channel}
-              // When the group header directly above states the status, the row does not say it
-              // again (ref-issue-tracker-density.webp also keeps state words in the header only).
-              // What it does not do is erase the fact that this is a session — overwriting
-              // agentState with null drops a runtime session row to a channel glyph and it starts
-              // calling itself a "Slack message" (round three's rejection).
-              agentState={item.row.agentState}
-              groupedByState={grouped}
-              timestamp={item.row.timestamp}
-              unread={item.row.unread}
-              unreadCount={item.row.unreadCount}
-              selected={item.row.id === selectedId}
-              // On the needs-approval tab every row is pending — repeating with a dot per row
-              // what the tab already said makes the dot distinguish nothing (the same rule as
-              // dropping the status badge under a group header: what is stated above is not
-              // repeated below).
-              hasPendingApproval={filter !== "needs-approval" && item.row.hasPendingApproval}
-              labels={item.row.labels}
-              person={item.row.person}
-              archived={view === "archived"}
-              leaving={leavingIds.has(item.row.id)}
-              onArchive={(id) => toggleArchive(id, view !== "archived")}
-              onSelect={(id) => {
-                setSelectedId(id);
-                onOpen?.({ threadId: item.row.threadId, agentSession: item.row.agentSession });
-              }}
-            />
-          )
-        }
-      />
+      {/* loop-r1-03: the wrapper exists to scope four keys — see onListKeyDown. It carries no
+          tabindex of its own: the list's tab stop is the selected row, and the wrapper is not a
+          stop at all (NC-18 counted the "list wrapper (no visible focus)" as one). */}
+      <div className="inbox-card__list" onKeyDown={onListKeyDown}>
+        <Virtuoso
+          ref={virtuosoRef}
+          role="listbox"
+          // loop-r1-03/NC-18: react-virtuoso puts tabIndex={0} on its scroller by default, which is
+          // the focusable-but-invisible stop the keyboard-only session counted. Taking it out
+          // leaves the list exactly one tab stop, on the selected row.
+          tabIndex={-1}
+          style={{ flex: "1 1 0", minHeight: 0 }}
+          data={listItems}
+          itemContent={(index, item) =>
+            item.kind === "header" ? (
+              <GroupHeader pill={item.pill} count={item.count} />
+            ) : (
+              <InboxRow
+                // US-D08 §c.4: only the row at the end of the list drops its hairline. The index
+                // is the flat list index, and the last item is always a row — a group header is
+                // only ever emitted above the rows it counts.
+                last={index === listItems.length - 1}
+                id={item.row.id}
+                name={item.row.title}
+                summary={item.row.summary}
+                isDraft={item.row.isDraft}
+                avatar={item.row.avatar}
+                channel={item.row.channel}
+                // When the group header directly above states the status, the row does not say it
+                // again (ref-issue-tracker-density.webp also keeps state words in the header
+                // only). What it does not do is erase the fact that this is a session —
+                // overwriting agentState with null drops a runtime session row to a channel glyph
+                // and it starts calling itself a "Slack message" (round three's rejection).
+                agentState={item.row.agentState}
+                groupedByState={grouped}
+                timestamp={item.row.timestamp}
+                unread={item.row.unread}
+                unreadCount={item.row.unreadCount}
+                selected={item.row.id === selectedId}
+                // On the needs-approval tab every row is pending — repeating with a dot per row
+                // what the tab already said makes the dot distinguish nothing (the same rule as
+                // dropping the status badge under a group header: what is stated above is not
+                // repeated below).
+                hasPendingApproval={filter !== "needs-approval" && item.row.hasPendingApproval}
+                labels={item.row.labels}
+                person={item.row.person}
+                archived={view === "archived"}
+                leaving={leavingIds.has(item.row.id)}
+                // loop-r1-03: one Tab reaches the list and it lands on the selected row; every
+                // other row is one `j` away instead. See tabStopId.
+                tabStop={item.row.id === tabStopId}
+                // Focus *is* selection — a Tab into the list, Escape's focus restore and a row
+                // focused in another window all arrive here, and none of them opens the pane.
+                onFocusRow={setSelectedId}
+                // The mouse path takes the same advance as `e`: one archive rule, two triggers.
+                onArchive={(id) => archiveAndAdvance(id, view !== "archived")}
+                onSelect={(id) => {
+                  setSelectedId(id);
+                  onOpen?.({ threadId: item.row.threadId, agentSession: item.row.agentSession });
+                }}
+              />
+            )
+          }
+        />
+      </div>
       {/* US-D09 §c.6: M125's Filters sheet. It is a sibling of the prompt below rather than its
           ancestor, and that is load-bearing — both portal to <body>, and React bubbles a synthetic
           event through the **React** tree, so a prompt rendered inside the sheet would deliver its
