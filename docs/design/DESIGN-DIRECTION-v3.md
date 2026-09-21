@@ -8,7 +8,7 @@ Evidence: `apple-mail-ios/Apple Mail ios Feb 2026<n>.png` — cited below as **M
 **Prerequisite: D6 must land first.** `ACCENT-DIRECTION.md` is not implemented on this branch — `packages/ui/src/tokens.css` still carries hue-260 neutrals, the peach/mint canvas radials and `--ask-gradient`, and `aurora-surface.tsx` does not exist. D7–D9 assume D6's tokens. Do not start D8 before D6 step 1 is reviewed.
 
 **Two dependency facts, verified, that this spec is built on:**
-- `motion` / `framer-motion` / `dnd-kit` are **not installed** (checked root, `packages/ui`, `apps/desktop` `package.json` and `node_modules`). The brief's Reorder branch does not apply. Reorder and swipe are Pointer Events + FLIP, one shared primitive (§c.1), no new dependency.
+- ~~`motion` / `framer-motion` / `dnd-kit` are **not installed** … Reorder and swipe are Pointer Events + FLIP, one shared primitive (§c.1), no new dependency.~~ **Superseded on 2026-09-21 by the motion-OSS wave — see §c.1.1.** At the time this spec was written none of them was installed and the brief's Reorder branch did not apply. Logan then asked for the hand-rolled physics to be replaced with battle-tested open-source motion, and five libraries are now installed (`motion@13.4.0`, `vaul@1.1.2`, `@use-gesture/react@10.3.1`, `@formkit/auto-animate@0.10.0`, `sonner@2.0.8` — all MIT). Guard 6 in §e is amended with them. §c.1's `pointer-drag.ts` survives as the **gesture** primitive; what the wave changes is the **animation** layer around it, not the gesture gates.
 - The Agents mascot is **already wired** (`row-meta.ts:5-6,59` → `CHANNEL_BRAND_ASSET.agent` → `ChannelGlyph`, commit `87e2688`). D7 verifies it renders at 1x/2x; it does not re-do it.
 
 One sentence for the whole thing: **the canvas is plain paper, the chrome is glass that floats above it, and the only colour on either is one blue.**
@@ -145,6 +145,27 @@ export function pointerDrag(h: DragHandlers, opts?: { holdMs?: number; axis?: "x
 ```
 
 FLIP, in both consumers: on commit, read every sibling's `getBoundingClientRect()` **before** the DOM change (First), apply the change (Last), set `transform: translate(Δ)` with no transition (Invert), then on the next frame clear the transform with `transition: transform var(--dur-reorder) var(--ease-settle)` (Play). Under reduced motion the duration is 0ms and the whole thing lands instantly — no separate branch.
+
+#### c.1.1 What the motion-OSS wave replaced, and the line it drew
+
+Added 2026-09-21. The wave's rule, derived from the evidence below and applied to every slice since:
+
+> **`motion` owns the animation layer. `pointer-drag.ts` keeps the gesture layer.**
+
+That line is not a preference, it is what the harness can verify. The animation layer is React-level — `AnimatePresence`, `LayoutGroup`, `layout`, springs, `MotionConfig` — and a unit test drives it by rendering and asserting the DOM. The gesture layer is layout- and pointer-level, and jsdom has no layout: `getBoundingClientRect()` returns zeroes for every element and hit-testing does not exist. A gesture that a test cannot drive is a gesture whose regressions no test can catch.
+
+**Replaced:** the per-surface JS exit holds (`useClosingSpring` held a node in the DOM for `PANEL_MS`/`LEAVE_MS` so a CSS exit animation could finish — `AnimatePresence` does this natively and correctly, including the "never opened, so never animate out" rule that `useClosingSpring` hand-rolled); the CSS duration ladder as the *only* source of motion timing (now `TIER_MS`/`SPRING` in `lib/motion.ts` mirror it, guarded by a drift test); the mobile bottom sheet's hand-built drag-to-dismiss (now `vaul`); the hand-rolled flat list transitions (now `auto-animate`); and the "Archived · Undo" affordance, which had no toast at all (now `sonner`).
+
+**Deliberately kept — the rail's reorder stays on `pointer-drag.ts` + FLIP, and this is the wave's one recorded non-port:**
+
+The brief asked for `motion`'s `Reorder.Group`/`Reorder.Item` here. It was evaluated and not taken, for two measured reasons, not one:
+
+1. **`Reorder`'s drag cannot be driven in jsdom, so the port trades verified behaviour for unverified behaviour.** Probed directly: a `Reorder.Group` of three items, with `getBoundingClientRect` stubbed to a real 44px/52px stacked column (the same stub `channel-rail.test.tsx` uses), driven by a full synthetic `pointerdown` → moves → `pointerup` gesture. Result: `onReorder` fired **zero** times and the dragged item's inline style stayed `transform: none`. Repeated with the moves dispatched on `window` rather than the item, in case the binding target was the issue — same result. `Reorder`'s drag depends on layout, which jsdom does not have. In a real browser it would very likely work; the point is that the 13 tests that today pin the rail's reorder — the slot-crossing compensation, Escape-revert, click suppression, the 350ms hold, the scroll-vs-lift disambiguation — could not follow it there.
+2. **`Reorder` does not cover the parts that are actually hard.** It replaces the FLIP (~60 lines). It does not replace the gesture gates: the mouse 6px slop, the touch 350ms hold with its 8px abandon, the scroll-vs-drag disambiguation, Escape-cancel-and-revert, or click suppression after a drop. Those are ~70 lines in `pointer-drag.ts`, and porting means re-implementing them around `dragControls.start(event)`, including calling it 350ms after the press with a retained event. Net: comparable code, on a strictly worse verification footing. It also cannot delete `pointer-drag.ts`, which the D8 row swipe still needs.
+
+Reason 2 alone would be arguable. Reason 1 is decisive, and it is the one that generalises: **a gesture primitive this repo owns and tests beats a library's gesture it cannot.** That is also why `@use-gesture/react`'s `useDrag` is not used for the rail or the row swipe — its `useGesture`-level velocity and rubber-band maths are used where the *maths* is the point and is unit-testable in isolation (`lib/detail-pane.ts`), not as a replacement for the pointer gates.
+
+If a future wave wants `Reorder` here, the prerequisite is a browser-driven test (Playwright) that drives the drag for real, so the behaviour has somewhere to be verified. `tools/e2e/` is where that would live.
 
 ### c.2 Rail — `channel-rail.tsx` + `app.css:61-191`
 
@@ -334,7 +355,8 @@ These add to ACCENT §5.3's seven guards and `SKILLS.md`'s twelve. They do not r
 3. **Hairlines are inset and faint.** A full-bleed row divider, or ink above 8%, turns the list into a table. Both are rejects.
 4. **Glass is chrome only.** The canvas, list rows, message bodies, approval cards, attachment cards and every input stay opaque. A glass card inside a glass sheet is a reject (ACCENT §4.4).
 5. **Nothing bounces for decoration.** Springs exist for direct manipulation — a drag settling, a sheet arriving, a row collapsing. A hover that scales, a card that fades up on mount, a chip that springs when selected: rejects.
-6. **No new dependency.** `motion`, `framer-motion`, `dnd-kit`, a headless-UI kit, an icon pack beyond `lucide-react` / `react-icons` — reject. The primitives in §c.1 and Radix Popover are what exist.
+6. **No unreviewed dependency.** *Amended 2026-09-21 by the motion-OSS wave.* The five vetted animation libraries are now **allowed** (§c.1.1): `motion`, `vaul`, `@use-gesture/react`, `@formkit/auto-animate`, `sonner`. Still a reject: `dnd-kit`, a headless-UI kit, an icon pack beyond `lucide-react` / `react-icons`, GSAP, react-spring, lenis, and component kits (Aceternity, Magic UI). The rule's intent is unchanged — a dependency earns its place by doing something the primitives do badly, and it is added one at a time, with its bundle cost measured. What guard 6 was protecting against was *unvetted* dependencies, not dependencies as such.
+   *Why this one was worth breaking:* the hand-rolled motion was a CSS duration ladder plus one shared pointer primitive, and the parts that needed real engineering — a spring that settles, a layout transition where siblings flow around a lifted element, an exit that unmounts only when its animation ends — were being re-derived per surface. §c.1.1 records what was actually replaced and what was deliberately kept.
 7. **Chips are pills, not tabs.** No underline indicator, no bottom border, no segmented-control frame around the chip row. The active chip is a filled pill and nothing else (M100, M135).
 8. **The AI summary survives.** Mail shows two lines of raw body preview; omnis shows one line of AI summary. A row that reverts to body preview has lost the product, not gained fidelity.
 9. **Icon-only means labelled.** Every icon-only control carries an `aria-label` that does not depend on visible text. An icon button whose accessible name disappears with its label at a breakpoint is a reject.
