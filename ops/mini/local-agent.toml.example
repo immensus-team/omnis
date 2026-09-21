@@ -11,3 +11,16 @@ token_keychain_item = "omnis.bridge.token.mini"
 kind = "codex"
 binary = "/opt/homebrew/bin/codex"
 allowed_roots = ["/Users/vigor/omnis"]
+
+# Capture channels (C-D3). Each block runs one adapter inside this GUI-session process, and the string
+# must match the hub's `accounts.external_id` exactly — a typo drops every batch silently (A3-D4).
+# Leave them commented until the channel's live story says so: US-C21 for KakaoTalk, US-C30 for LinkedIn.
+# One block per channel is the maximum; a second one is a ConfigError.
+# Beeper/WhatsApp has no block here — it is not a GUI-sidecar channel. `preflight.sh` gates its probe on a
+# `whatsapp` account row instead.
+# [[capture]]
+# channel = "kakaotalk"
+# account_external_id = "kakaotalk:me"
+# [[capture]]
+# channel = "linkedin"
+# account_external_id = "linkedin:me"

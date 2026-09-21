@@ -1,7 +1,25 @@
 #!/bin/bash
 # US-B43: mini boot checklist. Read-only — it prints only the failing items and fixes nothing (A6 §2).
+# US-C18 adds the capture-channel probes at the end. Each one is inert until its channel is switched on,
+# so preflight stays green on a mini where Phase C has not gone live yet.
 set -uo pipefail
 FAILS=()
+
+TOML="${OMNIS_LOCAL_AGENT_TOML:-$HOME/.omnis/local-agent.toml}"
+
+# US-C18. Capture is opt-in per host (C-D3): a `[[capture]]` block in the TOML is the switch. The pattern
+# is anchored and so rejects a leading `#`, which is what keeps the commented example block that install.sh
+# copies from counting as enabled.
+capture_enabled() {
+  grep -qE "^[[:space:]]*channel[[:space:]]*=[[:space:]]*\"$1\"" "$TOML" 2>/dev/null
+}
+# Beeper/WhatsApp is a hub-side adapter rather than a `[[capture]]` channel, so the account row itself is
+# its gate. A DB that is down reads as "no row" and skips the probe — check_slot below is the check that
+# actually reports a broken Postgres.
+whatsapp_account() {
+  psql "${DATABASE_URL:-postgres://$(id -un)@127.0.0.1:5432/omnis}" -Atc \
+    "select 1 from accounts where channel = 'whatsapp' limit 1" 2>/dev/null | grep -q 1
+}
 
 check_filevault() {
   local status; status="$(fdesetup status 2>/dev/null || echo unknown)"
@@ -40,6 +58,33 @@ check_slot() {
   [ "$active" = "t" ] || FAILS+=("replication slot inactive")
 }
 
+# --- US-C18 capture channels. Each probe prints a `skip:` note instead of failing while its channel is off. ---
+check_kakaotalk() {
+  capture_enabled kakaotalk \
+    || { echo 'skip: KakaoTalk.app (no [[capture]] channel = "kakaotalk")'; return 0; }
+  pgrep -x KakaoTalk >/dev/null 2>&1 \
+    || FAILS+=("KakaoTalk.app not running (kmsg reads its UI through AX, A1 §2.8)")
+}
+check_kmsg_ax() {
+  capture_enabled kakaotalk \
+    || { echo 'skip: kmsg Accessibility (no [[capture]] channel = "kakaotalk")'; return 0; }
+  # `kmsg status` exits non-zero when the process that spawns it is not AX-trusted. Grant it to the node
+  # binary that run.sh execs, not to kmsg itself — that node process is the one asking (A1 §2.8).
+  kmsg status --json >/dev/null 2>&1 \
+    || FAILS+=("kmsg has no Accessibility trust (grant it to the node binary that runs local-agent)")
+}
+check_beeper() {
+  whatsapp_account || { echo "skip: Beeper Desktop API (no whatsapp account row)"; return 0; }
+  lsof -nP -iTCP@127.0.0.1:23373 -sTCP:LISTEN >/dev/null 2>&1 \
+    || FAILS+=("Beeper Desktop API not listening on 127.0.0.1:23373")
+}
+check_linkedin_profile() {
+  capture_enabled linkedin \
+    || { echo 'skip: LinkedIn profile (no [[capture]] channel = "linkedin")'; return 0; }
+  [ -d "$HOME/.omnis/linkedin-profile" ] \
+    || FAILS+=("LinkedIn Playwright profile missing: ~/.omnis/linkedin-profile")
+}
+
 check_filevault
 check_autologin
 check_pmset
@@ -47,6 +92,10 @@ check_autorestart
 check_launchagents
 check_ollama
 check_slot
+check_kakaotalk
+check_kmsg_ax
+check_beeper
+check_linkedin_profile
 
 if [ "${#FAILS[@]}" -eq 0 ]; then
   echo "ok: preflight passed"

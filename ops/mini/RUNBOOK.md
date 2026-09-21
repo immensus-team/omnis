@@ -76,6 +76,8 @@ cd /Users/vigor/omnis && bash ops/mini/install.sh        # all three. A single o
 ```
 install.sh lays down `ops/mini/env.sh` (from `env.sh.example` if absent) and `~/.omnis/local-agent.toml`
 (from `local-agent.toml.example` if absent), substitutes the plists, and bootstraps them into `gui/$(id -u)`.
+It also copies the US-C18 capture sidecars into `~/Library/LaunchAgents/` under the same "only when absent"
+rule, but deliberately does **not** load them — that is the live story's step (§7).
 `env.sh` is **not committed** (.gitignore) — every value is a Keychain lookup.
 
 ### 6) tailnet exposure
@@ -86,6 +88,51 @@ install.sh lays down `ops/mini/env.sh` (from `env.sh.example` if absent) and `~/
 Mount it at `/` — because Serve **strips** the prefix given by `--set-path` before handing the request to the backend,
 mounting at `/api` would deliver the hub's `/api/zero-token` as `/zero-token` and 404. More specific paths win,
 so the existing `/recaps` (:8090) mount stays alive. Check with `serve status`.
+
+### 7) Capture channels (US-C18 — nothing here is live until its story says so)
+
+Two GUI apps have to stay running in the mini's login session: `kmsg` reads KakaoTalk.app's UI through the
+AX API (A1 §2.8), and Beeper Desktop serves the WhatsApp API on `127.0.0.1:23373` (A1 §2.6). `install.sh`
+only copies `com.omnis.{kakaotalk,beeper}.plist` into `~/Library/LaunchAgents/`; **loading** one is the step
+below, and it belongs to the channel's live story. `preflight.sh --check` probes each channel only when its
+`[[capture]]` block in `~/.omnis/local-agent.toml` (or, for Beeper, a `whatsapp` account row) exists —
+before that it prints one `skip:` line per channel and preflight stays green. The capture blocks in
+`local-agent.toml.example` ship commented out for exactly this reason: one block per channel is the
+maximum, and `account_external_id` has to match the hub's `accounts.external_id` character for character.
+
+**KakaoTalk** (Task 20 → 21). One time: `brew install channprj/tap/kmsg`; then System Settings → Privacy &
+Security → Accessibility → grant **the `node` binary that runs local-agent** (`/opt/homebrew/bin/node`) —
+`run.sh` execs it, and it is that process which spawns `kmsg`, so granting `kmsg` itself does nothing. The
+grant only works from a GUI session. Never run `kmsg auth login` (it stores the password in kmsg's own
+store, A1 §2.8). Verify with `kmsg status --json` (exit 0 = trusted) and `kmsg chats --json`. To go live:
+insert the account row (`channel='kakaotalk'`, `external_id='kakaotalk:me'`), uncomment the `[[capture]]`
+block, and
+
+```bash
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.omnis.kakaotalk.plist
+```
+
+**Beeper / WhatsApp** (Task 23). Install Beeper Desktop and pair the **secondary** number by QR — never the
+primary one (master Q2). Issue a Desktop API token under Settings → Integrations, enable **Remote Access**
+under Settings → Integrations → Advanced, and bind it to **Tailscale only** (Beeper offers no tunnel of its
+own; no Funnel, no Cloudflare — A1 §2.6). Then
+
+```bash
+tools/auth-kit/keychain-add.sh omnis.beeper.token
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.omnis.beeper.plist
+```
+
+Personal use only: no bulk sending, no automatic replies.
+
+**LinkedIn** (Task 30). No LaunchAgent of its own — Playwright runs inside `local-agent`. Log in **once** in
+the resident profile, 2FA included, then leave the profile alone:
+
+```bash
+npx playwright open --user-data-dir ~/.omnis/linkedin-profile https://www.linkedin.com/messaging/
+```
+
+Store no credentials: the profile holds the session cookies and is itself a secret, so treat it that way
+when backing up or migrating (A1 §2.9). Poll at a randomized 5–15 minute interval, never bulk-view profiles.
 
 ## Update (when the code has changed)
 
@@ -231,7 +278,7 @@ curl -so /dev/null -w '%{http_code}\n' http://127.0.0.1:4848/   # zero-cache →
 grep '"bridge connected"' ~/Library/Logs/omnis/hub.log | tail -1   # confirm local-agent registration
 psql -U vigor -d omnis -Atc \
   "SELECT slot_name, active, wal_status FROM pg_replication_slots"  # zero_0_a|t|reserved
-bash ops/mini/preflight.sh --check   # FileVault · auto-login · pmset (3 no-sleep settings + autorestart=1 auto-boot on power restore) · 4 LaunchAgents · Ollama · slot, all at once (US-B43)
+bash ops/mini/preflight.sh --check   # FileVault · auto-login · pmset (3 no-sleep settings + autorestart=1 auto-boot on power restore) · 4 LaunchAgents · Ollama · slot · the 4 capture probes, all at once (US-B43, US-C18)
 ```
 
 The `agent_runtimes` table is **not yet populated in Phase A** — `apps/local-agent/src/main.ts` comes up with an

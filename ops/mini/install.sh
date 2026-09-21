@@ -13,6 +13,10 @@ SERVICES=("${@:-}")
 mkdir -p "$AGENTS" "$HOME/Library/Logs/omnis" "$HOME/.omnis" "$HOME/omnis-var"
 [ -f "$ROOT/ops/mini/env.sh" ] || cp "$ROOT/ops/mini/env.sh.example" "$ROOT/ops/mini/env.sh"
 [ -f "$HOME/.omnis/local-agent.toml" ] || cp "$ROOT/ops/mini/local-agent.toml.example" "$HOME/.omnis/local-agent.toml"
+# US-C18: the capture sidecars. Copied by the same "only when absent" rule as the TOML, but deliberately
+# NOT bootstrapped here — nothing is loaded on the mini until the channel's live story (US-C21/US-C23) does it.
+[ -f "$AGENTS/com.omnis.kakaotalk.plist" ] || cp "$ROOT/ops/mini/com.omnis.kakaotalk.plist" "$AGENTS/com.omnis.kakaotalk.plist"
+[ -f "$AGENTS/com.omnis.beeper.plist" ] || cp "$ROOT/ops/mini/com.omnis.beeper.plist" "$AGENTS/com.omnis.beeper.plist"
 chmod +x "$ROOT/ops/mini/run.sh"
 
 for service in "${SERVICES[@]}"; do
