@@ -1349,6 +1349,17 @@ body {
      read the same property). 420px is the width the narrow sheet has always had, so the two shapes
      open the same size and the number exists in one place. */
   width: var(--detail-width, 420px);
+  /* US-D10 §c.1: the settle. Every width the pane takes that is not a *gesture* has to travel to it,
+     and the release from the rubber band is the case that matters: while the pointer is down the pane
+     follows it one-for-one (the band is drawn at a third of the overshoot — detail-pane.ts), and on
+     release the shell commits the clamped width, so 816px has to become 720px. With no transition
+     the two land in the same frame and the band is thrown away rather than sprung back from: only
+     the half of the gesture before the release was ever fluid. The same pair covers a double-click
+     back to the shipped width and each 16px arrow-key step, which jump for the same reason.
+     `--ease-settle` is tokens.css's own "a drag's drop" curve, so this is the declaration that
+     sentence was written about; `--dur-move` is the movement rung, and under reduced motion it is
+     80ms — the settle shortens with every other movement in the app rather than branching here. */
+  transition: width var(--dur-move) var(--ease-settle);
   /* The gutter to the list, animated with the width when the pane collapses: leaving it behind would
      hold the list 16px short until the pane unmounted, which is a step at the end of the close. */
   margin-left: 16px;
@@ -1447,6 +1458,12 @@ body {
   height: 64px;
   cursor: col-resize;
   user-select: none;
+  /* The pill rides the divider, so it has to take the divider's motion: `right` is computed from
+     `--detail-width`, and on a release that springs the pane (816px → 720px, the case the pane's own
+     rule above describes) the grip would arrive in one frame and the pill would spend the settle
+     96px proud of the edge it belongs to. A transition on `right` and not on a `transform` because
+     the grip already has one (the centring translate below), which a second one would overwrite. */
+  transition: right var(--dur-move) var(--ease-settle);
   /* A drag the browser reads as a pan would be cancelled half way through, which is the one gesture
      this element exists for. */
   touch-action: none;
@@ -1476,6 +1493,19 @@ body {
    the length of the gesture, so one rule covers whatever the pointer crosses. */
 .app-shell--detail-dragging {
   user-select: none;
+}
+
+/* ...and the same flag switches the settle off, on both things that carry one.
+   While the pointer is down the pane is being *drawn*, not settled: leaving the transition on would
+   put --dur-move of easing between the pointer and the edge it is holding, and the divider would
+   trail the cursor by a fifth of a second for the whole gesture. The grip's `right` goes with it —
+   a pill that eased to a new position the pane had already reached is the same one-frame lag in the
+   other direction, and it would also mean the two numbers being animated off one flag disagreed
+   about when the gesture started. One class, so "a gesture is running" is said once and everything
+   that would smooth a width reads it. */
+.app-shell--detail-dragging .app-shell__detail,
+.app-shell--detail-dragging .detail-pane__grip {
+  transition: none;
 }
 
 .detail-pane__grip:hover .detail-pane__grip-pill,

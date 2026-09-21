@@ -31,7 +31,11 @@ export const DETAIL_STEP_PX = 16;
 /** How much of the travel past a limit the pane actually takes while a drag is running. The pane
  *  keeps following the pointer past both ends (so the gesture never feels stuck) at a third of the
  *  distance (so it reads as a limit rather than as a wall). On release the caller clamps, and the
- *  pane springs back to the limit — the settle is `--ease-settle`'s job, not this file's.
+ *  pane springs back to the limit — the spring is app.css's, not this file's: `.app-shell__detail`
+ *  carries `transition: width var(--dur-move) var(--ease-settle)`, which is the `--ease-settle` this
+ *  sentence names, and `.app-shell--detail-dragging` switches it off for the length of the gesture so
+ *  the band itself stays one-to-one with the pointer. This function only says *where* the band is;
+ *  it deliberately does not say how the pane leaves it, because that is a duration and a curve.
  *  ponytail: linear resistance, no curve. A progressive band is a nicer feel and three more lines;
  *  add it when the drag is measured to feel stiff rather than on the way in. */
 const RUBBER_BAND = 0.32;

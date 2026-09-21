@@ -476,12 +476,43 @@ describe("App shell detail card (US-D10 §c.5: the pane is the list's own card)"
     );
   });
 
-  // `app-shell--detail-dragging` is on the shell for exactly one declaration: the grip's own
-  // `user-select: none` does not stop a selection the pointer starts inside it and then extends out
-  // across the pane, which is every drag to the left. Nothing else reads the class, so this is what
-  // keeps the rule from being dead weight in the class list.
+  // `app-shell--detail-dragging` is on the shell for two declarations, and the second is the one a
+  // reviewer caught missing: the grip's own `user-select: none` does not stop a selection the pointer
+  // starts inside it and then extends out across the pane (which is every drag to the left), and the
+  // class also has to switch the pane's settle *off* while a gesture is running (asserted below).
   it("turns off text selection for the length of a drag", () => {
     expect(baseRule(".app-shell--detail-dragging")).toContain("user-select: none;");
+  });
+
+  // §c.1's gesture is two halves, and the release is the half that lives in CSS. `draggedDetailWidth`
+  // draws the band — 816px where the ceiling is 720 — and `onWidthCommit` then hands the shell the
+  // clamped 720. Both numbers were already right; what was missing was anything making the pane
+  // *travel* between them, so the band was computed and then thrown away in a single frame. The same
+  // declaration covers the double-click reset and each arrow-key step, which is why it belongs on the
+  // pane's own rule rather than on a gesture class.
+  it("settles the width on release, and does not settle it mid-drag", () => {
+    // --ease-settle is tokens.css's "a drag's drop" curve and --dur-move the movement rung (80ms
+    // under prefers-reduced-motion, so the settle shortens with everything else rather than needing
+    // a branch of its own).
+    expect(baseRule(".app-shell__detail")).toContain(
+      "transition: width var(--dur-move) var(--ease-settle);",
+    );
+    // The pill is positioned off the same width (`right: calc(16px + var(--detail-width, …))`), so
+    // without this it snaps to the settled edge while the pane is still moving — a handle visibly
+    // 96px off the divider it belongs to, for the length of the settle.
+    expect(baseRule(".detail-pane__grip")).toContain(
+      "transition: right var(--dur-move) var(--ease-settle);",
+    );
+
+    // ...and one flag switches both off. This is the declaration that keeps the drag one-to-one with
+    // the pointer: transitioned, the pane would ease toward each frame of the gesture instead of
+    // being drawn by it, and the divider would lag the cursor by --dur-move for the whole drag.
+    const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
+    const start = css.indexOf("\n.app-shell--detail-dragging .app-shell__detail,");
+    expect(start, "the drag does not switch the settle off").toBeGreaterThan(-1);
+    const midDrag = css.slice(start, css.indexOf("}", start));
+    expect(midDrag).toContain(".detail-pane__grip {");
+    expect(midDrag).toContain("transition: none;");
   });
 });
 

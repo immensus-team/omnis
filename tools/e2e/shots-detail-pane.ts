@@ -49,8 +49,10 @@ import {
 
 const OUT = join(REPO_ROOT, "docs/design/screens/wave2");
 const HEIGHT = 1000;
-/** --dur-panel is the longest transition on this screen (240ms), and the pane's close is an
- *  animation React holds the node for; 450ms clears both without racing the settle. */
+/** --dur-panel is the longest transition on this screen (240ms) — the pane's own width settle
+ *  (--dur-move) is the same rung — and the pane's close is an animation React holds the node for;
+ *  450ms clears both without racing the settle, which is what the mid-flight sample relies on being
+ *  over by the time it takes its second reading. */
 const SETTLE_MS = 450;
 /** The drag distance for the resized shot. 420 + 140 = 560, comfortably inside 320…720 (half of
  *  1440), so the picture shows the pane following the pointer rather than a rubber band. */
@@ -83,6 +85,26 @@ async function drawnWidth(page: Page): Promise<string> {
         ?.style.getPropertyValue("--detail-width") ?? "",
   );
 }
+
+/** How wide the browser actually laid a box out. The counterpart to `drawnWidth`, and the only one
+ *  of the two that can see a width being *travelled* to: `--detail-width` is a custom property the
+ *  shell writes in a single go whatever CSS does with it, so a reading of it is identical with and
+ *  without a transition — which is precisely how the pane's missing settle survived the last pass.
+ *  A function expression is avoided for the same reason as below (tsx's esbuild transform names
+ *  inner functions and injects a `__name` helper that does not exist in the page). */
+async function renderedWidth(page: Page, selector: string): Promise<number> {
+  return page.evaluate(
+    `document.querySelector(${JSON.stringify(selector)})?.getBoundingClientRect().width ?? 0`,
+  );
+}
+
+/** The widths the two halves of §c.1's settle are read back from: the pane, and the list it hands
+ *  the width back to. */
+const PANE_SELECTOR = ".app-shell__detail";
+const LIST_SELECTOR = ".inbox-card";
+/** The grip's pill — the bar that is the entire visible evidence a handle exists, since it is
+ *  `opacity: 0` until the divider is hovered or held (app.css). */
+const PILL_SELECTOR = ".detail-pane__grip-pill";
 
 async function assertNoOverflowAt(page: Page, label: string): Promise<void> {
   const overflow = await page.evaluate(measureOverflow);
@@ -146,10 +168,19 @@ async function dragGrip(page: Page, distance: number): Promise<void> {
     await page.waitForTimeout(16);
   }
   await page.mouse.up();
+  // Let the pane settle before aiming at the divider again. Since US-D10 the release springs the
+  // pane from the banded width to the committed one (app.css: `transition: width`), so a box read
+  // *now* is the box the grip is leaving — and a pointer parked where the grip used to be is a
+  // pointer that is not hovering it, so the pill fades back out and the shot becomes a picture of a
+  // pane with no handle in it, which is the one thing this screenshot exists to show.
+  //
+  // The dwell is safe here even at SETTLE_MS: the press point is three-quarters across the grip,
+  // which is *inside* the pane, and the row hover card this script parks the pointer for is anchored
+  // to the list. (A drag that ends inside the limits — this one does, 420 + 140 = 560 against a
+  // ceiling of 720 — settles where it was released, so the wait costs only the dwell anyway.)
+  await page.waitForTimeout(SETTLE_MS);
   // Leave the pointer on the divider's new position, so the pill is painting for the screenshot.
-  // Deliberately a short wait and not SETTLE_MS: the pill's fade is --dur-fast, and the hover card
-  // needs 400ms of dwell on a row to open — this is under it, so the pane is shot with the handle
-  // showing and nothing else on top of it.
+  // The short wait after it, and not SETTLE_MS, is now only the pill's own fade: that is --dur-fast.
   const to = await gripPressPoint(page);
   await page.mouse.move(to.x, to.y);
   // Drop the focus the press moved onto the grip. A pointer drag leaves the divider hovered, not
@@ -160,6 +191,19 @@ async function dragGrip(page: Page, distance: number): Promise<void> {
     "document.activeElement instanceof HTMLElement && document.activeElement.blur()",
   );
   await page.waitForTimeout(220);
+
+  // The pill is the one thing a drag is supposed to leave on screen, and it is transparent at rest
+  // — so whether the shot actually shows a handle cannot be checked by looking at the shot. It is
+  // checked here instead. Since US-D10 the release springs both the pane and the grip's `right`
+  // (app.css), so a pointer aimed at the grip's box too early ends up parked where the grip *was*:
+  // not hovering it, pill faded out, and the picture is of a pane with no handle in it. Opacity 1
+  // also proves it is `:hover` doing it and not the focus ring, which the blur above has dropped.
+  const pillOpacity = await page.evaluate(
+    `getComputedStyle(document.querySelector(${JSON.stringify(PILL_SELECTOR)})).opacity`,
+  );
+  if (pillOpacity !== "1") {
+    throw new Error(`the grip's pill is at opacity ${pillOpacity} for the shot, not 1`);
+  }
 }
 
 async function main(): Promise<void> {
@@ -231,11 +275,43 @@ async function main(): Promise<void> {
     console.log(`  ${before} -> ${grown} -> ${grown - STEP_PX}px`);
     // Double-click resets to the shipped width, which is the same number the narrow sheet opens at
     // — so a reset and a collapse-and-reopen cannot disagree about how wide the conversation is.
+    //
+    // This is also where §c.1's settle is measured, because it is the reset the same reviewer caught
+    // snapping: the presses above left the pane at 484 and the reset is 420, so 64px has to be
+    // *travelled*. Sampled on the rendered boxes rather than on `--detail-width`, which would read
+    // the same with and without the transition (renderedWidth's note). Two boxes, because the third
+    // track is `auto`: a settle the track does not follow would paint the pane wider than its own
+    // column and overlap the list rather than handing the width back to it.
+    //
+    // The mid-flight sample is taken *early*, and that is the whole trick. Without a transition the
+    // commit lands in the next frame, so the pane is already at 420 by ~16ms and any reading above
+    // that is a reading no snapped pane can produce. The curve gives the window its width:
+    // --ease-settle has both control points at y=1, so it is ~90% of the way there at 90ms and the
+    // sample only has to be inside the first ~180ms.
+    const paneAt = () => renderedWidth(page, PANE_SELECTOR);
+    const listAt = () => renderedWidth(page, LIST_SELECTOR);
     await handle.dblclick();
+    await page.waitForTimeout(60);
+    const paneMid = await paneAt();
+    const listMid = await listAt();
     await page.waitForTimeout(SETTLE_MS);
+    const paneEnd = await paneAt();
+    const listEnd = await listAt();
     const reset = await drawnWidth(page);
     if (reset !== "420px") throw new Error(`double-click reset the pane to ${reset}, not 420px`);
-    console.log(`  double-click reset to ${reset}`);
+    // The floor is deliberately half a pixel rather than a comfortable margin. A snapped pane reads
+    // the same float twice — the commit lands, layout runs once, and both readings are the same
+    // integer — so *any* strict inequality is proof, while a large floor would only narrow the window
+    // in which a slow machine may take its sample. (Measured on the reference run: 439.8px and 19.8
+    // of the list's 64px given back, against a settle of 240ms.)
+    if (!(paneMid > paneEnd + 0.5 && listMid < listEnd - 0.5)) {
+      throw new Error(
+        `the reset is snapping, not settling: the pane was at 484px, reads ${paneMid}px mid-flight and ${paneEnd}px settled, and the list went ${listMid} -> ${listEnd}px`,
+      );
+    }
+    console.log(
+      `  double-click reset to ${reset} (mid-flight ${paneMid.toFixed(1)}px; the list gave back ${(listEnd - listMid).toFixed(1)}px of its 64)`,
+    );
 
     // ---- the pointer drag, which is also the width the reload check below reads back -------------
     console.log("1440 — resized");
