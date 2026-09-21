@@ -24,3 +24,16 @@ export async function createTask(title: string): Promise<TaskRecord> {
   if (!res.ok) throw new Error(`task add failed: HTTP ${res.status}`);
   return res.json();
 }
+
+/** loop-r2-06/L2-04: the checkbox's write. Two states and no third: the hub owns `done_at`, and a
+ *  caller that could also send `in_progress` would be reaching into the agents' own state machine
+ *  from a square. A refusal throws, which is what makes the screen put the box back. */
+export async function setTaskDone(id: string, done: boolean): Promise<TaskRecord> {
+  const res = await fetch(`${HUB_HTTP_URL}/tasks/${id}/state`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ state: done ? "done" : "open" }),
+  });
+  if (!res.ok) throw new Error(`task update failed: HTTP ${res.status}`);
+  return res.json();
+}

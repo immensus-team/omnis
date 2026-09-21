@@ -143,15 +143,26 @@ export interface TasksProps {
   onOpenSource?: (itemId: string) => void;
   /** A delegated task's Agent Session (tasks.delegated_session_id). */
   onOpenDelegation?: (sessionId: string) => void;
-  /** A5 §3.5: the checkbox is an optimistic `state: 'done'`. `POST /tasks` creates a task but
-   *  nothing changes one's state yet, so today the shell passes nothing and the checkbox reflects
-   *  the row it was given. */
-  onToggleDone?: (taskId: string, done: boolean) => void;
+  /** A5 §3.5: the checkbox is a write (loop-r2-06/L2-04). The shell owns it — the toast that answers
+   *  it is the same one slot every other write in the app uses — so this screen raises the request
+   *  and draws the optimistic box, and the shell passes nothing only where there is no hub to write
+   *  to (a screen rendered on its own).
+   *
+   *  The `title` rides along because the shell's answer is a sentence about the task ("Completed
+   *  "Send the deck""), and re-deriving it there would mean a second subscription to this table.
+   *  The returned promise is the half that tells this screen whether to keep the optimistic box or
+   *  put it back. */
+  onToggleDone?: (taskId: string, done: boolean, title: string) => void | Promise<void>;
 }
 
 export function Tasks({ now: nowProp, onOpenSource, onOpenDelegation, onToggleDone }: TasksProps) {
   const zero: ZeroClient = useZeroClient();
   const [view, setView] = useState<TasksView>("today");
+  /** loop-r2-06/L2-04: the box's optimistic state, keyed by task id. The write goes to the hub over
+   *  HTTP and the row comes back through Zero's replica, so without this the box flips back under
+   *  the finger for the length of a round trip and then flips again — which is exactly how L2-04
+   *  read. Dropped when the write is refused, and when the replica's own row has caught up. */
+  const [pendingState, setPendingState] = useState<Record<string, boolean>>({});
   const [quickAdd, setQuickAdd] = useState("");
   /** True while `POST /tasks` is in flight. The field stays editable throughout — this is a label
    *  for assistive tech and the second-submit guard, not a lock on the input. */
@@ -225,6 +236,59 @@ export function Tasks({ now: nowProp, onOpenSource, onOpenDelegation, onToggleDo
     }
     return map;
   }, [approvals]);
+
+  /** The state the checkbox draws: the optimistic one while a write is in the air, the row's own
+   *  otherwise.
+   *
+   *  Deliberately not fed back into `visible` above. The tab's own rule is that a finished task
+   *  leaves it (`filterTasksByView`), and filtering on the override would unmount the row — and its
+   *  box — on the click, so the flip the person just made would read as the row vanishing instead
+   *  of as a box filling. The override only has to survive one replica round trip; the row leaves
+   *  the tab a beat later, on the hub's own state, which is the same beat every other write in this
+   *  app takes. */
+  const stateFor = (task: { id: string; state: string }): TaskState => {
+    const next = pendingState[task.id];
+    if (next === undefined) return task.state as TaskState;
+    return next ? "done" : "open";
+  };
+
+  /** The click. Three things happen in order: the box fills, the hub is told, and — only if the hub
+   *  refuses — the box goes back. Without a writer the row is drawn as it came, which is what this
+   *  screen did before the shell passed one. */
+  const onToggle = (taskId: string, done: boolean, title: string): void => {
+    if (onToggleDone === undefined) return;
+    setPendingState((state) => ({ ...state, [taskId]: done }));
+    // `Promise.resolve` because the shell's handler is free to answer with void (its toast is
+    // raised from the promise's own `then`), and a rejection is the only branch this screen reads.
+    void Promise.resolve(onToggleDone(taskId, done, title)).catch(() => {
+      setPendingState((state) => {
+        if (!(taskId in state)) return state;
+        const next = { ...state };
+        delete next[taskId];
+        return next;
+      });
+    });
+  };
+
+  // An override that the replica's own row has caught up with has nothing left to say, and it is
+  // dropped rather than left to accumulate: one entry per task toggled in this mount would grow for
+  // the life of the screen. `changed` keeps this from publishing a new object on every replication.
+  useEffect(() => {
+    setPendingState((state) => {
+      const entries = Object.entries(state);
+      if (entries.length === 0) return state;
+      const next = { ...state };
+      let changed = false;
+      for (const [id, done] of entries) {
+        const row = tasks.find((t) => t.id === id);
+        if (row !== undefined && (row.state === "done") === done) {
+          delete next[id];
+          changed = true;
+        }
+      }
+      return changed ? next : state;
+    });
+  }, [tasks]);
 
   const sourceLabelFor = (taskId: string): string | null => {
     const task = taskById.get(taskId);
@@ -345,11 +409,11 @@ export function Tasks({ now: nowProp, onOpenSource, onOpenDelegation, onToggleDo
                   id={task.id}
                   title={task.title}
                   kind={task.kind as TaskKind}
-                  state={task.state as TaskState}
+                  state={stateFor(task)}
                   dueBasis={dueBasisFor(task.created_by, sourceDueBasisFor(task.id))}
                   dueLabel={dueLabelFor(row.dueAt, now)}
                   sourceLabel={sourceLabelFor(task.id)}
-                  onToggleDone={(id, done) => onToggleDone?.(id, done)}
+                  onToggleDone={(id, done) => onToggle(id, done, task.title)}
                   {...(task.source_item_id && onOpenSource
                     ? { onOpenSource: () => onOpenSource(task.source_item_id as string) }
                     : {})}
