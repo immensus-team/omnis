@@ -271,6 +271,38 @@ describe("KakaoTalk send gate (US-C13)", () => {
     expect(realCalls()).toHaveLength(1);
   });
 
+  it("refuses a second send backed by a dry run that already sent", async () => {
+    const dryRunId = await proposeSend(kakaoThreadId);
+    await decide(dryRunId);
+    const confirm = await until(() => pendingConfirm(dryRunId));
+    await decide(confirm.id);
+    await until(() => (realCalls().length === 1 ? true : null));
+
+    // Same text, so every text check passes: only the dry run being spent can refuse this one.
+    const reuse = await proposeSend(kakaoThreadId, { confirm_of: dryRunId });
+    await decide(reuse);
+
+    expect((await failedRow(reuse)).fail_reason).toContain("already backed a send");
+    expect(realCalls()).toHaveLength(1);
+  });
+
+  it("refuses a confirm whose text the dry run never previewed", async () => {
+    const dryRunId = await proposeSend(kakaoThreadId);
+    await decide(dryRunId);
+    await until(() => pendingConfirm(dryRunId));
+
+    // The dry run previewed "on my way"; this names it while carrying something else entirely, which
+    // is how an agent would get unreviewed text typed for real without a dry run of its own.
+    const swapped = await proposeSend(kakaoThreadId, {
+      text: "wire the deposit today",
+      confirm_of: dryRunId,
+    });
+    await decide(swapped);
+
+    expect((await failedRow(swapped)).fail_reason).toContain("previewed different text");
+    expect(realCalls()).toHaveLength(0);
+  });
+
   it("ignores a send approval on a channel it does not relay", async () => {
     const accountId = await insertAccount("slack", "slack:test");
     const thread = await one<{ id: string }>(
