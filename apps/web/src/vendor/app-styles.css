@@ -10,9 +10,9 @@
    cite its own sha, so the header names the merge that produced this copy instead of a hash it
    would have to be amended to learn — the same reason the S5 copy named its wave. The count moved
    from 6398 to 6404 when loop-r1-08 added §c.5's `.ask-panel__action kbd` rule — and the gallery's
-   copy, which the same header rule binds and no test guards, was re-copied with it; loop-r2-01's
-   approval-card editor, reply field and primary-decision fill are the latest re-copy, at 6547
-   lines.
+   copy, which the same header rule binds and no test guards, was re-copied with it. loop-r2-02's
+   `.approval-card__provenance` line and its shared `.draft-card__actions button` rule are the
+   latest re-copy, at 6562 lines.
    apps/web/test/vendor-css.test.ts is what holds the line: it compares everything below this
    comment against that file byte for byte — forgetting to re-copy fails a test, not the screen. */
 /* Shell layout only. Colour and type come from @omnis/ui/tokens.css (A5 §1).
@@ -2026,6 +2026,16 @@ body {
   margin-left: auto;
 }
 
+/* loop-r2-02: where a draft-shaped card's message came from. Quieter than the description below it
+   — it is context, not the message — so it takes the tertiary tone and the 12px step, the same one
+   the standalone DraftCard's provenance sentence is meant to carry. */
+.approval-card__provenance {
+  margin: 4px 0 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 /* DESIGN-DIRECTION "full text": the body is the message the card would send, quoted, not an AI
    summary of it. The clamp is a card-height guard — the editor behind "Edit" holds the same text
    unclamped, so a clamp here never hides a message for good. */
@@ -2151,7 +2161,11 @@ body {
   margin-left: auto;
 }
 
-.approval-card__actions button {
+/* loop-r2-02: the draft card's row is the same row. Its buttons were rendering as the browser's own
+   because only this selector was written — so the rule is shared rather than copied, and the two
+   cards cannot drift apart later. */
+.approval-card__actions button,
+.draft-card__actions button {
   white-space: nowrap;
   border: var(--hairline);
   border-radius: 8px;

@@ -2009,6 +2009,16 @@ body {
   margin-left: auto;
 }
 
+/* loop-r2-02: where a draft-shaped card's message came from. Quieter than the description below it
+   — it is context, not the message — so it takes the tertiary tone and the 12px step, the same one
+   the standalone DraftCard's provenance sentence is meant to carry. */
+.approval-card__provenance {
+  margin: 4px 0 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 /* DESIGN-DIRECTION "full text": the body is the message the card would send, quoted, not an AI
    summary of it. The clamp is a card-height guard — the editor behind "Edit" holds the same text
    unclamped, so a clamp here never hides a message for good. */
@@ -2134,7 +2144,11 @@ body {
   margin-left: auto;
 }
 
-.approval-card__actions button {
+/* loop-r2-02: the draft card's row is the same row. Its buttons were rendering as the browser's own
+   because only this selector was written — so the rule is shared rather than copied, and the two
+   cards cannot drift apart later. */
+.approval-card__actions button,
+.draft-card__actions button {
   white-space: nowrap;
   border: var(--hairline);
   border-radius: 8px;

@@ -23,6 +23,11 @@ export interface ApprovalStackItem extends ApprovalCardInterrupt {
   id: string;
   /** pending_approvals.thread_id — nullable in the schema (an approval raised outside any thread). */
   thread_id: string | null;
+  /** loop-r2-02: pending_approvals.item_id — the message the action is about, when it is about one.
+   *  A `send` proposed over a `draft` item carries that draft's id, which is how the thread view
+   *  knows the card and the draft are one reply rather than two. Nullable: most approvals are about
+   *  something that is not an item of ours. */
+  item_id?: string | null;
   /** 'normal' | 'high' (approvals_risk_ck). */
   risk: string;
   created_at: number;

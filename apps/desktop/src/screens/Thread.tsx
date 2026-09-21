@@ -20,6 +20,7 @@ import {
   ToolCallBadge,
   type ToolCallState,
   type UiItemStatus,
+  toast,
   useFloatingPane,
   useNarrowShell,
 } from "@omnis/ui";
@@ -27,7 +28,7 @@ import { formatRelativeTime } from "@omnis/ui/lib/relative-time";
 import { type CHANNEL_LABEL, initialsFromName, pastelFromName } from "@omnis/ui/lib/row-meta";
 import { useQuery } from "@rocicorp/zero/react";
 import { type ReactNode, useMemo, useState } from "react";
-import { setThreadArchived } from "../api/threads.js";
+import { discardDraft, setThreadArchived } from "../api/threads.js";
 import { useZeroClient } from "../zero-client.js";
 
 export interface ThreadQueryItem {
@@ -37,6 +38,10 @@ export interface ThreadQueryItem {
   /** items.kind (A3 §7). Missing reads as an ordinary message — only 'tool_call' renders as
    *  anything other than body copy, and every caller that leaves it out is a fixture. */
   kind?: string;
+  /** items.external_id: the id the message carries in its channel. NULL for a draft (it has not
+   *  gone out yet) and for anything omnis wrote itself — which is how a discarded draft is told
+   *  apart from a message the channel really has (loop-r2-02). */
+  external_id?: string | null;
   /** epochs ms; the conversation is ordered by it and the header block's date comes from the last
    *  one. */
   sent_at?: number;
@@ -46,9 +51,37 @@ export interface ThreadQueryItem {
   author?: { display_name: string } | null;
 }
 
-/** A5 §3.2: DraftCard appears only when an Item with status='draft' exists. */
+/** A5 §3.2: DraftCard appears only when an Item with status='draft' exists.
+ *
+ *  loop-r2-02: the draft is the *fallback* subject now. When a pending approval was raised over
+ *  this item — the usual case — `foldDraft` pairs the two and the screen draws one approval card
+ *  instead of a draft card beside it. This stays the whole question for a draft nobody has been
+ *  asked about. */
 export function findDraftItem<T extends ThreadQueryItem>(items: T[]): T | undefined {
   return items.find((i) => i.status === "draft");
+}
+
+/** loop-r2-02: "one reply, one card". A draft and the approval about it were two objects on screen
+ *  that had to be decided separately, and deciding the approval left the draft behind — the same
+ *  sentence, twice, with two sets of buttons.
+ *
+ *  The pairing is by `pending_approvals.item_id`, which is the link the proposing caller writes (the
+ *  seed does; `approvals.propose` accepts it). Older rows predate that column being filled, so a
+ *  `send` whose body is the draft's body is taken as the same reply: the text is what the person
+ *  sees, and two `send` approvals on one thread quoting the same message are not a case this screen
+ *  has to tell apart. With no draft item there is nothing to fold, and the function says so. */
+export function foldDraft<T extends ThreadQueryItem>(
+  items: T[],
+  approvals: ApprovalStackItem[],
+  threadId: string,
+): { draft: T | undefined; draftApproval: ApprovalStackItem | undefined } {
+  const draft = findDraftItem(items);
+  if (draft === undefined) return { draft: undefined, draftApproval: undefined };
+  const inThread = approvals.filter((a) => a.thread_id === threadId && a.action === "send");
+  const draftApproval =
+    inThread.find((a) => a.item_id === draft.id) ??
+    inThread.find((a) => typeof a.args?.body === "string" && a.args.body === draft.body);
+  return { draft, draftApproval };
 }
 
 /** US-D03: the detail header's segments (the reference's "Price | PPSF" control turned into the
@@ -130,6 +163,10 @@ export function threadFlow<T extends ThreadQueryItem>(
   return nodes.sort((a, b) => a.at - b.at).map((entry) => entry.node);
 }
 
+/** loop-r2-02: the ids App is holding for the ignore's 5s undo. A module constant rather than a
+ *  fresh `new Set()` per render, so the empty case does not invalidate the memo below. */
+const NO_HELD_ITEMS: ReadonlySet<string> = new Set();
+
 /** `children` is the slot directly under the segments — US-D03 put the approval stack there. With
  *  §c.5 the approvals are in the flow, so a caller with something else to say above the
  *  conversation still has the slot; the desktop shell passes nothing. */
@@ -137,6 +174,7 @@ export function Thread({
   threadId,
   approvals,
   onDecide,
+  heldItemIds = NO_HELD_ITEMS,
   children,
 }: {
   threadId: string;
@@ -149,6 +187,11 @@ export function Thread({
     decision: ApprovalCardDecision,
     decidedArgs?: Record<string, unknown>,
   ) => void;
+  /** loop-r2-02: the `item_id`s of the approvals App has taken off screen and is holding for the
+   *  undo window. The approval those belong to is already gone from `approvals`, so its draft would
+   *  fold to "no approval" and redraw as a standalone DraftCard for the length of the window — the
+   *  card the person just dismissed, coming back. Held here means drawn as neither. */
+  heldItemIds?: ReadonlySet<string>;
   children?: ReactNode;
 }) {
   const zero = useZeroClient();
@@ -171,7 +214,6 @@ export function Thread({
     zero.query.items.where("thread_id", "=", threadId).orderBy("sent_at", "asc").related("author"),
   );
   const typedItems = items as unknown as ThreadQueryItem[];
-  const draft = findDraftItem(typedItems);
   const [threads] = useQuery(zero.query.threads.where("id", "=", threadId));
   const thread = (threads as unknown as ThreadRowQuery[])[0];
   const archived = thread?.archived_at ?? null;
@@ -200,10 +242,27 @@ export function Thread({
   const senderAt = lastItem?.sent_at ?? thread?.last_item_at ?? null;
   const senderTime = senderAt === null ? null : formatRelativeTime(senderAt);
 
-  const flow = useMemo(
-    () => threadFlow(typedItems, approvals ?? [], threadId),
+  // loop-r2-02: the draft and its approval leave the flow and are drawn once, under it. The draft
+  // item goes either way — as its card, or as nothing while App holds the ignored approval — so it
+  // is removed here rather than at the render site, or it would reappear as a message bubble in the
+  // frame the card left.
+  const { draft, draftApproval } = useMemo(
+    () => foldDraft(typedItems, approvals ?? [], threadId),
     [typedItems, approvals, threadId],
   );
+  const draftHeld = draft !== undefined && heldItemIds.has(draft.id);
+  const flow = useMemo(() => {
+    const flowItems = typedItems.filter(
+      (item) =>
+        item.id !== draft?.id &&
+        // A discarded draft that never reached the channel: `archived` with no `external_id`. The
+        // items query carries no status filter (below), so without this the text the person just
+        // threw away comes straight back into the conversation.
+        !(item.status === "archived" && !item.external_id),
+    );
+    const flowApprovals = (approvals ?? []).filter((a) => a.id !== draftApproval?.id);
+    return threadFlow(flowItems, flowApprovals, threadId);
+  }, [typedItems, approvals, threadId, draft, draftApproval]);
 
   // The thread's own facts, in the one component allowed to draw hairlines.
   // The Label action's panel: the thread's labels through thread_labels (items have no labels
@@ -405,20 +464,40 @@ export function Thread({
                 <ThreadItem key={node.item.id} item={node.item} />
               ),
             )}
-            {draft && (
+            {/* loop-r2-02: the draft and its approval are one object. The folded card is the
+                ApprovalCardView of 01 — same buttons, same editor, same confirm — so Approve sends,
+                Edit edits then sends, and Discard is an ignore, all through the one `onDecide` path
+                every other card uses. `provenance` is what says the message was drafted rather than
+                written by the person, which is the one thing the standalone card said that this one
+                would otherwise lose. */}
+            {draftHeld ? null : draftApproval !== undefined ? (
+              <ApprovalCardView
+                key={`draft-approval-${draftApproval.id}`}
+                interrupt={draftApproval}
+                className="thread-screen__draft"
+                destination={title}
+                provenance="Drafted from memory and past threads"
+                ignoreLabel="Discard"
+                onDecide={(decision, decidedArgs) =>
+                  onDecide?.(draftApproval.id, decision, decidedArgs)
+                }
+              />
+            ) : draft !== undefined ? (
+              /* The fallback: a draft nobody has been asked about. Discard is the only thing this
+                 screen can offer it — "Edit & send" goes back on it with the composer (loop-r2-03),
+                 and a second button that does nothing is what the testers reported. The write goes
+                 through the hub (Zero grants no write permissions); a failure says so instead of
+                 disappearing. */
               <DraftCard
                 body={draft.body}
                 rationale="memory, past threads"
-                onEditAndSend={() => {
-                  /* Composer wiring is out of this story's scope (YAGNI) */
-                }}
-                onDiscard={() => zero.mutate.items.update({ id: draft.id, status: "archived" })}
-                onRegenerate={() => {
-                  /* Re-requesting propose_draft belongs to packages/agents; this screen only exposes
-                   the trigger. */
+                onDiscard={() => {
+                  void discardDraft(draft.id).catch(() => {
+                    toast.error("Couldn't discard the draft.");
+                  });
                 }}
               />
-            )}
+            ) : null}
           </>
         )}
       </div>
