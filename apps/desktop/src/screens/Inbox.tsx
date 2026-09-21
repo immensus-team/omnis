@@ -13,6 +13,7 @@ import {
   SheetCheck,
   SheetGroup,
   SheetRow,
+  type ToastRequest,
   type UiChannel,
   type UiItemStatus,
   UserIcon,
@@ -42,7 +43,7 @@ import {
 } from "react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { setThreadArchived } from "../api/threads.js";
-import { useKeymap } from "../hooks/use-keymap.js";
+import { isEditableTarget, useKeymap } from "../hooks/use-keymap.js";
 import { useZeroClient } from "../zero-client.js";
 
 export const FILTERS = ["all", "work", "personal", "agents", "needs-approval"] as const;
@@ -287,6 +288,7 @@ export function Inbox({
   onFiltersOpenChange,
   pendingApprovals = 0,
   onOpenApprovals,
+  notify,
 }: {
   onOpen?: (target: OpenTarget) => void;
   /** U1 channel rail selection. null = everything (the Inbox tile). ANDed with the pill filters
@@ -306,6 +308,12 @@ export function Inbox({
    *  itself there), and at >=1280 it is the way back after the user has collapsed the pane. */
   pendingApprovals?: number;
   onOpenApprovals?: () => void;
+  /** loop-r1-06: how this screen says something back. The toast itself belongs to the shell — one
+   *  slot, one pill, in one corner of the window — so archiving raises a request rather than a node,
+   *  and the optional `deferred` is the work the toast should hold back until it goes: here, the
+   *  disarming of the undo it is offering. A request and not a spec: the id that tells one toast
+   *  from the next belongs to the slot, and this screen has no way to know it. */
+  notify?: (spec: ToastRequest, deferred?: { run: () => void }) => void;
 }) {
   const zero = useZeroClient();
   const [filter, setFilter] = useState<InboxFilter>("all");
@@ -497,42 +505,85 @@ export function Inbox({
     });
   }, []);
 
-  const toggleArchive = useCallback((threadId: string, archived: boolean) => {
-    // US-D04: the row is held in the list for one leave animation. The server call goes out
-    // immediately rather than after the animation — the round trip overlaps the 240ms instead of
-    // queueing behind it, and the optimistic state below still lands on the same frame as the
-    // click, so nothing about the archive is slower than it was.
-    setLeavingIds((s) => new Set(s).add(threadId));
-    setPendingArchive((p) => ({ ...p, [threadId]: archived }));
-    leaveTimers.current.push(
-      window.setTimeout(() => {
+  /** loop-r1-06: the archive whose Undo is still on screen — `z` and ⌘Z are the toast's keyboard
+   *  twin, and they have to name the same row the button would. It is armed by the toggle below and
+   *  disarmed by that toggle's toast leaving (the deferred passed to `notify`), so the keys are live
+   *  exactly as long as the button is rather than forever. */
+  const lastToggle = useRef<{ id: string; archived: boolean } | null>(null);
+
+  const toggleArchive = useCallback(
+    function toggle(threadId: string, archived: boolean) {
+      // US-D04: the row is held in the list for one leave animation. The server call goes out
+      // immediately rather than after the animation — the round trip overlaps the 240ms instead of
+      // queueing behind it, and the optimistic state below still lands on the same frame as the
+      // click, so nothing about the archive is slower than it was.
+      setLeavingIds((s) => new Set(s).add(threadId));
+      setPendingArchive((p) => ({ ...p, [threadId]: archived }));
+      leaveTimers.current.push(
+        window.setTimeout(() => {
+          setLeavingIds((s) => {
+            if (!s.has(threadId)) return s;
+            const next = new Set(s);
+            next.delete(threadId);
+            return next;
+          });
+        }, motionMs(LEAVE_MS)),
+      );
+      setThreadArchived(threadId, archived).catch(() => {
+        // If the hub refuses, the optimistic state is rolled back — the screen does not get to lie
+        // ahead of the server. The row comes back on the next render, so the leave animation is cut
+        // short; that is the right way round (a failed archive should not keep showing the row
+        // sliding away).
+        setPendingArchive((p) => {
+          const next = { ...p };
+          delete next[threadId];
+          return next;
+        });
         setLeavingIds((s) => {
           if (!s.has(threadId)) return s;
           const next = new Set(s);
           next.delete(threadId);
           return next;
         });
-      }, motionMs(LEAVE_MS)),
-    );
-    setThreadArchived(threadId, archived).catch((e: unknown) => {
-      // If the hub refuses, the optimistic state is rolled back — the screen does not get to lie
-      // ahead of the server. The row comes back on the next render, so the leave animation is cut
-      // short; that is the right way round (a failed archive should not keep showing the row
-      // sliding away).
-      setPendingArchive((p) => {
-        const next = { ...p };
-        delete next[threadId];
-        return next;
+        // loop-r1-06: a failed write used to be a `console.error` and nothing else — the row
+        // reappeared with no explanation, which reads as a glitch rather than as a failure. Retry
+        // re-attempts the same write, not the rollback.
+        notify?.({
+          message: archived ? "Couldn't archive. It's back in your inbox." : "Couldn't restore it.",
+          action: { label: "Retry", onAction: () => toggle(threadId, archived) },
+        });
       });
-      setLeavingIds((s) => {
-        if (!s.has(threadId)) return s;
-        const next = new Set(s);
-        next.delete(threadId);
-        return next;
-      });
-      console.error("archive failed", e);
-    });
-  }, []);
+
+      // The toast goes up with the optimistic state rather than with the reply: the row has already
+      // left, and the point of the Undo is to catch the second thought that arrives while the write
+      // is still in flight. "Archived" and "Moved to Inbox" say where the row went, which is the
+      // one thing the row itself can no longer say.
+      const armed = { id: threadId, archived };
+      lastToggle.current = armed;
+      notify?.(
+        {
+          message: archived ? "Archived" : "Moved to Inbox",
+          action: { label: "Undo", onAction: () => toggle(threadId, !archived) },
+        },
+        {
+          run: () => {
+            // Identity, not truthiness: a newer toggle has armed the ref for its own toast by now,
+            // and this one going away must not disarm that.
+            if (lastToggle.current === armed) lastToggle.current = null;
+          },
+        },
+      );
+    },
+    [notify],
+  );
+
+  /** The undo the toast is offering, whichever key or button asked for it. Nothing armed means
+   *  nothing to take back — the toast has gone, and with it the right to undo. */
+  const undoArchive = useCallback(() => {
+    const last = lastToggle.current;
+    if (last === null) return;
+    toggleArchive(last.id, !last.archived);
+  }, [toggleArchive]);
 
   // The leave timers outlive a row that unmounts first (archiving the last row and switching views,
   // or closing the window mid-animation). A pending timer that fires after unmount would call
@@ -706,6 +757,13 @@ export function Inbox({
           moveTo(stepRow(rowIds, selectedId, -1));
           return;
         }
+        // loop-r1-06: `z` is answered here too, above the selection guard, because what it acts on
+        // is not the selection — it is the toast. The undo is armed by the toggle and disarmed when
+        // that toast leaves, so `z` reads the ref rather than the row the cursor happens to be on.
+        if (action === "undo") {
+          undoArchive();
+          return;
+        }
         // Nothing happens when nothing is selected: archive and restore are the selection's own
         // keys, and `j` is what gives them something to act on.
         if (selectedId === null) return;
@@ -715,9 +773,25 @@ export function Inbox({
         if (action === "archive" && view === "inbox") archiveAndAdvance(selectedId, true);
         if (action === "unarchive" && view === "archived") archiveAndAdvance(selectedId, false);
       },
-      [rowIds, selectedId, view, moveTo, archiveAndAdvance],
+      [rowIds, selectedId, view, moveTo, archiveAndAdvance, undoArchive],
     ),
   );
+
+  // loop-r1-06: ⌘Z / Ctrl+Z, the second half of the toast's undo. It cannot go through useKeymap,
+  // which deliberately ignores every press carrying a modifier — that rule is what keeps `e` from
+  // firing mid-shortcut — so the one modified key this screen wants is bound here instead.
+  // `isEditableTarget` for the same reason the keymap has it: ⌘Z inside the composer is the
+  // browser's own undo, and it has to stay that way.
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+      if (e.key.toLowerCase() !== "z") return;
+      if (isEditableTarget(e.target)) return;
+      undoArchive();
+    }
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [undoArchive]);
 
   /** loop-r1-03/L-19: the arrow keys, Home and End belong to the *list*, so they are handled on the
    *  list rather than in the global keymap, which listens on `window`. A window-level ArrowDown

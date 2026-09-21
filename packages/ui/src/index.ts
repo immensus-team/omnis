@@ -38,6 +38,10 @@ export * from "./components/approval-stack.js";
 export { CHANNEL_LABEL } from "./lib/row-meta.js";
 export * from "./components/channel-glyph.js";
 export * from "./components/detail-pane.js";
+// loop-r1-06: the write-feedback toast. It is raised by the shell (one slot, one pill) and by the
+// Inbox through it, which is why the request type travels with it — the app names a message and an
+// action, never the id or the spec the slot ends up holding.
+export * from "./components/toast.js";
 export { ChevronRight as ChevronRightIcon } from "lucide-react";
 export { Tag as TagIcon } from "lucide-react";
 export { MoreHorizontal as MoreHorizontalIcon } from "lucide-react";

@@ -12,8 +12,9 @@ import {
   DETAIL_WIDTH_KEY,
   FLOATING_PANE_QUERY,
   NARROW_SHELL_QUERY,
+  TOAST_MS,
 } from "@omnis/ui";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /** This test file's own directory. vitest's transform can leave import.meta.url on a scheme other
@@ -931,5 +932,198 @@ describe("App shell approval queue (loop-r1-02: the list comes first)", () => {
     fireEvent.click(screen.getByRole("button", { name: "1 needs approval" }));
     expect(pane()).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Pending approvals" })).toBeInTheDocument();
+  });
+
+  /** loop-r1-06: what a decision says back, and — the half that is timing rather than copy — what
+   *  it holds back. The ignore is the one decision with a delay to spend: nothing downstream has
+   *  happened when the card leaves, so the hub is not told until the toast offering the undo has
+   *  gone. Everything else here is about that gap closing in the right order. */
+  describe("decision toasts (loop-r1-06)", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    interface HubCall {
+      url: string;
+      init?: RequestInit;
+    }
+
+    /** The hub as the decisions see it: every write recorded, and the answer switchable so the
+     *  failure path can be walked. The response is as much of one as src/api/approvals.ts reads. */
+    function stubDecide(ok = true): HubCall[] {
+      const calls: HubCall[] = [];
+      vi.stubGlobal("fetch", async (url: string, init?: RequestInit): Promise<Response> => {
+        calls.push({ url, init });
+        return { ok, status: ok ? 200 : 500, json: async () => ({}) } as unknown as Response;
+      });
+      return calls;
+    }
+
+    const decideCalls = (calls: HubCall[]): HubCall[] =>
+      calls.filter((call) => call.url.includes("/decide"));
+    /** Which decision each write carried, in the order the hub saw them. */
+    const decisions = (calls: HubCall[]): string[] =>
+      decideCalls(calls).map(
+        (call) => (JSON.parse(String(call.init?.body)) as { decision: string }).decision,
+      );
+
+    /** The queue, opened the way the list opens it. */
+    const openQueue = (count = 1): void => {
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: `${count} ${count === 1 ? "needs" : "need"} approval`,
+        }),
+      );
+    };
+
+    /** Approve through the confirmation — the card's own Approve asks first, and the question's
+     *  button is the one that decides. */
+    const approveThroughConfirm = (): void => {
+      fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+      fireEvent.click(
+        within(screen.getByRole("alertdialog")).getByRole("button", { name: "Approve" }),
+      );
+    };
+
+    it("holds the ignore back until its toast goes, and an Undo means it never goes", async () => {
+      const calls = stubDecide();
+      approvals.rows = [approval("a1")];
+      render(<App />);
+      openQueue();
+
+      fireEvent.click(screen.getByRole("button", { name: "Ignore" }));
+
+      // The card is gone on the click — the pane is the queue, and the queue says it went — while
+      // the hub has not been told. That gap is what the undo stands on: the decision is real to the
+      // user and not yet real to the server.
+      expect(screen.queryByText("Approval a1")).toBeNull();
+      expect(screen.getByRole("status")).toHaveTextContent("Ignored: Approval a1");
+      expect(decideCalls(calls)).toHaveLength(0);
+
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      expect(screen.getByText("Approval a1")).toBeInTheDocument();
+
+      // Past the toast's whole life, with the undo taken: nothing is ever sent. Without the
+      // cancellation this is the line where the deferred ignore fires anyway.
+      await act(async () => {
+        vi.advanceTimersByTime(TOAST_MS);
+      });
+      expect(decideCalls(calls)).toHaveLength(0);
+    });
+
+    it("sends the ignore when the toast runs out — once, and as an ignore", async () => {
+      const calls = stubDecide();
+      approvals.rows = [approval("a1")];
+      render(<App />);
+      openQueue();
+      fireEvent.click(screen.getByRole("button", { name: "Ignore" }));
+      expect(decideCalls(calls)).toHaveLength(0);
+
+      await act(async () => {
+        vi.advanceTimersByTime(TOAST_MS);
+      });
+
+      expect(decisions(calls)).toEqual(["ignore"]);
+      expect(decideCalls(calls)[0]?.url).toContain("/approvals/a1/decide");
+      // The card stays gone: this is a decision that was taken out of the queue, not one that
+      // failed.
+      expect(screen.queryByText("Approval a1")).toBeNull();
+    });
+
+    it("sends it when another toast takes the slot instead", async () => {
+      const calls = stubDecide();
+      approvals.rows = [approval("a1"), approval("a2")];
+      render(<App />);
+      openQueue(2);
+      fireEvent.click(screen.getAllByRole("button", { name: "Ignore" })[0] as HTMLElement);
+      expect(decideCalls(calls)).toHaveLength(0);
+
+      // One slot, no queue: the second decision's toast replaces the first, and with the undo off
+      // the screen the ignored approval goes out rather than waiting for a button nobody can press.
+      fireEvent.click(screen.getAllByRole("button", { name: "Edit" })[0] as HTMLElement);
+      await act(async () => {});
+
+      expect(decisions(calls)).toEqual(["edit", "ignore"]);
+    });
+
+    it("says an approval did not go through, and puts the card back", async () => {
+      const calls = stubDecide(false);
+      approvals.rows = [approval("a1")];
+      render(<App />);
+      openQueue();
+      approveThroughConfirm();
+      await act(async () => {});
+
+      expect(screen.getByRole("status")).toHaveTextContent("Approval didn't go through.");
+      expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+      // The rollback, and the reason the toast is not a lie: the card is back in the queue, which
+      // is where the Retry will send it from.
+      expect(screen.getByText("Approval a1")).toBeInTheDocument();
+      expect(decisions(calls)).toEqual(["accept"]);
+    });
+
+    it("confirms an approval, and offers nothing to undo", async () => {
+      stubDecide();
+      approvals.rows = [approval("a1")];
+      render(<App />);
+      openQueue();
+      approveThroughConfirm();
+      await act(async () => {});
+
+      expect(screen.getByRole("status")).toHaveTextContent("Approved: Approval a1");
+      // Accept has already gone out — the outbox has it and the reply may be on its way — so an
+      // Undo here would be a button that lies. It is absent, not disabled.
+      expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+    });
+
+    it("states the decision rather than repeating the question", async () => {
+      stubDecide();
+      approvals.rows = [{ ...approval("a1"), description: "Send the Q3 summary?" }];
+      render(<App />);
+      openQueue();
+      approveThroughConfirm();
+      await act(async () => {});
+
+      expect(screen.getByRole("status")).toHaveTextContent("Approved: Send the Q3 summary");
+    });
+
+    /** jsdom's Blob has no `text()` (nor `arrayBuffer`), so the beacon's body is read the way this
+     *  environment does have — the same FileReader a browser would fall back on. */
+    const readBody = (body: BodyInit | null): Promise<string> =>
+      new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.readAsText(body as Blob);
+      });
+
+    it("flushes the held-back ignore as a beacon if the window goes first", async () => {
+      stubDecide();
+      const sent: { url: string; body: BodyInit | null }[] = [];
+      vi.stubGlobal(
+        "navigator",
+        Object.assign(Object.create(navigator), {
+          sendBeacon: (url: string, body?: BodyInit | null): boolean => {
+            sent.push({ url, body: body ?? null });
+            return true;
+          },
+        }),
+      );
+      approvals.rows = [approval("a1")];
+      render(<App />);
+      openQueue();
+      fireEvent.click(screen.getByRole("button", { name: "Ignore" }));
+
+      act(() => {
+        window.dispatchEvent(new Event("beforeunload"));
+      });
+
+      // A fetch would be cancelled with the document, so the deferred write leaves as a beacon —
+      // same route, same JSON body, best effort by construction.
+      expect(sent).toHaveLength(1);
+      expect(sent[0]?.url).toContain("/approvals/a1/decide");
+      // The fake clock goes before the read: jsdom's FileReader delivers its load in a task, and a
+      // task that never runs is a promise that never settles.
+      vi.useRealTimers();
+      expect(await readBody(sent[0]?.body ?? null)).toContain('"decision":"ignore"');
+    });
   });
 });
