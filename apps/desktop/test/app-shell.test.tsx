@@ -5,7 +5,13 @@ import "./setup";
 
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+  DETAIL_COLLAPSED_KEY,
+  DETAIL_DEFAULT_WIDTH,
+  DETAIL_MIN_WIDTH,
+  DETAIL_WIDTH_KEY,
+} from "@omnis/ui";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /** This test file's own directory. vitest's transform can leave import.meta.url on a scheme other
@@ -397,5 +403,192 @@ describe("App shell thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
     const menu = ruleBody(body, ".glass-surface.context-menu");
     expect(menu).toContain("background: var(--bg-elevated);");
     expect(menu).toContain("backdrop-filter: none;");
+  });
+});
+
+describe("App shell detail card (US-D10 §c.5: the pane is the list's own card)", () => {
+  /** `.inbox-card`'s own rule, which is the base file rather than a tier — this one is top-level, so
+   *  it is not `ruleBody`'s (that reads the indented form inside an at-rule). */
+  function listCard(): string {
+    const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
+    const start = css.indexOf("\n.inbox-card {");
+    expect(start, ".inbox-card is not in app.css").toBeGreaterThan(-1);
+    return css.slice(start, css.indexOf("}", start));
+  }
+
+  function widePane(): string {
+    return ruleBody(atRuleBody("@container shell (min-width: 1280px) {"), ".app-shell__detail");
+  }
+
+  // §c.5's card, stated as the half a test can hold: the pane is not a lookalike of the list card, it
+  // is the same three declarations. They are read from `.inbox-card` itself, so the two cannot drift
+  // apart silently — change the list card's radius and this fails until the pane follows it.
+  it("gives the pane the same fill, radius and elevation as the list", () => {
+    const list = listCard();
+    const pane = widePane();
+
+    for (const decl of [
+      "background: var(--bg-base);",
+      "border-radius: 20px;",
+      "box-shadow: var(--shadow-row-selected);",
+    ]) {
+      expect(list, `.inbox-card does not carry ${decl}`).toContain(decl);
+      expect(pane, `the pane does not carry ${decl}`).toContain(decl);
+    }
+    // ...and no hairline on either: the elevation is the edge.
+    expect(pane).toContain("border: none;");
+    expect(list).not.toContain("border:");
+  });
+
+  // The pane with no column: a thread the user asks for while collapsed arrives as the same card,
+  // floating. `100% - 32px` is the window's own clamp — the sheet's geometry with the card's
+  // material, and deliberately not the <=1279.98 glass recipe: §c.5 puts a glass toolbar inside this
+  // pane, and a glass surface in a glass surface is the ACCENT §4.4 nesting US-D09 removed.
+  it("floats the collapsed pane as the same opaque card, over the list", () => {
+    const overlay = ruleBody(
+      atRuleBody("@container shell (min-width: 1280px) {"),
+      ".app-shell--detail-sheet .app-shell__detail",
+    );
+
+    expect(overlay).toContain("position: fixed;");
+    expect(overlay).toContain("width: min(var(--detail-width, 420px), calc(100% - 32px));");
+    expect(overlay).toMatch(/z-index: 20;/);
+    // The material comes from the tier's own pane rule, which is opaque — so the overlay must not
+    // restate a blur here, and this test is what stops the sheet's recipe being copied up.
+    expect(overlay).not.toContain("backdrop-filter");
+    expect(widePane()).toContain("backdrop-filter: none;");
+  });
+});
+
+/** US-D10: the pane's layout is a setting, so the shell reads it once on mount and writes it back on
+ *  every change. Both halves are visible without an approval in the queue: the width lands on the
+ *  shell's own inline style (`--detail-width`, which every shape the pane takes reads from there) and
+ *  the collapsed flag lands in the DOM as the one chevron that brings the pane back. The drag itself
+ *  is packages/ui's — test/detail-pane.test.tsx drives it — and what this file owns is the shell's
+ *  half: restore it, clamp it, and remember it. */
+describe("App shell detail pane (US-D10: width and collapse are settings)", () => {
+  const REAL_MATCH_MEDIA = window.matchMedia;
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    window.matchMedia = REAL_MATCH_MEDIA;
+  });
+
+  interface HubCall {
+    url: string;
+    init?: RequestInit;
+  }
+
+  /** The hub's settings routes — GET answers with `settings`, PUT with 200. Every call is recorded,
+   *  because half of what these tests assert is what the shell did *not* write. The response is as
+   *  much of one as src/api/settings.ts reads (`ok` and `json`), so the test does not depend on a
+   *  global `Response` that jsdom does not implement. */
+  function stubHub(settings: Record<string, unknown> = {}): HubCall[] {
+    const calls: HubCall[] = [];
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit): Promise<Response> => {
+      calls.push({ url, init });
+      const body = init?.method === "PUT" ? {} : { settings };
+      return { ok: true, status: 200, json: async () => body } as unknown as Response;
+    });
+    return calls;
+  }
+
+  const writes = (calls: HubCall[]) => calls.filter((call) => call.init?.method === "PUT");
+  const writtenValue = (call: HubCall | undefined) =>
+    (JSON.parse(String(call?.init?.body)) as { value: unknown }).value;
+
+  /** jsdom's window is 1024 wide, so the ceiling every clamp here is measured against is 512 — half
+   *  the shell (`maxDetailWidth`). */
+  const MAX = 512;
+
+  /** The pane's width as the shell draws it. One property for the column, the sheet and the
+   *  collapsed overlay, so this is the width in whichever shape the pane currently has. */
+  function paneWidth(): string {
+    return screen.getByTestId("app-shell").style.getPropertyValue("--detail-width");
+  }
+
+  it("draws the shipping width when nothing has been stored", async () => {
+    const calls = stubHub();
+    render(<App />);
+    expect(paneWidth()).toBe(`${DETAIL_DEFAULT_WIDTH}px`);
+
+    // ...and the answered read does not move it: `null` means "never dragged", which is the default.
+    await waitFor(() => expect(writes(calls)).toHaveLength(0));
+    expect(paneWidth()).toBe(`${DETAIL_DEFAULT_WIDTH}px`);
+  });
+
+  it("restores the stored width, clamped to the window it is drawn in", async () => {
+    stubHub({ [DETAIL_WIDTH_KEY]: 500 });
+    const fromStore = render(<App />);
+    await waitFor(() => expect(paneWidth()).toBe("500px"));
+    fromStore.unmount();
+
+    // A number chosen on a wider screen is not rewritten by a narrower one — it is drawn at the
+    // narrower screen's ceiling. 5000 is past half of jsdom's 1024, 240 is under the floor.
+    stubHub({ [DETAIL_WIDTH_KEY]: 5000 });
+    const wide = render(<App />);
+    await waitFor(() => expect(paneWidth()).toBe(`${MAX}px`));
+    wide.unmount();
+
+    stubHub({ [DETAIL_WIDTH_KEY]: 240 });
+    render(<App />);
+    await waitFor(() => expect(paneWidth()).toBe(`${DETAIL_MIN_WIDTH}px`));
+  });
+
+  it("restores the collapsed pane, and the same press puts it back", async () => {
+    const calls = stubHub({ [DETAIL_COLLAPSED_KEY]: true });
+    render(<App />);
+
+    // With the pane collapsed and nothing to show in it, the way back is the one chevron drawn on
+    // the canvas — and that chevron is also how the restore is visible here. Collapsed means the
+    // pane is not in the document at all, which is the whole of "the list takes the width".
+    const toggle = await screen.findByRole("button", { name: "Expand details" });
+    expect(screen.queryByTestId("detail-pane")).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(screen.queryByRole("button", { name: "Expand details" })).not.toBeInTheDocument();
+    await waitFor(() => expect(writes(calls)).toHaveLength(1));
+    expect(writes(calls)[0]?.url).toContain(DETAIL_COLLAPSED_KEY);
+    expect(writtenValue(writes(calls)[0])).toBe(false);
+  });
+
+  it("collapses on Cmd+\\ and remembers it", async () => {
+    const calls = stubHub();
+    render(<App />);
+    // Nothing is open, so neither chevron is drawn: there is nothing to collapse yet.
+    expect(screen.queryByRole("button", { name: "Collapse details" })).not.toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "\\", code: "Backslash", metaKey: true });
+    // eslint-disable-next-line no-console
+    expect(await screen.findByRole("button", { name: "Expand details" })).toBeInTheDocument();
+    expect(screen.queryByTestId("detail-pane")).not.toBeInTheDocument();
+    await waitFor(() => expect(writes(calls)).toHaveLength(1));
+    expect(writtenValue(writes(calls)[0])).toBe(true);
+  });
+
+  // Below 900 the pane is a full-width sheet with no column and no toggle, and app.css hides both.
+  // The shortcut is switched off with them rather than left writing a flag nothing on this tier can
+  // show: a key that silently rewrites a setting the user cannot see is worse than a key that does
+  // nothing. Nothing is asserted about the DOM because there is nothing there to assert — the flag
+  // never flips, which is exactly what "no write" says.
+  it("ignores the shortcut below 900, where the pane cannot be collapsed", async () => {
+    vi.stubGlobal(
+      "matchMedia",
+      (query: string) =>
+        ({
+          media: query,
+          matches: true,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    );
+    const calls = stubHub();
+    render(<App />);
+
+    fireEvent.keyDown(window, { key: "\\", code: "Backslash", metaKey: true });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Filters" })).toBeInTheDocument(),
+    );
+    expect(writes(calls)).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Expand details" })).not.toBeInTheDocument();
   });
 });
