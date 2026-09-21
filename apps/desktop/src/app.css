@@ -4379,6 +4379,21 @@ button.today-screen__event-title:focus-visible {
   .channel-rail {
     --dur-reorder: 0ms;
   }
+
+  /* §c.6 narrow: the drawer does not travel.
+     The travel is the *movement* — a modal sheet sliding a full viewport height is exactly what the
+     preference asks not to see — so it collapses to nothing, the way the rail's reorder and the
+     row's swipe already do. The scrim is not in this list on purpose: its cross-fade is opacity,
+     which is not motion, and `--dur-base` already brings it down to the shared 80ms fade for free.
+
+     Duration rather than `transition: none`, and `!important` because `vaul` writes the drawer's
+     transition inline on every settle. Zeroing the duration is also the safer of the two: `vaul`
+     reads the computed duration to decide *whether* it is transitioning at all, so removing the
+     property outright would change what the gesture does rather than only how fast it looks. */
+  [data-vaul-drawer].sheet {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+  }
 }
 
 /* ==========================================================================================
@@ -4604,6 +4619,90 @@ button.today-screen__event-title:focus-visible {
     width: min(480px, calc(100% - 48px));
     border-radius: 20px;
   }
+}
+
+/* ==========================================================================================
+   §c.6, narrow tier — the same sheet as a `vaul` drawer.
+
+   The rules below are the second half of the split sheet.tsx documents: below 900px the panel is
+   `vaul`'s `Drawer.Content`, which is *not* a child of the overlay (they are siblings in the
+   portal) and is not sized by flexbox. `vaul` supplies the mechanism — the drag, the snap points,
+   the modal — and the geometry is still ours.
+
+   Three things `vaul` does that the rules below have to answer, all of them read off its bundle
+   rather than guessed:
+
+   1. It positions nothing. `[data-vaul-drawer]` carries a transform and a transition and no box,
+      so `.sheet` places itself. Its `--snap-point-height` is a **translate**, not a height: for a
+      bottom drawer the offset is `viewport - snap * viewport` (`index.mjs`'s `snapPointsOffset`),
+      which means the element has to be a full viewport tall for the offset to leave the snap
+      fraction on screen.
+   2. It hides the overlay at every snap point but the one `fadeFromIndex` names
+      (`shouldFade` → `data-vaul-snap-points-overlay`). That is the right model for a drawer that
+      opens as a non-modal peek and becomes modal at full height; it is the wrong one for this
+      sheet, which is a modal dialog at both of its snaps — so the overlay is pinned visible and
+      the scrim's cross-fade moves to a pseudo-element, which is the one part of it that may not be
+      pinned.
+   3. Its durations are inline (`set(drawerRef.current, { transition: ... })` on every settle), so
+      nothing in a stylesheet can shorten them without `!important`. That is the reduce block at
+      the end of this file, and it is the same shape as sonner's.
+   ========================================================================================== */
+[data-vaul-drawer].sheet {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  /* Full viewport: the snap offset is measured *from* the bottom edge, so a shorter box would show
+     the snap fraction of a shorter box and the two would drift apart. */
+  height: 100dvh;
+  /* The wide tier's cap is the opposite decision — there the box *is* the sheet, so a sheet taller
+     than the viewport would be a second scroller with no way back to the header. */
+  max-height: none;
+  /* M125's sheet is flush with the bottom edge and rounded only at the top; the full-height box
+     above reaches past it, so the bottom corners are squared off the same way. */
+  border-radius: 20px 20px 0 0;
+  /* The entrance is `vaul`'s transform transition, not the wide tier's `sheet-in` keyframe — two
+     animations on one property is the double-animation guard's reject. */
+  animation: none;
+}
+
+[data-vaul-drawer].sheet .sheet__body {
+  /* The drawer is a fixed viewport tall, so the body is the only thing that scrolls — the wide
+     tier's `max-height` cap plays that role there. */
+  flex: 1 1 auto;
+}
+
+/* The grabber. `vaul` ships a 32x5 grey pill and a 44px hit area; this paints the pill with the
+   design tokens instead of its hardcoded `#e2e2e4`, and leaves the hit area alone — it is the
+   reason `handleOnly` can put the whole gesture on a 5px element. */
+[data-vaul-handle].sheet__grabber {
+  flex: none;
+  width: 36px;
+  height: 5px;
+  margin: 8px auto 0;
+  background: var(--gray-300);
+  opacity: 0.55;
+}
+
+[data-vaul-handle].sheet__grabber:hover,
+[data-vaul-handle].sheet__grabber:active {
+  opacity: 0.9;
+}
+
+/* The pin from note 2. `!important` because `vaul` writes the overlay's opacity inline as well as
+   in its injected stylesheet, and an inline custom declaration beats a stylesheet one. The scrim's
+   own cross-fade is the pseudo-element's animation, which the pin cannot reach. */
+[data-vaul-overlay].sheet-overlay {
+  opacity: 1 !important;
+  animation: none !important;
+  background: none;
+}
+
+[data-vaul-overlay].sheet-overlay::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: oklch(0 0 0 / 0.18);
+  animation: fade-in var(--dur-base) var(--ease-spring);
 }
 
 @keyframes sheet-in {

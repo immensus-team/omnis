@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactNode } from "react";
+import { type HTMLAttributes, type ReactNode, forwardRef } from "react";
 import { cn } from "../lib/cn.js";
 
 /** A5 §1.5: glass belongs on the control/navigation layer, four places only. The content layer is
@@ -7,19 +7,23 @@ export type GlassSlot = "sidebar" | "toolbar" | "sheet" | "palette";
 
 /** US-D01: the remaining div attributes (role/aria-label/data-*) pass straight through — the ask
  *  panel has to be a glass surface and role="dialog" at the same time, so there is no longer any
- *  reason to add a wrapping div per surface. */
-export function GlassSurface({
-  slot,
-  className,
-  children,
-  ...rest
-}: { slot: GlassSlot } & HTMLAttributes<HTMLDivElement>) {
+ *  reason to add a wrapping div per surface.
+ *
+ *  The ref is forwarded for the same reason, one wave later: `vaul`'s `Drawer.Content asChild`
+ *  hands the surface the role, the aria wiring and the drawer's own `data-vaul-*` attributes
+ *  through Radix's `Slot`, and Slot composes a ref onto the child it clones. A function component
+ *  without `forwardRef` drops that ref silently in React 18 — the DOM would still look right and
+ *  the drawer would have no element to measure or drag. */
+export const GlassSurface = forwardRef<
+  HTMLDivElement,
+  { slot: GlassSlot } & HTMLAttributes<HTMLDivElement>
+>(function GlassSurface({ slot, className, children, ...rest }, ref) {
   return (
-    <div className={cn("glass-surface", className)} data-glass-slot={slot} {...rest}>
+    <div ref={ref} className={cn("glass-surface", className)} data-glass-slot={slot} {...rest}>
       {children}
     </div>
   );
-}
+});
 
 /** The content-layer twin of GlassSurface, and for the same reason it takes the remaining div
  *  attributes: a screen that has to say something about a surface — DigestCard's `data-digest-kind`
