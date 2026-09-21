@@ -18,6 +18,7 @@ import {
   type RailScreen,
   type RailSelection,
   Toast,
+  type ToastRequest,
   type ToastSpec,
   type UiChannel,
   type UiSearchGroup,
@@ -220,6 +221,12 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
    *  competing for the same corner of the window, and with one thing just done there is one thing
    *  the user might want taken back. */
   const [toast, setToast] = useState<ToastSpec | null>(null);
+  /** The next toast's id. Every `notify` takes one, so the pill can tell a replacement from a
+   *  re-render — including the replacement that says exactly what its predecessor said, which is
+   *  what two archives in a row are. A ref rather than a second piece of state: it is an input to
+   *  the slot, not a thing anything renders, and it has to be the value the `setToast` beside it
+   *  carries, never a render behind. */
+  const toastId = useRef(0);
   /** The work a toast is holding back until it goes away, and (for the ignore) the approval the
    *  `beforeunload` beacon would have to re-send. Only the ignore defers a hub call today: its whole
    *  point is that the user may take it back, so the decision waits for the toast to leave. */
@@ -242,17 +249,20 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
    *  work off: an Undo on the ignore means the ignore is not sent, whichever screen put the button
    *  there. No caller has to remember that. */
   const notify = useCallback(
-    (spec: ToastSpec, deferred?: { run: () => void; ignoreId?: string }) => {
+    (spec: ToastRequest, deferred?: { run: () => void; ignoreId?: string }) => {
       const outgoing = held.current;
       held.current = null;
       outgoing?.run();
       held.current = deferred ?? null;
       const action = spec.action;
+      toastId.current += 1;
+      const id = toastId.current;
       setToast(
         action === undefined
-          ? spec
+          ? { ...spec, id }
           : {
               ...spec,
+              id,
               action: {
                 label: action.label,
                 onAction: () => {
@@ -939,7 +949,12 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
           that is already in the tree and then fills in is announced by all of them.
           `message={toast?.message ?? null}` rather than a conditional render, for the same reason —
           the toast needs a frame of `null` to play its exit in before the pill is unmounted. */}
-      <Toast message={toast?.message ?? null} action={toast?.action} onDismiss={clearToast} />
+      <Toast
+        id={toast?.id ?? 0}
+        message={toast?.message ?? null}
+        action={toast?.action}
+        onDismiss={clearToast}
+      />
     </main>
   );
 }

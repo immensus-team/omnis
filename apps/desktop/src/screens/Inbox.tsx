@@ -13,7 +13,7 @@ import {
   SheetCheck,
   SheetGroup,
   SheetRow,
-  type ToastSpec,
+  type ToastRequest,
   type UiChannel,
   type UiItemStatus,
   UserIcon,
@@ -309,10 +309,11 @@ export function Inbox({
   pendingApprovals?: number;
   onOpenApprovals?: () => void;
   /** loop-r1-06: how this screen says something back. The toast itself belongs to the shell — one
-   *  slot, one pill, in one corner of the window — so archiving raises a spec rather than a node,
+   *  slot, one pill, in one corner of the window — so archiving raises a request rather than a node,
    *  and the optional `deferred` is the work the toast should hold back until it goes: here, the
-   *  disarming of the undo it is offering. */
-  notify?: (spec: ToastSpec, deferred?: { run: () => void }) => void;
+   *  disarming of the undo it is offering. A request and not a spec: the id that tells one toast
+   *  from the next belongs to the slot, and this screen has no way to know it. */
+  notify?: (spec: ToastRequest, deferred?: { run: () => void }) => void;
 }) {
   const zero = useZeroClient();
   const [filter, setFilter] = useState<InboxFilter>("all");

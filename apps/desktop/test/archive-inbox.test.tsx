@@ -4,7 +4,7 @@
 // file tags queries by table name and returns different rows per table (Inbox runs seven).
 import "./setup";
 
-import { TOAST_MS, Toast, type ToastSpec } from "@omnis/ui";
+import { TOAST_MS, Toast, type ToastRequest, type ToastSpec } from "@omnis/ui";
 import { LEAVE_MS, REDUCED_FADE_MS } from "@omnis/ui/lib/motion";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useRef, useState } from "react";
@@ -192,9 +192,13 @@ describe("Inbox archive/restore (US-A36)", () => {
 function Harness() {
   const [toast, setToast] = useState<ToastSpec | null>(null);
   const held = useRef<(() => void) | null>(null);
-  const notify = (spec: ToastSpec, deferred?: { run: () => void }) => {
+  /** App.tsx's id counter, in miniature, and here for the same reason: a toast that replaces one
+   *  saying the same words is still a new toast, and the pill's countdown depends on being told. */
+  const nextId = useRef(0);
+  const notify = (spec: ToastRequest, deferred?: { run: () => void }) => {
     held.current = deferred?.run ?? null;
-    setToast(spec);
+    nextId.current += 1;
+    setToast({ ...spec, id: nextId.current });
   };
   const dismiss = () => {
     const run = held.current;
@@ -205,7 +209,12 @@ function Harness() {
   return (
     <VirtuosoMockContext.Provider value={{ viewportHeight: 600, itemHeight: 72 }}>
       <Inbox notify={notify} />
-      <Toast message={toast?.message ?? null} action={toast?.action} onDismiss={dismiss} />
+      <Toast
+        id={toast?.id ?? 0}
+        message={toast?.message ?? null}
+        action={toast?.action}
+        onDismiss={dismiss}
+      />
     </VirtuosoMockContext.Provider>
   );
 }

@@ -11,17 +11,34 @@ export interface ToastAction {
 
 /** What the shell's one toast slot holds. A new spec replaces whatever is there: there is no queue,
  *  because there is one thing the user just did and one thing they might want taken back, and a
- *  stack of them would be a second place to look for the one that matters. */
+ *  stack of them would be a second place to look for the one that matters.
+ *
+ *  `id` is the toast's identity, and it is deliberately not the message: two toasts in a row can say
+ *  the same words — `j e j e` across two rows raises "Archived" twice, and two ignored approvals can
+ *  share a description — and the second one must not inherit whatever is left of the first one's
+ *  clock. The slot stamps a fresh number on every notify, so a replacement that reads identically is
+ *  still a new toast to the pill, with a full duration of its own. */
 export interface ToastSpec {
+  id: number;
   message: string;
   action?: ToastAction;
 }
+
+/** A toast as the screen raising it describes it: everything the raiser knows, which is everything
+ *  but the id. Identity belongs to the one slot that holds the toast, not to the row that raised it,
+ *  so a raiser never invents one and can never collide with another raiser's. */
+export type ToastRequest = Omit<ToastSpec, "id">;
 
 /** The undo window Gmail's own archive toast gives. Every caller here inherits it — the number is
  *  not a parameter anyone passes. */
 export const TOAST_MS = 5000;
 
 export interface ToastProps {
+  /** Which toast this is — the timer's identity, and the reason it is a prop at all rather than
+   *  something this component could work out for itself. Two consecutive renders with the same
+   *  `message` are indistinguishable otherwise, and the second one has to start a fresh countdown
+   *  rather than inherit the first one's. A caller that passes a new id is showing a new toast. */
+  id: number;
   /** The toast to show, or null for "nothing to show". The wrapper below is mounted either way — a
    *  live region has to be in the DOM *before* its content is, or the change is not announced. */
   message: string | null;
@@ -41,7 +58,7 @@ export interface ToastProps {
  *
  *  The action is the point of it. Every toast this story raises is either reversible (Undo) or
  *  retryable (Retry), so the pill holds a message and one text button and nothing else. */
-export function Toast({ message, action, onDismiss, durationMs = TOAST_MS }: ToastProps) {
+export function Toast({ id, message, action, onDismiss, durationMs = TOAST_MS }: ToastProps) {
   /** True while the pointer or the focus is on the pill. The Undo is why the toast is on screen at
    *  all, so a clock that runs down while someone is reaching for the button takes away the thing
    *  it was showing. The countdown restarts when they leave rather than resuming mid-flight:
@@ -69,12 +86,32 @@ export function Toast({ message, action, onDismiss, durationMs = TOAST_MS }: Toa
   const closing = useClosingSpring(message !== null, FAST_MS);
   const content = message !== null ? { message, action } : closing ? last.current : null;
   const shownAction = content?.action;
+  /** The pill is in the DOM, which is not the same as there being a message: it outlives the
+   *  message by its leave animation, so "gone" is the only state in which nothing can be holding
+   *  it. */
+  const showing = content !== null;
 
+  // The hold belongs to the pill that took it, and it has to be given up when that pill goes. The
+  // browser fires no `mouseleave` or `blur` for a node that has been removed from under the pointer
+  // or the focus, so the hold taken by the click that *cleared* the toast — mouse on Undo, or the
+  // keyboard's focus ring on it — would outlive its own pill and mute the countdown of the next
+  // one, which would then sit there indefinitely. Reset it the moment the pill leaves.
+  useEffect(() => {
+    if (!showing) setHeld(false);
+  }, [showing]);
+
+  // `id`, not `message`, is what makes this a *new* toast: keyed on the message alone, a replacement
+  // saying the same words changes nothing, the outgoing toast's timer keeps running, and the newer
+  // one is dismissed early — the second archive of a `j e j e` loses the tail of its own undo
+  // window. It is in the array and nowhere in the body on purpose. It is not an input to the
+  // timeout, it is what the timeout belongs to, and re-arming is the whole effect; the linter reads
+  // that as a dependency nobody uses.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `id` is the timer's identity, not one of its inputs — see above.
   useEffect(() => {
     if (message === null || held) return;
     const timer = window.setTimeout(() => dismiss.current(), durationMs);
     return () => window.clearTimeout(timer);
-  }, [message, durationMs, held]);
+  }, [id, message, durationMs, held]);
 
   // The wrapper is `<output>` rather than a div with role="status": the element already carries the
   // role and the polite live region (the same call Network.tsx's merge note makes), and it is
