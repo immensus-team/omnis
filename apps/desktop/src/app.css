@@ -3323,7 +3323,20 @@ body {
 /* >=900: the pane's bar, right-aligned over the scrolling body. `sticky` rather than `fixed` — it is
    a row of the conversation's own flow that happens to stay put, so it scrolls with the thread
    instead of hovering over the whole window. `margin-left: auto` with `width: max-content` pins a
-   block child to the end without a wrapper element. */
+   block child to the end without a wrapper element.
+
+   `margin-bottom` is the band the bar's own paint needs: the capsule is opaque and `--shadow-glass`
+   (`0 8px 24px`) reaches ~20px past its box, and the header's first line — the sender's date,
+   right-aligned to the same edge the capsule is — is the first thing under it. Without a band the
+   capsule's bottom edge and its shadow land across the top of the date, which is what the 1440
+   acceptance frame showed.
+
+   The extra 8px is the bar's own offset, and it is measured, not guessed: `top: 8px` holds the bar
+   8px below the scroller's content edge, and a sticky element's *paint* may sit lower than its flow
+   box — at 1440 the bar's row is 32–78 while the capsule paints 40–86. So the row has to reserve its
+   shadow's 20px plus the 8px the paint drops by, or the gap the header sees is 8px short of the
+   shadow. Scrolled, only the box is pinned and the message passes under the glass, which is what
+   §c.5's "sitting over the scrolling body" means — the band is a rest position, not an inset. */
 @container shell (min-width: 900px) {
   .thread-toolbar--pane {
     position: sticky;
@@ -3331,6 +3344,7 @@ body {
     z-index: 2;
     width: max-content;
     margin-left: auto;
+    margin-bottom: 28px;
   }
 }
 
@@ -3369,6 +3383,9 @@ body {
     flex: 0 0 auto;
     align-self: flex-end;
     width: max-content;
+    /* The chrome row carries no material, so it casts nothing onto the message below it — the band
+       the sticky tier reserves is for that shadow, and here it would only be a hole. */
+    margin-bottom: 0;
   }
 }
 

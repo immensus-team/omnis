@@ -179,6 +179,52 @@ function readSheetMotion(): string {
  *  shape. 1100 is the width the rejected pass was caught at. */
 const WIDTHS = [1440, 1280, 1100, 1024, 900, 899, 768, 390];
 
+/** Runs in the page (same constraints as readGlassStack). The pane's bar is right-aligned over the
+ *  scrolling body and the sender's date is right-aligned to the same edge, so the one geometric
+ *  question the material map cannot answer is whether the bar — and the shadow it casts down the
+ *  page — lands on the header. `--shadow-glass` is `0 8px 24px`, so its reach past the box is the
+ *  y-offset plus half the blur; both numbers are read off the token rather than restated, so a
+ *  retuned shadow moves the requirement with it.
+ *
+ *  Only the tier where the bar *is* the glass casts that shadow. At 900–1279.98 it drops the
+ *  material and becomes the sheet's chrome row (ThreadToolbar's `variant="chrome"`), and a chrome
+ *  row owes the header no more than not overlapping it — so the requirement there is zero and the
+ *  same helper serves both tiers. */
+function readHeaderClearance(): { gap: number; needs: number; glass: boolean } {
+  const bar = document.querySelector(".thread-toolbar--pane");
+  const header = document.querySelector(".thread-header__sender");
+  if (bar === null || header === null) return { gap: Number.NaN, needs: Number.NaN, glass: false };
+  // The clearance is a requirement of the *rest* position: pinned over a message that has been
+  // scrolled up is the behaviour §c.5 asks for. So the pane's scroller is put back at the top before
+  // the boxes are read — whichever element the current tier made the scroller.
+  let node: Element | null = bar.parentElement;
+  while (node !== null) {
+    if (node.scrollHeight > node.clientHeight) {
+      node.scrollTop = 0;
+      break;
+    }
+    node = node.parentElement;
+  }
+  let needs = 0;
+  const glass = bar.classList.contains("glass-surface");
+  if (glass) {
+    const shadow = getComputedStyle(document.documentElement).getPropertyValue("--shadow-glass");
+    for (const layer of shadow.split(",")) {
+      const parts = layer.trim().split(/\s+/);
+      const y = Number.parseFloat(parts[1] ?? "0");
+      const blur = Number.parseFloat(parts[2] ?? "0");
+      if (Number.isFinite(y) && Number.isFinite(blur)) {
+        needs = Math.max(needs, Math.max(0, y) + blur / 2);
+      }
+    }
+  }
+  return {
+    gap: header.getBoundingClientRect().top - bar.getBoundingClientRect().bottom,
+    needs,
+    glass,
+  };
+}
+
 async function openThread(page: Page): Promise<void> {
   await page.locator(".inbox-row").first().click();
   await page.mouse.move(2, 2);
@@ -204,6 +250,22 @@ test("US-D09 surfaces (nested glass, surface material, type scale)", async ({ pa
       ).toEqual([]);
       return `${layers.length} glass layers, 0 nested`;
     });
+
+    // >=900 is where the bar is the pane's own bar rather than the floating one; below that it is
+    // out of the pane's flow entirely and there is no header for it to sit over.
+    if (width >= 900) {
+      await check(`the pane's bar clears the header at rest at ${width}px (§c.5)`, async () => {
+        const { gap, needs, glass } = await page.evaluate(readHeaderClearance);
+        expect(Number.isFinite(gap), "the pane's bar or the sender block was not on screen").toBe(
+          true,
+        );
+        expect(
+          gap,
+          `the bar's box leaves ${gap.toFixed(1)}px, and its shadow needs ${needs}px`,
+        ).toBeGreaterThanOrEqual(needs);
+        return `${gap.toFixed(1)}px clear, ${glass ? "glass" : "chrome"} needs ${needs}px`;
+      });
+    }
   }
 
   // The three D9 chrome surfaces, at the widths they actually render at: the action bar and the

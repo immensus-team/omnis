@@ -248,6 +248,23 @@ describe("App shell thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
     expect(body).toMatch(/margin-left: auto;/);
   });
 
+  // The bar is right-aligned to the same edge the sender's date is, and `--shadow-glass` reaches
+  // ~20px below the capsule's box — so at rest, with no reserved band, the capsule's bottom edge and
+  // its shadow land across the date (the 1440 acceptance frame showed it sliced). The clearance is
+  // what the browser check in tools/e2e/d9-surfaces.spec.ts measures; this is the text half, so a
+  // rule that loses the margin fails here rather than only in a screenshot nobody re-reads.
+  it("keeps the pane's bar clear of the header's first line", () => {
+    const body = ruleBody(
+      atRuleBody("@container shell (min-width: 900px) {"),
+      ".thread-toolbar--pane",
+    );
+    const margin = /margin-bottom: (\d+)px;/.exec(body);
+    expect(margin, "the bar reserves no band below itself").not.toBeNull();
+    // 28 is `--shadow-glass`'s reach (y-offset 8 plus half its 24px blur) plus the 8px the paint
+    // drops below the flow box at `top: 8px` — both measured at 1440 in d9-surfaces.spec.ts.
+    expect(Number(margin?.[1])).toBeGreaterThanOrEqual(28);
+  });
+
   // §c.5 pins the narrow tier's bar at `bottom: var(--bar-gap)`, which is where §c.9 leaves the rail
   // bar — the same adaptation the BottomBar needed. These three numbers have to be the BottomBar's
   // own: the bar stands in that row, between its 44px filters circle and its 52px compose circle, so
