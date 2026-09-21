@@ -12,6 +12,8 @@ export * from "./lib/ask-model.js";
 export * from "./lib/motion.js";
 export * from "./lib/focus-trap.js";
 export * from "./components/sheet.js";
+export * from "./components/toast.js";
+export * from "./components/animated-list.js";
 export * from "./components/confirm-prompt.js";
 export * from "./lib/pointer-drag.js";
 export * from "./lib/rail-order.js";

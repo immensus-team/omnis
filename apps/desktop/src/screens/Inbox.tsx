@@ -16,6 +16,7 @@ import {
   type UiChannel,
   type UiItemStatus,
   UserIcon,
+  toast,
 } from "@omnis/ui";
 import { groupBy } from "@omnis/ui/components/command-palette";
 import { GroupHeader } from "@omnis/ui/components/group-header";
@@ -487,6 +488,34 @@ export function Inbox({
     });
   }, []);
 
+  /** motion-OSS S6: archive (or restore) and say so, with a way back.
+   *
+   *  This is the screen's only undo. Before it, archiving from the Inbox was a one-way door: the row
+   *  left the list and the Archived view was the only place to get it back, which is a different
+   *  screen the user did not ask to visit. The Undo re-runs the same toggle in the other direction,
+   *  so it commits through exactly one code path and cannot drift from the forward action.
+   *
+   *  It takes a list rather than one id because the bulk confirm ("Archive 3 threads?") must raise
+   *  ONE toast: toasting per thread inside `toggleArchive` would stack three toasts for one press,
+   *  and the count is the thing the user wants confirmed anyway. The single-row call sites pass a
+   *  one-element list, so there is one shape and one copy function rather than two. */
+  const archiveWithUndo = useCallback(
+    (threadIds: readonly string[], archived: boolean) => {
+      if (threadIds.length === 0) return;
+      for (const threadId of threadIds) toggleArchive(threadId, archived);
+      const count = threadIds.length;
+      toast(archived ? (count === 1 ? "Archived" : `Archived ${count} threads`) : "Restored", {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            for (const threadId of threadIds) toggleArchive(threadId, !archived);
+          },
+        },
+      });
+    },
+    [toggleArchive],
+  );
+
   // The leave timers outlive a row that unmounts first (archiving the last row and switching views,
   // or closing the window mid-animation). A pending timer that fires after unmount would call
   // setState on a dead component, so they are cleared together on the way out.
@@ -501,10 +530,10 @@ export function Inbox({
     useCallback(
       (action: string) => {
         if (selectedId === null) return;
-        if (action === "archive") toggleArchive(selectedId, true);
-        if (action === "unarchive") toggleArchive(selectedId, false);
+        if (action === "archive") archiveWithUndo([selectedId], true);
+        if (action === "unarchive") archiveWithUndo([selectedId], false);
       },
-      [selectedId, toggleArchive],
+      [selectedId, archiveWithUndo],
     ),
   );
 
@@ -737,7 +766,7 @@ export function Inbox({
               person={item.row.person}
               archived={view === "archived"}
               leaving={leavingIds.has(item.row.id)}
-              onArchive={(id) => toggleArchive(id, view !== "archived")}
+              onArchive={(id) => archiveWithUndo([id], view !== "archived")}
               onSelect={(id) => {
                 setSelectedId(id);
                 onOpen?.({ threadId: item.row.threadId, agentSession: item.row.agentSession });
@@ -825,9 +854,7 @@ export function Inbox({
         onOpenChange={(open) => !open && setArchiveAll(null)}
         {...CONFIRM_COPY.archiveThreads(archiveAll?.length ?? 0)}
         confirmLabel="Archive"
-        onConfirm={() => {
-          for (const threadId of archiveAll ?? []) toggleArchive(threadId, true);
-        }}
+        onConfirm={() => archiveWithUndo(archiveAll ?? [], true)}
       />
     </OpaqueSurface>
   );

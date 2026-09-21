@@ -1,8 +1,13 @@
 import { MotionConfig } from "motion/react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+// sonner ships no injected styles — its own `[data-sonner-toaster]` rules are what declare the
+// variables app.css then overrides — so this import is load-bearing. It is here, beside tokens.css,
+// because CSS in this repo is only ever imported by the app entry.
+import "sonner/dist/styles.css";
 import "@omnis/ui/tokens.css";
 import "./app.css";
+import { Toaster } from "@omnis/ui";
 import { App } from "./App.js";
 import { type OAuthClient, Onboarding } from "./screens/Onboarding.js";
 import { loadZeroToken } from "./zero-client.js";
@@ -26,7 +31,13 @@ loadZeroToken()
       // the onboarding preview below is rendered *instead of* App, and a screen outside the config
       // would be the one place the preference is ignored.
       <StrictMode>
-        <MotionConfig reducedMotion="user">{previewElement()}</MotionConfig>
+        <MotionConfig reducedMotion="user">
+          {previewElement()}
+          {/* The toast host, beside the config rather than inside a screen: a toast outlives the
+              screen that raised it (archive a thread, then switch views — the Undo must still be
+              there), and mounting it per screen would unmount the toast with its raiser. */}
+          <Toaster />
+        </MotionConfig>
       </StrictMode>,
     );
   });

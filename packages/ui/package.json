@@ -8,6 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./tokens.css": "./src/tokens.css",
+    "./test/setup": "./test/setup.ts",
     "./*": "./src/*.ts",
     "./components/*": "./src/components/*.tsx"
   },

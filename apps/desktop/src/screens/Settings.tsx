@@ -1,4 +1,5 @@
 import {
+  AnimatedList,
   CHANNEL_LABEL,
   ChannelGlyph,
   OpaqueSurface,
@@ -531,7 +532,7 @@ export function Settings() {
                   return (
                     <div key={kind} className="settings-screen__allowlist">
                       <h3 className="settings-screen__sublabel">{ALLOWLIST_LABEL[kind]}</h3>
-                      <ul className="settings-screen__chips">
+                      <AnimatedList className="settings-screen__chips">
                         {entries.map((entry) => (
                           <li key={entry} className="settings-screen__chip">
                             <span className="settings-screen__chip-text">{entry}</span>
@@ -551,7 +552,7 @@ export function Settings() {
                             </button>
                           </li>
                         ))}
-                      </ul>
+                      </AnimatedList>
                       <input
                         type="text"
                         className="settings-screen__input"

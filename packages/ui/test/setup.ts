@@ -26,6 +26,54 @@ if (typeof Element.prototype.scrollIntoView === "undefined") {
   Element.prototype.scrollIntoView = () => {};
 }
 
+// deviation: jsdom 25 implements no matchMedia at all (probed: `window.matchMedia` is undefined).
+// That is a gap rather than a preference, and it became load-bearing with the motion wave, which
+// reads media queries on mount: @formkit/auto-animate throws outright without it — it checks
+// `prefers-reduced-motion` before it will animate a list — and lib/media-query.ts asks for
+// `prefers-reduced-transparency` the same way.
+// Every query answers `false`, and the listener methods are real but never fire. That is all a
+// component that *reads* a preference needs. A test that needs to *move* an answer installs its own
+// stub over this one: motion-prefs.test.tsx does, because motion caches its answer and only ever
+// updates it from a change event. The deprecated addListener/removeListener pair is here because
+// libraries of this generation still call it.
+// ponytail: no evaluator and no re-evaluation on resize. Add one if a test ever needs a query this
+// answers wrongly.
+if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
+// deviation: jsdom 25 implements no Web Animations API (probed: `Element.prototype.animate` is
+// undefined), and @formkit/auto-animate calls it the moment a list's children change. Without this,
+// *rendering* an AnimatedList is fine and *using* one throws — from a MutationObserver, on a later
+// tick, after the test that caused it has already been reported as passing. That is the worst shape
+// a failure can take, which is why this is a stub rather than something each test opts into.
+// It records nothing and finishes nothing: it exists so the call is a call rather than a crash, and
+// so a test can spy on it to tell an animation that ran from one that was skipped — which is how
+// animated-list.test.tsx asserts auto-animate's reduced-motion bail-out.
+// ponytail: no timeline, no currentTime, no finish event. Add them if a test ever asserts on the
+// animation itself; jsdom has no layout, so it cannot.
+if (typeof Element.prototype.animate === "undefined") {
+  Element.prototype.animate = (() => ({
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    cancel: () => {},
+    finish: () => {},
+    play: () => {},
+    pause: () => {},
+    currentTime: 0,
+    playState: "finished",
+  })) as unknown as Element["animate"];
+}
+
 // deviation: jsdom 25 implements neither PointerEvent nor pointer capture (probed: both are
 // `undefined`). lib/pointer-drag.ts is Pointer Events only — the whole point of §c.1 is that no
 // drag library is installed — so without these, `@testing-library`'s fireEvent.pointerDown builds

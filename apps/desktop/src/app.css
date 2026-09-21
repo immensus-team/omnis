@@ -5724,3 +5724,69 @@ button.today-screen__event-title:focus-visible {
     height: 44px;
   }
 }
+
+/* ==========================================================================================
+   motion-OSS S6 — the toast ("Archived · Undo").
+
+   sonner's own stylesheet is imported by main.tsx beside tokens.css. It declares its defaults as
+   custom properties on `[data-sonner-toaster]` (`--normal-bg`, `--normal-text`, `--normal-border`,
+   `--border-radius`), and the block below re-points those at the design tokens — so the toast is
+   themed by changing tokens, not by overriding sonner's rules one at a time.
+
+   The toast is deliberately **opaque** (`--bg-elevated`), not glass. A toast is transient content
+   that lands over the list, and `.glass-surface` on it would be glass over body content rather
+   than chrome over a surface — ACCENT §4.4's rule read to its conclusion. `--shadow-glass` still
+   gives it the lift that says "this is floating above what you were reading".
+
+   Portalled to <body>, so the narrow-tier rule below is a viewport media query, not the
+   `@container shell` query the rest of this file uses — the same reason and the same shape as the
+   Sheet's block above.
+   ========================================================================================== */
+
+[data-sonner-toaster] {
+  --normal-bg: var(--bg-elevated);
+  --normal-text: var(--text-primary);
+  --normal-border: var(--border-hairline);
+  --border-radius: var(--radius-group);
+  /* One type scale step down from body: a toast is a confirmation, not a message to read at
+     length, and at the row's 15px it competed with the list it was talking about. */
+  font-family: inherit;
+}
+
+.omnis-toast {
+  box-shadow: var(--shadow-glass);
+  font-size: 14px;
+  /* The action ('Undo') is the only thing to press, so the padding gives it a real target without
+     making the toast a button. */
+  padding: 10px 12px;
+}
+
+.omnis-toast__action {
+  /* `--accent` is this app's one blue and it means "the primary thing to do here" (v3 §b.1); the
+     Undo in a toast is exactly that. */
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-radius: calc(var(--radius-group) / 2);
+  font-weight: 600;
+  padding: 4px 10px;
+}
+
+/* The narrow tier's BottomBar occupies `--bar-h` + `--bar-gap` of the bottom edge, which is
+   exactly where a bottom-centred toaster rests. `!important` because sonner writes the offset as
+   an inline custom property from its `offset` prop (it injects a style tag for it), and an inline
+   custom property beats a stylesheet one — this is the one place a `!important` is the whole
+   mechanism rather than a shortcut. `--bar-h`/`--bar-gap` are on :root in tokens.css, so the
+   portalled toaster can still read them. */
+@media (max-width: 899.98px) {
+  [data-sonner-toaster] {
+    --offset-bottom: calc(var(--bar-h) + var(--bar-gap) + 8px) !important;
+  }
+}
+
+/* Reduced motion: sonner ships its own `@media (prefers-reduced-motion)` rule that sets
+   `transition: none; animation: none` on the toast and its children. It is left in place. It is a
+   *stronger* reduction than this repo's own convention — tokens.css collapses every duration onto
+   an 80ms fade rather than onto zero, because a zero-length exit is what unmounts a node before its
+   animation can run — but the difference is deliberate here: a toast's information is its text,
+   which stays on screen for its full dwell either way, and stripping a library's shipped
+   accessibility CSS back out with `!important` would be a worse trade than the inconsistency. */
