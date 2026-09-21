@@ -170,10 +170,12 @@ vi.stubGlobal(
   vi.fn(async () => ({ ok: true, json: async () => ({}) })),
 );
 
+// loop-r2-06: the pill badge is the shell's number, so it has to be handed in — the fixture below
+// has exactly two threads carrying an approval, and that is the number the shell would pass.
 const renderInbox = () =>
   render(
     <VirtuosoMockContext.Provider value={{ viewportHeight: 800, itemHeight: 72 }}>
-      <Inbox />
+      <Inbox pendingApprovals={2} />
     </VirtuosoMockContext.Provider>,
   );
 
@@ -252,9 +254,8 @@ describe("Inbox group headers (US-D02)", () => {
   });
 
   // How much is waiting on a decision is a fact about the queue, not about the tab you happen to
-  // be reading it from. Counting it downstream of the pill filter made it a fact about the tab:
-  // the badge read 0 on every tab whose own rows carry no approval, so the agents view showed no
-  // badge at all while both waiting threads sat one tab away.
+  // be reading it from. It is the shell's number (loop-r2-06), so it cannot move when the pill
+  // filter moves: the badge reads the same on every tab.
   it("keeps the pending count on the pill whichever tab is selected", () => {
     renderInbox();
     expect(filterTab("needs-approval")).toHaveTextContent("2");

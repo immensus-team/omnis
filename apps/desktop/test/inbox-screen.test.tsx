@@ -234,3 +234,27 @@ describe("Inbox skeleton rows (loop-r2-05)", () => {
     }
   });
 });
+
+// loop-r2-06 (L2-07, NC2-08): one screen used to show three disagreeing approval numbers, and the
+// rows below them had a vote in two of the three. The pill's badge and the subline both read the
+// shell's `visibleApprovals` now — the mock in this file answers every query with zero rows, so a
+// number that still came from the list could only read 0 here.
+describe("Inbox approval count (loop-r2-06)", () => {
+  it("takes the pill badge and the subline from the shell's number, not from the rows", () => {
+    const { container } = render(<Inbox pendingApprovals={8} onOpenApprovals={() => {}} />);
+
+    expect(container.querySelector(".inbox-card__pill-count")).toHaveTextContent("8");
+    expect(container.querySelector(".inbox-card__subline")).toHaveTextContent("8 need approval");
+  });
+
+  it("singularises one, and draws no badge at zero", () => {
+    const { container } = render(<Inbox pendingApprovals={1} onOpenApprovals={() => {}} />);
+    expect(container.querySelector(".inbox-card__subline")).toHaveTextContent("1 needs approval");
+
+    const none = render(<Inbox pendingApprovals={0} />);
+    expect(none.container.querySelector(".inbox-card__pill-count")).toBeNull();
+    expect(none.container.querySelector(".inbox-card__subline")?.textContent ?? "").not.toContain(
+      "approval",
+    );
+  });
+});

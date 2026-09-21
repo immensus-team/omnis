@@ -411,7 +411,9 @@ describe("Inbox header and category chips (US-D08 §c.3)", () => {
       { id: "ap-2", thread_id: THREADS.both, state: "pending", created_at: Date.now() },
     ];
     try {
-      renderInbox();
+      // loop-r2-06: the badge is the shell's number, handed in as a prop; the rows below it are a
+      // different question and no longer feed it.
+      renderInbox({ pendingApprovals: 2 });
       const chip = screen.getByRole("radio", { name: "Needs approval" });
       expect(chip.querySelector(".inbox-card__pill-count")).toHaveTextContent("2");
     } finally {

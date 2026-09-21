@@ -692,7 +692,8 @@ export function Inbox({
   // US-D02: grouping happens in the agents view only. needs-approval queries pending alone
   // (pending_approvals' `.where(state, pending)` above), so there is always exactly one group and
   // a header band would repeat the name of the tab just chosen without carrying any information —
-  // only the number folds into the tab pill (pendingCount below). Archived stays flat too: laying
+  // the number goes on the tab pill, and it is the shell's number (see below). Archived stays flat
+  // too: laying
   // state groups over its own sort axis (archive time, newest first) makes the two fight.
   const grouped = view === "inbox" && filter === "agents";
   const listItems = useMemo<FlatItem[]>(() => {
@@ -856,20 +857,6 @@ export function Inbox({
   const tabStopId =
     selectedId !== null && rowIds.includes(selectedId) ? selectedId : (rowIds[0] ?? null);
 
-  // The needs-approval tab's count. It only means anything if it is the same number whether or
-  // not the tab is selected, so it is counted **before** the pill filter — from `channelFiltered`,
-  // the last stage upstream of it. (It read `labelFiltered`, which looks pre-pill and is not: that
-  // stage returns `pillFiltered` untouched when no label is chosen, so the count was taken after
-  // the pill after all. The badge then vanished on every tab whose own rows carry no approval —
-  // the agents view advertised no queue while both waiting threads sat one tab away.) At zero it
-  // is not drawn: an empty queue is said by an empty list, not by a badge.
-  const pendingCount = useMemo(
-    () =>
-      applyArchiveView(channelFiltered, view, pendingArchive).filter((r) => r.hasPendingApproval)
-        .length,
-    [channelFiltered, view, pendingArchive],
-  );
-
   // US-D08 §c.3: the subline under the title. Same three segments Mail shows, in that order, with
   // any segment that has nothing to say removed — and, because it is a join over a filtered array,
   // a separator can never be left dangling without a segment after it.
@@ -963,8 +950,15 @@ export function Inbox({
               >
                 <Icon size={16} aria-hidden="true" />
                 <span className="inbox-card__chip-label">{FILTER_LABEL[f]}</span>
-                {f === "needs-approval" && pendingCount > 0 && (
-                  <span className="inbox-card__pill-count">{pendingCount}</span>
+                {/* loop-r2-06/L2-07, NC2-08: the badge is the **shell's** number, not a count of
+                    the rows below. It used to count threads carrying an approval, which is a
+                    different question: archiving a thread took its still-pending approval off the
+                    badge while the subline and the queue went on counting it, so one screen showed
+                    three answers that drifted further apart with every archive. The pill's *filter*
+                    still lists threads — that is what a filter is — but what it advertises is the
+                    queue, which is one number and lives in the shell. */}
+                {f === "needs-approval" && pendingApprovals > 0 && (
+                  <span className="inbox-card__pill-count">{pendingApprovals}</span>
                 )}
               </button>
             );
