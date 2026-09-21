@@ -1,0 +1,34 @@
+{
+  "scenario": "thread_reply",
+  "raw": {
+    "chat_id": "2002",
+    "chat_name": "omnis launch",
+    "sender": "Logan Kim",
+    "is_me": false,
+    "text": "10am works — I booked the room",
+    "timestamp": "2026-09-22T09:16:40+09:00"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "2002",
+        "externalId": "27f0182d9c6e760a13b4fae36dbd138c88c371ed5a8f0ef99feda913411bab0e",
+        "kind": "message",
+        "author": { "kind": "person", "id": "Logan Kim" },
+        "body": "10am works — I booked the room",
+        "attachments": [],
+        "sentAt": "2026-09-22T00:16:40.000Z",
+        "status": "received",
+        "sourceHash": "27f0182d9c6e760a13b4fae36dbd138c88c371ed5a8f0ef99feda913411bab0e",
+        "threadMeta": {
+          "externalId": "2002",
+          "kind": "group",
+          "title": "omnis launch",
+          "participants": [{ "externalId": "Logan Kim", "displayName": "Logan Kim" }],
+          "lastItemAt": "2026-09-22T00:16:40.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

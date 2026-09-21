@@ -1,0 +1,35 @@
+{
+  "scenario": "non_english_korean_text",
+  "note": "Korean body on purpose: this fixture is specifically about capturing non-English input verbatim (CLAUDE.md fixture exception).",
+  "raw": {
+    "chat_id": "2002",
+    "chat_name": "omnis launch",
+    "sender": "Dana Lee",
+    "is_me": false,
+    "text": "내일 오전 10시에 만나요. 회의실은 제가 잡을게요.",
+    "timestamp": "2026-09-22T09:24:45+09:00"
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "2002",
+        "externalId": "4594ffcce972ee07e5bf4028834217830cd9989c64c5909add9519813a2940f0",
+        "kind": "message",
+        "author": { "kind": "person", "id": "Dana Lee" },
+        "body": "내일 오전 10시에 만나요. 회의실은 제가 잡을게요.",
+        "attachments": [],
+        "sentAt": "2026-09-22T00:24:45.000Z",
+        "status": "received",
+        "sourceHash": "4594ffcce972ee07e5bf4028834217830cd9989c64c5909add9519813a2940f0",
+        "threadMeta": {
+          "externalId": "2002",
+          "kind": "group",
+          "title": "omnis launch",
+          "participants": [{ "externalId": "Dana Lee", "displayName": "Dana Lee" }],
+          "lastItemAt": "2026-09-22T00:24:45.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

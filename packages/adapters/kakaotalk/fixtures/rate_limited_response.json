@@ -1,0 +1,5 @@
+{
+  "scenario": "rate_limited_response",
+  "raw": { "error": "kmsg watch failed: too many requests (HTTP 429)" },
+  "expected": { "errorKind": "retryable_rate_limit" }
+}
