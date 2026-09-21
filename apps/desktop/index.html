@@ -1,5 +1,14 @@
 <!doctype html>
-<html lang="ko">
-  <head><meta charset="UTF-8" /><title>omnis</title></head>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- UX-28 (A5 §4.1): `viewport-fit=cover` is what makes the env(safe-area-inset-*) values
+         non-zero on a notched iPhone. Without it the shell's bottom bar sits on the home indicator
+         and the top bar under the status bar, and both are unreachable by CSS. L-39: without the
+         meta at all a phone lays this page out at 980px and zooms it out, so the <900 tier never
+         applies at all. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>omnis</title>
+  </head>
   <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
 </html>
