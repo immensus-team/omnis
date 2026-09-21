@@ -223,7 +223,12 @@ describe("Inbox row in the <900 tier (US-D08 §c.4)", () => {
     expect(selected).toBeDefined();
     expect(selected).toContain("background: var(--state-hover)");
     expect(selected).toContain("box-shadow: none");
-    expect(selected).toContain("border-radius: 0");
+    // loop-r1-03: no radius in this tier either, but it is now said once. The row declares
+    // --row-radius: 0 here and the selection, the hover fill and the focus ring all read it, so
+    // "this tier's rows are square" is one statement rather than three that can drift apart.
+    expect(selected).toContain("border-radius: var(--row-radius)");
+    const row = /^ {2}\.inbox-row \{([\s\S]*?)^ {2}\}/m.exec(narrow)?.[1];
+    expect(row).toContain("--row-radius: 0");
     // The override must not reach for the pseudo-element — the rule survives the flattening.
     expect(selected).not.toContain("::after");
   });
@@ -242,5 +247,29 @@ describe("Inbox row in the <900 tier (US-D08 §c.4)", () => {
     expect(narrow).toMatch(/\.inbox-row__name \{\s*font-size: 16px;/);
     expect(narrow).toMatch(/\.inbox-row__timestamp \{\s*font-size: 13px;/);
     expect(narrow).toMatch(/\.inbox-row__summary \{\s*font-size: 14px;/);
+  });
+});
+
+describe("Inbox row radius and focus ring (loop-r1-03/NC-28)", () => {
+  // The row's corner is one number in three places — the selection card, the hover fill and the
+  // focus ring. The ring is the reason it is a token at all: NC-28's square blue box ran past the
+  // card's 8px corners because the ring did not know what shape the box under it was.
+  it("gives the selected card, the hover fill and the ring one radius", () => {
+    expect(ruleBody(appCss, ".inbox-row")).toContain("--row-radius: 8px");
+    expect(ruleBody(appCss, ".inbox-row--selected")).toContain("border-radius: var(--row-radius)");
+    expect(ruleBody(appCss, ".inbox-row:hover")).toContain("border-radius: var(--row-radius)");
+  });
+
+  // Read from the source rather than from a render: jsdom neither lays out nor paints an outline,
+  // so a DOM assertion could only prove the selector matches something.
+  it("insets the focus ring into the row's own corners", () => {
+    const ring = ruleBody(appCss, '.inbox-row[role="option"]:focus-visible');
+    expect(ring).toContain("outline: 2px solid var(--accent)");
+    // Inside the row's box rather than growing it — this is the "bleeds past the corners" half.
+    expect(ring).toContain("outline-offset: -2px");
+    expect(ring).toContain("border-radius: var(--row-radius)");
+    // One ring only (v3 §e.11): a shadow beside the outline is the second one, and it is what made
+    // the row look focused and broken at the same time.
+    expect(ring).not.toContain("box-shadow");
   });
 });

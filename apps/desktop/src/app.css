@@ -94,6 +94,43 @@ body {
   grid-template-columns: 76px minmax(0, 1fr) auto;
 }
 
+/* loop-r1-03/NC-18: the skip link (App.tsx). It is first in the shell's markup so it is the first
+   thing Tab reaches, and it is moved off-screen rather than `display: none` — an element that is
+   not rendered cannot hold the focus, and being focusable is the entire point of a skip link.
+   It is opaque and not glass: it lands on top of the rail's own glass plate, and glass over glass
+   kills the text (ACCENT §4.4) — the same reason the model menu above it is opaque. The recipe is
+   that popover's (hairline, `--bg-base`, `--shadow-glass`), at the 12px panel radius rather than
+   `--radius-group`, because this is a floating panel and not a card.
+   `:focus-visible` and not `:focus`: Tab is exactly the focus-visible case, and the link is never
+   reachable any other way.
+   No transition, so there is nothing here for the reduced-motion block to turn off. */
+.skip-link {
+  position: fixed;
+  z-index: 20;
+  left: 16px;
+  top: 16px;
+  padding: 8px 14px;
+  border: var(--hairline);
+  border-radius: 12px;
+  background: var(--bg-base);
+  box-shadow: var(--shadow-glass);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  /* The pill's own height plus the 16px inset above it, so it clears the shell's padding. */
+  transform: translateY(calc(-100% - 32px));
+}
+
+.skip-link:focus-visible {
+  transform: none;
+  /* The house ring for a floating panel's own control — `2px solid var(--accent)`, outside the
+     border rather than inset into it (`-2px` is the *row*'s rule, and a row is a card, not a
+     pill). One ring and nothing else: the shadow above is the panel's depth, not a second ring. */
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .channel-rail {
   display: flex;
   flex-direction: column;
@@ -765,6 +802,18 @@ body {
   container-name: list;
 }
 
+/* loop-r1-03: the box the arrow keys are handled on (Inbox.tsx's onListKeyDown). It is the flex
+   child of .inbox-card the Virtuoso scroller used to be, and it is a column flex container only so
+   the scroller's own inline `flex: 1 1 0; min-height: 0` still means what it meant — the wrapper
+   occupies no height of its own and carries no tabindex. Four keys are the whole of why it exists;
+   anything visible here would be a change to the list, not to the keyboard. */
+.inbox-card__list {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
 /* US-D02b: the title line, and nothing else. The filter pills and the Archived toggle used to
    share it, so at narrow widths the three fought each other (that is the screenshot where
    "Archived" broke across two lines). The whole filter UI moved down into the single strip
@@ -956,6 +1005,14 @@ body {
      occupies 24px and the list closes over a 24px hole. Declared once here, read once in
      @keyframes inbox-row-leave below. */
   --row-pad-y: 12px;
+  /* loop-r1-03: the row's own corner radius, named because two other rules have to agree with it
+     and only the row knows it. It is the selection card's radius — the shallow 8px kinso uses (the
+     P1 note on .inbox-row--selected) — and the point of naming it is that the focus ring below
+     draws the row's shape rather than a rectangle around it: NC-28's square blue box that bled
+     past the card's corners was the ring not knowing what the box was. The `<900` tier sets it to
+     0, where the row is a flat full-width band and a rounded ring would be a shape the row does not
+     have (v3 §a.1). */
+  --row-radius: 8px;
   padding: var(--row-pad-y) 16px;
   /* US-D08 §c.4: kinso divided rows with padding alone (23 §2); the v3 amendment allows a hairline,
      and the inset is the whole of what makes it read as Mail (M100, M143) rather than as a table.
@@ -1008,9 +1065,22 @@ body {
   background: var(--bg-base);
   /* P1: kinso's selection card has a shallow radius (8px) — the previous 14px was sized against
      the other cards (inbox-card 20px, channel-rail__plate 22px) and was far too large for a
-     row. */
-  border-radius: 8px;
+     row. loop-r1-03: read from --row-radius so the focus ring below is drawn by the same number. */
+  border-radius: var(--row-radius);
   box-shadow: var(--shadow-row-selected);
+}
+
+/* loop-r1-03/NC-28: the row's focus ring. A square 2px box ran to the card's outer edge and past
+   its corners, so the row looked focused *and* broken at the same time. The ring is inset
+   (`outline-offset: -2px` — it sits inside the row's box rather than growing it) and it takes the
+   row's own radius, so it is the same shape as the card it outlines.
+   One ring and no second one: no box-shadow, no border, no inset highlight (v3 §e.11). `--accent`
+   is the only colour here that hover never uses, so focus cannot be mistaken for pointing at a
+   row, and `:focus-visible` keeps it off a mouse click. */
+.inbox-row[role="option"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: var(--row-radius);
 }
 
 /* US-D08 §c.4: the row hairline. `--row-rule-inset` on the left, the row's own 16px padding on the
@@ -1280,7 +1350,7 @@ body {
    + shadow). */
 .inbox-row:hover {
   background: var(--state-hover);
-  border-radius: 8px;
+  border-radius: var(--row-radius);
 }
 
 /* The selected row already floats as a white card with a shadow (.inbox-row--selected) — laying a
@@ -2864,7 +2934,7 @@ body {
   .inbox-row--selected,
   .inbox-row--selected:hover {
     background: var(--state-hover);
-    border-radius: 0;
+    border-radius: var(--row-radius);
     box-shadow: none;
   }
 
@@ -2880,6 +2950,10 @@ body {
   /* §c.4: the swipe, in the one tier that has it — the tier where the rail has already collapsed
      to a bottom bar, i.e. the coarse-pointer layout. */
   .inbox-row {
+    /* loop-r1-03: this tier's row is a flat full-width band — no card to round (v3 §a.1), so the
+       row's radius is 0 and every rule that reads --row-radius (hover, the selection tint, the
+       focus ring) squares with it instead of each carrying its own exception. */
+    --row-radius: 0;
     /* The translating content would otherwise paint past the row's left edge and widen the page. */
     overflow: hidden;
     /* The browser keeps the vertical scroll and only that: without this a horizontal drag is read

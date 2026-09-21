@@ -635,6 +635,20 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
       // there is exactly one number behind both shapes.
       style={{ "--detail-width": `${detailWidth}px` } as CSSProperties}
     >
+      {/* loop-r1-03/NC-18: the keyboard route past the chrome, and the first stop in the shell.
+          The rail's twelve tiles, the ask bar and the filter pills are all real controls, so there
+          is nothing above the list that can simply be taken out of the tab order — and the price of
+          that was 27 Tabs from a cold load to the first row. A skip link is the standard answer when
+          the content sits behind chrome: one Tab, one activation, and the focus is in the list with
+          the whole j/k grammar live.
+          `href` and no click handler: the browser already moves the focus to a focusable fragment
+          target, which is the entire mechanism. It is drawn only on the Inbox, because `#inbox-list`
+          is the only thing it can point at — on any other screen it would be a link to nowhere. */}
+      {screen === "inbox" ? (
+        <a className="skip-link" href="#inbox-list">
+          Skip to inbox list
+        </a>
+      ) : null}
       <ChannelRail
         channels={connectedChannels}
         selected={railChannel}
