@@ -7,7 +7,7 @@ import {
   type UiChannel,
 } from "@omnis/ui";
 import { useQuery } from "@rocicorp/zero/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   type CostReport,
   type KillSwitchStatus,
@@ -162,16 +162,22 @@ export function autonomyRulesOf(value: unknown): AutonomyRule[] {
   return rules;
 }
 
-export function autonomyAllows(rules: readonly AutonomyRule[], channel: string): boolean {
-  return rules.some((rule) => rule.ref === channel);
+export function autonomyAllows(rules: readonly unknown[], channel: string): boolean {
+  return rules.some((rule) => isChannelRuleFor(rule, channel));
 }
 
-export function autonomySet(
-  rules: readonly AutonomyRule[],
-  channel: string,
-  allow: boolean,
-): AutonomyRule[] {
-  const kept = rules.filter((rule) => rule.ref !== channel);
+function isChannelRuleFor(rule: unknown, channel: string): boolean {
+  if (typeof rule !== "object" || rule === null) return false;
+  const r = rule as { kind?: unknown; ref?: unknown };
+  return r.kind === "channel" && r.ref === channel;
+}
+
+/** Takes the *stored* array, not `autonomyRulesOf`'s reading of it: the hub replaces the whole jsonb
+ *  value, so rebuilding the array out of the rules this screen understands would delete every entry
+ *  it does not — including the delegation rules A4 §4.4 keeps in the same key. Only the one channel's
+ *  entry is replaced. */
+export function autonomySet(rules: readonly unknown[], channel: string, allow: boolean): unknown[] {
+  const kept = rules.filter((rule) => !isChannelRuleFor(rule, channel));
   return allow ? [...kept, { kind: "channel", ref: channel }] : kept;
 }
 
@@ -180,19 +186,19 @@ export function autonomySet(
 export interface QuietHours {
   start: string;
   end: string;
-  vipOverride: boolean;
 }
 
 /** A4 §3.6's window. `notify.quiet_hours` is jsonb, so a row of another shape falls back to the
- *  default rather than drawing "undefined" into a time field. */
+ *  default rather than drawing "undefined" into a time field. Only the two times are read: the VIP
+ *  exception is its own key (`notify.vip_override`, the one `notifyTierFor` documents reading), and
+ *  a second copy of it living in here is how the two come to disagree. */
 export function quietHoursOf(value: unknown): QuietHours {
-  const fallback: QuietHours = { start: "23:00", end: "07:00", vipOverride: true };
+  const fallback: QuietHours = { start: "23:00", end: "07:00" };
   if (typeof value !== "object" || value === null) return fallback;
-  const c = value as { start?: unknown; end?: unknown; vipOverride?: unknown };
+  const c = value as { start?: unknown; end?: unknown };
   return {
     start: typeof c.start === "string" ? c.start : fallback.start,
     end: typeof c.end === "string" ? c.end : fallback.end,
-    vipOverride: typeof c.vipOverride === "boolean" ? c.vipOverride : fallback.vipOverride,
   };
 }
 
@@ -283,6 +289,8 @@ export function Settings() {
 
   const [pendingChannel, setPendingChannel] = useState<string | null>(null);
   const [confirmingKill, setConfirmingKill] = useState(false);
+  // Both dialogs are the same shape and only one is on screen at a time, so they share the ref.
+  const dialogRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -307,11 +315,23 @@ export function Settings() {
   const reserveRatio = numberOr(settings["cost.reserve_ratio"], 0.1);
   const quiet = useMemo(() => quietHoursOf(settings["notify.quiet_hours"]), [settings]);
   const rules = useMemo(() => autonomyRulesOf(settings["autonomy.rules"]), [settings]);
+  // What a write sends back: the stored value, of which this screen only understands part. See
+  // autonomySet.
+  const storedRules = useMemo<readonly unknown[]>(
+    () =>
+      Array.isArray(settings["autonomy.rules"]) ? (settings["autonomy.rules"] as unknown[]) : [],
+    [settings],
+  );
   const threshold = numberOr(settings["archive.t1_confidence_min"], 0.85);
 
   // The fetched value is the source of truth; each draft is seeded from it and re-seeded whenever a
   // save lands, so a field never shows a number the hub did not accept.
   useEffect(() => setCapDraft(String(capUsd)), [capUsd]);
+  // A5 §9's focus rule. It also does the scrolling: the panels sit at the foot of the screen, and at
+  // 390 a dialog that opens below the fold reads as a click that did nothing.
+  useEffect(() => {
+    if (confirmingKill || pendingChannel !== null) dialogRef.current?.focus();
+  }, [confirmingKill, pendingChannel]);
   useEffect(() => setQuietStart(quiet.start), [quiet.start]);
   useEffect(() => setQuietEnd(quiet.end), [quiet.end]);
   useEffect(() => setThresholdDraft(String(threshold)), [threshold]);
@@ -343,9 +363,16 @@ export function Settings() {
   }
 
   async function saveQuietHours(): Promise<void> {
+    // The hub takes the whole value, so the rest of the stored row is carried through: this screen
+    // edits two times and owns nothing else in the object.
+    const storedQuiet = settings["notify.quiet_hours"];
+    const base =
+      typeof storedQuiet === "object" && storedQuiet !== null
+        ? (storedQuiet as Record<string, unknown>)
+        : {};
     await write(
       "notify.quiet_hours",
-      { start: quietStart, end: quietEnd, vipOverride: quiet.vipOverride },
+      { ...base, start: quietStart, end: quietEnd },
       "Quiet hours saved.",
     );
   }
@@ -382,7 +409,7 @@ export function Settings() {
     setPendingChannel(null);
     await write(
       "autonomy.rules",
-      autonomySet(rules, channel, true),
+      autonomySet(storedRules, channel, true),
       `Autonomy on for ${channelLabel(channel)}.`,
     );
   }
@@ -394,6 +421,9 @@ export function Settings() {
     capUsd,
     reserveRatio,
   });
+  // The hatch width and the tick position are the same number as the label, so they come from the
+  // same computation: `cost.reserve_ratio` is a setting and only its default makes this 10%.
+  const reserveWidthPct = 100 - segments.reserveStartPct;
   const stopped = killSwitch?.on === true;
 
   return (
@@ -476,7 +506,7 @@ export function Settings() {
                             if (on) {
                               void write(
                                 "autonomy.rules",
-                                autonomySet(rules, account.channel, false),
+                                autonomySet(storedRules, account.channel, false),
                                 `Autonomy off for ${channelLabel(account.channel)}.`,
                               );
                               return;
@@ -568,8 +598,14 @@ export function Settings() {
                     className="settings-screen__bar-spend"
                     style={{ width: `${String(segments.spendPct)}%` }}
                   />
-                  <div className="settings-screen__bar-reserve" />
-                  <span className="settings-screen__bar-mark">{`${String(Math.round(segments.reserveStartPct))}%`}</span>
+                  <div
+                    className="settings-screen__bar-reserve"
+                    style={{ width: `${String(reserveWidthPct)}%` }}
+                  />
+                  <span
+                    className="settings-screen__bar-mark"
+                    style={{ right: `${String(reserveWidthPct)}%` }}
+                  >{`${String(Math.round(segments.reserveStartPct))}%`}</span>
                 </div>
                 <p className="settings-screen__bar-state">{COST_STATE_LABEL[barState]}</p>
               </div>
@@ -775,6 +811,8 @@ export function Settings() {
       {confirmingKill && (
         <div
           role="alertdialog"
+          ref={dialogRef}
+          tabIndex={-1}
           aria-label={KILL_SWITCH_QUESTION}
           className="settings-screen__dialog"
         >
@@ -807,6 +845,8 @@ export function Settings() {
       {pendingChannel !== null && (
         <div
           role="alertdialog"
+          ref={dialogRef}
+          tabIndex={-1}
           aria-label={`Allow autonomy for ${channelLabel(pendingChannel)}?`}
           className="settings-screen__dialog"
         >

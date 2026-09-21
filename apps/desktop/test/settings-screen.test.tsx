@@ -89,19 +89,21 @@ describe("allowlistOf / allowlistAdd / allowlistRemove (the three ingest allowli
 
 describe("quietHoursOf (notify.quiet_hours is json, not a column type)", () => {
   it("reads a stored window", () => {
-    expect(quietHoursOf({ start: "22:30", end: "06:15", vipOverride: false })).toEqual({
+    expect(quietHoursOf({ start: "22:30", end: "06:15" })).toEqual({
       start: "22:30",
       end: "06:15",
-      vipOverride: false,
     });
   });
 
   it("falls back to A4 §3.6's window for a row of another shape", () => {
-    expect(quietHoursOf(null)).toEqual({ start: "23:00", end: "07:00", vipOverride: true });
-    expect(quietHoursOf({ start: 23 })).toEqual({
-      start: "23:00",
-      end: "07:00",
-      vipOverride: true,
+    expect(quietHoursOf(null)).toEqual({ start: "23:00", end: "07:00" });
+    expect(quietHoursOf({ start: 23 })).toEqual({ start: "23:00", end: "07:00" });
+  });
+
+  it("ignores the VIP flag: notifyTierFor reads notify.vip_override, not a copy in here", () => {
+    expect(quietHoursOf({ start: "22:30", end: "06:15", vipOverride: false })).toEqual({
+      start: "22:30",
+      end: "06:15",
     });
   });
 });
@@ -130,6 +132,22 @@ describe("autonomy.rules (A5 §3.9: every target is off by default)", () => {
     expect(autonomySet(autonomySet([], "slack", true), "slack", true)).toEqual([
       { kind: "channel", ref: "slack" },
     ]);
+  });
+
+  // The hub replaces the whole jsonb, so a write that rebuilt the array from autonomyRulesOf would
+  // silently delete every entry this screen cannot parse. A4 §4.4's delegation rules live in the
+  // same key.
+  it("carries rules of another shape through a toggle instead of deleting them", () => {
+    const delegation = { runtime: "claude_code", repo: "logankim/omnis" };
+    const stored = [delegation, { kind: "channel", ref: "slack" }];
+
+    expect(autonomySet(stored, "slack", false)).toEqual([delegation]);
+    expect(autonomySet(stored, "gmail", true)).toEqual([
+      delegation,
+      { kind: "channel", ref: "slack" },
+      { kind: "channel", ref: "gmail" },
+    ]);
+    expect(autonomyAllows(autonomySet(stored, "gmail", true), "gmail")).toBe(true);
   });
 });
 
@@ -332,6 +350,31 @@ describe("Settings screen (A5 §3.9)", () => {
     expect(Number.parseFloat(spend?.style.width ?? "0")).toBeCloseTo(81.67, 1);
     expect(screen.getByText("T2→T1 downgrade")).toBeInTheDocument();
     expect(screen.getByText("90%")).toBeInTheDocument();
+    // The hatch and the tick sit on the boundary the label names, whatever the ratio is.
+    expect(
+      Number.parseFloat(
+        document.querySelector<HTMLElement>(".settings-screen__bar-reserve")?.style.width ?? "0",
+      ),
+    ).toBeCloseTo(10, 1);
+  });
+
+  it("draws the reserve at the ratio the hub reports, not at a hardcoded 10%", async () => {
+    vi.mocked(api.fetchSettings).mockResolvedValue(settingsPayload({ "cost.reserve_ratio": 0.2 }));
+    render(<Settings />);
+    await ready();
+    tab("Model tiers");
+
+    expect(
+      Number.parseFloat(
+        document.querySelector<HTMLElement>(".settings-screen__bar-reserve")?.style.width ?? "0",
+      ),
+    ).toBeCloseTo(20, 1);
+    expect(
+      Number.parseFloat(
+        document.querySelector<HTMLElement>(".settings-screen__bar-mark")?.style.right ?? "0",
+      ),
+    ).toBeCloseTo(20, 1);
+    expect(screen.getByText("80%")).toBeInTheDocument();
   });
 
   it("writes a new cap to the hub, and only for a number the field can actually hold", async () => {
@@ -379,6 +422,7 @@ describe("Settings screen (A5 §3.9)", () => {
     expect(
       within(dialog).getByText("Actions to this target send without approval"),
     ).toBeInTheDocument();
+    expect(dialog).toHaveFocus();
     expect(vi.mocked(api.putSetting)).not.toHaveBeenCalled();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
@@ -406,6 +450,28 @@ describe("Settings screen (A5 §3.9)", () => {
       "aria-checked",
       "false",
     );
+  });
+
+  it("keeps the rules it cannot parse when it writes the switch", async () => {
+    const delegation = { runtime: "claude_code", repo: "logankim/omnis" };
+    vi.mocked(api.fetchSettings).mockResolvedValue(
+      settingsPayload({ "autonomy.rules": [delegation] }),
+    );
+    render(<Settings />);
+    await ready();
+    tab("Autonomy");
+
+    fireEvent.click(screen.getByRole("switch", { name: "Allow autonomy for Slack" }));
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Confirm" }),
+    );
+
+    await vi.waitFor(() => {
+      expect(vi.mocked(api.putSetting)).toHaveBeenCalledWith("autonomy.rules", [
+        delegation,
+        { kind: "channel", ref: "slack" },
+      ]);
+    });
   });
 
   it("edits each allowlist kind as chips, adding on Enter and removing on the chip", async () => {
@@ -447,6 +513,7 @@ describe("Settings screen (A5 §3.9)", () => {
     fireEvent.change(screen.getByLabelText("Quiet hours start"), { target: { value: "22:30" } });
     fireEvent.click(screen.getByRole("button", { name: "Save quiet hours" }));
 
+    // The two times are replaced; the rest of the seeded row is carried through untouched.
     await vi.waitFor(() => {
       expect(vi.mocked(api.putSetting)).toHaveBeenCalledWith("notify.quiet_hours", {
         start: "22:30",
@@ -464,6 +531,26 @@ describe("Settings screen (A5 §3.9)", () => {
     });
   });
 
+  it("does not invent a VIP flag: the stored row is the only source of what it does not edit", async () => {
+    vi.mocked(api.fetchSettings).mockResolvedValue(
+      settingsPayload({ "notify.quiet_hours": { start: "23:00", end: "07:00", source: "mini" } }),
+    );
+    render(<Settings />);
+    await ready();
+    tab("General");
+
+    fireEvent.change(screen.getByLabelText("Quiet hours end"), { target: { value: "06:30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save quiet hours" }));
+
+    await vi.waitFor(() => {
+      expect(vi.mocked(api.putSetting)).toHaveBeenCalledWith("notify.quiet_hours", {
+        start: "23:00",
+        end: "06:30",
+        source: "mini",
+      });
+    });
+  });
+
   it("stops all autonomous actions only after the second confirmation", async () => {
     render(<Settings />);
     await ready();
@@ -471,6 +558,9 @@ describe("Settings screen (A5 §3.9)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Stop all autonomous actions" }));
     const dialog = screen.getByRole("alertdialog", { name: "Stop all autonomous actions?" });
     expect(vi.mocked(api.setKillSwitch)).not.toHaveBeenCalled();
+    // A5 §9: the dialog takes focus, which is also what scrolls it into view — at 390 it renders
+    // below the fold, where an unfocused dialog reads as a click that did nothing.
+    expect(dialog).toHaveFocus();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
     await vi.waitFor(() => {

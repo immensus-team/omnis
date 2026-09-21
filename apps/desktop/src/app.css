@@ -4210,7 +4210,8 @@ button.today-screen__event-title:focus-visible {
 .settings-screen__bar-reserve {
   position: absolute;
   inset: 0 0 0 auto;
-  width: 10%;
+  /* No width here: it is 100 - costBarSegments().reserveStartPct, set inline. `cost.reserve_ratio`
+   * is a setting, so a hardcoded 10% would drift from the % the mark shows. */
   border-radius: 999px;
   background-image: repeating-linear-gradient(
     135deg,
@@ -4221,7 +4222,7 @@ button.today-screen__event-title:focus-visible {
 
 .settings-screen__bar-mark {
   position: absolute;
-  right: 10%;
+  /* Also inline, for the same reason as the hatch above: the tick sits on the reserve boundary. */
   top: -15px;
   transform: translateX(50%);
   font-size: 11px;
