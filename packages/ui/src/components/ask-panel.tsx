@@ -1,14 +1,15 @@
-import { ListChecks, PenLine, Sparkles, X } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { cn } from "../lib/cn.js";
 import { AuroraSurface } from "./aurora-surface.js";
+import type { PaletteAction } from "./command-palette.js";
 import { GlassSurface } from "./glass-surface.js";
 
 /** US-D01: the floating glass panel the ask bar expands into. It is the reference
- *  ref-glass-mail-ai-panel.webp's three suggested actions (Draft a reply / Summarize / Extract)
- *  plus the model picker, said in omnis's own words.
+ *  ref-glass-mail-ai-panel.webp's suggested actions (Summarize) plus the model picker, said in
+ *  omnis's own words.
  *
- *  The composer (input + @ chip + attach + model) lives in the ask bar row above, not in the panel
+ *  The composer (input + @ chip + model) lives in the ask bar row above, not in the panel
  *  — the bar is already an input, and a second input inside the panel would split cmdk's search
  *  state in two (at which point "typing filters the command list" breaks silently). So "the
  *  expanded bar" = the bar row + the panel below it. */
@@ -16,6 +17,9 @@ export interface AskPanelProps {
   /** The "Commands" tab's contents (the cmdk list). Ownership stays with CommandPalette — the
    *  palette is never built twice. */
   commands: ReactNode;
+  /** loop-r1-08: what the Suggestions tab falls back to when the context it is in has no
+   *  suggestion of its own — the palette's first commands, which work with or without a thread. */
+  recentActions?: PaletteAction[];
   /** App.tsx's `open` (the selected thread). When it is null there is nothing to summarize. */
   threadSelected: boolean;
   /** threads.title — the context line saying what the panel is working on. */
@@ -38,6 +42,7 @@ type Tab = "suggest" | "commands";
 
 export function AskPanel({
   commands,
+  recentActions = [],
   threadSelected,
   threadTitle = null,
   summary,
@@ -84,9 +89,13 @@ export function AskPanel({
         <div className="ask-panel__head">
           {/* biome-ignore lint/a11y/useSemanticElements: tab-like toggle, not a form fieldset. */}
           <div className="ask-panel__tabs" role="group" aria-label="Panel views">
+            {/* loop-r1-08 (NC-13): a press on a tab may not take the focus. It used to, so the next
+                keystroke went to the button and the input — the thing the panel exists to type into
+                — stopped filtering until the user found their way back to it. */}
             <button
               type="button"
               aria-pressed={tab === "suggest"}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => setOverride("suggest")}
             >
               Suggestions
@@ -94,6 +103,7 @@ export function AskPanel({
             <button
               type="button"
               aria-pressed={tab === "commands"}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => setOverride("commands")}
             >
               {searchActive ? "Search" : "Commands"}
@@ -123,45 +133,42 @@ export function AskPanel({
                   ? (summary ?? "No summary yet")
                   : threadSelected
                     ? "The suggestions below run against this thread."
-                    : "Suggestions come alive once you pick a thread."}
+                    : "Suggestions come alive once you pick a thread. These commands work anywhere."}
               </p>
             </div>
-            <div className="ask-panel__actions">
-              {/* US-D01 fallback: there is no route to attach drafts or todo extraction to —
-                  disabled, with title="Phase B". Saying it cannot be pressed is more honest than
-                  pretending it can. */}
-              <button type="button" className="ask-panel__action" disabled title="Phase B">
-                <PenLine size={15} aria-hidden="true" />
-                Draft a reply
-                <span className="ask-panel__tag" aria-hidden="true">
-                  Phase B
-                </span>
-              </button>
-              {/* Only this one is actually wired up — threads.meta.summary (filled by the T1
-                  summarization loop). */}
-              <button
-                type="button"
-                className="ask-panel__action"
-                disabled={!threadSelected}
-                {...(threadSelected ? {} : { title: "Select a thread" })}
-                onClick={() => setSummaryShown(true)}
-              >
-                <Sparkles size={15} aria-hidden="true" />
-                Summarize this thread
-                {!threadSelected && (
-                  <span className="ask-panel__tag" aria-hidden="true">
-                    Thread required
-                  </span>
-                )}
-              </button>
-              <button type="button" className="ask-panel__action" disabled title="Phase B">
-                <ListChecks size={15} aria-hidden="true" />
-                Extract to-dos
-                <span className="ask-panel__tag" aria-hidden="true">
-                  Phase B
-                </span>
-              </button>
-            </div>
+            {threadSelected ? (
+              <div className="ask-panel__actions">
+                {/* The one suggestion left, and the one that is wired up — threads.meta.summary
+                    (filled by the T1 summarization loop). Its "Thread required" tag is gone with
+                    the state it described: with no thread there is nothing here to disable. */}
+                <button
+                  type="button"
+                  className="ask-panel__action"
+                  onClick={() => setSummaryShown(true)}
+                >
+                  <Sparkles size={15} aria-hidden="true" />
+                  Summarize this thread
+                </button>
+              </div>
+            ) : (
+              /* loop-r1-08 (L-35, NC-40): no suggestion survives for a context with no thread in
+                 it, and a tab of disabled buttons is a tab that says the product is unfinished.
+                 The palette's first commands go here instead: real, pressable, and the same rows
+                 the Commands tab runs — so the tab teaches the thing next to it. */
+              <div className="ask-panel__actions">
+                {recentActions.map((action) => (
+                  <button
+                    key={action.id}
+                    type="button"
+                    className="ask-panel__action"
+                    onClick={action.perform}
+                  >
+                    {action.name}
+                    {action.shortcut && <kbd>{action.shortcut}</kbd>}
+                  </button>
+                ))}
+              </div>
+            )}
           </>
         )}
       </GlassSurface>

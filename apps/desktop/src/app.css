@@ -753,6 +753,12 @@ body {
   color: var(--text-secondary);
 }
 
+/* loop-r1-08: a command's shortcut, at the row's right edge — the same edge the tag took before it
+   (the row is a flex line, so `auto` is the whole of it). */
+.ask-panel__action kbd {
+  margin-left: auto;
+}
+
 /* The line that says what the panel is working on — the reference puts its conversation area
    here. */
 .ask-panel__context {

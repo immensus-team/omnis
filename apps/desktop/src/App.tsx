@@ -461,58 +461,6 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
     ),
   );
 
-  const actions: PaletteAction[] = [
-    {
-      id: "go-inbox",
-      name: "Go to Inbox",
-      shortcut: "g i",
-      group: "Navigate",
-      perform: () => goTo("inbox"),
-    },
-    {
-      id: "go-today",
-      name: "Go to Today",
-      shortcut: "g t",
-      group: "Navigate",
-      perform: () => goTo("today"),
-    },
-    {
-      id: "go-tasks",
-      name: "Go to Tasks",
-      shortcut: "g k",
-      group: "Navigate",
-      perform: () => goTo("tasks"),
-    },
-    {
-      id: "go-network",
-      name: "Go to Network",
-      shortcut: "g n",
-      group: "Navigate",
-      perform: () => goTo("network"),
-    },
-    {
-      id: "go-notes",
-      name: "Go to Notes",
-      shortcut: "g o",
-      group: "Navigate",
-      perform: () => goTo("notes"),
-    },
-    {
-      id: "go-digest",
-      name: "Go to Digest",
-      shortcut: "g d",
-      group: "Navigate",
-      perform: () => goTo("digest"),
-    },
-    {
-      id: "go-settings",
-      name: "Go to Settings",
-      shortcut: "g s",
-      group: "Navigate",
-      perform: () => goTo("settings"),
-    },
-  ];
-
   // US-B27: the palette's search mode. The palette owns the 180ms debounce and hands back the
   // settled query; the request itself is hub HTTP (contract §5) — search reads across tables Zero
   // does not replicate. `gen` drops a response that a newer keystroke has already superseded.
@@ -549,12 +497,23 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
       });
   }, []);
 
-  // Deep links the shell can keep: only the thread route exists so far (a person link's Network
-  // screen and a digest link's Digest screen are other Phase B stories), and a memory's deep link
-  // carries an item id but no thread id — so a memory row is shown and not followed yet.
+  // Deep links the shell can follow: the thread route, and (loop-r1-08/L-15, NC-12) the person one
+  // the hub has been sending all along. A memory's deep link carries an item id but no thread id,
+  // so a memory row is shown and not followed yet.
+  //
+  // The person branch clears `open` rather than stacking: the pane draws one of PersonDetail or
+  // Thread, never a mix, and a person opened over a thread would be read through that thread's
+  // context (the same reason openThreadFromPerson clears `openPersonId`).
   const openHit = useCallback((hit: UiSearchHit) => {
     const link = hits.current.get(`${hit.kind}:${hit.id}`)?.deep_link;
-    if (link?.screen !== "thread" || link.thread_id === undefined) return;
+    if (link === undefined || link === null) return;
+    if (link.screen === "person" && link.person_id !== undefined) {
+      setOpen(null);
+      setOpenPersonId(link.person_id);
+      setAskOpen(false);
+      return;
+    }
+    if (link.screen !== "thread" || link.thread_id === undefined) return;
     setOpen({ threadId: link.thread_id, agentSession: false });
     setAskOpen(false);
   }, []);
@@ -666,6 +625,72 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
   }, []);
 
   useDetailPaneKey(onPaneToggle, !narrow);
+
+  /** A5 §2.3 + loop-r1-08/L-16: the palette's own list. The seven Navigate rows are loop-r1-01's
+   *  (each one names a screen the rail also has a tile for), and "Toggle detail pane" is here
+   *  because the pane is otherwise only reachable by a chevron — a command list that omits the
+   *  shortcut the shell already binds teaches nothing about it.
+   *
+   *  Built here rather than beside the other shell state because it closes over `onPaneToggle`:
+   *  state read above, handed down below, and nothing between the two renders it. */
+  const actions: PaletteAction[] = [
+    {
+      id: "go-inbox",
+      name: "Go to Inbox",
+      shortcut: "g i",
+      group: "Navigate",
+      perform: () => goTo("inbox"),
+    },
+    {
+      id: "go-today",
+      name: "Go to Today",
+      shortcut: "g t",
+      group: "Navigate",
+      perform: () => goTo("today"),
+    },
+    {
+      id: "go-tasks",
+      name: "Go to Tasks",
+      shortcut: "g k",
+      group: "Navigate",
+      perform: () => goTo("tasks"),
+    },
+    {
+      id: "go-network",
+      name: "Go to Network",
+      shortcut: "g n",
+      group: "Navigate",
+      perform: () => goTo("network"),
+    },
+    {
+      id: "go-notes",
+      name: "Go to Notes",
+      shortcut: "g o",
+      group: "Navigate",
+      perform: () => goTo("notes"),
+    },
+    {
+      id: "go-digest",
+      name: "Go to Digest",
+      shortcut: "g d",
+      group: "Navigate",
+      perform: () => goTo("digest"),
+    },
+    {
+      id: "go-settings",
+      name: "Go to Settings",
+      shortcut: "g s",
+      group: "Navigate",
+      perform: () => goTo("settings"),
+    },
+    {
+      id: "toggle-detail-pane",
+      name: "Toggle detail pane",
+      shortcut: "⌘\\",
+      group: "View",
+      perform: onPaneToggle,
+    },
+  ];
 
   /** loop-r1-02 §4: Escape closes the pane, and the shell owns it rather than the pane.
    *
