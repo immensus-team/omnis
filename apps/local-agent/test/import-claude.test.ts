@@ -192,6 +192,74 @@ describe("scanClaudeProjects", () => {
     expect(turnText.startsWith(`${"x".repeat(980)}***`)).toBe(true);
     expect(turnText).not.toContain(KNOWN_SECRET.slice(0, 20));
   });
+
+  it("masks every string it emits, not only the turn text", async () => {
+    const home = await mkdtemp(join(tmpdir(), "omnis-claude-import-fields-"));
+    const dir = join(home, "projects", "-repo-omnis");
+    await mkdir(dir, { recursive: true });
+    // The session id, the cwd and a tool name are all attacker-influenced strings from the transcript,
+    // and all three reach the hub. A masking pass that covered only `text` would ship them in the clear.
+    const sk = `sk-${"a".repeat(20)}`;
+    const ghp = `ghp_${"B".repeat(36)}`;
+    const line = (over: Record<string, unknown>) =>
+      JSON.stringify({
+        type: "assistant",
+        timestamp: "2026-09-20T10:00:00.000Z",
+        cwd: join(home, KNOWN_SECRET),
+        message: { role: "assistant", content: [{ type: "tool_use", id: "t", name: ghp }] },
+        ...over,
+      });
+    await writeFile(
+      join(dir, "s.jsonl"),
+      [
+        line({ uuid: sk, sessionId: sk }),
+        line({ uuid: "c3c3c3c3-0000-4000-8000-000000000009", sessionId: sk }),
+      ].join("\n"),
+    );
+
+    const sessions = await scanClaudeProjects(
+      null,
+      10,
+      deps({ claudeHome: home, allowedRoots: [home] }),
+    );
+
+    const blob = JSON.stringify(sessions);
+    expect(blob).not.toContain(KNOWN_SECRET);
+    expect(blob).not.toContain(sk);
+    expect(blob).not.toContain(ghp);
+    expect(sessions[0]?.source_id).toBe("***");
+    expect(sessions[0]?.cwd).toBe(join(home, "***"));
+    expect(sessions[0]?.turns[0]?.tool_calls).toEqual(["***"]);
+    // Masking must not push any field outside what the hub's schema accepts.
+    expect(ImportScanResult.parse({ sessions }).sessions).toHaveLength(1);
+  });
+
+  it("drops a transcript it cannot key instead of emitting an unparseable session", async () => {
+    const home = await mkdtemp(join(tmpdir(), "omnis-claude-import-nokey-"));
+    const dir = join(home, "projects", "-repo-omnis");
+    await mkdir(dir, { recursive: true });
+    // No `sessionId` anywhere, in a file named exactly `.jsonl`: the filename fallback is the empty
+    // string, and `source_id` is `.min(1)` — so one such file would fail the hub's parse of the lot.
+    await writeFile(
+      join(dir, ".jsonl"),
+      JSON.stringify({
+        type: "user",
+        uuid: "c3c3c3c3-0000-4000-8000-00000000000f",
+        timestamp: "2026-09-20T10:00:00.000Z",
+        cwd: home,
+        message: { role: "user", content: "body" },
+      }),
+    );
+
+    const sessions = await scanClaudeProjects(
+      null,
+      10,
+      deps({ claudeHome: home, allowedRoots: [home] }),
+    );
+
+    expect(sessions).toEqual([]);
+    expect(ImportScanResult.parse({ sessions }).sessions).toEqual([]);
+  });
 });
 
 describe("sessions.import_scan over the dispatcher", () => {

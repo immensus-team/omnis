@@ -135,7 +135,14 @@ function insideAnyRoot(cwd: string, roots: string[]): boolean {
 
 /** The mask/truncate pair, in that order: cutting first would leave the head of a secret in the item. */
 function turnForImport(turn: ImportedTurn, secrets: string[]): ImportedTurn {
-  return { ...turn, text: maskSecrets(turn.text, secrets).slice(0, IMPORT_TURN_MAX_CHARS) };
+  return {
+    ...turn,
+    // Every string here is transcript-supplied and reaches the hub, so all of them are masked. Doing
+    // only `text` would leave `source_id` (the line's uuid) as a clear channel for a smuggled token.
+    source_id: maskSecrets(turn.source_id, secrets),
+    text: maskSecrets(turn.text, secrets).slice(0, IMPORT_TURN_MAX_CHARS),
+    tool_calls: turn.tool_calls.map((name) => maskSecrets(name, secrets)),
+  };
 }
 
 export async function scanClaudeProjects(
@@ -180,13 +187,20 @@ export async function scanClaudeProjects(
       }
       const parsed = parseClaudeJsonl(text);
       if (parsed.cwd === null || parsed.startedAt === null) continue;
+      // Containment is decided on the transcript's own cwd, before masking rewrites it for the item.
       if (!insideAnyRoot(parsed.cwd, deps.allowedRoots)) continue;
+      // The session id lives in the file, but the filename is the same id — trust the file first.
+      const sourceId = maskSecrets(parsed.sessionId ?? basename(file.name, ".jsonl"), deps.secrets);
+      // A transcript with no `sessionId` in a file named exactly `.jsonl` leaves no key at all, and
+      // `ImportedSession.source_id` is `.min(1)`: one empty id would fail the *whole* result parse
+      // on the hub, taking every other session down with it. Unkeyable means unimportable.
+      if (sourceId.length === 0) continue;
       found.push({
         session: {
           runtime: "claude_code",
-          // The session id lives in the file, but the filename is the same id — trust the file first.
-          source_id: parsed.sessionId ?? basename(file.name, ".jsonl"),
-          cwd: parsed.cwd,
+          source_id: sourceId,
+          // Masked like the turn text: any transcript-supplied string that reaches the hub is a channel.
+          cwd: maskSecrets(parsed.cwd, deps.secrets),
           started_at: parsed.startedAt,
           turns: parsed.turns.map((t) => turnForImport(t, deps.secrets)),
         },
