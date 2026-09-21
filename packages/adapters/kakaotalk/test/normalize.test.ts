@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { CHANNEL, mapError, nextPollDelayMs, normalize, sourceHash } from "../src/index.js";
 
@@ -154,5 +157,32 @@ describe("KakaoTalk nextPollDelayMs()", () => {
       expect(ms).toBeGreaterThanOrEqual(5000);
       expect(ms).toBeLessThanOrEqual(15000);
     }
+  });
+});
+
+// This suite is deliberately about non-English input: the one Korean fixture exists because KakaoTalk
+// is a Korean channel and a captured body must survive normalize() byte-for-byte rather than being
+// transliterated, transposed or dropped (CLAUDE.md permits the non-English fixture for exactly this
+// test, and the fixture carries the matching `note` label).
+describe("KakaoTalk normalize() on non-English input", () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      join(
+        dirname(fileURLToPath(import.meta.url)),
+        "..",
+        "fixtures",
+        "non_english_korean_text.json",
+      ),
+      "utf8",
+    ),
+  ) as { raw: { text: string } };
+
+  it("keeps a Korean body byte-for-byte and keys it deterministically", () => {
+    const [item] = normalize(fixture.raw);
+    expect(item?.body).toBe(fixture.raw.text);
+    expect(Buffer.byteLength(item?.body ?? "", "utf8")).toBe(
+      Buffer.byteLength(fixture.raw.text, "utf8"),
+    );
+    expect(item?.sourceHash).toMatch(/^[0-9a-f]{64}$/);
   });
 });
