@@ -21,6 +21,7 @@ export * from "./components/filter-chip-bar.js";
 export * from "./components/key-value-table.js";
 export * from "./components/segmented-control.js";
 export * from "./components/person-card.js";
+export * from "./components/task-row.js";
 export * from "./components/approval-stack.js";
 export { ChevronRight as ChevronRightIcon } from "lucide-react";
 export { Tag as TagIcon } from "lucide-react";
