@@ -250,10 +250,18 @@ test("Phase A seeded smoke", async ({ page }) => {
 
   await check("A8 Approve → hub moves the approval to decided", async () => {
     await page.getByRole("button", { name: "Approve", exact: true }).first().click();
+    // US-D09 §c.8: the card's Accept is the one control here that goes straight out to the tool, so
+    // it asks once before it does. The prompt's pill carries the same word as the button that opened
+    // it, so the second click is scoped to the prompt rather than left to `.first()` — which would
+    // click the button behind the overlay and then poll a hub that was never told anything.
+    const prompt = page.getByRole("alertdialog");
+    await expect(prompt).toBeVisible();
+    await prompt.getByRole("button", { name: "Approve", exact: true }).click();
+    await expect(prompt).toBeHidden();
     await expect
       .poll(async () => (await hubApprovals("decided")).map((a) => a.id), { timeout: 20_000 })
       .toContain(SEED.approvalId);
-    return "pending → decided";
+    return "pending → decided, through §c.8's prompt";
   });
 
   // US-D01: ⌘K opens the ask bar's floating AI panel rather than a separate modal palette (see
