@@ -13,6 +13,10 @@ const DIRECT_KEYS: Record<string, string> = {
   t: "add-task",
   n: "focus-note",
   x: "toggle-select",
+  // loop-r1-06: the keyboard twin of the toast's Undo. It is live exactly as long as that button
+  // is — the screen behind it arms and disarms the undo with the toast it raised — so `z` on a
+  // screen with nothing to take back is a key that does nothing, which is what it already was.
+  z: "undo",
 };
 const GOTO_KEYS: Record<string, string> = {
   i: "go-inbox",

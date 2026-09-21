@@ -7,7 +7,8 @@ import { useEffect, useRef, useState } from "react";
  *  length of an exit animation — a stylesheet cannot animate a node React has already unmounted:
  *    - command-palette.tsx holds the ask panel for PANEL_MS after `open` goes false;
  *    - Inbox.tsx holds an archived row in the list for LEAVE_MS so it can collapse out;
- *    - both have to give up at the same moment the CSS does under reduced motion.
+ *    - toast.tsx holds the pill for FAST_MS so its fade is not cut off at the frame it starts;
+ *    - all of them have to give up at the same moment the CSS does under reduced motion.
  *
  *  These mirror tokens.css and must move with it. That is not a comment-level promise:
  *  test/motion.test.ts reads tokens.css and fails if either side drifts. */
@@ -18,6 +19,13 @@ export const REDUCED_FADE_MS = 80;
 
 /** `--dur-panel` — the layer rung of DESIGN-DIRECTION's ladder: a floating panel's arrival. */
 export const PANEL_MS = 320;
+
+/** `--dur-fast` — the fastest rung, and the only one that is an *exit* rather than a transition: the
+ *  toast's fade. It is here for the same reason as the two below (a node has to be held in the DOM
+ *  for the length of the animation that removes it), and it is short enough that the hold is a
+ *  formality — but a zero-length hold unmounts the pill on the tick it started leaving, which is
+ *  the one outcome this file exists to prevent. */
+export const FAST_MS = 100;
 
 /** `--dur-move` — the transition rung: a row collapsing out of a list. */
 export const LEAVE_MS = 240;

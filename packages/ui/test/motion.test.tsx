@@ -9,6 +9,7 @@ import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CommandPalette } from "../src/components/command-palette";
 import {
+  FAST_MS,
   LEAVE_MS,
   PANEL_MS,
   REDUCED_FADE_MS,
@@ -99,6 +100,7 @@ describe("US-D04 CSS and JS agree on the durations", () => {
   it("matches the tokens lib/motion.ts mirrors", () => {
     expect(tokensCss).toContain(`--dur-panel: ${PANEL_MS}ms;`);
     expect(tokensCss).toContain(`--dur-move: ${LEAVE_MS}ms;`);
+    expect(tokensCss).toContain(`--dur-fast: ${FAST_MS}ms;`);
     expect(tokensCss).toContain("--dur-base: 160ms;");
   });
 
@@ -125,6 +127,7 @@ describe("US-D04 reduced motion keeps the fade and drops the travel", () => {
     '.row-hover-card[data-state="closed"]',
     ".app-shell__detail",
     ".inbox-row--leaving",
+    ".toast__pill",
   ];
 
   it("lands the rail's reorder in the same slots with no travel", () => {

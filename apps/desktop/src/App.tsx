@@ -17,6 +17,8 @@ import {
   type PaletteAction,
   type RailScreen,
   type RailSelection,
+  Toast,
+  type ToastSpec,
   type UiChannel,
   type UiSearchGroup,
   type UiSearchHit,
@@ -29,7 +31,7 @@ import {
 } from "@omnis/ui";
 import { ZeroProvider, useQuery } from "@rocicorp/zero/react";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { decideApproval } from "./api/approvals.js";
+import { approvalDecideUrl, decideApproval } from "./api/approvals.js";
 import { type SearchHit, search, toUiSearchGroups } from "./api/search.js";
 import { fetchSettings, putSetting } from "./api/settings.js";
 import { isEditableTarget, useKeymap } from "./hooks/use-keymap.js";
@@ -210,6 +212,87 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
   const [approvals] = useQuery(zero.query.pending_approvals.where("state", "=", "pending"));
   const [accounts] = useQuery(zero.query.accounts);
 
+  /** loop-r1-06: the one thing the shell says back after a write. Until this existed a decision
+   *  answered with nothing at all — the row slid away, the card silently became the next one — and a
+   *  write that *failed* answered with even less.
+   *
+   *  One slot, no queue: a new toast replaces the current one. The alternative is a stack of them
+   *  competing for the same corner of the window, and with one thing just done there is one thing
+   *  the user might want taken back. */
+  const [toast, setToast] = useState<ToastSpec | null>(null);
+  /** The work a toast is holding back until it goes away, and (for the ignore) the approval the
+   *  `beforeunload` beacon would have to re-send. Only the ignore defers a hub call today: its whole
+   *  point is that the user may take it back, so the decision waits for the toast to leave. */
+  const held = useRef<{ run: () => void; ignoreId?: string } | null>(null);
+
+  const clearToast = useCallback(() => {
+    const outgoing = held.current;
+    held.current = null;
+    setToast(null);
+    outgoing?.run();
+  }, []);
+
+  /** Raises a toast, and hands it the work it should hold back. The toast being replaced finishes
+   *  that work first — "replaced by another toast" and "timed out" are the same event for anything
+   *  deferred — and it runs *before* the new toast is armed, so the new slot is not what the
+   *  outgoing work finds when it looks. (A deferred run must therefore not raise a toast
+   *  synchronously; the one that does raises it from a promise's `catch`.)
+   *
+   *  The action is wrapped rather than passed through, so that taking the action calls the deferred
+   *  work off: an Undo on the ignore means the ignore is not sent, whichever screen put the button
+   *  there. No caller has to remember that. */
+  const notify = useCallback(
+    (spec: ToastSpec, deferred?: { run: () => void; ignoreId?: string }) => {
+      const outgoing = held.current;
+      held.current = null;
+      outgoing?.run();
+      held.current = deferred ?? null;
+      const action = spec.action;
+      setToast(
+        action === undefined
+          ? spec
+          : {
+              ...spec,
+              action: {
+                label: action.label,
+                onAction: () => {
+                  held.current = null;
+                  action.onAction();
+                },
+              },
+            },
+      );
+    },
+    [],
+  );
+
+  /** loop-r1-06: `/approvals/:id/decide` re-sent as the window closes. A fetch would be cancelled
+   *  with the document, so the deferred ignore goes out as a beacon instead — same route, same JSON
+   *  body (the hub parses the body, not the request's content type). Best effort by construction:
+   *  the browser may drop it, and the approval then simply stays pending. */
+  useEffect(() => {
+    function onBeforeUnload() {
+      const ignoreId = held.current?.ignoreId;
+      if (ignoreId === undefined) return;
+      navigator.sendBeacon(
+        approvalDecideUrl(ignoreId),
+        new Blob([JSON.stringify({ decision: "ignore" })], { type: "application/json" }),
+      );
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
+
+  /** loop-r1-06: the approvals that are still on screen. A card that has just been decided or
+   *  ignored is taken out here rather than waiting for the hub and Zero to agree — and *everything*
+   *  that reads the queue reads this list, so a hidden card cannot vanish from the pane's stack
+   *  while surviving in the subline's count. */
+  const [hiddenApprovalIds, setHiddenApprovalIds] = useState<ReadonlySet<string>>(new Set());
+  const visibleApprovals = useMemo(
+    () => (approvals as unknown as ApprovalStackItem[]).filter((a) => !hiddenApprovalIds.has(a.id)),
+    [approvals, hiddenApprovalIds],
+  );
+
   // US-D01: the selected thread's AI summary (threads.meta.summary, filled by the T1 summary loop
   // in packages/agents). No new backend call is needed — it is the same query shape Thread.tsx
   // uses to read archived_at. With nothing selected it queries the empty string (an empty result),
@@ -255,11 +338,78 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
 
   // The stack hands back the id it decided on (it renders one card per approval, so the card
   // itself no longer knows which one it is).
+  //
+  // loop-r1-06: every decision the user can see now answers back. The card leaves the queue on the
+  // click rather than on the hub's reply — a card that sits there for a round trip reads as a click
+  // that did nothing — and what the toast says depends on what was actually decided:
+  //
+  //   accept / edit — a confirmation, no Undo. These are writes that have already been made:
+  //                   the draft is in the outbox and the reply may be on its way out. An Undo button
+  //                   there would be a button that lies, which is worse than no button at all.
+  //   ignore        — an Undo, and the hub is not told until the toast goes. This is the one
+  //                   decision with a delay to spend, because nothing downstream has happened yet.
+  //   respond       — nothing. The draft is sent and the conversation shows it; a toast would be
+  //                   the third time the same fact was reported.
   const onDecide = useCallback(
-    (id: string, decision: ApprovalCardDecision, decidedArgs?: Record<string, unknown>) => {
-      void decideApproval(id, decision, decidedArgs);
+    function decide(
+      id: string,
+      decision: ApprovalCardDecision,
+      decidedArgs?: Record<string, unknown>,
+    ) {
+      if (decision === "respond") {
+        void decideApproval(id, decision, decidedArgs);
+        return;
+      }
+      const description =
+        visibleApprovals.find((a) => a.id === id)?.description.replace(/\?$/, "") ?? "";
+      setHiddenApprovalIds((ids) => new Set(ids).add(id));
+      const unhide = () =>
+        setHiddenApprovalIds((ids) => {
+          if (!ids.has(id)) return ids;
+          const next = new Set(ids);
+          next.delete(id);
+          return next;
+        });
+
+      if (decision === "ignore") {
+        notify(
+          {
+            message: `Ignored: ${description}`,
+            action: {
+              label: "Undo",
+              onAction: () => {
+                unhide();
+                clearToast();
+              },
+            },
+          },
+          {
+            ignoreId: id,
+            run: () => {
+              void decideApproval(id, "ignore").catch(() => {
+                unhide();
+                notify({
+                  message: "Approval didn't go through.",
+                  action: { label: "Retry", onAction: () => decide(id, "ignore") },
+                });
+              });
+            },
+          },
+        );
+        return;
+      }
+
+      void decideApproval(id, decision, decidedArgs)
+        .then(() => notify({ message: `Approved: ${description}` }))
+        .catch(() => {
+          unhide();
+          notify({
+            message: "Approval didn't go through.",
+            action: { label: "Retry", onAction: () => decide(id, decision, decidedArgs) },
+          });
+        });
     },
-    [],
+    [visibleApprovals, notify, clearToast],
   );
 
   // A5 §3.4: a briefing item on Today deep-links to its Thread — the one navigation that screen
@@ -437,7 +587,10 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
     open !== null ||
     openPersonId !== null ||
     queueOpen ||
-    (!floating && !paneCollapsed && screen === "inbox" && approvals.length > 0);
+    // loop-r1-06: `visibleApprovals`, not `approvals` — an ignored card must not hold the pane open
+    // for the round trip it no longer needs, and on a one-approval inbox that is the difference
+    // between the pane closing on the click and the pane closing five seconds later.
+    (!floating && !paneCollapsed && screen === "inbox" && visibleApprovals.length > 0);
   // The pane stays mounted while it leaves, because the close is animated and CSS cannot animate a
   // node React has already unmounted (lib/motion.ts — the same hold the ask panel uses).
   const closing = useClosingSpring(paneVisible, LEAVE_MS);
@@ -613,8 +766,12 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
         onFiltersOpenChange={setFiltersOpen}
         // loop-r1-02 §2: the count is the whole queue, not the rows on screen — the subline says
         // what is waiting to be decided, and a list filtered to one channel still has all of them.
-        pendingApprovals={approvals.length}
+        pendingApprovals={visibleApprovals.length}
         onOpenApprovals={() => setQueueOpen(true)}
+        // loop-r1-06: the toast slot lives here, not in the screen, so that "Archived · Undo" from
+        // the Inbox and "Approved: …" from a card are the same object in the same corner of the
+        // window. The Inbox raises its own toasts through this.
+        notify={notify}
       />
     );
 
@@ -725,15 +882,11 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
           {openPersonId !== null ? (
             <PersonDetail personId={openPersonId} onOpenThread={openThreadFromPerson} />
           ) : open === null ? (
-            <ApprovalStack
-              approvals={approvals as unknown as ApprovalStackItem[]}
-              openThreadId={null}
-              onDecide={onDecide}
-            />
+            <ApprovalStack approvals={visibleApprovals} openThreadId={null} onDecide={onDecide} />
           ) : open.agentSession ? (
             <>
               <ApprovalStack
-                approvals={approvals as unknown as ApprovalStackItem[]}
+                approvals={visibleApprovals}
                 openThreadId={open.threadId}
                 onDecide={onDecide}
               />
@@ -743,11 +896,7 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
             // US-D09 §c.5: the thread's approvals go *into* the conversation, in document order,
             // so this screen gets the list rather than a stack to draw above it. The stack still
             // owns the pane with nothing open, where the queue is the whole subject.
-            <Thread
-              threadId={open.threadId}
-              approvals={approvals as unknown as ApprovalStackItem[]}
-              onDecide={onDecide}
-            />
+            <Thread threadId={open.threadId} approvals={visibleApprovals} onDecide={onDecide} />
           )}
         </section>
       )}
@@ -784,6 +933,13 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
           }}
         />
       ) : null}
+      {/* loop-r1-06: the write-feedback toast — the last child of the shell, and mounted whether or
+          not there is anything to say. The wrapper is the live region (see toast.tsx): a status that
+          appears out of nowhere is announced by some screen readers and missed by others, while one
+          that is already in the tree and then fills in is announced by all of them.
+          `message={toast?.message ?? null}` rather than a conditional render, for the same reason —
+          the toast needs a frame of `null` to play its exit in before the pill is unmounted. */}
+      <Toast message={toast?.message ?? null} action={toast?.action} onDismiss={clearToast} />
     </main>
   );
 }

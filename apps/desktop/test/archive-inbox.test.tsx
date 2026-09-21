@@ -4,8 +4,10 @@
 // file tags queries by table name and returns different rows per table (Inbox runs seven).
 import "./setup";
 
+import { TOAST_MS, Toast, type ToastSpec } from "@omnis/ui";
 import { LEAVE_MS, REDUCED_FADE_MS } from "@omnis/ui/lib/motion";
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { useRef, useState } from "react";
 import { VirtuosoMockContext } from "react-virtuoso";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -177,6 +179,110 @@ describe("Inbox archive/restore (US-A36)", () => {
 
     runLeaveAnimation();
     expect(rowNames()).toEqual([]);
+    vi.useRealTimers();
+  });
+});
+
+/** loop-r1-06: the toast slot, in miniature. The screen raises a spec and the shell draws it — that
+ *  is the whole contract — so the two have to be rendered together for "Archived · Undo" to be
+ *  something a test can click. What it keeps is the one line this file's assertions rest on: the
+ *  work a toast was handed runs when the toast goes. The rest of App.tsx's notify — cancelling that
+ *  work when the action is taken, and running it when a newer toast replaces this one — is the
+ *  shell's own subject and is covered in app-shell.test.tsx, where the real one runs. */
+function Harness() {
+  const [toast, setToast] = useState<ToastSpec | null>(null);
+  const held = useRef<(() => void) | null>(null);
+  const notify = (spec: ToastSpec, deferred?: { run: () => void }) => {
+    held.current = deferred?.run ?? null;
+    setToast(spec);
+  };
+  const dismiss = () => {
+    const run = held.current;
+    held.current = null;
+    setToast(null);
+    run?.();
+  };
+  return (
+    <VirtuosoMockContext.Provider value={{ viewportHeight: 600, itemHeight: 72 }}>
+      <Inbox notify={notify} />
+      <Toast message={toast?.message ?? null} action={toast?.action} onDismiss={dismiss} />
+    </VirtuosoMockContext.Provider>
+  );
+}
+
+describe("Inbox archive toasts (loop-r1-06)", () => {
+  const toast = () => screen.getByRole("status");
+
+  /** Archive the first row with `e`, the way the triage keys do. "New mail" is the only thread in
+   *  the inbox — "Older mail" is the archived one this file starts from. */
+  const archiveWithE = () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("option", { name: /New mail/ }));
+    fireEvent.keyDown(window, { key: "e" });
+  };
+
+  /** The row is in the inbox and has finished leaving — the state an undone archive leaves behind.
+   *  Without the undo it is out of this list entirely, so `getByRole` would throw. */
+  const expectingBack = () => {
+    runLeaveAnimation();
+    expect(screen.getByRole("option", { name: /New mail/ })).not.toHaveClass("inbox-row--leaving");
+  };
+
+  it("says what it did and offers the Undo, which really puts the thread back", () => {
+    vi.useFakeTimers();
+    archiveWithE();
+
+    expect(toast()).toHaveTextContent("Archived");
+    expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    // The reverse write, for the row the toast named — not for whatever is selected by then.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(url(1)).toContain(`/api/threads/${THREAD_A}/unarchive`);
+    expectingBack();
+    vi.useRealTimers();
+  });
+
+  it("undoes with `z` — the keyboard twin of that button", () => {
+    vi.useFakeTimers();
+    archiveWithE();
+    expect(toast()).toHaveTextContent("Archived");
+
+    fireEvent.keyDown(window, { key: "z" });
+    expect(url(1)).toContain(`/api/threads/${THREAD_A}/unarchive`);
+    expectingBack();
+    vi.useRealTimers();
+  });
+
+  it("undoes with ⌘Z too, and stops once the toast has gone", () => {
+    vi.useFakeTimers();
+    archiveWithE();
+    fireEvent.keyDown(window, { key: "z", metaKey: true });
+    expect(url(1)).toContain(`/api/threads/${THREAD_A}/unarchive`);
+
+    // The undo is the toast's, not the screen's: five seconds after the archive there is no button
+    // on screen, so ⌘Z has nothing left to take back. (The Ctrl variant is the same branch — the
+    // listener takes either modifier.)
+    act(() => vi.advanceTimersByTime(TOAST_MS));
+    fireEvent.keyDown(window, { key: "z", metaKey: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it("says a failed archive failed, and offers the Retry", async () => {
+    vi.useFakeTimers();
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => ({}),
+    } as unknown as Response);
+    archiveWithE();
+    await act(async () => {});
+
+    expect(toast()).toHaveTextContent("Couldn't archive. It's back in your inbox.");
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    // The rollback is what makes the sentence true: the row is in the inbox, un-animated.
+    expectingBack();
     vi.useRealTimers();
   });
 });
