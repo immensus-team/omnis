@@ -6,14 +6,17 @@
    changes, re-copy the whole file below this comment — verbatim, do not hand-pick a subset, or a
    screen composing an unlisted selector silently loses its styling.
 
-   Source: apps/desktop/src/app.css at the loop-r1 merge (6404 lines). A commit cannot
+   Source: apps/desktop/src/app.css at the loop-r1 merge (6404 lines, 6413 from US-C05 on). A commit cannot
    cite its own sha, so the header names the merge that produced this copy instead of a hash it
    would have to be amended to learn — the same reason the S5 copy named its wave. The count moved
    from 6398 to 6404 when loop-r1-08 added §c.5's `.ask-panel__action kbd` rule — and the gallery's
    copy, which the same header rule binds and no test guards, was re-copied with it.
    apps/web/test/vendor-css.test.ts is what holds the line: it compares everything below this
    comment against that file byte for byte, so forgetting to re-copy fails a test rather than
-   shipping a half-styled screen. */
+   shipping a half-styled screen.
+   The re-copy was forgotten once more on US-C05 (09-22), which added §c.6's
+   `.settings-screen__rule` to the source only: this file stayed a rule short while the
+   unguarded gallery copy was re-copied, and this test caught it here. */
 /* Shell layout only. Colour and type come from @omnis/ui/tokens.css (A5 §1).
    react-virtuoso needs its scroller to have a real height before it draws even one row, so the
    height chain is joined here. */
@@ -5811,6 +5814,15 @@ button.today-screen__event-title:focus-visible {
   border-radius: 8px;
   background: var(--bg-elevated);
   font-size: 13px;
+}
+
+/* US-C05: one delegation rule, read as the sentence it is ("Claude Code on the MacBook in
+   /Users/…"). `anywhere` and `min-width: 0` are both load-bearing: an absolute path is one
+   unbroken run and a flex item's automatic minimum size would hold it at its full width, which is
+   SKILLS.md gate 11 — one sideways scrollbar at 320/375/414/768 and the task fails. */
+.settings-screen__rule {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* The switch is the native-looking one this app already draws elsewhere: a track and a knob, state
