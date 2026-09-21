@@ -1,0 +1,11 @@
+{
+  "scenario": "message.deleted — an IDs-only WS frame (the docs are explicit that deleted events carry no entries). Nothing is emitted: omnis never hard-deletes, so the stored item stays and the deletion is simply not a new timeline entry",
+  "raw": {
+    "type": "message.deleted",
+    "seq": 43,
+    "ts": 1758531000000,
+    "chatID": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+    "ids": ["1343993"]
+  },
+  "expected": { "items": [] }
+}

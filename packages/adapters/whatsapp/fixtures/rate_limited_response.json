@@ -1,0 +1,9 @@
+{
+  "scenario": "a Beeper REST 429 — retryable_rate_limit, and the server's Retry-After is carried through as retryAfterMs",
+  "raw": {
+    "status": 429,
+    "message": "Too many requests",
+    "retryAfterMs": 30000
+  },
+  "expected": { "errorKind": "retryable_rate_limit" }
+}

@@ -1,0 +1,32 @@
+{
+  "scenario": "chat.upserted — a group chat payload carries no message content, so it yields no item; it is the source a message's threadMeta is read from (see group_message_with_chat.json)",
+  "raw": {
+    "type": "chat.upserted",
+    "data": {
+      "id": "!whatsapp_120363021234567890:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+      "accountID": "local-whatsapp_ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc",
+      "network": "whatsapp",
+      "title": "Trip planning",
+      "type": "group",
+      "unreadCount": 3,
+      "participants": {
+        "hasMore": false,
+        "total": 3,
+        "items": [
+          {
+            "id": "@ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc:local-whatsapp.localhost",
+            "fullName": "Logan Kim",
+            "isSelf": true
+          },
+          { "id": "@15550101002:local-whatsapp.localhost", "fullName": "Dana Lee" },
+          {
+            "id": "@15550109999:local-whatsapp.localhost",
+            "fullName": "Sam Okafor",
+            "isAdmin": true
+          }
+        ]
+      }
+    }
+  },
+  "expected": { "items": [] }
+}

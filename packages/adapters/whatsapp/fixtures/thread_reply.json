@@ -1,0 +1,73 @@
+{
+  "scenario": "message.upserted — a quoted reply. WhatsApp threads by chat, not by quote, so the item lands in the same thread; NormalizedItem v1 has no reply-to field, so linkedMessageID is dropped",
+  "raw": {
+    "type": "message.upserted",
+    "data": {
+      "id": "1344001",
+      "accountID": "local-whatsapp_ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc",
+      "chatID": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+      "senderID": "@ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc:local-whatsapp.localhost",
+      "senderName": "Logan Kim",
+      "sortKey": "455171050120",
+      "timestamp": "2026-09-22T09:16:40.004Z",
+      "type": "TEXT",
+      "text": "Yes — 10:00 in the small room.",
+      "linkedMessageID": "1343993",
+      "isSender": true,
+      "isDeleted": false,
+      "attachments": [],
+      "chat": {
+        "id": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+        "accountID": "local-whatsapp_ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc",
+        "network": "whatsapp",
+        "title": "Dana Lee",
+        "type": "single",
+        "unreadCount": 0,
+        "participants": {
+          "hasMore": false,
+          "total": 2,
+          "items": [
+            {
+              "id": "@ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc:local-whatsapp.localhost",
+              "fullName": "Logan Kim",
+              "isSelf": true
+            },
+            { "id": "@15550101002:local-whatsapp.localhost", "fullName": "Dana Lee" }
+          ]
+        }
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+        "externalId": "1344001",
+        "kind": "message",
+        "author": {
+          "kind": "person",
+          "id": "@ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc:local-whatsapp.localhost"
+        },
+        "body": "Yes — 10:00 in the small room.",
+        "attachments": [],
+        "sentAt": "2026-09-22T09:16:40.004Z",
+        "status": "received",
+        "sourceHash": "1344001",
+        "threadMeta": {
+          "externalId": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+          "kind": "dm",
+          "title": "Dana Lee",
+          "participants": [
+            {
+              "externalId": "@ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc:local-whatsapp.localhost",
+              "displayName": "Logan Kim"
+            },
+            { "externalId": "@15550101002:local-whatsapp.localhost", "displayName": "Dana Lee" }
+          ],
+          "lastItemAt": "2026-09-22T09:16:40.004Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

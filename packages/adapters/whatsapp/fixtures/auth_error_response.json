@@ -1,0 +1,8 @@
+{
+  "scenario": "the Desktop API token was revoked in Beeper Settings (A1 §2.6: token invalidation → re-auth), so a 401 is auth_expired, not a retry",
+  "raw": {
+    "status": 401,
+    "message": "Invalid or expired access token"
+  },
+  "expected": { "errorKind": "auth_expired" }
+}

@@ -1,0 +1,20 @@
+{
+  "scenario": "message.upserted with isDeleted=true — the delete arrives as an upsert mutation of an existing id. Like message.deleted it yields no item, and no hard delete is attempted",
+  "raw": {
+    "type": "message.upserted",
+    "data": {
+      "id": "1343993",
+      "accountID": "local-whatsapp_ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc",
+      "chatID": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+      "senderID": "@15550101002:local-whatsapp.localhost",
+      "senderName": "Dana Lee",
+      "sortKey": "455171049984",
+      "timestamp": "2026-09-22T09:14:03.621Z",
+      "type": "TEXT",
+      "text": "",
+      "isDeleted": true,
+      "attachments": []
+    }
+  },
+  "expected": { "items": [] }
+}

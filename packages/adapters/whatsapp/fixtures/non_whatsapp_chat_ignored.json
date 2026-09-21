@@ -1,0 +1,23 @@
+{
+  "scenario": "chat.upserted for a chat whose network field says Telegram — ignored twice over: not WhatsApp, and a chat carries no message content anyway",
+  "raw": {
+    "type": "chat.upserted",
+    "data": {
+      "id": "!telegram_123456789:ba_ZzQwMTIzNDU2Nzg5.local-telegram.localhost",
+      "accountID": "local-telegram_ba_ZzQwMTIzNDU2Nzg5",
+      "network": "telegram",
+      "title": "Dana Lee",
+      "type": "single",
+      "unreadCount": 0,
+      "participants": {
+        "hasMore": false,
+        "total": 2,
+        "items": [
+          { "id": "@ba_ZzQwMTIzNDU2Nzg5:local-telegram.localhost", "isSelf": true },
+          { "id": "@telegram_123456789:local-telegram.localhost", "fullName": "Dana Lee" }
+        ]
+      }
+    }
+  },
+  "expected": { "items": [] }
+}

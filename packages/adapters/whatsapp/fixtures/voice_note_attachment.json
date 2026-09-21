@@ -1,0 +1,61 @@
+{
+  "scenario": "a WhatsApp voice note — the attachment type is 'audio' and isVoiceNote is set; it maps to the protocol's audio kind with the duration dropped (Attachment v1 has no duration field)",
+  "raw": {
+    "id": "1344020",
+    "accountID": "local-whatsapp_ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc",
+    "chatID": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+    "senderID": "@15550101002:local-whatsapp.localhost",
+    "senderName": "Dana Lee",
+    "sortKey": "455171052000",
+    "timestamp": "2026-09-22T09:25:00.000Z",
+    "type": "VOICE",
+    "text": "",
+    "isDeleted": false,
+    "attachments": [
+      {
+        "type": "audio",
+        "id": "mxc://local-whatsapp.localhost/VoiceNote001",
+        "srcURL": "http://localhost:23373/v1/assets/mxc%3A%2F%2Flocal-whatsapp.localhost%2FVoiceNote001",
+        "mimeType": "audio/ogg",
+        "fileSize": 41088,
+        "duration": 12,
+        "isVoiceNote": true
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+        "externalId": "1344020",
+        "kind": "message",
+        "author": { "kind": "person", "id": "@15550101002:local-whatsapp.localhost" },
+        "body": "",
+        "attachments": [
+          {
+            "kind": "audio",
+            "url": "http://localhost:23373/v1/assets/mxc%3A%2F%2Flocal-whatsapp.localhost%2FVoiceNote001",
+            "mimeType": "audio/ogg",
+            "sizeBytes": 41088
+          }
+        ],
+        "sentAt": "2026-09-22T09:25:00.000Z",
+        "status": "received",
+        "sourceHash": "1344020",
+        "threadMeta": {
+          "externalId": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+          "kind": "dm",
+          "title": null,
+          "participants": [
+            {
+              "externalId": "@15550101002:local-whatsapp.localhost",
+              "displayName": "Dana Lee"
+            }
+          ],
+          "lastItemAt": "2026-09-22T09:25:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

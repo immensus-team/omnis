@@ -1,0 +1,75 @@
+{
+  "scenario": "message.upserted on a group chat — the chat's type decides threadMeta.kind='group' and its title comes from the chat, not the sender",
+  "raw": {
+    "type": "message.upserted",
+    "data": {
+      "id": "2200771",
+      "accountID": "local-whatsapp_ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc",
+      "chatID": "!whatsapp_120363021234567890:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+      "senderID": "@15550109999:local-whatsapp.localhost",
+      "senderName": "Sam Okafor",
+      "sortKey": "455171060000",
+      "timestamp": "2026-09-22T10:02:00.000Z",
+      "type": "TEXT",
+      "text": "Booked the 14:20 ferry.",
+      "isSender": false,
+      "isDeleted": false,
+      "attachments": [],
+      "chat": {
+        "id": "!whatsapp_120363021234567890:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+        "accountID": "local-whatsapp_ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc",
+        "network": "whatsapp",
+        "title": "Trip planning",
+        "type": "group",
+        "unreadCount": 3,
+        "participants": {
+          "hasMore": false,
+          "total": 3,
+          "items": [
+            {
+              "id": "@ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc:local-whatsapp.localhost",
+              "fullName": "Logan Kim",
+              "isSelf": true
+            },
+            { "id": "@15550101002:local-whatsapp.localhost", "fullName": "Dana Lee" },
+            {
+              "id": "@15550109999:local-whatsapp.localhost",
+              "fullName": "Sam Okafor",
+              "isAdmin": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "!whatsapp_120363021234567890:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+        "externalId": "2200771",
+        "kind": "message",
+        "author": { "kind": "person", "id": "@15550109999:local-whatsapp.localhost" },
+        "body": "Booked the 14:20 ferry.",
+        "attachments": [],
+        "sentAt": "2026-09-22T10:02:00.000Z",
+        "status": "received",
+        "sourceHash": "2200771",
+        "threadMeta": {
+          "externalId": "!whatsapp_120363021234567890:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+          "kind": "group",
+          "title": "Trip planning",
+          "participants": [
+            {
+              "externalId": "@ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc:local-whatsapp.localhost",
+              "displayName": "Logan Kim"
+            },
+            { "externalId": "@15550101002:local-whatsapp.localhost", "displayName": "Dana Lee" },
+            { "externalId": "@15550109999:local-whatsapp.localhost", "displayName": "Sam Okafor" }
+          ],
+          "lastItemAt": "2026-09-22T10:02:00.000Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

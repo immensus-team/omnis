@@ -1,0 +1,20 @@
+{
+  "scenario": "a Beeper account for another network (master §8: Beeper carries 12+ networks, omnis v1 takes only WhatsApp) — the accountID is the only network marker a message payload carries, and it is not WhatsApp, so nothing is emitted",
+  "raw": {
+    "type": "message.upserted",
+    "data": {
+      "id": "m_9911",
+      "accountID": "local-telegram_ba_ZzQwMTIzNDU2Nzg5",
+      "chatID": "!telegram_123456789:ba_ZzQwMTIzNDU2Nzg5.local-telegram.localhost",
+      "senderID": "@telegram_123456789:local-telegram.localhost",
+      "senderName": "Dana Lee",
+      "sortKey": "455171049990",
+      "timestamp": "2026-09-22T09:30:00.000Z",
+      "type": "TEXT",
+      "text": "this arrives through Beeper's Telegram bridge, not WhatsApp",
+      "isDeleted": false,
+      "attachments": []
+    }
+  },
+  "expected": { "items": [] }
+}
