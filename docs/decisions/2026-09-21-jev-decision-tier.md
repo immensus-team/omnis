@@ -229,10 +229,16 @@ inbound user data), and it is out of scope for this spike.
 
 ## What this spike does not establish
 
-- **No Jev call has ever been made against the real service.** There is no gateway key yet. Every
-  number in `tools/spikes/gate-jev/RESULT.md` from this attempt comes from mock mode, and the
-  memo's pricing and context figures are the vendor's published ones, uncorroborated.
+- **No Jev answer has ever come back from the real service.** The Keychain item
+  `omnis.vercel.ai_gateway` now resolves, so a real call is *made* — and the Gateway refuses it with
+  `403 customer_verification_required` until the account has a credit card on file
+  (`tools/spikes/gate-jev/RESULT.md`, "Why the real run cannot score yet"). Every number in that file
+  from this attempt therefore comes from mock mode, and the memo's pricing and context figures are the
+  vendor's published ones, uncorroborated.
 - **No accuracy claim.** The gate runner scores Jev against `auto_archive`, `route_note`, `task`
-  and `followup`; the mock run's precision/recall measure the *harness*, not the model.
+  and `followup`; the mock run's precision/recall measure the *harness*, not the model. It prints the
+  incumbent row next to the candidate — T0 only, `routeByRule` only, no veto — so those three
+  deterministic baselines are real numbers, but the LLM arm of each is a pending OpenRouter run, not
+  a measured one.
 - **`agents.decision_provider` defaults to `"llm"`.** Nothing in omnis changes behaviour until
   the flag is set, and a test asserts that the default path makes zero Jev calls.

@@ -24,10 +24,21 @@
  *
  * Nothing here touches the database, the settings flag, or the hub: the runner calls the decider
  * directly so a spike run cannot change production behaviour or record a run.
+ *
+ * Every dataset prints two rows. `current` is the path omnis runs today — T0 only, rule only, or no
+ * veto — scored on the same rows with the same counters, deterministic and free of model calls.
+ * `jev` is the candidate. Where today's path continues into a text model, that leg is printed as a
+ * pending OpenRouter run instead of being invented: a baseline this runner cannot compute is worth
+ * naming, not guessing.
  */
 import { readFileSync } from "node:fs";
 import { z } from "zod";
-import { nonHumanSender } from "../../../packages/agents/src/index.js";
+import {
+  type HostHealth,
+  extractHints,
+  nonHumanSender,
+  routeByRule,
+} from "../../../packages/agents/src/index.js";
 import {
   QUESTION,
   autoArchiveRequest,
@@ -48,6 +59,16 @@ const T1_ARCHIVE_CONFIDENCE_MIN = 0.85; // mirrors loops/auto-archive.ts
 const DELEGATION_JEV_MIN = 0.7; // mirrors loops/task.ts
 const FOLLOWUP_VETO_BELOW = 0.15; // mirrors loops/followup.ts
 
+/**
+ * Both hosts fresh, as `hostHealth()` would report them on a healthy fleet. This runner must not
+ * touch Postgres, so the rule baseline passes this instead of a query — the one input under which
+ * `routeByRule` abstains rather than routing on a stale host.
+ */
+const HEALTHY_FLEET: HostHealth = { mini: { lastHeartbeatMs: 0 }, macbook: { lastHeartbeatMs: 0 } };
+
+/** The label every row of today's model-backed leg carries. See `Scored.llmPending`. */
+const PENDING_LLM = "pending OpenRouter run (needs OMNIS_OPENROUTER_API_KEY)";
+
 function rows<T extends z.ZodTypeAny>(file: string, schema: T): z.infer<T>[] {
   const url = new URL(file, EVAL_DIR);
   return readFileSync(url, "utf8")
@@ -59,6 +80,8 @@ function rows<T extends z.ZodTypeAny>(file: string, schema: T): z.infer<T>[] {
 interface Metrics {
   dataset: string;
   question: string;
+  /** Which arm this row is: `current` (what omnis runs today) or `jev`. */
+  label: string;
   n: number;
   tp: number;
   fp: number;
@@ -73,10 +96,20 @@ interface Metrics {
   costUsd: number[];
 }
 
-function empty(dataset: string, question: string): Metrics {
+/** One dataset: today's deterministic path, the model leg it falls through to, and the Jev arm. */
+interface Scored {
+  /** Null only when today's path is itself a model call, which a mock run cannot score. */
+  current: Metrics | null;
+  /** What the model leg of today's path is, when there is one. Printed as a pending row. */
+  llmPending: string | null;
+  jev: Metrics;
+}
+
+function empty(dataset: string, question: string, label: string): Metrics {
   return {
     dataset,
     question,
+    label,
     n: 0,
     tp: 0,
     fp: 0,
@@ -89,6 +122,19 @@ function empty(dataset: string, question: string): Metrics {
     tokensIn: [],
     costUsd: [],
   };
+}
+
+function jevRow(dataset: string, question: string, decider: Decider): Metrics {
+  return empty(dataset, question, `jev (${decider.run.provider}/${decider.run.model})`);
+}
+
+/** The four counters a binary row shares. `answered` is the yes-answer for this row's question. */
+function bump(m: Metrics, answered: boolean, expected: boolean, gateBlocked: boolean): void {
+  if (answered && expected) m.tp += 1;
+  else if (answered) m.fp += 1;
+  else if (expected) m.fn += 1;
+  else m.tn += 1;
+  if (answered && gateBlocked) m.unsafe += 1;
 }
 
 function record(m: Metrics, response: DecisionResponse): void {
@@ -166,10 +212,13 @@ function mockDecider(oracle: Map<DecisionRequest, Record<string, DecisionAnswer>
 async function scoreAutoArchive(
   decider: Decider,
   oracle: Map<DecisionRequest, Record<string, DecisionAnswer>>,
-): Promise<Metrics> {
-  const m = empty("auto_archive.jsonl", `${QUESTION.archive} (boolean)`);
+): Promise<Scored> {
+  const question = `${QUESTION.archive} (boolean)`;
+  const cur = empty("auto_archive.jsonl", question, "current (T0 only, no model call)");
+  const jev = jevRow("auto_archive.jsonl", question, decider);
   const cases = rows("auto_archive.jsonl", AutoArchiveCase);
-  m.n = cases.length;
+  cur.n = cases.length;
+  jev.n = cases.length;
 
   for (const c of cases) {
     const gateBlocked = c.sensitivity !== "normal" || c.vip;
@@ -181,6 +230,9 @@ async function scoreAutoArchive(
 
     // T0 first, exactly as the loop does: non-human sender, never replied, no question mark.
     const t0 = !gateBlocked && nonHumanSender(c) && !c.i_replied && !/[?？]/.test(c.body);
+    // Today's row: T0 decides and nothing else. What T0 abstains on stays in the inbox.
+    bump(cur, t0, c.expect_archive, gateBlocked);
+
     let archived = t0;
     if (!t0 && !gateBlocked) {
       const req = autoArchiveRequest({
@@ -192,33 +244,42 @@ async function scoreAutoArchive(
       });
       oracle.set(req, { [QUESTION.archive]: { type: "boolean", probability: c.expect_archive ? 1 : 0 } });
       const res = await decider.decide(req);
-      record(m, res);
+      record(jev, res);
       archived = (probabilityOf(res, QUESTION.archive) ?? 0) >= T1_ARCHIVE_CONFIDENCE_MIN;
     }
     // Archived ∪ expected. A gate-blocked row can only ever land in the "keep" column, which is
     // why unsafe is structurally 0 here — the hard gate is not Jev's to answer.
-    if (archived && c.expect_archive) m.tp += 1;
-    if (archived && !c.expect_archive) m.fp += 1;
-    if (!archived && c.expect_archive) m.fn += 1;
-    if (!archived && !c.expect_archive) m.tn += 1;
-    if (archived && gateBlocked) m.unsafe += 1;
+    bump(jev, archived, c.expect_archive, gateBlocked);
   }
-  return m;
+  return {
+    current: cur,
+    // loops/auto-archive.ts: the ambiguous ②/④-b residue wakes the T1 model when the tier abstains.
+    llmPending: "the T1 model that answers T0's ambiguous residue (loops/auto-archive.ts)",
+    jev,
+  };
 }
 
 async function scoreTask(
   decider: Decider,
   oracle: Map<DecisionRequest, Record<string, DecisionAnswer>>,
-): Promise<Metrics> {
-  const m = empty("task.jsonl", `${QUESTION.delegate} (boolean)`);
+): Promise<Scored> {
+  const question = `${QUESTION.delegate} (boolean)`;
+  const cur = empty("task.jsonl", question, "current (routeByRule only, no model call)");
+  const jev = jevRow("task.jsonl", question, decider);
   const cases = rows("task.jsonl", TaskCase);
-  m.n = cases.length;
-  m.extras.push(
-    `label distribution: ${cases.filter((c) => c.has_action_item && c.expected_tasks.some((t) => t.owner === "agent")).length} delegate / ${cases.length} rows`,
-  );
+  cur.n = cases.length;
+  jev.n = cases.length;
+  const distribution = `label distribution: ${cases.filter((c) => c.has_action_item && c.expected_tasks.some((t) => t.owner === "agent")).length} delegate / ${cases.length} rows`;
+  cur.extras.push(distribution);
+  jev.extras.push(distribution);
 
   for (const c of cases) {
     const expected = c.has_action_item && c.expected_tasks.some((t) => t.owner === "agent");
+    // Today's row: the deterministic rules run first and win outright in loops/task.ts, and this
+    // golden set carries no file paths, so every row here is one the rules abstain on — a routing
+    // is a delegation, an abstention is none.
+    bump(cur, routeByRule(extractHints(c.item.body), HEALTHY_FLEET) !== null, expected, false);
+
     const req = delegationRequest({
       taskTitle: c.item.body.slice(0, 120),
       taskDetail: c.item.body,
@@ -226,23 +287,41 @@ async function scoreTask(
     });
     oracle.set(req, { [QUESTION.delegate]: { type: "boolean", probability: expected ? 1 : 0 } });
     const res = await decider.decide(req);
-    record(m, res);
+    record(jev, res);
     const predicted = (probabilityOf(res, QUESTION.delegate) ?? 0) >= DELEGATION_JEV_MIN;
-    if (predicted && expected) m.tp += 1;
-    if (predicted && !expected) m.fp += 1;
-    if (!predicted && expected) m.fn += 1;
-    if (!predicted && !expected) m.tn += 1;
+    bump(jev, predicted, expected, false);
   }
-  return m;
+  return {
+    current: cur,
+    // routeDelegation's residue: the eligibility question the tier answers before it was Jev.
+    llmPending: "the delegation-eligibility LLM that answers what routeByRule abstains on (loops/task.ts)",
+    jev,
+  };
+}
+
+/** Decision #4's counters: a veto is the positive class, so letting a candidate through is `tn`. */
+function vetoRow(m: Metrics, vetoed: boolean, c: z.infer<typeof FollowupCase>): void {
+  const coldRisk = c.expected_channel === "linkedin" || c.expected_channel === "kakao";
+  if (!vetoed) m.tn += 1; // let it through: correct for a veto-only gate
+  else if (coldRisk) {
+    m.tp += 1;
+    m.extras.push(`${c.id}: vetoed a no-cold-outreach candidate — correct`);
+  } else {
+    m.fp += 1;
+    m.extras.push(`${c.id}: vetoed ${c.expected_channel} (first_contact=${c.first_contact})`);
+  }
 }
 
 async function scoreFollowup(
   decider: Decider,
   oracle: Map<DecisionRequest, Record<string, DecisionAnswer>>,
-): Promise<Metrics> {
-  const m = empty("followup.jsonl", `${QUESTION.reachOut} (boolean, veto-only)`);
+): Promise<Scored> {
+  const question = `${QUESTION.reachOut} (boolean, veto-only)`;
+  const cur = empty("followup.jsonl", question, "current (no veto — every candidate is nudged)");
+  const jev = jevRow("followup.jsonl", question, decider);
   const cases = rows("followup.jsonl", FollowupCase);
-  m.n = cases.length;
+  cur.n = cases.length;
+  jev.n = cases.length;
 
   for (const c of cases) {
     const req = followupRequest({
@@ -260,20 +339,14 @@ async function scoreFollowup(
     // "reach out" — a veto is what we are measuring, and the cold-outreach rows are the exception.
     oracle.set(req, { [QUESTION.reachOut]: { type: "boolean", probability: 1 } });
     const res = await decider.decide(req);
-    record(m, res);
+    record(jev, res);
 
-    const vetoed = (probabilityOf(res, QUESTION.reachOut) ?? 1) < FOLLOWUP_VETO_BELOW;
-    const coldRisk = c.expected_channel === "linkedin" || c.expected_channel === "kakao";
-    if (!vetoed) m.tn += 1; // let it through: correct for a veto-only gate
-    else if (coldRisk) {
-      m.tp += 1;
-      m.extras.push(`${c.id}: vetoed a no-cold-outreach candidate — correct`);
-    } else {
-      m.fp += 1;
-      m.extras.push(`${c.id}: vetoed ${c.expected_channel} (first_contact=${c.first_contact})`);
-    }
+    // Today's row: the tier abstains (flag "llm", no veto implemented here), and an abstention is
+    // no veto — nothing cancels a candidate the sweep proposed.
+    vetoRow(cur, false, c);
+    vetoRow(jev, (probabilityOf(res, QUESTION.reachOut) ?? 1) < FOLLOWUP_VETO_BELOW, c);
   }
-  return m;
+  return { current: cur, llmPending: null, jev };
 }
 
 /**
@@ -294,10 +367,11 @@ function routeNoteProbe(c: z.infer<typeof RouteNoteCase>): DecisionRequest {
 async function scoreRouteNote(
   decider: Decider,
   oracle: Map<DecisionRequest, Record<string, DecisionAnswer>>,
-): Promise<Metrics> {
-  const m = empty("route_note.jsonl", "note_kind (choice, off-mapping probe)");
+): Promise<Scored> {
+  const question = "note_kind (choice, off-mapping probe)";
+  const jev = jevRow("route_note.jsonl", question, decider);
   const cases = rows("route_note.jsonl", RouteNoteCase);
-  m.n = cases.length;
+  jev.n = cases.length;
   let correct = 0;
   let traps = 0;
   let trapHits = 0;
@@ -308,7 +382,7 @@ async function scoreRouteNote(
       note_kind: { type: "choice", choice: c.expected.id, probabilities: { [c.expected.id]: 0.9 } },
     });
     const res = await decider.decide(req);
-    record(m, res);
+    record(jev, res);
     const picked = choiceOf(res, "note_kind", c.candidates.map((k) => k.id));
     if (picked === c.expected.id) correct += 1;
     if (c.overconfidence_trap) {
@@ -316,9 +390,15 @@ async function scoreRouteNote(
       if (picked === c.expected.id) trapHits += 1;
     }
   }
-  m.accuracy = correct / Math.max(1, cases.length);
-  m.extras.push(`overconfidence traps: ${trapHits}/${traps} correct`);
-  return m;
+  jev.accuracy = correct / Math.max(1, cases.length);
+  jev.extras.push(`overconfidence traps: ${trapHits}/${traps} correct`);
+  return {
+    // Notes are routed by a T1 text loop, not by a decision this runner can reimplement offline:
+    // there is no deterministic arm to score, which is itself the point — see RESULT.md.
+    current: null,
+    llmPending: "the T1 note_route loop, which is what routes notes today (loops/note-route.ts)",
+    jev,
+  };
 }
 
 // --- Reporting --------------------------------------------------------------------------------
@@ -327,18 +407,63 @@ function pct(n: number, d: number): string {
   return d === 0 ? "n/a" : (n / d).toFixed(3);
 }
 
-function report(m: Metrics): void {
+function reportRow(m: Metrics): void {
   const asked = m.latencyMs.length;
   const mean = (xs: number[]): number => (xs.length === 0 ? 0 : xs.reduce((a, b) => a + b, 0) / xs.length);
   const p95 = (xs: number[]): number => [...xs].sort((a, b) => a - b)[Math.floor(xs.length * 0.95)] ?? 0;
   const costPer1k = mean(m.costUsd) * 1000;
 
-  console.log(`\n${m.dataset}  [${m.question}]`);
-  console.log(`  rows=${m.n} asked=${asked} not_asked=${m.n - asked}`);
-  console.log(`  tp=${m.tp} fp=${m.fp} tn=${m.tn} fn=${m.fn} unsafe=${m.unsafe} precision=${pct(m.tp, m.tp + m.fp)} recall=${pct(m.tp, m.tp + m.fn)}`);
-  if (m.accuracy !== null) console.log(`  accuracy=${m.accuracy.toFixed(3)}`);
-  console.log(`  latency mean=${mean(m.latencyMs).toFixed(1)}ms p95=${p95(m.latencyMs)}ms  tokens_in mean=${mean(m.tokensIn).toFixed(0)}  $/1k=${costPer1k.toFixed(4)}`);
-  for (const e of m.extras) console.log(`  - ${e}`);
+  console.log(`  ${m.label}: rows=${m.n} asked=${asked} not_asked=${m.n - asked}`);
+  console.log(`    tp=${m.tp} fp=${m.fp} tn=${m.tn} fn=${m.fn} unsafe=${m.unsafe} precision=${pct(m.tp, m.tp + m.fp)} recall=${pct(m.tp, m.tp + m.fn)}`);
+  if (m.accuracy !== null) console.log(`    accuracy=${m.accuracy.toFixed(3)}`);
+  if (asked === 0) {
+    console.log("    latency/cost: n/a — this row makes no model call");
+  } else {
+    console.log(`    latency mean=${mean(m.latencyMs).toFixed(1)}ms p95=${p95(m.latencyMs)}ms  tokens_in mean=${mean(m.tokensIn).toFixed(0)}  $/1k=${costPer1k.toFixed(4)}`);
+  }
+  for (const e of m.extras) console.log(`    - ${e}`);
+}
+
+/** Today's row first, then the model leg this runner cannot reach, then the candidate. */
+function reportDataset(s: Scored): void {
+  console.log(`\n${s.jev.dataset}  [${s.jev.question}]`);
+  if (s.current !== null) reportRow(s.current);
+  if (s.llmPending !== null) console.log(`  current (LLM): ${PENDING_LLM} — ${s.llmPending}`);
+  reportRow(s.jev);
+}
+
+/**
+ * One line, no stack. The AI SDK wraps every non-2xx in a class whose own `type` is the generic
+ * `internal_server_error`, and the cause it carries holds the entire request payload — so this reads
+ * the Gateway's own error type out of the cause's parsed body and prints nothing else of it.
+ */
+function diagnose(err: unknown): string {
+  const e = err as {
+    name?: string;
+    message?: string;
+    statusCode?: number;
+    cause?: { statusCode?: number; data?: unknown; responseBody?: unknown };
+  };
+  const status = e?.statusCode ?? e?.cause?.statusCode;
+  const body = (e?.cause?.data ?? parseJson(e?.cause?.responseBody)) as
+    | { error?: { type?: string } }
+    | undefined;
+  const parts = [
+    status === undefined ? null : `HTTP ${status}`,
+    body?.error?.type ?? null,
+    e?.name ?? null,
+    err instanceof Error ? err.message.split("\n")[0]?.slice(0, 200) ?? null : null,
+  ];
+  return parts.filter((p): p is string => p !== null && p !== "").join(" ") || String(err).slice(0, 200);
+}
+
+function parseJson(value: unknown): unknown {
+  if (typeof value !== "string") return undefined;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
 }
 
 async function main(): Promise<void> {
@@ -363,7 +488,7 @@ async function main(): Promise<void> {
       return;
     } else {
       decider = mockDecider(oracle);
-      mode = "mock (no credential — see RESULT.md, 'pending real key')";
+      mode = "mock (no credential resolved — see RESULT.md)";
     }
   }
   console.log(`jev gate: mode=${mode} model=${decider.run.provider}/${decider.run.model}`);
@@ -373,13 +498,22 @@ async function main(): Promise<void> {
     );
   }
 
-  const metrics = [
-    await scoreAutoArchive(decider, oracle),
-    await scoreTask(decider, oracle),
-    await scoreFollowup(decider, oracle),
-    await scoreRouteNote(decider, oracle),
-  ];
-  for (const m of metrics) report(m);
+  try {
+    const scored = [
+      await scoreAutoArchive(decider, oracle),
+      await scoreTask(decider, oracle),
+      await scoreFollowup(decider, oracle),
+      await scoreRouteNote(decider, oracle),
+    ];
+    for (const s of scored) reportDataset(s);
+  } catch (e) {
+    // A provider that answers and then refuses is a different failure from one that never ran, and
+    // it is the one a reader of RESULT.md will hit. Diagnose it in a line; never dump the stack,
+    // whose error object carries the whole request body.
+    console.error(`jev gate: ${mode} run failed, nothing scored — ${diagnose(e)}`);
+    console.error("  rerun with --mock for the scorer check, or fix the account and rerun --real.");
+    process.exit(1);
+  }
 }
 
 await main();
