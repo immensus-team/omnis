@@ -46,51 +46,51 @@ they were actually executed (W4 was split into W4a backend surfaces and W4b scre
 | Story | What landed | Plan task |
 |---|---|---|
 | US-B00 | W0 schema bundle — migrations 0009–0013, `settings.ts`, root scripts | — |
-| US-B01 | `@omnis/memory` scaffold + thin pgvector layer (`embed`/`upsertMemory`/`searchMemories`/`invalidateBySource`) | [T1–T4](2026-09-20-phase-b-memory-ingestion.md#task-1-omnismemory-scaffold-protocol-ingest-types-root-scripts-us-b01-tier-sonnet) |
-| US-B02 | self-model 3-file loader + frozen git snapshot with token caps | [T5–T6](2026-09-20-phase-b-memory-ingestion.md#task-5-self-model-snapshot-loader-token-caps-us-b02-tier-sonnet) |
-| US-B03 | person identity resolution (`handleNorm`, 4-step resolve, merge/split) + `author_person_id` wiring | [T7–T9](2026-09-20-phase-b-memory-ingestion.md#task-7-handlenorm-6-deterministic-per-channel-identity-keys-us-b03-tier-opus) |
-| US-B04 | bi-temporal `entities`/`relations` write API + `asOf(ts)` | [T10](2026-09-20-phase-b-memory-ingestion.md#task-10-bi-temporal-entities-relations-write-api-us-b04-tier-opus) |
-| US-B05 | context assembler + `<data>` normalization and injection tagging (20 cases) | [T11–T13](2026-09-20-phase-b-memory-ingestion.md#task-11-data-normalization-injection-scanner-us-b05-tier-opus) |
-| US-B06 | loop runtime contract — `LoopSpec`/`runLoopSpec`, budget, 7 failure handlers | [T1–T4](2026-09-20-phase-b-agents.md#task-1-loop-contract-types-registry-us-b06-tier-opus) |
-| US-B07 | tool palette — 7 read tools + 6 `propose_*` tools | [T5](2026-09-20-phase-b-agents.md#task-5-tool-palette-the-seven-read-tools-the-six-propose_-tools-us-b07-tier-opus) |
+| US-B01 | `@omnis/memory` scaffold + thin pgvector layer (`embed`/`upsertMemory`/`searchMemories`/`invalidateBySource`) | [T1–T4](2026-09-20-phase-b-memory-ingestion.md#task-1-omnismemory-scaffold--protocol-ingest-types--root-scripts-us-b01-tier-sonnet) |
+| US-B02 | self-model 3-file loader + frozen git snapshot with token caps | [T5–T6](2026-09-20-phase-b-memory-ingestion.md#task-5-self-model-snapshot-loader--token-caps-us-b02-tier-sonnet) |
+| US-B03 | person identity resolution (`handleNorm`, 4-step resolve, merge/split) + `author_person_id` wiring | [T7–T9](2026-09-20-phase-b-memory-ingestion.md#task-7-handlenorm--6-deterministic-per-channel-identity-keys-us-b03-tier-opus) |
+| US-B04 | bi-temporal `entities`/`relations` write API + `asOf(ts)` | [T10](2026-09-20-phase-b-memory-ingestion.md#task-10-bi-temporal-entities--relations-write-api-us-b04-tier-opus) |
+| US-B05 | context assembler + `<data>` normalization and injection tagging (20 cases) | [T11–T13](2026-09-20-phase-b-memory-ingestion.md#task-11-data-normalization--injection-scanner-us-b05-tier-opus) |
+| US-B06 | loop runtime contract — `LoopSpec`/`runLoopSpec`, budget, 7 failure handlers | [T1–T4](2026-09-20-phase-b-agents.md#task-1-loop-contract-types--registry-us-b06-tier-opus) |
+| US-B07 | tool palette — 7 read tools + 6 `propose_*` tools | [T5](2026-09-20-phase-b-agents.md#task-5-tool-palette--the-seven-read-tools--the-six-propose_-tools-us-b07-tier-opus) |
 | US-B08 | L9 ingestion core — chunkers, T1 extraction, `ingest_sources` cursor, dead-letter | [T14, T16–T17](2026-09-20-phase-b-memory-ingestion.md#task-14-three-chunking-strategies-us-b08-tier-opus) |
 | US-B09 | local ingestion (mini) — FSEvents, folder allowlist, hard exclusion rules | [T15, T18](2026-09-20-phase-b-memory-ingestion.md#task-15-hard-exclusion-rules-isdenied-us-b09-tier-sonnet) |
-| US-B10 | local ingestion (MacBook) — `ingest.scan`/`ingest.read` RPCs + hub consumer | [T19–T20](2026-09-20-phase-b-memory-ingestion.md#task-19-ingestscan-ingestread-rpc-macbook-bridge-us-b10-tier-opus) |
+| US-B10 | local ingestion (MacBook) — `ingest.scan`/`ingest.read` RPCs + hub consumer | [T19–T20](2026-09-20-phase-b-memory-ingestion.md#task-19-ingestscan--ingestread-rpc--macbook-bridge-us-b10-tier-opus) |
 | US-B11 | Drive + GitHub polling ingestion (tombstones, ETag, backoff) | [T21–T22](2026-09-20-phase-b-memory-ingestion.md#task-21-drive-polling-provider-us-b11-tier-sonnet) |
-| US-B12 | recall eval harness + exclusion-rule hard gate | [T23](2026-09-20-phase-b-memory-ingestion.md#task-23-recall-eval-harness-exclusion-rule-hard-gate-us-b12-tier-sonnet) |
-| US-B13 | L2 reply draft loop — 60s SLA, register, 6-point self-check, 6 escalations | [T8–T9](2026-09-20-phase-b-agents.md#task-8-draft-pure-functions-register-needs-reply-channel-shape-self-check-us-b13-tier-opus) |
-| US-B14 | cost meter — 5 states, VIP·sensitive reserve, `cost_daily` + 00:05 job | [T6–T7](2026-09-20-phase-b-agents.md#task-6-cost-meter-coststate-policy-currentpolicy-us-b14-tier-opus) |
-| US-B15 | 3-tier notification router + `push_batch` | [T10–T11](2026-09-20-phase-b-agents.md#task-10-notification-tier-determination-quiet-hours-us-b15-tier-sonnet) |
+| US-B12 | recall eval harness + exclusion-rule hard gate | [T23](2026-09-20-phase-b-memory-ingestion.md#task-23-recall-eval-harness--exclusion-rule-hard-gate-us-b12-tier-sonnet) |
+| US-B13 | L2 reply draft loop — 60s SLA, register, 6-point self-check, 6 escalations | [T8–T9](2026-09-20-phase-b-agents.md#task-8-draft-pure-functions--register--needs-reply--channel-shape--self-check-us-b13-tier-opus) |
+| US-B14 | cost meter — 5 states, VIP·sensitive reserve, `cost_daily` + 00:05 job | [T6–T7](2026-09-20-phase-b-agents.md#task-6-cost-meter--coststate--policy--currentpolicy-us-b14-tier-opus) |
+| US-B15 | 3-tier notification router + `push_batch` | [T10–T11](2026-09-20-phase-b-agents.md#task-10-notification-tier-determination--quiet-hours-us-b15-tier-sonnet) |
 | US-B16 | Web Push VAPID keypair generation, Keychain storage, rotation | [T1](2026-09-20-phase-b-ops.md#task-1-vapid-key-rotation-us-b16-tier-haiku) |
-| US-B17 | notification delivery — macOS local + VAPID Web Push sender | [T12](2026-09-20-phase-b-agents.md#task-12-web-push-sender-macos-local-notifications-us-b17-tier-sonnet) |
-| US-B18 | L8 auto-archive loop + 7-day undo (5 hard gates, 22:00 sweep) | [T13–T14](2026-09-20-phase-b-agents.md#task-13-archiveitem-undoarchive-7-day-undo-30-day-re-archive-exclusion-us-b18-tier-opus) |
-| US-B19 | L3 todo extraction + the pure-SQL reminder job | [T15–T16](2026-09-20-phase-b-agents.md#task-15-taskloop-precision-first-todo-extraction-us-b19-tier-sonnet) |
-| US-B20 | delegation — `routeByRule()`, 4 runaway guards, approved execution | [T17–T18](2026-09-20-phase-b-agents.md#task-17-extracthints-routebyrule-the-rules-come-first-us-b20-tier-opus) |
-| US-B21 | L7 note routing — ≤3 candidates, never auto-attach | [T19](2026-09-20-phase-b-agents.md#task-19-noterouteloop-search-first-never-auto-attach-us-b21-tier-sonnet) |
-| US-B22 | L6 network follow-up — first-contact detection + inactivity sweep | [T20](2026-09-20-phase-b-agents.md#task-20-followuploop-the-inactivity-detection-sweep-us-b22-tier-sonnet) |
-| US-B23 | L5 morning briefing — arithmetic ranking, one `digests(kind='morning')` row | [T21](2026-09-20-phase-b-agents.md#task-21-rankbriefitems-morningdigestloop-us-b23-tier-opus) |
-| US-B24 | L5 nightly digest + T2 memory consolidation | [T22–T23](2026-09-20-phase-b-agents.md#task-22-nightlydigestloop-full-auto-archive-exposure-the-cost-field-us-b24-tier-opus) |
-| US-B25 | self-model patch proposals + approved `git apply` | [T24](2026-09-20-phase-b-agents.md#task-24-self-model-patch-proposals-apply-us-b25-tier-opus) |
-| US-B26 | unified search API — `GET /search`, four branches, merged ranking | [T1](2026-09-20-phase-b-surfaces.md#task-1-unified-search-api-get-search-us-b26-tier-opus) |
+| US-B17 | notification delivery — macOS local + VAPID Web Push sender | [T12](2026-09-20-phase-b-agents.md#task-12-web-push-sender--macos-local-notifications-us-b17-tier-sonnet) |
+| US-B18 | L8 auto-archive loop + 7-day undo (5 hard gates, 22:00 sweep) | [T13–T14](2026-09-20-phase-b-agents.md#task-13-archiveitem--undoarchive--7-day-undo--30-day-re-archive-exclusion-us-b18-tier-opus) |
+| US-B19 | L3 todo extraction + the pure-SQL reminder job | [T15–T16](2026-09-20-phase-b-agents.md#task-15-taskloop--precision-first-todo-extraction-us-b19-tier-sonnet) |
+| US-B20 | delegation — `routeByRule()`, 4 runaway guards, approved execution | [T17–T18](2026-09-20-phase-b-agents.md#task-17-extracthints--routebyrule--the-rules-come-first-us-b20-tier-opus) |
+| US-B21 | L7 note routing — ≤3 candidates, never auto-attach | [T19](2026-09-20-phase-b-agents.md#task-19-noterouteloop--search-first-never-auto-attach-us-b21-tier-sonnet) |
+| US-B22 | L6 network follow-up — first-contact detection + inactivity sweep | [T20](2026-09-20-phase-b-agents.md#task-20-followuploop--the-inactivity-detection-sweep-us-b22-tier-sonnet) |
+| US-B23 | L5 morning briefing — arithmetic ranking, one `digests(kind='morning')` row | [T21](2026-09-20-phase-b-agents.md#task-21-rankbriefitems--morningdigestloop-us-b23-tier-opus) |
+| US-B24 | L5 nightly digest + T2 memory consolidation | [T22–T23](2026-09-20-phase-b-agents.md#task-22-nightlydigestloop--full-auto-archive-exposure--the-cost-field-us-b24-tier-opus) |
+| US-B25 | self-model patch proposals + approved `git apply` | [T24](2026-09-20-phase-b-agents.md#task-24-self-model-patch-proposals--apply-us-b25-tier-opus) |
+| US-B26 | unified search API — `GET /search`, four branches, merged ranking | [T1](2026-09-20-phase-b-surfaces.md#task-1-unified-search-api--get-search-us-b26-tier-opus) |
 | US-B27 | ⌘K search mode — palette falls through to results | [T2](2026-09-20-phase-b-surfaces.md#task-2-k-search-mode-us-b27-tier-sonnet) |
 | US-B28 | Today screen — greeting, digest card, calendar, briefing list, 4 states | [T3](2026-09-20-phase-b-surfaces.md#task-3-today-screen-us-b28-tier-sonnet) |
 | US-B29 | Tasks screen — 4 tabs, quick add, inline delegation approval | [T4](2026-09-20-phase-b-surfaces.md#task-4-tasks-screen-us-b29-tier-sonnet) |
 | US-B30 | Network screen — person card, follow-up queue, detail pane, merge/split | [T5](2026-09-20-phase-b-surfaces.md#task-5-network-screen-us-b30-tier-sonnet) |
 | US-B31 | Notes screen — routing suggestion with 3 buttons | [T6](2026-09-20-phase-b-surfaces.md#task-6-notes-screen-us-b31-tier-sonnet) |
 | US-B32 | Digest screen — category accordion, restore, cost report | [T7](2026-09-20-phase-b-surfaces.md#task-7-digest-screen-us-b32-tier-sonnet) |
-| US-B33 | Settings screen + the `settings` write path | [T8](2026-09-20-phase-b-surfaces.md#task-8-settings-screen-the-settings-write-path-us-b33-tier-sonnet) |
+| US-B33 | Settings screen + the `settings` write path | [T8](2026-09-20-phase-b-surfaces.md#task-8-settings-screen--the-settings-write-path-us-b33-tier-sonnet) |
 | US-B34 | Tailscale Serve mounts + ACL docs | [T2](2026-09-20-phase-b-ops.md#task-2-tailscale-serve-mount-us-b34-tier-sonnet) |
 | US-B35 | `apps/web` PWA shell — bottom tab bar, manifest, service worker, install card | [T9](2026-09-20-phase-b-surfaces.md#task-9-appsweb-pwa-shell-us-b35-tier-sonnet) |
 | US-B36 | PWA Web Push subscription — in-context permission, subscribe routes, `notificationclick` | [T10](2026-09-20-phase-b-surfaces.md#task-10-pwa-web-push-subscription-us-b36-tier-sonnet) |
-| US-B37 | Outlook adapter — `/common` OAuth, delta polling, 3 write-backs | [T1–T5](2026-09-20-phase-b-channels.md#task-1-outlook-adapter-package-scaffold-normalize-us-b37-tier-sonnet) |
-| US-B38 | Telegram adapter — mtcute sidecar, QR pairing, MTProto stream | [T6–T10](2026-09-20-phase-b-channels.md#task-6-telegram-adapter-package-scaffold-normalize-texteditdelete-us-b38-tier-sonnet) |
-| US-B39 | Hermes read-only session + `GET /transcript/:session_id` | [T11-S, T11–T13](2026-09-20-phase-b-channels.md#task-11-hermes-bridge-probe-capabilities-self-description-session_key_header-verification-us-b39-tier-opus) |
-| US-B40 | adapter health → system Item + real refresh/rewatch jobs | [T14–T16](2026-09-20-phase-b-channels.md#task-14-kernel-recordadapterhealth-dual-exposure-as-a-system-item-ntfy-us-b40-tier-sonnet) |
+| US-B37 | Outlook adapter — `/common` OAuth, delta polling, 3 write-backs | [T1–T5](2026-09-20-phase-b-channels.md#task-1-outlook-adapter--package-scaffold--normalize-us-b37-tier-sonnet) |
+| US-B38 | Telegram adapter — mtcute sidecar, QR pairing, MTProto stream | [T6–T10](2026-09-20-phase-b-channels.md#task-6-telegram-adapter--package-scaffold--normalize-texteditdelete-us-b38-tier-sonnet) |
+| US-B39 | Hermes read-only session + `GET /transcript/:session_id` | [T11-S, T11–T13](2026-09-20-phase-b-channels.md#task-11-hermes-bridge--probe--capabilities-self-description--session_key_header-verification-us-b39-tier-opus) |
+| US-B40 | adapter health → system Item + real refresh/rewatch jobs | [T14–T16](2026-09-20-phase-b-channels.md#task-14-kernel--recordadapterhealth--dual-exposure-as-a-system-item--ntfy-us-b40-tier-sonnet) |
 | US-B41 | backup — `pg_dump` + restic, forget policy, quarterly restore drill | [T3](2026-09-20-phase-b-ops.md#task-3-backup-and-quarterly-restore-drill-us-b41-tier-sonnet) |
 | US-B42 | monitoring — healthcheck pings, ntfy dual alerting, log rotation | [T4](2026-09-20-phase-b-ops.md#task-4-healthcheck-ping-and-dual-alerting-us-b42-tier-sonnet) |
 | US-B43 | mini boot preflight script | [T5](2026-09-20-phase-b-ops.md#task-5-mini-boot-preflight-us-b43-tier-haiku) |
 | US-B44 | monthly cost·usage report job | [T6](2026-09-20-phase-b-ops.md#task-6-monthly-cost-report-job-us-b44-tier-sonnet) |
-| US-B45 | hub adapter registry + bootstrap wiring | [T17](2026-09-20-phase-b-channels.md#task-17-hub-adapter-registry-bootstrap-wiring-us-b45-tier-opus) |
+| US-B45 | hub adapter registry + bootstrap wiring | [T17](2026-09-20-phase-b-channels.md#task-17-hub-adapter-registry--bootstrap-wiring-us-b45-tier-opus) |
 
 ### Deferred
 
