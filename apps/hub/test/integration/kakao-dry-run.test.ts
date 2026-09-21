@@ -209,6 +209,33 @@ describe("KakaoTalk send gate (US-C13)", () => {
     expect(confirmConfig.config.allow_edit).toBe(false);
   });
 
+  it("keeps the confirm acceptable even when the ask forbade accept", async () => {
+    // An agent can propose the ask with accept forbidden, leaving edit as the human's only "do it".
+    // The dry run then runs and the confirm is proposed — and since accepting it is the only route to
+    // a real send (US-C13), it must not inherit that config and become a card nobody can decide.
+    const id = await kernel.approvals.propose({
+      action: "send",
+      args: { text: "on my way" },
+      description: "Send the drafted KakaoTalk reply",
+      config: { allow_accept: false, allow_edit: true, allow_respond: false, allow_ignore: true },
+      thread_id: kakaoThreadId,
+    });
+    await kernel.approvals.decide(id, { decision: "edit", decided_args: { text: "on my way" } });
+    const confirm = await until(() => pendingConfirm(id));
+
+    const row = await one<{ config: { allow_accept: boolean; allow_edit: boolean } }>(
+      pool,
+      "SELECT config FROM pending_approvals WHERE id = $1",
+      [confirm.id],
+    );
+    expect(row.config).toMatchObject({ allow_accept: true, allow_edit: false });
+
+    // And that accept really is what sends.
+    await decide(confirm.id);
+    await until(() => (realCalls().length === 1 ? true : null));
+    expect(realCalls()).toHaveLength(1);
+  });
+
   it("accepting the confirm is the only path to a real send", async () => {
     const dryRunId = await proposeSend(kakaoThreadId);
     await decide(dryRunId);

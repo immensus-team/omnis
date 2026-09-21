@@ -545,9 +545,12 @@ export function startCaptureSendExecutor(deps: CaptureSendExecDeps): CaptureSend
       action: "send",
       args: { ...args, dry_run_preview: preview, confirm_of: a.id },
       description: `Confirm the KakaoTalk dry run: ${preview}`,
-      // Accept or ignore, but never edit: the preview in `args` is what the human approved, and a
-      // confirm carrying different text is refused below. Offering the edit would only dead-end.
-      config: { ...a.config, allow_edit: false },
+      // Accept, never edit: the preview in `args` is what the human approved, and a confirm carrying
+      // different text is refused below, so offering the edit would only dead-end. Accept is forced on
+      // rather than inherited — this confirm is the only route to a real send (US-C13), and an ask
+      // that forbade accept (edit was its human's do-it decision) would otherwise propose a card
+      // nobody can decide.
+      config: { ...a.config, allow_accept: true, allow_edit: false },
       risk: a.risk,
       // The confirm belongs to the same ask, so it keeps the first approval's provenance.
       ...(a.requested_by === null ? {} : { requested_by: a.requested_by }),
@@ -568,10 +571,14 @@ export function startCaptureSendExecutor(deps: CaptureSendExecDeps): CaptureSend
     // approve one, so unlike delegate-exec there is nothing to do until it is decided.
     if (typeof p.id !== "string" || p.state !== "decided") return;
     void execute(p.id).catch((e: unknown) => {
-      // A lost race is an expected outcome, not a fault: two callers can see the same NOTIFY (another
-      // hub process, or an explicit call) and the winner owns the approval. delegate-exec returns
-      // silently for the same reason; runEgress claims outside its own try, so it reaches us here.
-      if (e instanceof ApprovalStateError) return;
+      // A lost race is expected, not a fault: two callers can see the same NOTIFY (another hub process,
+      // or an explicit call) and the winner owns the approval. runEgress claims outside its own try, so
+      // it arrives here. It is a warn rather than silence because a row that moved underneath a
+      // finished execution throws this same type, and that anomaly has to stay findable.
+      if (e instanceof ApprovalStateError) {
+        logger.warn("kakao send execution did not run", { approvalId: p.id, err: e.message });
+        return;
+      }
       logger.error("capture send executor threw", {
         approvalId: p.id,
         err: e instanceof Error ? e.message : String(e),
