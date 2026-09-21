@@ -30,7 +30,7 @@ import { removeSubscription, saveSubscription } from "./push.js";
 import { REPLY_ERROR, proposeReply } from "./reply.js";
 import { createSearchDeps, runSearch } from "./search.js";
 import { isValidSettingKey } from "./settings.js";
-import { TASK_TITLE_MAX_CHARS, createTask } from "./tasks.js";
+import { TASK_TITLE_MAX_CHARS, createTask, setTaskState } from "./tasks.js";
 import { clampLastN, loadTranscript } from "./transcript.js";
 
 const APPROVAL_STATES = [
@@ -438,6 +438,33 @@ export function createHubServer(deps: HubServerDeps): Server {
         });
       }
       return send(res, 201, task);
+    }
+
+    // loop-r2-06/L2-04: the checkbox the screen has always drawn and nothing ever wrote. Same
+    // optional `/api` prefix as the thread routes (Tailscale Serve strips it). Two states, so a bad
+    // one is a 400 rather than a silent no-op, and an id no row matches is a 404 — the same shape
+    // `/notes/:id/route` answers with.
+    const taskStateRoute = /^(?:\/api)?\/tasks\/([0-9a-fA-F-]{36})\/state$/.exec(path);
+    if (taskStateRoute !== null) {
+      if (method !== "POST") return send(res, 405, { error: "method not allowed" });
+      let body: unknown;
+      try {
+        body = await readJson(req);
+      } catch {
+        return send(res, 400, { error: "invalid json body" });
+      }
+      if (body === null || typeof body !== "object") {
+        return send(res, 400, { error: "expected { state: 'done' | 'open' }" });
+      }
+      const state = (body as { state?: unknown }).state;
+      if (state !== "done" && state !== "open") {
+        return send(res, 400, { error: "expected { state: 'done' | 'open' }" });
+      }
+      const taskId = taskStateRoute[1];
+      if (taskId === undefined) return send(res, 400, { error: "bad id" });
+      const task = await setTaskState(pool, taskId, state);
+      if (task === null) return send(res, 404, { error: "task not found" });
+      return send(res, 200, task);
     }
 
     // Delta §7 (US-B33): Settings screen reads, settings write, and the cost banner.
