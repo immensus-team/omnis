@@ -210,6 +210,23 @@ describe("LinkedIn subscribe()", () => {
     await adapter.disconnect();
   });
 
+  // Two rows keyed the same (same ordinal and timestamp — a re-render, or the extractor returning the
+  // row twice) are one item: the dedupe window is what makes the second one a no-op.
+  it("emits a row once even when the extractor returns it twice in one batch", async () => {
+    vi.useFakeTimers();
+    const page = fakePage({ openThread: vi.fn(async () => [message(), message()]) });
+    const adapter = createLinkedInAdapter({ page, now: fixedNow, rand: () => 0 });
+    await adapter.connect(auth);
+    const iterator = adapter.subscribe()[Symbol.asyncIterator]();
+    await iterator.next(); // the `connected` event
+
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    expect(((await iterator.next()).value as NormalizedItem).body).toBe("hi");
+    expect(await stillPending(iterator.next())).toBe(true);
+
+    await adapter.disconnect();
+  });
+
   it("goes degraded when a selector is missing, keeps polling, and needs no retry burst", async () => {
     vi.useFakeTimers();
     const page = fakePage({
@@ -254,6 +271,30 @@ describe("LinkedIn subscribe()", () => {
     const health = await adapter.health();
     expect(health.status).toBe("down");
     expect(health.lastError?.kind).toBe("retryable_network");
+
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    expect(page.pollInbox).toHaveBeenCalledTimes(2);
+
+    await adapter.disconnect();
+  });
+
+  // A throttle is the failure A1 §2.9 actually expects to hit (the provider-limit ceilings), and it is
+  // `down` rather than `degraded` — the extractor is fine, the page is just refusing to answer.
+  it("reports down on a throttle and keeps polling", async () => {
+    vi.useFakeTimers();
+    const page = fakePage({
+      pollInbox: vi
+        .fn(async () => [conversation()])
+        .mockRejectedValueOnce(new Error("HTTP 429: too many requests")),
+    });
+    const adapter = createLinkedInAdapter({ page, now: fixedNow, rand: () => 0 });
+    await adapter.connect(auth);
+    adapter.subscribe();
+
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    const health = await adapter.health();
+    expect(health.status).toBe("down");
+    expect(health.lastError?.kind).toBe("retryable_rate_limit");
 
     await vi.advanceTimersByTimeAsync(POLL_MS);
     expect(page.pollInbox).toHaveBeenCalledTimes(2);
@@ -325,6 +366,32 @@ describe("LinkedIn backfill()", () => {
     expect(items).toHaveLength(1);
   });
 
+  // A walk that cannot finish must say so: silently stopping halfway would leave the first-login
+  // history looking complete when it is not.
+  it("surfaces a mid-walk read failure instead of truncating silently", async () => {
+    const page = fakePage({
+      pollInbox: vi.fn(async () => [
+        conversation({ conversationId: "2-a" }),
+        conversation({ conversationId: "2-b" }),
+      ]),
+      openThread: vi.fn(async (conversationId: string) => {
+        if (conversationId === "2-b") throw new SelectorMissingError("div.msg-s-message-list");
+        return [message({ conversationId, text: "from 2-a" })];
+      }),
+    });
+    const adapter = createLinkedInAdapter({ page, now: fixedNow });
+    await adapter.connect(auth);
+
+    const items: NormalizedItem[] = [];
+    const walk = async (): Promise<void> => {
+      for await (const item of adapter.backfill()) items.push(item);
+    };
+
+    await expect(walk()).rejects.toMatchObject({ kind: "fatal_protocol" });
+    expect(items.map((i) => i.body)).toEqual(["from 2-a"]);
+    expect((await adapter.health()).status).toBe("degraded");
+  });
+
   it("refuses to run before connect()", async () => {
     const adapter = createLinkedInAdapter({ page: fakePage() });
     const iterate = async (): Promise<void> => {
@@ -367,6 +434,21 @@ describe("LinkedIn send()", () => {
     );
     expect(result).toEqual({ externalId: "li:2-YWJjMTIz:1", sentAt: "2026-09-22T00:00:00.000Z" });
     // The sink is the approval path (it is what wraps page.sendText); the adapter still does not call it.
+    expect(page.sendText).not.toHaveBeenCalled();
+  });
+
+  // The approval path is where a send can fail (the gate refused, the page broke). That failure is the
+  // caller's to handle: swallowing it here would report a send that never happened.
+  it("lets a sink rejection reach the caller", async () => {
+    const page = fakePage();
+    const sink = vi.fn(async () => {
+      throw new Error("approval rejected: no gate token");
+    });
+    const adapter = createLinkedInAdapter({ page, sink, now: fixedNow });
+
+    await expect(
+      adapter.send({ accountId: "logan-linkedin", externalId: CONVERSATION_ID }, { text: "hi" }),
+    ).rejects.toThrow("approval rejected: no gate token");
     expect(page.sendText).not.toHaveBeenCalled();
   });
 });

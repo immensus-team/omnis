@@ -233,6 +233,16 @@ describe("LinkedIn normalize()", () => {
     expect(normalize({ messages: [withoutId] })).toEqual([]);
   });
 
+  // Neither text nor media is a row with nothing to show; telegram and slack drop it too, which is what
+  // makes "every stored item has a body or an attachment" an invariant rather than a coincidence.
+  it("drops a row with neither text nor attachments, keeping the rest of the batch", () => {
+    const items = normalize({
+      conversation: conversation(),
+      messages: [message({ text: "", attachments: [] }), message({ ordinal: 3, text: "kept" })],
+    });
+    expect(items.map((i) => i.body)).toEqual(["kept"]);
+  });
+
   // `{ error: {...} }` is the extractor's failure envelope, not a message payload — the error itself is
   // classified by mapError(), never turned into an item.
   it("yields nothing for a non-message payload", () => {

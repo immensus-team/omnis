@@ -29,8 +29,6 @@ export {
   parseNotificationEmail,
 } from "./email.js";
 export {
-  type ExtractedError,
-  type ExtractedThread,
   type LinkedInPageLike,
   type RawAttachment,
   type RawConversation,
@@ -70,7 +68,9 @@ const RATE_LIMIT =
 const LOGGED_OUT =
   /not logged in|login required|sign in|unauthorized|session (?:expired|invalid)|authwall|checkpoint|\b401\b/i;
 /** A LinkedIn UI change breaks the DOM selectors — "element not found" is the same class of failure as
- *  an explicit `SelectorMissingError`, and A1 §2.9 says it is fixed by a manual deploy, never a retry. */
+ *  an explicit `SelectorMissingError`, and A1 §2.9 says it is fixed by a manual deploy, never a retry.
+ *  The bare "selector" also catches Playwright's "Timeout waiting for selector", which a slow page can
+ *  produce; that reads as `degraded` for one poll instead of `down`, and the next poll clears it. */
 const SELECTOR_MISSING = /selectormissingerror|selector|element not found/i;
 
 function causeMessage(cause: unknown): string {
@@ -190,18 +190,25 @@ function messageOf(entry: unknown, fallbackConversationId: string | null): Messa
   const rawSentAt = nonEmptyString(candidate.sentAt);
   if (rawSentAt === null) return null;
   const at = new Date(rawSentAt).getTime();
-  // `sentAt` must be a valid ISO string, so a row stamped with the epoch would be a lie — drop it.
+  // An unreadable timestamp has no place on the timeline, and `sentAt` must be a valid ISO string — a
+  // dropped row beats one stamped with the epoch.
   if (!Number.isFinite(at)) return null;
 
   const senderName = nonEmptyString(candidate.senderName) ?? "";
   const senderProfileUrl = nonEmptyString(candidate.senderProfileUrl);
   const isMe = candidate.isMe === true;
+  const text = typeof candidate.text === "string" ? candidate.text : "";
+  const attachments = attachmentsOf(candidate.attachments);
+  // A row with neither text nor media carries nothing to store; telegram and slack drop the same case
+  // rather than putting a blank line in the inbox.
+  if (text === "" && attachments.length === 0) return null;
+
   return {
     conversationId,
     ordinal: candidate.ordinal,
     authorId: isMe ? "me" : (senderProfileUrl ?? (senderName !== "" ? senderName : "unknown")),
-    text: typeof candidate.text === "string" ? candidate.text : "",
-    attachments: attachmentsOf(candidate.attachments),
+    text,
+    attachments,
     sentAt: new Date(at),
     rawSentAt,
   };

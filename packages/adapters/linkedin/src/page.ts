@@ -50,19 +50,6 @@ export interface LinkedInPageLike {
   sendText(conversationId: string, text: string): Promise<{ sentAt: string }>;
 }
 
-/** The extractor's JSON for one opened conversation. `conversation` carries the thread context the
- *  inbox row had (title, participants); `normalize()` reads `messages` and nothing else is required. */
-export interface ExtractedThread {
-  conversation?: RawConversation;
-  messages: RawMessage[];
-}
-
-/** The extractor's failure envelope — the same shape with no messages (`{ error: ... }` from the
- *  `dom_*_response.json` fixtures). `normalize()` yields nothing for it; `mapError()` classifies it. */
-export interface ExtractedError {
-  error: unknown;
-}
-
 /** A LinkedIn UI update stopped a selector from matching. Not transient, and not fixable by a retry —
  *  the adapter reports `degraded` and keeps polling on its normal schedule while a human ships a fix. */
 export class SelectorMissingError extends Error {
