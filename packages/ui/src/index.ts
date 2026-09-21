@@ -23,6 +23,7 @@ export * from "./components/bottom-bar.js";
 export * from "./components/status-pill.js";
 export * from "./components/group-header.js";
 export * from "./components/filter-chip-bar.js";
+export * from "./components/context-menu.js";
 export * from "./components/key-value-table.js";
 export * from "./components/segmented-control.js";
 export * from "./components/person-card.js";

@@ -3160,4 +3160,85 @@ body {
   .glass-surface.confirm-prompt {
     background: var(--bg-sheet);
   }
+
+  /* §c.7's menu is the row's `…`, so it is the one popover a pointer reaches without a keyboard.
+     It falls back with the rest of them. */
+  .glass-surface.context-menu {
+    background: var(--bg-elevated);
+  }
+}
+
+/* US-D09 §c.7: the contextual menu. It is the third caller of the floating-panel grammar this repo
+   already had twice — the chip popover above and the rail's menu — so it borrows their field
+   (.glass-surface, 12px radius, 6px of inner padding) and differs only in what it holds. Rows are
+   40px, not the sheet's 48px: a menu is scanned, so its lines are tighter than a list's. */
+.context-menu {
+  min-width: 240px;
+  border-radius: 12px;
+  padding: 6px;
+}
+
+/* §c.7: groups are separated by 6px of gap and never by a rule. A hairline inside a panel this
+   small reads as a second edge, not as a separator. */
+.context-menu__group + .context-menu__group {
+  margin-top: 6px;
+}
+
+/* §c.7's optional grey caption ("Move to", "Label") — 12px, secondary, and close to the group it
+   names so the 6px gap stays the only thing between groups. */
+.context-menu__group-label {
+  margin: 0;
+  padding: 6px 10px 2px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* M115: the icon trails the label. The verb is what the eye scans for, so it gets the leading edge
+   and the glyph confirms it on the trailing one. */
+.context-menu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.context-menu__item:hover:not(:disabled),
+.context-menu__item:focus-visible {
+  background: var(--state-hover);
+}
+
+.context-menu__item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.context-menu__item:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+
+.context-menu__item .context-menu__icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+}
+
+/* M115's "Block Contact": a destructive row is destructive in both halves — the label and its
+   glyph. Colouring only the text leaves a grey icon that contradicts it. */
+.context-menu__item[data-destructive="true"],
+.context-menu__item[data-destructive="true"] .context-menu__icon {
+  color: var(--danger-500);
 }
