@@ -3,7 +3,7 @@
 // environment and the setup (jest-dom matchers + afterEach(cleanup)) are declared by the file itself.
 import "./setup";
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AskPanel } from "../src/components/ask-panel";
 
@@ -286,11 +286,49 @@ describe("AskPanel, the narrow tier — vaul's drawer (motion-OSS S5)", () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
-  it("moves focus into the drawer on open", () => {
+  // loop-r2-04 (L2-03, NC2-15): the drawer used to hold no input of its own, so `vaul`'s focus went
+  // to the first tabbable element — the "Suggestions" tab button — and the letters of a search typed
+  // there ran as Inbox shortcuts: "Brightstone"'s `e` archived the selected thread. The input is the
+  // fix, and the caret in it is the half that matters. It is a `type="search"` field, whose ARIA role
+  // is `searchbox` and not `textbox` — `aria-query` maps the type, and the accessible name is the one
+  // the brief names.
+  const drawerInput = () => screen.getByRole("searchbox", { name: "Ask or search" });
+
+  it("draws its own input, named Ask or search", () => {
+    stubTier(true);
+    render(panel(true, null));
+    expect(drawerInput()).toBeInTheDocument();
+  });
+
+  it("types into the palette's query through onQueryChange", () => {
+    stubTier(true);
+    const onQueryChange = vi.fn();
+    render(
+      <AskPanel
+        commands={null}
+        threadSelected
+        summary={null}
+        query=""
+        onQueryChange={onQueryChange}
+        onClose={vi.fn()}
+      />,
+    );
+    fireEvent.change(drawerInput(), { target: { value: "Brightstone" } });
+    expect(onQueryChange).toHaveBeenCalledWith("Brightstone");
+  });
+
+  it("moves the caret into that input on open", async () => {
     stubTier(true);
     render(panel(true, null));
     // `vaul`'s `autoFocus` defaults to *off* and prevents Radix's mount autofocus when it is off;
-    // the drawer passes it, and the panel's first control is where Radix's focus scope lands.
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Suggestions" }));
+    // the drawer passes it. Either way the panel focuses the input itself, in a frame — Radix moves
+    // focus on mount, after the effect that asks for it.
+    await waitFor(() => expect(document.activeElement).toBe(drawerInput()));
+  });
+
+  it("draws no second input above the breakpoint — the bar's own input is the one there", () => {
+    stubTier(false);
+    render(panel(true, null));
+    expect(screen.queryByRole("searchbox", { name: "Ask or search" })).not.toBeInTheDocument();
   });
 });

@@ -1,5 +1,5 @@
 import { Sparkles, X } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { cn } from "../lib/cn.js";
 import { useNarrowShell } from "../lib/media-query.js";
 import { AuroraSurface } from "./aurora-surface.js";
@@ -32,6 +32,10 @@ export interface AskPanelProps {
    *  that closes off the dead end where typing filters the cmdk list while the screen still shows
    *  only suggestions. */
   query?: string;
+  /** loop-r2-04: where the narrow drawer's own input writes. Below 900 the bar's input is under the
+   *  drawer, so the drawer draws one of its own and this is how it reaches the palette's query — the
+   *  same state the bar's input writes, so the two are one query rather than two. */
+  onQueryChange?: (query: string) => void;
   /** US-B27: the input matched no action, so the list under the second tab is search results. The
    *  tab is labelled by what it shows, not by what it usually shows. */
   searchActive?: boolean;
@@ -97,10 +101,22 @@ function AskPanelDrawer({
   threadTitle = null,
   summary,
   query = "",
+  onQueryChange,
   searchActive = false,
   onClose,
 }: AskPanelProps) {
   const { tab, setOverride, summaryShown, setSummaryShown } = usePanelState(open, query);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // loop-r2-04 (L2-03, NC2-15): the drawer's caret goes in its input, and this is what puts it
+  // there. `vaul`'s autofocus is Radix's, which lands on the first tabbable element — before this
+  // input existed that was the "Suggestions" tab button, so a tap or ⌘K followed by "Brightstone"
+  // ran `e`-and-`r`-and-`t` as Inbox shortcuts and archived the selected thread. A frame rather than
+  // a synchronous call because Radix focuses on mount, after this effect.
+  useEffect(() => {
+    if (!open) return;
+    const frame = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
   return (
     <NarrowDrawer
       open={open}
@@ -121,6 +137,22 @@ function AskPanelDrawer({
           may never be the same element). */}
       <AuroraSurface variant="dawn" className="ask-panel__aurora">
         <DrawerGrabber />
+        {/* The drawer's own input, and the reason it is drawn rather than reusing the bar's: the bar
+            is under the drawer at this tier, so the input the drawer's own copy of the query lives in
+            has to be up here with it. It is a plain input rather than a second `Command.Input` — the
+            drawer is a React child of the palette's `Command` root through a portal, so that root's
+            `onKeyDown` already sees this input's arrows, its Enter and its Escape, and a second cmdk
+            input would split the search state the panel exists to keep in one place. */}
+        <input
+          ref={inputRef}
+          className="ask-panel__input"
+          type="search"
+          aria-label="Ask or search"
+          placeholder="Ask or search"
+          value={query}
+          onChange={(e) => onQueryChange?.(e.target.value)}
+          enterKeyHint="search"
+        />
         <AskPanelGlass
           commands={commands}
           recentActions={recentActions}

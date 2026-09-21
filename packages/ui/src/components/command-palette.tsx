@@ -485,6 +485,7 @@ function InlinePalette({
           threadTitle={threadTitle}
           summary={threadSummary}
           query={query}
+          onQueryChange={onQueryChange}
           searchActive={searchActive}
           closing={closing}
           onClose={() => onOpenChange(false)}
