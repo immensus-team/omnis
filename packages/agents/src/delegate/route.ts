@@ -14,8 +14,10 @@ export interface DelegationHints {
   repo: string | null;
 }
 
-/** In Phase B, hermes is not a delegation target (B-D7, master §19 Q7). */
-export type DelegationRuntime = Exclude<RuntimeKind, "hermes">;
+/** C-D6 (was B-D7): hermes is a delegation target in code from Phase C on. It stays off in
+ * production — `delegation.hermes_enabled` (default false) gates the kernel, and the bridge's
+ * Hermes TOML carries `delegation = false` until S-A2-5 passes (US-C27). */
+export type DelegationRuntime = RuntimeKind;
 
 export interface Routing {
   host: HostId;
@@ -63,13 +65,18 @@ export function routeByRule(h: DelegationHints, hosts: HostHealth): Routing | nu
   return null; // no rule could decide → L4 (LLM, T2)
 }
 
-/** A4 §5.2 runtime table. hermes is deferred to Phase C (B-D7). */
+/** A4 §5.2 runtime table, plus C-D6's hermes row. `hermesOnline` and `hermesSkillMatch` are the two
+ * signals the caller reads off the Hermes host — hermes wins only while both hold, and never for a
+ * code task (its runtime is the one that does not build repositories). */
 export function pickRuntime(i: {
   filesTouched: number;
   specClear: boolean;
   liveCodexSession: boolean;
   isCode: boolean;
+  hermesOnline: boolean;
+  hermesSkillMatch: boolean;
 }): DelegationRuntime {
+  if (!i.isCode && i.hermesOnline && i.hermesSkillMatch) return "hermes";
   if (!i.isCode) return "omnis";
   if (i.liveCodexSession) return "codex";
   if (i.filesTouched >= 3 || !i.specClear) return "claude_code";

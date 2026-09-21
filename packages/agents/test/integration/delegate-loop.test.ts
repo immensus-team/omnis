@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { configureAgents, delegateLoop, renderBrief } from "../../src/index.js";
+import { DelegateOutput, configureAgents, delegateLoop, renderBrief } from "../../src/index.js";
 import { returningId } from "./returning-id.js";
 
 const pool = new Pool({
@@ -57,7 +57,7 @@ describe("renderBrief (A4 §5.3)", () => {
 // outside the repo, egress — is in that file's table, plus the guards it did not cover.
 
 describe("delegateLoop (A4 §5)", () => {
-  it("is T2, fires on an unrouted agent task, and cannot propose hermes", () => {
+  it("is T2 and fires on an unrouted agent task", () => {
     expect(delegateLoop.tier).toBe("T2");
     expect(delegateLoop.trigger.on).toBe("task.created");
     expect(delegateLoop.trigger.where).toContain("routing_rule_id IS NULL");
@@ -74,7 +74,9 @@ describe("delegateLoop (A4 §5)", () => {
       "search_memory",
       "propose_delegation",
     ]);
-    expect(delegateLoop.outputSchema.safeParse({ runtime: "hermes" }).success).toBe(false);
+    // US-C07 / C-D6: hermes is a legal runtime now. Asserted on the field, not on a whole object:
+    // safeParse({runtime:"hermes"}) fails on the six missing required fields whatever the enum says.
+    expect(DelegateOutput.shape.runtime.safeParse("hermes").success).toBe(true);
   });
 
   it("creates a pending approval row, never an execution", async () => {

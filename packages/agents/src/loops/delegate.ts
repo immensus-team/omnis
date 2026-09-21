@@ -11,7 +11,7 @@ import type { LoopSpec, TriggerContext } from "../loop/spec.js";
 import { PROPOSE_TOOLS } from "../tools/propose.js";
 
 export const DelegateOutput = z.object({
-  runtime: z.enum(["claude_code", "codex", "claude_ds", "omnis"]), // B-D7: no hermes
+  runtime: z.enum(["claude_code", "codex", "claude_ds", "omnis", "hermes"]), // C-D6: hermes gated
   host: z.enum(["mini", "macbook"]),
   goal: z.string().max(200),
   // No .default() here, for the same reason as taskLoop: once z.input and z.output diverge it

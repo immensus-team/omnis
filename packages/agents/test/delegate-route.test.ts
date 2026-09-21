@@ -69,18 +69,45 @@ describe("routeByRule (A4 §5.2)", () => {
     expect(routeByRule(extractHints("문서 요약"), hosts)).toBe(null);
   });
 
-  it("never routes to hermes in Phase B (B-D7)", () => {
+  // C-D6 (was B-D7): hermes is routable now, so it only stays out of these four cases because both
+  // hermes signals are false here. delegate-hermes.test.ts owns the hermes cases themselves.
+  it("keeps the four A4 §5.2 runtimes when hermes is not in the picture (C-D6)", () => {
+    const noHermes = { hermesOnline: false, hermesSkillMatch: false };
     expect(
-      pickRuntime({ filesTouched: 5, specClear: false, liveCodexSession: false, isCode: true }),
+      pickRuntime({
+        filesTouched: 5,
+        specClear: false,
+        liveCodexSession: false,
+        isCode: true,
+        ...noHermes,
+      }),
     ).toBe("claude_code");
     expect(
-      pickRuntime({ filesTouched: 1, specClear: true, liveCodexSession: false, isCode: true }),
+      pickRuntime({
+        filesTouched: 1,
+        specClear: true,
+        liveCodexSession: false,
+        isCode: true,
+        ...noHermes,
+      }),
     ).toBe("claude_ds");
     expect(
-      pickRuntime({ filesTouched: 1, specClear: true, liveCodexSession: true, isCode: true }),
+      pickRuntime({
+        filesTouched: 1,
+        specClear: true,
+        liveCodexSession: true,
+        isCode: true,
+        ...noHermes,
+      }),
     ).toBe("codex");
     expect(
-      pickRuntime({ filesTouched: 0, specClear: true, liveCodexSession: false, isCode: false }),
+      pickRuntime({
+        filesTouched: 0,
+        specClear: true,
+        liveCodexSession: false,
+        isCode: false,
+        ...noHermes,
+      }),
     ).toBe("omnis");
   });
 
