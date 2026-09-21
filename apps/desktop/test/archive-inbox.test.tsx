@@ -165,6 +165,34 @@ describe("Inbox archive/restore (US-A36)", () => {
     vi.useRealTimers();
   });
 
+  /** Real timers, and one awaited frame: the Archived view focuses its heading a frame after the
+   *  key, because the empty list it leaves behind only renders on the next commit. The component's
+   *  frame is requested before this one, so a single frame is enough (the same reading as
+   *  inbox-keyboard.test.tsx's `nextFrame`). */
+  const nextFrame = async (): Promise<void> => {
+    await act(async () => {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    });
+  };
+
+  it("moves the focus to the heading when the last restore empties the Archived view (L2-28)", async () => {
+    renderInbox();
+    // "Older mail" is the only archived thread this file starts from, so restoring it leaves the
+    // view with no rows at all — and a list with no rows has no row to hold the focus.
+    fireEvent.click(archivedPill());
+    fireEvent.click(screen.getByRole("option", { name: /Older mail/ }));
+    fireEvent.keyDown(window, { key: "u" });
+    expect(url(0)).toContain(`/api/threads/${THREAD_B}/unarchive`);
+
+    // loop-r2-08/L2-28: it used to land on `<body>`, so the next Tab restarted at the top of the
+    // document. A screen with no content puts the focus on its own `h1` — the same target, and the
+    // same element, that a screen switch uses (App.tsx).
+    await nextFrame();
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading).toHaveClass("inbox-card__title");
+    expect(document.activeElement).toBe(heading);
+  });
+
   it("the hover action archives the row it belongs to without opening it", () => {
     vi.useFakeTimers();
     const onOpen = vi.fn();

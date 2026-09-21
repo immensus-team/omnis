@@ -10,7 +10,7 @@
 // gesture rather than two that have to be kept in step.
 import "./setup";
 
-import { type ToastRequest } from "@omnis/ui";
+import type { ToastRequest } from "@omnis/ui";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { VirtuosoMockContext } from "react-virtuoso";
 import { beforeEach, describe, expect, it, vi } from "vitest";

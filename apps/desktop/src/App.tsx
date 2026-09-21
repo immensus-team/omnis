@@ -88,6 +88,12 @@ function reloadPage(): void {
   window.location.reload();
 }
 
+/** loop-r2-08: how long the shell keeps looking for the Inbox row it remembers, in animation frames
+ *  (~330ms at 60Hz). It is only ever spent when a row was selected and the screen is being returned
+ *  to, and the fallback below it is the heading, so running out costs the old behaviour and nothing
+ *  worse. Measured on the live stack: the first frame has no rows, the next two have all ten. */
+const ROW_FOCUS_FRAMES = 20;
+
 /** The other half of A5 §2.4's go-to pair. The letters live in hooks/use-keymap.ts (GOTO_KEYS:
  *  `i` → `go-inbox`, …) next to the rest of the map; this is what those action names mean to the
  *  shell, and it is the only place that reads them. */
@@ -633,33 +639,53 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
    *    from the skip link, and would announce a screen the user has not navigated to. Comparing
    *    values rather than flipping a "first render" boolean is what survives StrictMode's
    *    mount/unmount/remount, which re-runs this effect without the screen having changed.
-   *  - `requestAnimationFrame` waits for the new screen to have mounted. On the Inbox that is not
-   *    politeness: the rows live in the virtualiser, which mounts them in its own layout effect, so
-   *    a synchronous query on this commit would find no row and the focus would not move.
+   *  - the lookup is a *frame*, not a call, and on the Inbox it is a few of them. The rows live in
+   *    the virtualiser, which mounts them in its own layout effect; and coming back to a screen that
+   *    was unmounted re-subscribes its queries, so the frame this effect asks for lands on an Inbox
+   *    with no rows at all — measured on the live stack: zero rows on that frame, ten by the next
+   *    50ms, which is why a single frame focused the heading and left `g i` a screen switch that
+   *    remembered the selection in state and lost it on screen. The retry is bounded and only runs
+   *    for a remembered row: a screen with no row to find focuses its heading on the first frame,
+   *    and a remembered thread that is genuinely gone falls back to the heading a third of a second
+   *    later rather than never.
    *
-   *  The frame is cancelled on the way out — on a second screen switch, and on unmount. A frame
-   *  that outlives the screen it was asked for focuses whatever is on screen when it lands, and
-   *  the case that makes that a bug rather than a near miss is the palette: a "Go to Tasks" row
-   *  both changes the screen *and* closes the palette, so a frame arriving late would move the
-   *  focus off the ask input, whose `onBlur` closes the panel — measured as a search whose results
-   *  never appeared, because a previous test's frame had closed the panel under it. */
+   *  Every frame is cancelled on the way out — on a second screen switch, and on unmount. A frame
+   *  that outlives the screen it was asked for focuses whatever is on screen when it lands, and the
+   *  case that makes that a bug rather than a near miss is the palette: a "Go to Tasks" row both
+   *  changes the screen *and* closes the palette, so a frame arriving late would move the focus off
+   *  the ask input, whose `onBlur` closes the panel — measured as a search whose results never
+   *  appeared, because a previous test's frame had closed the panel under it. */
   const focusMovedForScreen = useRef<ShellScreen>(screen);
+  const focusFrame = useRef<number | null>(null);
   useEffect(() => {
     if (focusMovedForScreen.current === screen) return;
     focusMovedForScreen.current = screen;
-    const frame = requestAnimationFrame(() => {
-      const remembered = screen === "inbox" ? lastInboxSelection.current : null;
+    const focusHeading = (): void => {
+      const heading = document.querySelector(".app-shell__main h1");
+      if (heading instanceof HTMLElement) heading.focus({ preventScroll: true });
+    };
+    const remembered = screen === "inbox" ? lastInboxSelection.current : null;
+    let frames = 0;
+    const look = (): void => {
       if (remembered !== null) {
         const row = document.querySelector(`[data-thread-id="${remembered}"]`);
         if (row instanceof HTMLElement) {
           row.focus({ preventScroll: true });
           return;
         }
+        if (frames < ROW_FOCUS_FRAMES) {
+          frames += 1;
+          focusFrame.current = requestAnimationFrame(look);
+          return;
+        }
       }
-      const heading = document.querySelector(".app-shell__main h1");
-      if (heading instanceof HTMLElement) heading.focus({ preventScroll: true });
-    });
-    return () => cancelAnimationFrame(frame);
+      focusHeading();
+    };
+    focusFrame.current = requestAnimationFrame(look);
+    return () => {
+      if (focusFrame.current !== null) cancelAnimationFrame(focusFrame.current);
+      focusFrame.current = null;
+    };
   }, [screen]);
 
   // A5 §2.4's go-to half of the keymap. Inbox.tsx registers its own for the row actions (archive,
