@@ -189,7 +189,9 @@ describe("InboxRow avatar (U2: photo -> initials+pastel fallback; agent_session 
   // the real brand PNG the rail and Settings already use, not an invented monogram. The assertion
   // is on the <img> and on the *absence* of initials: "OM" over a pastel disc was the defect.
   it("draws the omnis mark for an omnis row, with no monogram beside it", () => {
-    const { container } = render(<InboxRow {...baseProps} name="omnis" avatar={{ kind: "omnis" }} />);
+    const { container } = render(
+      <InboxRow {...baseProps} name="omnis" avatar={{ kind: "omnis" }} />,
+    );
     const avatarEl = container.querySelector(".inbox-row__avatar--omnis");
     expect(avatarEl).toBeInTheDocument();
     expect(avatarEl?.querySelector("img")).toBeInTheDocument();

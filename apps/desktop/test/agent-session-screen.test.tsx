@@ -189,14 +189,16 @@ describe("AgentSession states (loop-r1-07/NC-08)", () => {
   it("leads with the session's own summary when there is one", () => {
     // The row above the pane already says this; a pane that opens with less than its own row is the
     // defect the story closes, so the sentence is carried through rather than reinvented.
-    tables.agent_sessions = [{ ...sessionRow, summary: "Waiting for approval of the reply wording" }];
+    tables.agent_sessions = [
+      { ...sessionRow, summary: "Waiting for approval of the reply wording" },
+    ];
     render(<AgentSession sessionThreadId={SESSION_THREAD} />);
     expect(screen.getByRole("note")).toHaveTextContent(
       "Blocked · Waiting for approval of the reply wording. No approval is waiting in omnis.",
     );
   });
 
-  it("never says \"nothing to decide here yet\" (the sentence is gone)", () => {
+  it('never says "nothing to decide here yet" (the sentence is gone)', () => {
     render(<AgentSession sessionThreadId={SESSION_THREAD} />);
     expect(document.body.textContent ?? "").not.toContain("nothing to decide here yet");
   });
