@@ -559,3 +559,106 @@ regression visible, and a frame shot before the fix cannot carry that. The two f
 along with every other frame the scripts own, and all 22 now carry mtimes after the last edit.
 `inbox-glass.png` and `ai-panel-commands.png` are US-D01 artifacts (`7f979b8`) that no current script
 writes; they are not part of this count and are left as the D01 record.
+
+## motion-OSS — five libraries vetted, two slices of seven adopted, and an evidence script that could not run (2026-09-21)
+
+Logan asked for the hand-rolled motion physics to be replaced with battle-tested open-source motion.
+Five MIT libraries were vetted and installed — `motion@13.4.0`, `vaul@1.1.2`,
+`@use-gesture/react@10.3.1`, `@formkit/auto-animate@0.10.0`, `sonner@2.0.8` — and the wave ran as
+seven slices.
+
+**Two landed, four were evaluated and declined. §c.1.1 of DESIGN-DIRECTION-v3 is the authority for
+every one of those calls** — slice by slice, with the probe or the bundle reading behind each — and it
+is not repeated here. In one line each: **S1** (the libraries, `TIER_MS`/`SPRING` mirroring the
+`--dur-*` rungs with a drift test that reads `tokens.css` off disk, `useMotionPrefs()`, `MotionConfig`
+at the root) and **S6** (the app's first toast, `auto-animate` on the two lists whose *membership*
+changes on a user action) landed; **S2, S3, S4 and S5** — the rail reorder, the inbox row's leave and
+swipe, the detail pane's rubber band, the sheets — did not. In each of those four the port moved
+behaviour the suite currently *checks* into a library the suite cannot drive (jsdom has no layout
+engine: `Reorder`'s drag fired `onReorder` zero times under a full synthetic gesture) or introduced a
+reduced-motion regression this repo's convention forbids (`vaul` has no `prefers-reduced-motion`
+handling at all; motion's `reducedMotion="user"` keeps a transition's duration where `tokens.css`
+collapses it to 80ms).
+
+So the honest summary is that **most of the hand-rolled motion is still hand-rolled**, deliberately.
+`SPRING`, `TIER_MS` and `useMotionPrefs` have no consumer in `apps/` yet; §c.1.1 calls them
+scaffolding, which is what they are, rather than letting a dependency list read as adoption.
+
+### Bundle cost — the real number, not the target
+
+Built at the pre-wave commit `ce580af` in a scratch `git worktree` and at the current tree, reading
+the gzip column:
+
+| asset | baseline `ce580af` | current | delta |
+| --- | --- | --- | --- |
+| `index-*.js` | 267.72 kB | 280.70 kB | **+12.98 kB** |
+| `lazy-inspector-*.js` | 4.12 kB | 4.12 kB | 0 |
+| `index-*.css` | 12.28 kB | 14.97 kB | **+2.69 kB** |
+| **total** | **284.12 kB** | **299.79 kB** | **+15.67 kB** |
+
+Against the brief's ≤ +60 kB target. The JS is `motion` + `sonner` + `auto-animate`; the CSS is
+essentially sonner's own stylesheet plus the `omnis-toast*` token rules. `vaul` and
+`@use-gesture/react` reach no bundle at all, because nothing imports them — the four declined slices
+are exactly why.
+
+The brief's command for this, `pnpm --filter @omnis/desktop build`, **does not exist**;
+`@omnis/desktop`'s script is `vite:build` (`tsc --build && vite build`), and that is what was run.
+
+### An evidence script that could not run
+
+`tools/e2e/shots.ts` was **already broken at `ce580af`**, before this wave touched anything: it waited
+30s for a button named `"More details"` that exists nowhere in the tree. The label was real when
+US-D03 (`b329ee2`) wrote the line; US-D09 (`af2edcf`) renamed the control to `"Details"` and moved it
+into the "Thread options" menu, and the script was never updated. `af2edcf` is an ancestor of
+`ce580af`, and no commit in `ce580af..HEAD` touches `shots.ts`, `Thread.tsx` or `detail-pane.tsx` —
+so this is not this wave's breakage, but it is why S7's screenshot evidence was unobtainable until it
+was fixed, and it means the claim four paragraphs up that both shot scripts "exit 0" had stopped
+being true a wave later. This is the second time an evidence line in this log outlived the thing it
+described.
+
+The fix is the two steps the menu now needs, with `exact: true` — load-bearing because the pane's own
+toggle is named "Expand details" / "Collapse details" and `getByRole` matches accessible names as
+case-insensitive *substrings* by default. The frame it was blocking, `detail-pane.png`, now actually
+shows the open key-value table, which is the entire reason that click is in the script.
+
+**`shots-accent.ts` is still red, and is deliberately left alone.** It times out at
+`shots-accent.ts:273` waiting for the narrow rail's `More` trigger. The locator is valid —
+`channel-rail.tsx:463` carries `aria-label="More"` — and that button is gated on `narrow`
+(`useNarrowShell()`), so the narrow pass is not reaching a narrow shell. What is *proven* is only that
+this is not the wave's doing: nothing in `ce580af..HEAD` touches `shots-accent.ts` or
+`channel-rail.tsx`; `lib/media-query.ts`'s `useNarrowShell` and its breakpoint literal are untouched
+(the wave only *appended* a `prefers-reduced-transparency` query to that file); and `app.css`'s one
+narrow-tier addition is scoped to `[data-sonner-toaster]` on a custom property nothing else in the
+repo reads. The script was last updated at US-D05 (`70fbf40`), while US-D07 and US-D08 rewrote the
+rail and the narrow breakpoint after it — a likely cause, offered as a hypothesis and not as a
+finding, because I did not prove it.
+
+Its 15 frames were **reverted rather than committed half-updated**: the run died partway through, and
+a frame set that is new-in-parts is worse evidence than one that is openly stale.
+
+### Evidence
+
+`pnpm lint` → 805 files checked, exit 0. `pnpm typecheck` → exit 0. The full suite against
+`omnis_test_motion_oss` is **2143 passed | 2 skipped (2145 tests, 238 files: 237 passed | 1 skipped)**
+— the skip is `apps/desktop/test/integration/zero-client.test.ts`, which needs `OMNIS_ZERO_URL`
+pointing at a live zero-cache.
+
+`pnpm tsx tools/e2e/shots.ts` now exits 0 and reports `overflow 0px` with chip/side-slot overlap in
+**0 of 11 rows** at each of 390/768/1024/1280/1440. It re-shot 5 frames (`detail-pane`,
+`filter-chips`, `needs-approval`, `agents-density`, `row-hover-card`), and two of them were read back
+rather than assumed: `detail-pane.png` shows the key-value table open (the state the stale locator
+was blocking), and `filter-chips.png` shows the chip bar rendering unchanged with the label popover
+open, which is the frame that would have shown a regression from `FilterChipBar`'s new auto-animate
+ref if there were one.
+
+Two measurements in this entry are worth naming as measurements rather than claims: the bundle table
+is two real builds read off the gzip column, and the `shots-accent.ts` diagnosis explicitly separates
+what was proven (not this wave) from what was guessed (US-D07/US-D08).
+
+**No double animation** — checked on both sides rather than assumed, since `auto-animate` is the one
+addition that could collide with an existing CSS rule. It animates the animated container's *direct
+children* (the `.filter-chip`s, the `<li>`s), while every `transition` in the chip block is on
+`background` / `color`, and the only `transform` in it is an untransitioned `:active { scale }` on the
+chip's inner `<button>` — a different element from the one being animated. `.settings-screen__chips`
+declares no transition or transform at all. No property is driven by a CSS transition and the library
+at once.
