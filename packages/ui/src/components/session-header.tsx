@@ -56,8 +56,13 @@ export function SessionHeader({
     rows.push({
       label: "Directory",
       value: (
+        // `<bdi>` because the span is `direction: rtl` (app.css: the ellipsis has to fall on the
+        // left, where a path is cut). Without the isolation the path is an LTR run inside an RTL
+        // paragraph, and the leading "/" — a neutral between the paragraph start and a strong LTR
+        // character — is reordered to the *visual end*: `/Users/…-r1` renders as `Users/…-r1/`. The
+        // element makes the path its own LTR run, so the slash stays where the path puts it.
         <span className="session-header__cwd" title={cwd}>
-          {cwd}
+          <bdi>{cwd}</bdi>
         </span>
       ),
     });

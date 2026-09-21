@@ -1863,7 +1863,11 @@ body {
    the product and the right way round here: `/Users/…/omnis.plan-loop-r1` says where a session is
    running, and `/Users/logankim/AI-Workspa…` does not. `direction: rtl` is what moves the ellipsis
    to the left; `text-align: left` puts the shortened text back against the left edge of the value
-   column rather than the right one the RTL direction would choose. */
+   column rather than the right one the RTL direction would choose.
+   The path itself has to be isolated as a run of its own — session-header.tsx wraps it in `<bdi>`
+   — or the RTL paragraph reorders it: the leading "/" is neutral between the paragraph start and
+   the first strong (LTR) character, so it is drawn at the visual end and `/Users/…-r1` reads as
+   `Users/…-r1/`. Isolated, the path keeps its own order and only the clip is RTL's. */
 .session-header__cwd {
   display: block;
   max-width: 100%;
@@ -2811,6 +2815,12 @@ body {
   /* A long value (a full label list, a contract name) wraps instead of pushing the row past the
      card's edge — nothing overflows horizontally at any width. */
   overflow-wrap: anywhere;
+  /* Without this the promise above holds only for values that *may* wrap. This cell is a flex item,
+     and a flex item's `min-width: auto` floor is its content's min-content width — so one child that
+     cannot wrap takes the floor with it and the row draws past its card. loop-r1-07's directory path
+     is that child (`white-space: nowrap`, because a path cut mid-segment says nothing) and measured
+     79px past the sheet at 390 before this: dd 347px wide in a 324px row. */
+  min-width: 0;
 }
 
 /* Times and counts. Tabular figures are what make a column of them line up ("3m" over "11m" over
