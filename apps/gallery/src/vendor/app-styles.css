@@ -5,6 +5,7 @@
    have to be copied here for the demos to render styled. If apps/desktop/src/app.css
    changes, re-copy the whole file below this comment — verbatim, do not hand-pick a
    subset, or demos composing an unlisted selector will silently lose their styling. */
+
 /* Shell layout only. Colour and type come from @omnis/ui/tokens.css (A5 §1).
    react-virtuoso needs its scroller to have a real height before it draws even one row, so the
    height chain is joined here. */
@@ -2262,7 +2263,8 @@ body {
    floating surface, and glass belongs to the sidebar, toolbar, sheet, palette and floating panels
    only (DESIGN-DIRECTION) — so the pane is the plain column the base rule makes it. There is nothing
    to undo: US-D09 moved the glass into the block below rather than leaving a class on the pane for
-   this one to strip, which is also what keeps the pane's toolbar the only glass inside it. */
+   this one to strip. The bar that sits inside the column is the glass one; the pane under it is
+   opaque, so the two are not two glass layers. */
 @container shell (min-width: 1280px) {
   .app-shell__detail {
     background: var(--bg-base);
@@ -2274,14 +2276,14 @@ body {
 }
 
 /* <=1279.98: the detail pane becomes a glass sheet floating over the list. US-D09: the glass is
-   written out here rather than taken from a `.glass-surface` class on the TSX. The class used to be
-   unconditional on the pane and this block relied on it, but §c.5 puts a glass toolbar inside the
-   pane, and a glass surface inside a glass surface is a reject (ACCENT §4.4, reviewer check 2) —
-   and the >=1280 rule above only undid the *look*, not the class. So the pane is opaque by default
-   and is glass only where it actually floats; the recipe is tokens.css's, unmodified, so the sheet
-   is still the same material as the rail and the sheets. 900–1279 is two columns and below 900 is
-   one, but the sheet's skeleton is the same in both — only its width is overridden by the <900
-   block. */
+   written out here rather than taken from a `.glass-surface` class on the TSX — the class used to be
+   unconditional on the pane and the >=1280 rule above only undid the *look*, not the class. The
+   recipe is tokens.css's, unmodified, so the sheet is the same material as the rail and the sheets.
+   This block is what makes the pane glass, and that is the fact the next block depends on: at
+   900–1279.98 the pane's own toolbar stands *in* this sheet, so the toolbar is the one of the two
+   that has to give up the material (see `@container shell (min-width: 900px) and (max-width:
+   1279.98px)` below). 900–1279 is two columns and below 900 is one, but the sheet's skeleton is the
+   same in both — only its width is overridden by the <900 block. */
 @container shell (max-width: 1279.98px) {
   .app-shell__detail {
     background: var(--bg-overlay);
@@ -3337,6 +3339,44 @@ body {
     z-index: 2;
     width: max-content;
     margin-left: auto;
+  }
+}
+
+/* 900–1279.98: the pane is the glass sheet of the <=1279.98 block above, and this bar is the one
+   thing standing inside it — so the bar is the half of the pair that gives up the material. ACCENT
+   §4.4: a glass card inside a glass sheet is a reject, and that rule is about the material, not
+   about which element carries the class. The bar is therefore the sheet's chrome row: the TSX
+   renders it without `.glass-surface` in this tier (ThreadToolbar's `variant="chrome"`), so there
+   is no recipe to override here, and it is a row *above* the scroller rather than sticky over it.
+   Both halves of that are load-bearing. A transparent sticky bar is the shape this must not be:
+   §c.5's stickiness is exactly what slides the message under the bar, and with no field behind it
+   the sender's date and the subject would travel through the glyphs.
+
+   The two rules after it are how the row gets a scroller below it rather than behind it — the
+   sheet stops scrolling, and its only child (`.thread-screen`, which carries no box of its own
+   today) becomes the scroller. */
+@container shell (min-width: 900px) and (max-width: 1279.98px) {
+  .app-shell__detail {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .thread-screen {
+    flex: 1 1 auto;
+    /* Without this a flex item's automatic minimum size is its content height: the column would
+       grow to fit the message instead of scrolling it, and the pane's `overflow: hidden` would clip
+       the bottom rather than reveal it. */
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .thread-toolbar--pane {
+    /* A row of the sheet's chrome, not a capsule floating over the message. */
+    position: static;
+    flex: 0 0 auto;
+    align-self: flex-end;
+    width: max-content;
   }
 }
 
