@@ -225,6 +225,27 @@ function readHeaderClearance(): { gap: number; needs: number; glass: boolean } {
   };
 }
 
+/** Runs in the page (same constraints as readGlassStack). §c.7's cluster arrives on hover, and
+ *  "did it arrive" is the wrong question to put to it: the pill is a *child* of the cluster, and a
+ *  child's `opacity` is its own, so the cluster can be fully revealed while the pill inside it still
+ *  computes `opacity: 0; pointer-events: none` — which is what shipped out of 7a02ecd and what
+ *  phase A's A-archive spent its whole 90s budget trying to click. The material map could not see
+ *  it either, because nothing about the pill's colour is wrong. So this reads the browser's own hit
+ *  test: what would a click at the pill's centre land on, and can the pill receive one at all. */
+function readHoverCluster(): { at: string | null; opacity: string; pointerEvents: string } {
+  const row = document.querySelector(".inbox-row");
+  const pill = row === null ? null : row.querySelector(".inbox-row__action");
+  if (pill === null) return { at: null, opacity: "missing", pointerEvents: "missing" };
+  const rect = pill.getBoundingClientRect();
+  const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+  const style = getComputedStyle(pill);
+  return {
+    at: hit === null ? null : `${hit.tagName.toLowerCase()}.${String(hit.className)}`,
+    opacity: style.opacity,
+    pointerEvents: style.pointerEvents,
+  };
+}
+
 async function openThread(page: Page): Promise<void> {
   await page.locator(".inbox-row").first().click();
   await page.mouse.move(2, 2);
@@ -237,6 +258,22 @@ test("US-D09 surfaces (nested glass, surface material, type scale)", async ({ pa
   await page.waitForSelector(".inbox-row", { timeout: 60_000 });
   await page.waitForTimeout(2500);
   await openThread(page);
+
+  // §c.7's cluster, at the width the acceptance frames are shot at — the same 1440 the loop starts
+  // with. The row is hovered rather than focused: hover is the reveal a pointer gets.
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.waitForTimeout(400);
+  await check("the row's hover cluster is what a click lands on at 1440px (§c.7)", async () => {
+    await page.locator(".inbox-row").first().hover();
+    const { at, opacity, pointerEvents } = await page.evaluate(readHoverCluster);
+    expect(at, "no .inbox-row__action was found in the first row").not.toBeNull();
+    expect(at, `a click at the pill's centre lands on ${String(at)}`).toContain(
+      "inbox-row__action",
+    );
+    expect(pointerEvents, "the pill cannot receive the click it is drawn for").not.toBe("none");
+    expect(Number(opacity), `the revealed pill computes opacity ${opacity}`).toBe(1);
+    return `a click lands on ${String(at)}, opacity ${opacity}, pointer-events ${pointerEvents}`;
+  });
 
   for (const width of WIDTHS) {
     await page.setViewportSize({ width, height: 1000 });
