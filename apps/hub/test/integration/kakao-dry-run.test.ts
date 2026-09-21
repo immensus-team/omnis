@@ -37,10 +37,17 @@ const answer = (params: Record<string, unknown>): { preview: string; sent: boole
   sent: params.dry_run !== true,
 });
 
+/** Replaces the well-behaved answer for one test, so the branches the mini reaches only when
+ *  something is wrong are reachable: it typed on a dry run, or it refused the real send. The real
+ *  handler is apps/local-agent/src/capture.ts — its `preview` is the message body verbatim and `sent`
+ *  is what the channel actually did. */
+let scenario: ((params: Record<string, unknown>) => { preview: string; sent: boolean }) | null =
+  null;
+
 const bridgeCall = vi.fn(
   async (host: HostId, method: HubMethod, params: Record<string, unknown>) => {
     calls.push({ host, method, params });
-    return answer(params);
+    return (scenario ?? answer)(params);
   },
 );
 
@@ -139,6 +146,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   calls.length = 0;
+  scenario = null;
   await kernel.killSwitch.set(false, "kakao dry-run test reset");
   // The gate open, per test: 20 stable days and an opt-in. The closed cases override these.
   await setSetting(pool, "kakao.read_stable_since", ago(20), "test");
@@ -191,6 +199,14 @@ describe("KakaoTalk send gate (US-C13)", () => {
     // The preview is what the confirm card shows, and the confirm carries its own copy.
     expect(row.args.dry_run_preview).toBe("kakao dry run: on my way");
     expect(confirm?.id).not.toBe(id);
+    // The confirm offers accept, never edit: its text must stay the text that was previewed, so the
+    // card must not offer a change the executor would then refuse.
+    const confirmConfig = await one<{ config: { allow_edit: boolean } }>(
+      pool,
+      "SELECT config FROM pending_approvals WHERE id = $1",
+      [confirm.id],
+    );
+    expect(confirmConfig.config.allow_edit).toBe(false);
   });
 
   it("accepting the confirm is the only path to a real send", async () => {
@@ -278,12 +294,43 @@ describe("KakaoTalk send gate (US-C13)", () => {
     await decide(confirm.id);
     await until(() => (realCalls().length === 1 ? true : null));
 
-    // Same text, so every text check passes: only the dry run being spent can refuse this one.
+    // Same text, so every text check passes: only the dry run being spent can refuse this one, and
+    // the claim that finds that out is the conditional UPDATE taken inside the send — the assertion
+    // names the dry run so it cannot pass on some earlier, weaker check.
     const reuse = await proposeSend(kakaoThreadId, { confirm_of: dryRunId });
     await decide(reuse);
 
-    expect((await failedRow(reuse)).fail_reason).toContain("already backed a send");
+    expect((await failedRow(reuse)).fail_reason).toContain(
+      `the dry run ${dryRunId} already backed a send`,
+    );
     expect(realCalls()).toHaveLength(1);
+  });
+
+  it("fails the confirm when the mini refuses to send, without the body in the reason", async () => {
+    const dryRunId = await proposeSend(kakaoThreadId);
+    await decide(dryRunId);
+    const confirm = await until(() => pendingConfirm(dryRunId));
+
+    // The mini's own send gate is still closed, so the real send is refused. Its `preview` is the
+    // message body verbatim, and a failure reason is logged, shown on the card and written to
+    // audit_log — so the body must not be in it.
+    scenario = () => ({ preview: "on my way", sent: false });
+    await decide(confirm.id);
+
+    const row = await failedRow(confirm.id);
+    expect(row.fail_reason).toContain("the mini did not send");
+    expect(row.fail_reason).not.toContain("on my way");
+  });
+
+  it("fails the dry run when the mini claims it typed", async () => {
+    // A dry run that typed is the one thing that must never pass for a preview: the gate in front of
+    // the real send would then never have existed.
+    scenario = () => ({ preview: "on my way", sent: true });
+    const id = await proposeSend(kakaoThreadId);
+    await decide(id);
+
+    expect((await failedRow(id)).fail_reason).toContain("typed the message on a dry run");
+    expect(realCalls()).toHaveLength(0);
   });
 
   it("refuses a confirm whose text the dry run never previewed", async () => {

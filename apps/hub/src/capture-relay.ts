@@ -381,12 +381,11 @@ export function startCaptureSendExecutor(deps: CaptureSendExecDeps): CaptureSend
       thread_id: string | null;
       preview: unknown;
       confirmed: string | null;
-      used: string | null;
       text: string | null;
     }>(
       pool,
       `SELECT state, thread_id, args->'dry_run_preview' AS preview, args->>'confirm_of' AS confirmed,
-              args->>'confirmed_by' AS used, args->>'text' AS text
+              args->>'text' AS text
          FROM pending_approvals WHERE action = 'send' AND id::text = $1`,
       [confirmOf],
     );
@@ -402,11 +401,6 @@ export function startCaptureSendExecutor(deps: CaptureSendExecDeps): CaptureSend
     // naming one would let a chain of approvals reach the window with no dry run in front of it.
     if (dry.confirmed !== null && dry.confirmed !== undefined) {
       return `kakao send confirm_of ${confirmOf} is a confirmation, not a dry run`;
-    }
-    // One dry run backs one real send. Without this the same executed dry run could be named over and
-    // over, and every send after the first would go out with nothing in front of it.
-    if (dry.used !== null && dry.used !== undefined) {
-      return `kakao send confirm_of ${confirmOf} already backed a send`;
     }
     // A dry run on another thread previewed another conversation, not this one.
     if (dry.thread_id !== a.thread_id) {
@@ -517,14 +511,16 @@ export function startCaptureSendExecutor(deps: CaptureSendExecDeps): CaptureSend
           meta: { approval_id: a.id, dry_run: false },
         });
         // The mini answers for itself: its own `[capture] send_enabled` can still hold a send back
-        // (the adapter forces a dry run), and a refusal is not a sent message.
-        if (!r.sent) throw new Error(`the mini did not send: ${r.preview}`);
+        // (the adapter forces a dry run), and a refusal is not a sent message. Its `preview` is the
+        // message body verbatim, so it stays out of the reason — the reason is logged, shown on the
+        // card and written to audit_log.
+        if (!r.sent) throw new Error(`the mini did not send (approval ${a.id})`);
       });
       logger.info("kakao send executed", { approvalId: a.id, confirmOf });
       return;
     }
 
-    const confirmId = await runEgress(deps.kernel, spec(a, "item.send_dry_run"), async () => {
+    const preview = await runEgress(deps.kernel, spec(a, "item.send_dry_run"), async () => {
       const r = await relay.captureSend(ref, { text, meta: { approval_id: a.id, dry_run: true } });
       // The dry run's whole point is that nothing was typed; if the mini says otherwise, the gate in
       // front of the real send was never there.
@@ -538,21 +534,26 @@ export function startCaptureSendExecutor(deps: CaptureSendExecDeps): CaptureSend
           WHERE id = $1`,
         [a.id, r.preview, text],
       );
-      // Proposed inside the egress, so a propose that fails fails the approval: an `executed` dry run
-      // with no confirm behind it is a dead end, as nothing re-drives a send and there is nothing left
-      // for a human to accept.
-      return await deps.kernel.approvals.propose({
-        action: "send",
-        args: { ...args, dry_run_preview: r.preview, confirm_of: a.id },
-        description: `Confirm the KakaoTalk dry run: ${r.preview}`,
-        config: a.config,
-        risk: a.risk,
-        // The confirm belongs to the same ask, so it keeps the first approval's provenance.
-        ...(a.requested_by === null ? {} : { requested_by: a.requested_by }),
-        ...(a.thread_id === null ? {} : { thread_id: a.thread_id }),
-        ...(a.item_id === null ? {} : { item_id: a.item_id }),
-        ...(a.task_id === null ? {} : { task_id: a.task_id }),
-      });
+      return r.preview;
+    });
+
+    // Proposed only once that egress is done, so the confirm's target is `executed` before the confirm
+    // exists: a confirm can never be decided against a dry run that is still executing. A propose that
+    // throws leaves the executed dry run without a confirm and surfaces as `capture send executor
+    // threw` — a dead end, but one that needs a broken DB and is loud rather than silent.
+    const confirmId = await deps.kernel.approvals.propose({
+      action: "send",
+      args: { ...args, dry_run_preview: preview, confirm_of: a.id },
+      description: `Confirm the KakaoTalk dry run: ${preview}`,
+      // Accept or ignore, but never edit: the preview in `args` is what the human approved, and a
+      // confirm carrying different text is refused below. Offering the edit would only dead-end.
+      config: { ...a.config, allow_edit: false },
+      risk: a.risk,
+      // The confirm belongs to the same ask, so it keeps the first approval's provenance.
+      ...(a.requested_by === null ? {} : { requested_by: a.requested_by }),
+      ...(a.thread_id === null ? {} : { thread_id: a.thread_id }),
+      ...(a.item_id === null ? {} : { item_id: a.item_id }),
+      ...(a.task_id === null ? {} : { task_id: a.task_id }),
     });
     logger.info("kakao send dry run complete — confirm proposed", {
       approvalId: a.id,
@@ -567,6 +568,10 @@ export function startCaptureSendExecutor(deps: CaptureSendExecDeps): CaptureSend
     // approve one, so unlike delegate-exec there is nothing to do until it is decided.
     if (typeof p.id !== "string" || p.state !== "decided") return;
     void execute(p.id).catch((e: unknown) => {
+      // A lost race is an expected outcome, not a fault: two callers can see the same NOTIFY (another
+      // hub process, or an explicit call) and the winner owns the approval. delegate-exec returns
+      // silently for the same reason; runEgress claims outside its own try, so it reaches us here.
+      if (e instanceof ApprovalStateError) return;
       logger.error("capture send executor threw", {
         approvalId: p.id,
         err: e instanceof Error ? e.message : String(e),
