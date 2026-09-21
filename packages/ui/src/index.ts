@@ -27,3 +27,12 @@ export { MoreHorizontal as MoreHorizontalIcon } from "lucide-react";
 // The apps (desktop/gallery) do not depend on lucide-react directly — app screens that need an
 // icon take it through @omnis/ui, the same way ChannelGlyph fronts the brand assets.
 export { Archive as ArchiveIcon } from "lucide-react";
+// US-D08 §c.3: the Mail category chips. A chip is icon + label at every width because the label is
+// the half that folds away below 560px of list pane — an icon-less chip would collapse to an empty
+// pill. These five are the only ones the row needs; they are aliased so the app's import sites read
+// as icons rather than as bare nouns that collide with its own identifiers ("Inbox" is a screen).
+export { Inbox as InboxIcon } from "lucide-react";
+export { Briefcase as BriefcaseIcon } from "lucide-react";
+export { User as UserIcon } from "lucide-react";
+export { Bot as BotIcon } from "lucide-react";
+export { Clock as ClockIcon } from "lucide-react";

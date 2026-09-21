@@ -1,6 +1,6 @@
 import * as Popover from "@radix-ui/react-popover";
 import { Command } from "cmdk";
-import { Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { useState } from "react";
 
 /** US-D02: the filter chip bar laid over the list (the filter-DSL chips in
@@ -83,15 +83,14 @@ function AddFilterPopover({
         <button
           type="button"
           className="filter-chip-bar__add"
-          // In a narrow list pane the label word disappears and only the "+" is left (app.css
-          // @container list). An explicit aria-label plus a native tooltip keep the name through
-          // that collapse — the accessible name comes from this aria-label, never from the text
-          // that may or may not be on screen.
+          // US-D08 §c.3: 32px circular icon button, icon-only at every width — the row's end is
+          // two circles (this and the Archived toggle) and neither of them grows a word when the
+          // pane widens. The field name survives in the aria-label and the native tooltip: the
+          // accessible name never comes from a glyph.
           aria-label={`Add ${fieldLabel} filter`}
           title={fieldLabel}
         >
-          <span aria-hidden="true">+</span>
-          <span className="filter-chip-bar__add-label">{fieldLabel}</span>
+          <Plus aria-hidden="true" size={16} />
         </button>
       </Popover.Trigger>
       <Popover.Portal>

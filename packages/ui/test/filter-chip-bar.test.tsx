@@ -141,18 +141,20 @@ describe("FilterChipBar responsive contract (US-D02b)", () => {
     ).toEqual(["filter-chip", "filter-chip-bar__add"]);
   });
 
-  // Below a 560px list pane app.css hides `.filter-chip-bar__add-label` and leaves the "+" — the
-  // collapse is display:none, which JSDOM cannot apply. So what is locked here is that both halves
-  // stay in the DOM and the button keeps a name that does not depend on either being visible.
-  it("keeps the + glyph and the field label in the DOM under one stable accessible name", () => {
-    render(<FilterChipBar chips={[]} addOptions={addOptions()} />);
+  // US-D08 §c.3: the trigger carries no text at any width — the field name lives in the aria-label
+  // and the tooltip only. It is the one control in the strip whose whole label is invisible, so the
+  // name is asserted to exist with nothing on screen to derive it from.
+  it("keeps the field name on an icon-only trigger", () => {
+    const { container } = render(<FilterChipBar chips={[]} addOptions={addOptions()} />);
 
     const add = screen.getByRole("button", { name: "Add Label filter" });
-    // The name comes from aria-label, not from the text that the container query hides.
+    // The name comes from aria-label; there is no visible text left to fall back to.
     expect(add).toHaveAttribute("aria-label", "Add Label filter");
     expect(add).toHaveAttribute("title", "Label");
-    expect(add.querySelector(".filter-chip-bar__add-label")).toHaveTextContent("Label");
-    // The "+" is decoration once the label is there — it must not join the accessible name.
-    expect(within(add).getByText("+")).toHaveAttribute("aria-hidden", "true");
+    expect(add.textContent).toBe("");
+    // The glyph is decoration — it must not join the accessible name.
+    const glyph = container.querySelector(".filter-chip-bar__add svg");
+    expect(glyph).not.toBeNull();
+    expect(glyph).toHaveAttribute("aria-hidden", "true");
   });
 });

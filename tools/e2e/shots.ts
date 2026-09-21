@@ -184,17 +184,19 @@ async function main(): Promise<void> {
     //    the filter chip bar. It used to be filed as "approvals-density", but this view has
     //    neither status pills nor group headers (view 2 below is the one that has both), so it is
     //    named after the screen: needs-approval.png.
-    await page.getByRole("radio", { name: /^needs-approval/ }).click();
+    // US-D08 §c.3: the chip's accessible name is its label (FILTER_LABEL in Inbox.tsx), and the
+    // pending count is no longer part of it — hence an exact name instead of /^needs-approval/.
+    await page.getByRole("radio", { name: "Needs approval" }).click();
     await page.waitForTimeout(800);
     await page.screenshot({ path: join(OUT, "needs-approval.png") });
 
     // 2) agents — state group order (blocked → working → idle → done)
-    await page.getByRole("radio", { name: "agents" }).click();
+    await page.getByRole("radio", { name: "Agents" }).click();
     await page.waitForTimeout(800);
     await page.screenshot({ path: join(OUT, "agents-density.png") });
 
     // 3) Filter chips: actually pick two labels, then frame the chips and the popover (✓) together
-    await page.getByRole("radio", { name: "all" }).click();
+    await page.getByRole("radio", { name: "All" }).click();
     await page.waitForTimeout(400);
     await page.getByRole("button", { name: "Add Label filter" }).click();
     await page.waitForTimeout(300);

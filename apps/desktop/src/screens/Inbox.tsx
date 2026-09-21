@@ -1,10 +1,15 @@
 import {
   ArchiveIcon,
+  BotIcon,
+  BriefcaseIcon,
+  ClockIcon,
   type FilterChip,
   FilterChipBar,
+  InboxIcon,
   OpaqueSurface,
   type UiChannel,
   type UiItemStatus,
+  UserIcon,
 } from "@omnis/ui";
 import { groupBy } from "@omnis/ui/components/command-palette";
 import { GroupHeader } from "@omnis/ui/components/group-header";
@@ -28,6 +33,29 @@ import { useZeroClient } from "../zero-client.js";
 
 export const FILTERS = ["all", "work", "personal", "agents", "needs-approval"] as const;
 export type InboxFilter = (typeof FILTERS)[number];
+
+/** US-D08 §c.3: the chip's visible word. It is Title Case where the filter id is a slug —
+ *  "needs-approval" is an id, never a label — and it is also the chip's accessible name, so the
+ *  name is identical whether or not the container query has folded the word away. Exported because
+ *  a test that spells "Agents" itself is a second copy of this map that fails for the wrong reason
+ *  the day a label is reworded. */
+export const FILTER_LABEL: Record<InboxFilter, string> = {
+  all: "All",
+  work: "Work",
+  personal: "Personal",
+  agents: "Agents",
+  "needs-approval": "Needs approval",
+};
+
+/** US-D08 §c.3: one 16px glyph per chip, drawn at every width. Below 560px of list pane the label
+ *  folds and the glyph is all that is left, which is why the row cannot be text-only. */
+const FILTER_ICON: Record<InboxFilter, typeof InboxIcon> = {
+  all: InboxIcon,
+  work: BriefcaseIcon,
+  personal: UserIcon,
+  agents: BotIcon,
+  "needs-approval": ClockIcon,
+};
 
 /** The minimum the shell (App.tsx) needs to pick a screen. Thread and AgentSession look at the
  *  same threads row, but only kind='agent_session' opens the session screen (A5 §3.3). */
@@ -194,6 +222,9 @@ interface ThreadRow extends InboxQueryItem, ArchivableRow, SortableInboxRow {
   isDraft: boolean;
   channel: UiChannel;
   timestamp: string;
+  /** US-D08 §c.3: the header subline's clock. `timestamp` is already a finished relative phrase and
+   *  cannot be compared, so the raw value travels alongside it. */
+  sentAt: number;
   unread: boolean;
   unreadCount: number;
   labels: LabelChip[];
@@ -358,6 +389,7 @@ export function Inbox({
         isDraft: (item.status as UiItemStatus) === "draft",
         channel: channelByAccount.get(item.account_id) ?? "system",
         timestamp: formatRelativeTime(item.sent_at),
+        sentAt: item.sent_at,
         unread: (item.thread?.unread_count ?? 0) > 0,
         unreadCount: item.thread?.unread_count ?? 0,
         labels: chipsByThread.get(item.thread_id) ?? [],
@@ -554,16 +586,40 @@ export function Inbox({
     [channelFiltered, view, pendingArchive],
   );
 
+  // US-D08 §c.3: the subline under the title. Same three segments Mail shows, in that order, with
+  // any segment that has nothing to say removed — and, because it is a join over a filtered array,
+  // a separator can never be left dangling without a segment after it.
+  // The clock is the newest item **on screen**, not the newest in the mailbox: filtered down to a
+  // quiet channel, "Updated 2h" over a list of two-day-old rows would be advertising freshness the
+  // list below does not have.
+  // ponytail: the channel segment only appears when exactly one account is connected. With several
+  // there is no single account to name, and Mail's answer (the unified "All Inboxes" title) is a
+  // separate feature.
+  const latestSentAt = filtered.length === 0 ? null : Math.max(...filtered.map((r) => r.sentAt));
+  const unreadOnScreen = filtered.reduce((n, r) => n + (r.unread ? 1 : 0), 0);
+  const soleAccount = accounts.length === 1 ? accounts[0] : undefined;
+  const accountChannel = soleAccount ? CHANNEL_LABEL[soleAccount.channel as UiChannel] : null;
+  const subline = [
+    channelFilter ? CHANNEL_LABEL[channelFilter] : accountChannel,
+    latestSentAt === null ? null : `Updated ${formatRelativeTime(latestSentAt)}`,
+    // Dropped at zero: an empty queue is said by an empty list, the rule the needs-approval count
+    // badge already follows.
+    unreadOnScreen > 0 ? `${unreadOnScreen} unread` : null,
+  ]
+    .filter((segment): segment is string => segment !== null)
+    .join(" · ");
+
   return (
     <OpaqueSurface className="inbox-card">
       <div className="inbox-card__header">
         <h2 className="inbox-card__title">{view === "archived" ? "Archived" : "Inbox"}</h2>
+        {subline && <p className="inbox-card__subline">{subline}</p>}
       </div>
       {/* US-D02b: this one line under the title is the whole filter UI — the view pills, the
           Archived toggle and the label chips used to scatter over three lines (that is the
           screenshot where the chips folded into a pile) and are now a single horizontally
-          scrolling strip. Narrow does not wrap it, it slides; app.css's container queries are what
-          strip the two widest buttons down to icons. */}
+          scrolling strip. Narrow does not wrap it, it slides; app.css's container query is what
+          folds every inactive chip down to its icon (US-D08 §c.3). */}
       <div className="inbox-card__filter-row">
         {/* Active label chips lead the strip. They used to sit after five always-present view
             pills, so at 390px the chip currently filtering the list — and its x — scrolled off the
@@ -575,24 +631,36 @@ export function Inbox({
             appears tears that popover down mid-selection, which kills multi-select. */}
         {chips.length > 0 && <FilterChipBar chips={chips} />}
         <div role="radiogroup" aria-label="Inbox filters" className="inbox-card__pills">
-          {FILTERS.map((f) => (
-            <button
-              key={f}
-              type="button"
-              // biome-ignore lint/a11y/useSemanticElements: A5 §2.1 filter pill — <input type="radio"> can't render a pill label+count.
-              role="radio"
-              aria-checked={filter === f}
-              onClick={() => setFilter(f)}
-            >
-              {f}
-              {f === "needs-approval" && pendingCount > 0 && (
-                <span className="inbox-card__pill-count">{pendingCount}</span>
-              )}
-            </button>
-          ))}
+          {FILTERS.map((f) => {
+            const Icon = FILTER_ICON[f];
+            return (
+              <button
+                key={f}
+                type="button"
+                // biome-ignore lint/a11y/useSemanticElements: A5 §2.1 filter pill — <input type="radio"> can't render a pill label+count.
+                role="radio"
+                aria-checked={filter === f}
+                // US-D08 §c.3: the accessible name is the label, stated here rather than inherited
+                // from the chip's contents — below 560px of list pane the container query folds the
+                // word away, leaving an icon-only chip whose name would otherwise collapse with it.
+                // It also keeps the pending count out of the name ("Needs approval 2" announces the
+                // queue twice, once as a number nobody asked for).
+                aria-label={FILTER_LABEL[f]}
+                onClick={() => setFilter(f)}
+              >
+                <Icon size={16} aria-hidden="true" />
+                <span className="inbox-card__chip-label">{FILTER_LABEL[f]}</span>
+                {f === "needs-approval" && pendingCount > 0 && (
+                  <span className="inbox-card__pill-count">{pendingCount}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
         {/* US-A36: the Archived pill. Unlike the filter pills (radio) it is a toggle, so it sits
-            outside the radiogroup. */}
+            outside the radiogroup. US-D08 §c.3: a 32px circle at the row's end, icon-only at every
+            width — the word went with the label element, and the name now lives in aria-label and
+            the title. */}
         <button
           type="button"
           className="inbox-card__archived-pill"
@@ -601,8 +669,7 @@ export function Inbox({
           title="Archived"
           onClick={() => setView((v) => (v === "archived" ? "inbox" : "archived"))}
         >
-          <ArchiveIcon className="inbox-card__archived-icon" size={14} aria-hidden="true" />
-          <span className="inbox-card__archived-label">Archived</span>
+          <ArchiveIcon size={16} aria-hidden="true" />
         </button>
         {/* The "+ Label" trigger keeps the end of the strip whatever is filtering. A workspace
             with no labels at all gets no bar — an empty strip is a control with nothing to

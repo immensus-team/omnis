@@ -736,13 +736,30 @@ body {
    "Archived" broke across two lines). The whole filter UI moved down into the single strip
    below. */
 .inbox-card__header {
-  padding: 14px 16px 8px;
+  padding: 20px 16px 4px;
 }
 
 .inbox-card__title {
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
+  /* US-D08 §b.4: 28px/700 desktop, 32px in the `<900` shell tier (raised with the rest of that
+     tier's type, further down). The title is the screen's one large piece of text; the subline
+     below is the small print that makes it a header rather than a label. */
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+/* US-D08 §c.3: `channel · Updated 3m · 12 unread`, minus any segment with nothing to say. 13px at
+   every width (the tier raises the chips and the rows, not this) — it is a caption, and captions do
+   not need to grow to stay readable. */
+.inbox-card__subline {
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  /* It carries the newest time and the unread count, and a count that jitters as it changes is the
+     one thing tabular figures exist to prevent (§b.4). */
+  font-variant-numeric: tabular-nums;
 }
 
 /* US-D02b: the whole filter UI — radio pills, the Archived toggle and the label chips on one
@@ -761,9 +778,12 @@ body {
   scrollbar-width: none;
   /* `overflow-x: auto` forces the computed `overflow-y` to `auto` as well, so anything drawn
      outside a child's box — a focus ring above all — is clipped by this 40px strip. The vertical
-     padding is that ring's room: 4px above and 6px below clears `outline-offset: 1px` + a 2px
-     outline while the strip stays within its 40px budget. */
-  padding: 4px 16px 6px;
+     padding is that ring's room: 4px above and 4px below clears `outline-offset: 1px` + a 2px
+     outline, and the strip stays inside its 40px budget while holding a 32px chip.
+     US-D08 §c.3: the chips are `--chip-h` (32px) at every width now, so that budget is met at the
+     base rule and the `<560` block no longer trims the bottom padding back — the correction that
+     used to live there had nothing left to correct. */
+  padding: 4px 16px 4px;
   mask-image: linear-gradient(
     to right,
     transparent,
@@ -797,34 +817,52 @@ body {
   gap: 4px;
 }
 
+/* US-D08 §c.3: the Mail category chip — a filled pill with a 16px glyph and a 13px/500 label, not
+   the hairline-outlined tab that stood here. The fill is what makes the row read as a set of
+   choices rather than as a toolbar; the outline was doing the opposite, and the one that is chosen
+   is the one filled with the accent. */
 .inbox-card__pills button {
-  border: var(--hairline);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--chip-h);
+  padding: 0 14px;
+  border: 0;
   border-radius: 999px;
-  padding: 1px 8px;
-  background: transparent;
+  background: var(--chip-bg);
   color: var(--text-secondary);
   font: inherit;
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
+  /* The strip scrolls sideways; a chip that shrinks to fit is the folding bug in a new costume. */
+  flex: 0 0 auto;
 }
 
+.inbox-card__pills button svg {
+  flex: 0 0 auto;
+}
+
+/* §c.3: the active chip is the accent fill and nothing else — no border, no shadow, no scale. The
+   count badge rides on that fill, so it is white-on-accent at 65% opacity: it has to be legible
+   against the accent, not against the paper it stopped sitting on. */
 .inbox-card__pills button[aria-checked="true"] {
   background: var(--accent);
   color: var(--accent-fg);
-  border-color: transparent;
 }
 
 .inbox-card__archived-pill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  border: var(--hairline);
-  border-radius: 999px;
-  padding: 1px 8px;
-  background: transparent;
+  justify-content: center;
+  width: var(--chip-h);
+  height: var(--chip-h);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--chip-bg);
   color: var(--text-secondary);
   font: inherit;
-  font-size: 11px;
   cursor: pointer;
   /* Same as the filter row's other children — this button does not shrink as the pane does. */
   flex: 0 0 auto;
@@ -845,13 +883,6 @@ body {
 .inbox-card__archived-pill[aria-pressed="true"] {
   background: var(--accent);
   color: var(--accent-fg);
-  border-color: transparent;
-}
-
-/* The icon stands in for the word only in a narrow pane (@container list below) — wide keeps the
-   word alone. */
-.inbox-card__archived-icon {
-  display: none;
 }
 
 /* U2: the kinso conversation row — avatar | (name·time / summary·chips) | (channel mark or status
@@ -1618,9 +1649,12 @@ body {
    exactly one group). Inside a tab it has nothing to shift against, so it needs no tabular-nums,
    and it inherits the current label colour instead of going grey so it reads as part of the
    tab. */
+/* US-D08 §c.3: the count used to be faded to 0.65 to sit behind the word. On the active chip that
+   fade was white *at 65% over the accent fill* — 3.4:1, under the 4.5:1 the chip's own label has to
+   clear, on the one chip that is filled. The count now inherits the chip's ink (4.8:1 on accent,
+   and the same `--text-secondary` as the label on a grey chip) and is told apart by position alone;
+   the chip's own `gap` is what separates it from the word. */
 .inbox-card__pill-count {
-  margin-left: 5px;
-  opacity: 0.65;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1740,18 +1774,21 @@ body {
 .filter-chip button:active {
   transform: scale(0.9);
 }
+/* US-D08 §c.3: the "+ Label" trigger is the Archived toggle's twin — a 32px circle in the same
+   `--chip-bg`, icon-only at every width. The word went with the label element; the field name lives
+   in the aria-label and the tooltip (the component states both). */
 .filter-chip-bar__add {
-  /* "+" and the label word as one unit — when the word goes in a narrow pane, the "+" stays. */
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  border: var(--hairline);
-  border-radius: 8px;
-  padding: 3px 10px;
-  background: transparent;
+  justify-content: center;
+  width: var(--chip-h);
+  height: var(--chip-h);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--chip-bg);
   color: var(--text-secondary);
   font: inherit;
-  font-size: 12px;
   cursor: pointer;
   flex: 0 0 auto;
   transition: background var(--dur-base) var(--ease-spring), color var(--dur-base)
@@ -2096,6 +2133,19 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* US-D08 §b.4: this tier's type steps up — the header and the chips are read at arm's length
+     here. The tier is the *shell's* width, not the list pane's: at 768px with the detail pane open
+     the list is still ~736px, so the `list` query that folds the chip labels away never fires, and
+     the one label that stays is the one that grows. That is the intended pairing, not a
+     coincidence — an icon-only chip does not care what size its hidden label is. */
+  .inbox-card__title {
+    font-size: 32px;
+  }
+
+  .inbox-card__pills button {
+    font-size: 14px;
+  }
+
   /* This is the tier where the rail has already collapsed to a bottom bar, i.e. the coarse-pointer
      layout: `:hover` is not something a finger does, and there is no swipe or long-press standing
      in for it, so the hover-only Archive/Restore button is not merely hidden here, it is
@@ -2232,37 +2282,22 @@ body {
    never match at the same pixel.
    ========================================================================================== */
 
-/* <=559.98: two buttons in the filter row drop their words and keep only their icons. The row
-   does slide horizontally, but five tabs + Archived + a chip + "+" simply do not fit on one
-   screen below 560px — collapsing the two that carry the least information ("Label" in "+ Label",
-   and the word "Archived") cuts how far there is to scroll in the first place.
-   The height still has to hold: the buttons become 32px in this block, so the bottom padding
-   comes down to keep the whole row inside 40px. */
+/* <=559.98: every chip that is not the current one drops its word and keeps its icon (US-D08
+   §c.3, Mail's M15 exactly). The row does slide horizontally, but five chips + two circles do not
+   fit across 560px, and the word that costs the most scroll is the one on a chip you have not
+   chosen. The active chip keeps its label: it is the "you are here" of the strip, and an icon-only
+   row with one word in it is more legible than five glyphs and a guess.
+   The chips are already `--chip-h` tall, so nothing about the strip's height changes here — this
+   block is the labels' business only. */
 @container list (max-width: 559.98px) {
-  .filter-chip-bar__add-label,
-  .inbox-card__archived-label {
+  .inbox-card__pills button[aria-checked="false"] {
+    /* 10px, not 14: an icon needs less room around it than a word does, and the two pixels a side
+       are two more pixels of the strip that fit on screen. */
+    padding: 0 10px;
+  }
+
+  .inbox-card__pills button[aria-checked="false"] .inbox-card__chip-label {
     display: none;
-  }
-
-  .inbox-card__archived-icon {
-    display: block;
-  }
-
-  /* An icon-only button keeps a target of at least 32px — the padding takes back what the word
-     gave up. The five view pills come with them: this is the phone tier, they are its primary
-     control, and 19px is half the touch floor. The strip still measures 40px (4 + 32 + 4). */
-  .inbox-card__pills button,
-  .filter-chip-bar__add,
-  .inbox-card__archived-pill {
-    min-height: 32px;
-    min-width: 32px;
-    justify-content: center;
-  }
-
-  /* The controls grow to a 32px touch target here, so the strip gives back two of its six bottom
-     pixels to stay inside the same 40px budget (4 + 32 + 4). */
-  .inbox-card__filter-row {
-    padding-bottom: 4px;
   }
 }
 
