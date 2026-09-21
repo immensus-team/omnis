@@ -20,6 +20,7 @@ import { type ArchiveRouteDeps, handleDigestUndo, handleUnarchiveItem } from "./
 import { setThreadArchived } from "./archive.js";
 import type { HubConfig } from "./config.js";
 import { NOTE_MAX_CHARS, createNote, decideNoteRouting } from "./notes.js";
+import { removeSubscription, saveSubscription } from "./push.js";
 import { createSearchDeps, runSearch } from "./search.js";
 import { isValidSettingKey } from "./settings.js";
 import { clampLastN, loadTranscript } from "./transcript.js";
@@ -81,6 +82,10 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
 export function createHubServer(deps: HubServerDeps): Server {
   const { kernel, pool, config, logger, startedAt } = deps;
   const searchDeps = createSearchDeps(pool);
+  // Delta §7: with no VAPID keypair every /push/* route is 503 — the browser can neither read a key
+  // to subscribe with nor store a subscription nothing could ever deliver to. Checked once here
+  // rather than per route, because "not configured" is a property of the whole family.
+  const webpushConfigured = config.webpushVapidPublic !== "" && config.webpushVapidPrivate !== "";
   // US-B32: partly applied here so archive-routes.ts never has to know about pg or the audit sink.
   const archiveRouteDeps: ArchiveRouteDeps = {
     undoArchive: (ref, actor) => undoArchive(pool, ref, actor, kernel.audit),
@@ -377,6 +382,65 @@ export function createHubServer(deps: HubServerDeps): Server {
       // currentPolicy reads the cap internally but does not report it; the banner needs it.
       const capUsd = await getSetting(pool, "cost.cap_usd", 60);
       return send(res, 200, { state, mtdUsd, capUsd, reserveUsd, policy });
+    }
+
+    // Delta §7 (US-B36): the PWA's Web Push subscription. There is no sending path here — the
+    // browser's Approve button reuses POST /approvals/:id/decide as-is, and delivery is
+    // @omnis/kernel's sendWebPush (single owner, cross review M-webpush). The hub only hands out the
+    // public key and stores/removes what the browser subscribed with.
+    // The /api prefix is optional for the same reason the thread/item routes allow it (Tailscale
+    // Serve strips it), and the PWA reaches these through apps/web's dev proxy in dev.
+    const pushPath = path.startsWith("/api/push/") ? path.slice("/api".length) : path;
+    if (pushPath === "/push/vapid-public-key" || pushPath === "/push/subscribe") {
+      if (!webpushConfigured) return send(res, 503, { error: "web push is not configured" });
+
+      if (pushPath === "/push/vapid-public-key") {
+        if (method !== "GET") return send(res, 405, { error: "method not allowed" });
+        return send(res, 200, { key: config.webpushVapidPublic });
+      }
+
+      if (method === "POST") {
+        let body: unknown;
+        try {
+          body = await readJson(req);
+        } catch {
+          return send(res, 400, { error: "invalid json body" });
+        }
+        const b = body as {
+          endpoint?: unknown;
+          keys?: { p256dh?: unknown; auth?: unknown };
+          ua?: unknown;
+        };
+        if (
+          typeof b.endpoint !== "string" ||
+          typeof b.keys?.p256dh !== "string" ||
+          typeof b.keys?.auth !== "string"
+        ) {
+          return send(res, 400, { error: "expected PushSubscription shape" });
+        }
+        const id = await saveSubscription(pool, {
+          endpoint: b.endpoint,
+          keys: { p256dh: b.keys.p256dh, auth: b.keys.auth },
+          ...(typeof b.ua === "string" ? { ua: b.ua } : {}),
+        });
+        return send(res, 200, { id });
+      }
+
+      if (method === "DELETE") {
+        let body: unknown;
+        try {
+          body = await readJson(req);
+        } catch {
+          return send(res, 400, { error: "invalid json body" });
+        }
+        const b = body as { endpoint?: unknown };
+        if (typeof b.endpoint !== "string") {
+          return send(res, 400, { error: "expected { endpoint: string }" });
+        }
+        return send(res, 200, { removed: await removeSubscription(pool, b.endpoint) });
+      }
+
+      return send(res, 405, { error: "method not allowed" });
     }
 
     return send(res, 404, { error: "not found" });

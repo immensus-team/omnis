@@ -1,29 +1,43 @@
 import { createHmac } from "node:crypto";
 import type { AddressInfo } from "node:net";
-import { createPool } from "@omnis/db";
+import { createPool, query } from "@omnis/db";
 import { type Kernel, SETTING_DEFAULTS, createKernel, createLogger } from "@omnis/kernel";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { HUB_VERSION } from "../../src/config.js";
+import { HUB_VERSION, type HubConfig } from "../../src/config.js";
 import { createHubServer } from "../../src/http.js";
+
+/** VAPID present by default so the /push/* family answers; the 503 case below empties it. */
+function testConfig(overrides: Partial<HubConfig> = {}): HubConfig {
+  return {
+    port: 0,
+    host: "127.0.0.1",
+    version: HUB_VERSION,
+    bridgeToken: "",
+    userId: "logan",
+    zeroAuthSecret: "test-zero-secret",
+    googleOAuthClientId: "",
+    googleOAuthClientSecret: "",
+    outlookClientId: "",
+    ntfyUrl: "http://127.0.0.1:2586",
+    webpushVapidPublic: "test-public-key",
+    webpushVapidPrivate: "test-private-key",
+    webpushSubject: "mailto:test@example.com",
+    ...overrides,
+  };
+}
 
 let base = "";
 let kernel: Kernel;
+let pool: ReturnType<typeof createPool>;
 let close: () => Promise<void>;
 
 beforeAll(async () => {
-  const pool = createPool();
+  pool = createPool();
   kernel = createKernel({ pool });
   const server = createHubServer({
     kernel,
     pool,
-    config: {
-      port: 0,
-      host: "127.0.0.1",
-      version: HUB_VERSION,
-      bridgeToken: "",
-      userId: "logan",
-      zeroAuthSecret: "test-zero-secret",
-    },
+    config: testConfig(),
     logger: createLogger("@omnis/hub"),
     startedAt: Date.now(),
   });
@@ -319,5 +333,100 @@ describe("GET /cost", () => {
 
   it("405s a non-GET", async () => {
     expect((await fetch(`${base}/cost`, { method: "POST" })).status).toBe(405);
+  });
+});
+
+describe("PWA Web Push subscription (US-B36, delta §7)", () => {
+  const endpoint = "https://push.example/routes-test";
+  const create = (body: unknown, method = "POST"): Promise<Response> =>
+    fetch(`${base}/push/subscribe`, {
+      method,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  it("GET /push/vapid-public-key hands the browser the key it subscribes with", async () => {
+    const res = await fetch(`${base}/push/vapid-public-key`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ key: "test-public-key" });
+  });
+
+  it("answers under /api/push/… too, the prefix Tailscale Serve strips", async () => {
+    // The PWA reaches the hub through Tailscale (which mounts it at /api) or through the dev
+    // proxy — the same reason /threads/:id accepts both spellings.
+    expect((await fetch(`${base}/api/push/vapid-public-key`)).status).toBe(200);
+  });
+
+  it("stores the subscription, then upserts a re-subscribe onto the same row", async () => {
+    const first = await create({ endpoint, keys: { p256dh: "p", auth: "a" }, ua: "route test" });
+    expect(first.status).toBe(200);
+    const { id } = (await first.json()) as { id: string };
+    expect(
+      await query<{ p256dh: string; auth: string; ua: string | null }>(
+        pool,
+        "SELECT p256dh, auth, ua FROM push_subscriptions WHERE endpoint = $1",
+        [endpoint],
+      ),
+    ).toEqual([{ p256dh: "p", auth: "a", ua: "route test" }]);
+
+    // A browser that re-subscribes rotates its keys but keeps the endpoint: that updates in place.
+    const second = await create({ endpoint, keys: { p256dh: "p2", auth: "a2" } });
+    expect((await second.json()) as { id: string }).toEqual({ id });
+    expect(
+      await query<{ p256dh: string }>(
+        pool,
+        "SELECT p256dh FROM push_subscriptions WHERE endpoint = $1",
+        [endpoint],
+      ),
+    ).toEqual([{ p256dh: "p2" }]);
+  });
+
+  it("DELETE /push/subscribe removes it, and reports when there was nothing to remove", async () => {
+    // Self-contained: this row is created here rather than borrowed from the test above, so either
+    // one may be run alone.
+    expect((await create({ endpoint, keys: { p256dh: "p", auth: "a" } })).status).toBe(200);
+    expect(await (await create({ endpoint }, "DELETE")).json()).toEqual({ removed: true });
+    expect(await (await create({ endpoint }, "DELETE")).json()).toEqual({ removed: false });
+    expect(
+      await query(pool, "SELECT 1 FROM push_subscriptions WHERE endpoint = $1", [endpoint]),
+    ).toEqual([]);
+  });
+
+  it("400s anything that is not a PushSubscription, and 405s a wrong method", async () => {
+    for (const body of [
+      { endpoint: "https://push.example/x" }, // no keys at all
+      { keys: { p256dh: "p", auth: "a" } }, // no endpoint
+      { endpoint: 7, keys: { p256dh: "p", auth: "a" } }, // endpoint is not a string
+    ]) {
+      expect((await create(body)).status).toBe(400);
+    }
+    expect((await create({}, "DELETE")).status).toBe(400); // DELETE needs an endpoint too
+    expect((await fetch(`${base}/push/vapid-public-key`, { method: "POST" })).status).toBe(405);
+  });
+
+  it("503s the whole family when no VAPID keypair is configured (delta §7)", async () => {
+    const bare = createHubServer({
+      kernel,
+      pool,
+      config: testConfig({ webpushVapidPublic: "", webpushVapidPrivate: "" }),
+      logger: createLogger("@omnis/hub"),
+      startedAt: Date.now(),
+    });
+    await new Promise<void>((r) => bare.listen(0, "127.0.0.1", r));
+    const root = `http://127.0.0.1:${(bare.address() as AddressInfo).port}`;
+    try {
+      expect((await fetch(`${root}/push/vapid-public-key`)).status).toBe(503);
+      expect(
+        (
+          await fetch(`${root}/push/subscribe`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ endpoint, keys: { p256dh: "p", auth: "a" } }),
+          })
+        ).status,
+      ).toBe(503);
+    } finally {
+      await new Promise<void>((r) => bare.close(() => r()));
+    }
   });
 });
