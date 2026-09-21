@@ -2936,6 +2936,260 @@ body {
 }
 
 /* ==========================================================================================
+   US-B31 §3.7 — Notes. One line in, a routing suggestion under it, the recent notes below.
+
+   Same opaque 20px-radius surface in the shell's main column as the Inbox card, Today, Tasks and
+   Network, so switching screens does not move the ground under the reader. There is no card per
+   note: a note is one line of text and where it went, and boxing it would give the list the
+   "SaaS card kit" shape the SKILLS checklist rules out (2, 12) — the rows are separated by the
+   line break itself, the way the person detail pane's lists already are.
+   ========================================================================================== */
+.notes-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  /* Vertical only, for the same reason as Network and Tasks: `hidden` on the cross axis turns a
+     wrapping miss into a visible defect instead of a page-level scrollbar at 390. */
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 16px 20px;
+  border-radius: 20px;
+  box-shadow: var(--shadow-row-selected);
+}
+
+.notes-screen__banner {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.notes-screen__banner[data-state="error"] {
+  color: var(--danger-500);
+}
+
+.notes-screen__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.notes-screen__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* The input is the one thing on this screen you are meant to touch, so it carries the elevated
+   surface and the box the rest of the app's forms use — not a hairline over the paper canvas. */
+.notes-screen__composer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+}
+
+.notes-screen__input {
+  flex: 1 1 220px;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 4px 2px;
+  outline: none;
+}
+
+.notes-screen__input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.notes-screen__input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* The screen's actions — Save, and the suggestion's three. Plain `<button>`s styled here, not
+   `@omnis/ui`'s `Button`: that component styles itself only with Tailwind utilities and
+   apps/desktop compiles no Tailwind, so it renders as the UA's grey system-font box (the defect the
+   Network frames caught). This is the same reset `.network-screen__action` makes. */
+.notes-screen__save,
+.notes-screen__action {
+  flex: 0 0 auto;
+  border: var(--hairline);
+  border-radius: 999px;
+  padding: 3px 12px;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.notes-screen__save {
+  font-weight: 600;
+}
+
+.notes-screen__save:hover:not(:disabled),
+.notes-screen__action:hover:not(:disabled) {
+  border-color: var(--border-hairline-strong);
+  background: var(--state-hover);
+}
+
+.notes-screen__save:focus-visible,
+.notes-screen__action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.notes-screen__save:disabled,
+.notes-screen__action:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+
+/* The suggestion reads as a statement of fact above the list rather than a callout: the same
+   elevated strip the Network screen's follow-up queue uses, so the two screens' "here is what the
+   system noticed" surfaces are one object. No accent colour — A5 §3.7 keeps this feature quiet on
+   purpose, and a suggestion is not an alarm. */
+.notes-screen__suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+}
+
+.notes-screen__suggestion-copy {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.notes-screen__suggestion-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* The one decision the screen wants you to make, so it is the one filled control on it. */
+.notes-screen__action--primary {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.notes-screen__notice {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--danger-500);
+  font-size: 12px;
+}
+
+.notes-screen__recent {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notes-screen__recent-title {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.notes-screen__empty {
+  margin: 0;
+  padding: 8px 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.notes-screen__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+/* Flat at rest: no hairline, no shadow. A note with a decision waiting is the one row that gets the
+   elevated surface, because it is the one row with something left to do (SKILLS checklist 12). */
+.notes-screen__note {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.notes-screen__note[data-state="proposed"] {
+  background: var(--bg-elevated);
+}
+
+.notes-screen__note-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  /* A note is free text typed in one line, so it can hold an unbroken run with nowhere to break. */
+  overflow-wrap: anywhere;
+}
+
+.notes-screen__note-route {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.notes-screen__note-where {
+  overflow-wrap: anywhere;
+}
+
+.notes-screen__note-time {
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+@container shell (max-width: 899.98px) {
+  /* The composer stacks: at 390 the input and Save side by side leave the input about 200px, which
+     is shorter than the placeholder. */
+  .notes-screen__input {
+    flex: 1 1 100%;
+  }
+
+  .notes-screen__save {
+    margin-left: auto;
+  }
+}
+
+/* ==========================================================================================
    US-B29 §3.5 TaskRow — one todo, with where it came from.
 
    The row is flat at rest: no hairline, no shadow, no card. A list of eight todos is read by
