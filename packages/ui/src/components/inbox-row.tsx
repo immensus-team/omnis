@@ -159,8 +159,9 @@ function pickChips(labels: LabelChip[]): { shown: LabelChip[]; more: number } {
 }
 
 /** loop-r1-07: exported for the session header, which is the second surface that draws a runtime's
- *  own tile (32px there, 40px here). The four branches below — a brand mark, a letter fallback, a
- *  photo and initials — are the whole reason this is one component and not a second copy. */
+ *  own tile (32px there, 40px here). The five branches below — a brand mark, a letter fallback,
+ *  omnis's own mark (loop-r2-07), a photo and initials — are the whole reason this is one component
+ *  and not a second copy. */
 export function RowAvatarView({ avatar }: { avatar: RowAvatar }) {
   if (avatar.kind === "runtime") {
     // U5: a runtime with a real brand mark (Claude, DeepSeek, ...) shows that logo; one without

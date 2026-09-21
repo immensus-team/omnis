@@ -220,6 +220,18 @@ async function main(): Promise<void> {
     if ((await screen(page).getByText(asked).count()) !== 1) {
       throw new Error(`the pane does not carry the session's own line "${asked}"`);
     }
+    // The pane's own header tile: this session runs on the omnis runtime, so the header must draw
+    // the mark the row beside it draws. It used to be a black "O" — the same defect as the row's,
+    // one surface further in, and the header is inside the shot this file writes.
+    const headerSlot = page.locator(".session-header__avatar");
+    if ((await headerSlot.locator(".inbox-row__avatar--omnis img").count()) !== 1) {
+      throw new Error("the session header draws no omnis mark");
+    }
+    if ((await headerSlot.textContent())?.trim() !== "") {
+      throw new Error(
+        `the session header still draws a letter: "${await headerSlot.textContent()}"`,
+      );
+    }
     await assertNoOverflowAt(page, "1440 invoice session");
     await page.screenshot({ path: join(OUT, "1440.png") });
     console.log(`1440 — "${INVOICE_TITLE}": "${WAITING}" + the invoice card`);
