@@ -15,14 +15,14 @@
 // repairFixture below): the session's `cwd` is NULL, its one tool call carries `args = {}` (the hub
 // writes `meta.input ?? {}` for a call that reported no input), and no pending approval points at
 // the session thread — densify() proposes only on `kind <> 'agent_session'` threads, so the
-// "Waiting on you" section had nothing to show in the stack as seeded. The rows are left as the
+// waiting section had nothing to show in the stack as seeded. The rows are left as the
 // script wrote them: a second run finds the fixture already in place, and the stack keeps the one
 // approval these screenshots are evidence about.
 //
 // Five checks, in the order a person hits them:
 //   1. Agents pill -> the blocked `claude_code · inbox-draft` session: header title, runtime on its
-//      host, the directory, the "Blocked" pill (the same mapper the inbox row uses), "Waiting on you"
-//      with the card under it, and no "$" anywhere in the screen (UX-13).
+//      host, the directory, the "Blocked" pill (the same mapper the inbox row uses), the waiting
+//      label with the card under it, and no "$" anywhere in the screen (UX-13).
 //   2. The tool call: one line closed, the arguments the DB holds once its summary is clicked.
 //   3. 390: the same session in the sheet, with the header and the approval still on screen.
 //   4. The running "Drafting 3 inbox replies" session: a pane that says it is working rather than an
@@ -50,8 +50,10 @@ const SWEEP = [320, 375, 414, 768] as const;
 const SESSION_KEY = "agent:claude_code:macbook:inbox-draft";
 const WORKING_TITLE = "Drafting 3 inbox replies";
 /** The copy the script asserts on, spelled once so a reworded line fails the check rather than
- *  quietly passing it. */
-const WAITING = "Waiting on you";
+ *  quietly passing it. loop-r2-07 renamed the section label from "Waiting on you" to "Waiting for
+ *  your approval" (the old line named the section but not what the session was waiting on); this
+ *  script is the other reader of that copy, so it moves with it. */
+const WAITING = "Waiting for your approval";
 const WORKING = "Working · no output yet";
 const BLOCKED_PILL = "Blocked";
 
