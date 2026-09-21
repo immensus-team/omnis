@@ -52,7 +52,14 @@ describe("Toaster (motion-OSS S6: the app's first toast)", () => {
 
     // `omnis-toast` / `omnis-toast__action` are the hooks the token styling hangs off. Renaming one
     // without the other leaves the toast unstyled in the app and every test still green, so the
-    // pairing is asserted on both sides here and the CSS side is read from disk.
+    // pairing is pinned here, on the element sonner renders.
+    //
+    // What this file cannot check is whether those classes *win*: app.css's rules and sonner's are
+    // both just text to jsdom, which applies neither. That check is in the browser, at
+    // `tools/e2e/shots-motion-oss.ts` — its leave sequences read the Undo's computed background and
+    // fail unless it is `--accent`. The first version of these class rules was (0,1,0) against
+    // sonner's (0,2,0) and (0,3,0), i.e. dead declarations, and it was that assertion, not this
+    // test, that caught it.
     const text = await screen.findByText("Restored");
     expect(text.closest(".omnis-toast")).not.toBeNull();
     expect(screen.getByRole("button", { name: "Undo" })).toHaveClass("omnis-toast__action");

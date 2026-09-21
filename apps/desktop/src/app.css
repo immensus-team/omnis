@@ -5839,7 +5839,14 @@ button.today-screen__event-title:focus-visible {
    Sheet's block above.
    ========================================================================================== */
 
-[data-sonner-toaster] {
+/* Three attributes, not one. sonner declares its own defaults on
+   `[data-sonner-toaster][data-sonner-theme='light']` — (0,2,0) — so the `[data-sonner-toaster]` this
+   block used to be, (0,1,0), lost outright rather than to import order: the toast on screen was
+   sonner's `#fff` with its `--gray12` text, and none of the four tokens below reached it.
+   `data-sonner-theme` is the other half of the rule that beat it, and `data-y-position` is one
+   sonner always writes (`position="bottom-center"`), so the two together put this block one step
+   above that rule whatever order the two stylesheets load in. */
+[data-sonner-toaster][data-sonner-theme][data-y-position] {
   --normal-bg: var(--bg-elevated);
   --normal-text: var(--text-primary);
   --normal-border: var(--border-hairline);
@@ -5849,7 +5856,13 @@ button.today-screen__event-title:focus-visible {
   font-family: inherit;
 }
 
-.omnis-toast {
+/* sonner's own rules for the toast's box, and for the button inside it, are
+   `[data-sonner-toast][data-styled='true']` (0,2,0) and `… [data-button]` (0,3,0). A bare
+   `.omnis-toast*` class is (0,1,0), so both blocks below were dead CSS — measured in the first
+   run's row-leave-1440-239ms.png, where the toast wore sonner's 16px padding, its 13px type and a
+   dark-grey Undo. Each selector repeats sonner's own chain and then adds its class, which is the one
+   step above it. */
+[data-sonner-toast][data-styled="true"].omnis-toast {
   box-shadow: var(--shadow-glass);
   font-size: 14px;
   /* The action ('Undo') is the only thing to press, so the padding gives it a real target without
@@ -5857,7 +5870,7 @@ button.today-screen__event-title:focus-visible {
   padding: 10px 12px;
 }
 
-.omnis-toast__action {
+[data-sonner-toast][data-styled="true"] [data-button].omnis-toast__action {
   /* `--accent` is this app's one blue and it means "the primary thing to do here" (v3 §b.1); the
      Undo in a toast is exactly that. */
   background: var(--accent);
@@ -5867,15 +5880,22 @@ button.today-screen__event-title:focus-visible {
   padding: 4px 10px;
 }
 
-/* The narrow tier's BottomBar occupies `--bar-h` + `--bar-gap` of the bottom edge, which is
-   exactly where a bottom-centred toaster rests. `!important` because sonner writes the offset as
-   an inline custom property from its `offset` prop (it injects a style tag for it), and an inline
-   custom property beats a stylesheet one — this is the one place a `!important` is the whole
-   mechanism rather than a shortcut. `--bar-h`/`--bar-gap` are on :root in tokens.css, so the
+/* The narrow tier's bars occupy the bottom edge, which is exactly where a bottom-centred toaster
+   rests, so the offset has to clear §c.9's whole band: the rail bar's 56px, the BottomBar's
+   `--bar-h`, and a `--bar-gap` on each side of it (132px at the tokens' current values), plus 8px
+   of air. The two variables are both needed and they are not interchangeable: sonner reads
+   `--offset-bottom` down to its own 600px breakpoint and `--mobile-offset-bottom` below it
+   (`styles.css`, `@media (max-width: 600px)`), and `assignOffset` writes *both* of them inline —
+   24px and 16px — whether or not a caller passes `offset`. So the first version of this rule
+   changed a variable that at 390 nothing reads, and at 600–899 used a sum (72px) that lands inside
+   the bar's own band: the toast sat on the Inbox tile in both frames of the 390 leave sequence.
+   `!important` because those values are inline styles, and an `!important` stylesheet declaration
+   is the only thing that beats one. `--bar-h`/`--bar-gap` are on :root in tokens.css, so the
    portalled toaster can still read them. */
 @media (max-width: 899.98px) {
   [data-sonner-toaster] {
-    --offset-bottom: calc(var(--bar-h) + var(--bar-gap) + 8px) !important;
+    --offset-bottom: calc(56px + var(--bar-h) + var(--bar-gap) * 2 + 8px) !important;
+    --mobile-offset-bottom: calc(56px + var(--bar-h) + var(--bar-gap) * 2 + 8px) !important;
   }
 }
 
