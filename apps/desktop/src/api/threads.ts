@@ -20,3 +20,19 @@ export async function discardDraft(itemId: string): Promise<void> {
   const res = await fetch(`${HUB_HTTP_URL}/api/items/${itemId}/discard`, { method: "POST" });
   if (!res.ok) throw new Error(`draft discard failed: HTTP ${res.status}`);
 }
+
+/** loop-r2-03: the reply composer's one write. A reply is never sent directly — the hub proposes the
+ *  `send` approval and the thread's inline card carries it — so the answer is the new approval's id.
+ *  The caller keeps the body it sent so it can find that card again once Zero has replicated it. */
+export async function proposeReply(
+  threadId: string,
+  body: string,
+): Promise<{ approval_id: string }> {
+  const res = await fetch(`${HUB_HTTP_URL}/api/threads/${threadId}/reply`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+  if (!res.ok) throw new Error(`reply propose failed: HTTP ${res.status}`);
+  return (await res.json()) as { approval_id: string };
+}

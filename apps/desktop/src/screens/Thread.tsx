@@ -9,7 +9,7 @@ import {
   InfoIcon,
   type KeyValueRow,
   KeyValueTable,
-  PHASE_B_TITLE,
+  ReplyComposer,
   ReplyIcon,
   RotateCcwIcon,
   SegmentedControl,
@@ -27,8 +27,9 @@ import {
 import { formatRelativeTime } from "@omnis/ui/lib/relative-time";
 import { type CHANNEL_LABEL, initialsFromName, pastelFromName } from "@omnis/ui/lib/row-meta";
 import { useQuery } from "@rocicorp/zero/react";
-import { type ReactNode, useMemo, useState } from "react";
-import { discardDraft, setThreadArchived } from "../api/threads.js";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { discardDraft, proposeReply, setThreadArchived } from "../api/threads.js";
+import { useKeymap } from "../hooks/use-keymap.js";
 import { useZeroClient } from "../zero-client.js";
 
 export interface ThreadQueryItem {
@@ -167,6 +168,28 @@ export function threadFlow<T extends ThreadQueryItem>(
  *  fresh `new Set()` per render, so the empty case does not invalidate the memo below. */
 const NO_HELD_ITEMS: ReadonlySet<string> = new Set();
 
+/** loop-r2-03: how long the focus waits for the card a submit raised. Past this the reply is still
+ *  on its way — Zero has not replicated it — and leaving the focus on `<body>` after ⌘Enter would
+ *  cost the keyboard user their place, so the subject takes it instead. */
+const CARD_FOCUS_TIMEOUT_MS = 2000;
+
+/** loop-r2-03: the Approve button of the inline card whose quoted body is `body`.
+ *
+ *  A DOM query rather than a ref or a piece of state, because the card is not this screen's child:
+ *  the approval arrives through Zero's replica and is drawn by the flow's own map, so there is no
+ *  handle to hand across renders. The body is what identifies it — the approval id comes back from
+ *  the hub, but the card that matters is the one showing the sentence just typed, and matching on
+ *  the text is also what makes a re-render safe to run this against. */
+function approveButtonFor(body: string): HTMLButtonElement | null {
+  for (const card of document.querySelectorAll(".thread-screen .approval-card")) {
+    if (card.querySelector(".approval-card__body")?.textContent?.trim() !== body) continue;
+    for (const button of card.querySelectorAll("button")) {
+      if (button.textContent?.trim() === "Approve") return button as HTMLButtonElement;
+    }
+  }
+  return null;
+}
+
 /** `children` is the slot directly under the segments — US-D03 put the approval stack there. With
  *  §c.5 the approvals are in the flow, so a caller with something else to say above the
  *  conversation still has the slot; the desktop shell passes nothing. */
@@ -205,6 +228,14 @@ export function Thread({
   const [segment, setSegment] = useState<ThreadSegment>("conversation");
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [metaOpen, setMetaOpen] = useState(false);
+  /** loop-r2-03: the open composer, or null when there is none. An object rather than a boolean so
+   *  the shape already carries the field `initialBody` will need — "Edit & send" on a draft opens
+   *  the same box with text in it, and that is a prop, not a second state. */
+  const [composing, setComposing] = useState<{ body: string } | null>(null);
+  /** The body a submit handed to the hub, held until the card that carries it renders. */
+  const [awaitingBody, setAwaitingBody] = useState<string | null>(null);
+  /** The subject line, which is where the focus goes when that card is late. */
+  const subject = useRef<HTMLHeadingElement>(null);
 
   // The read shape is the one already proven on this screen: items by thread, ascending — plus the
   // thread row itself (US-D01 read archived_at from the same query; US-D03 reads the participants,
@@ -292,23 +323,75 @@ export function Thread({
       ]
     : [];
 
-  // §c.5: archive is the one real state change on this screen. Reply and move are controls whose
-  // destination does not exist yet, so they are disabled with the reason rather than announced as
-  // actionable and doing nothing — the same gate the rail's tiles and the BottomBar's circles use.
+  // §c.5: archive is the one real state change on this screen. loop-r2-03 wired the other control:
+  // Reply opens the composer below, and `r` is its keyboard twin. The two share `openComposer`
+  // rather than each holding its own copy of "open the box" — §e guard 10 wants every affordance to
+  // have a non-gesture twin, and a twin that drifts is worse than none.
   const archiveAction: ThreadToolbarAction = {
     id: "archive",
     label: archived !== null ? "Restore thread" : "Archive thread",
     icon: archived !== null ? RotateCcwIcon : ArchiveIcon,
     onSelect: () => void setThreadArchived(threadId, archived === null),
   };
+  const openComposer = useCallback(() => {
+    // The composer is drawn under the conversation, so a person who opens it from the Summary or
+    // Notes segment is moved to the view that can show it. Opening a box on a segment that does not
+    // render it would be a keyboard shortcut that appears to do nothing.
+    setSegment("conversation");
+    setComposing({ body: "" });
+  }, []);
   const replyAction: ThreadToolbarAction = {
     id: "reply",
     label: "Reply",
     icon: ReplyIcon,
-    onSelect: () => {},
-    disabled: true,
-    title: PHASE_B_TITLE,
+    onSelect: openComposer,
   };
+
+  // loop-r2-03: `r` is the composer's keyboard twin. use-keymap already resolves the letter to
+  // "reply"; this is the only screen that can answer it, and Inbox.tsx's own registration handles
+  // the disjoint set of row actions, which is the same division App.tsx's go-to keys use. An
+  // archived thread is left out: replying to something already filed away is a write the person did
+  // not ask for, and the toolbar's Reply stays live there only because the banner's Restore is one
+  // click away. Typing is excluded by isEditableTarget, so `r` inside the box is a letter.
+  useKeymap(
+    useCallback(
+      (action: string) => {
+        if (action !== "reply" || archived !== null) return;
+        openComposer();
+      },
+      [archived, openComposer],
+    ),
+  );
+
+  // The composer opens at the end of a conversation that can be long, and the toolbar that opened it
+  // may be off screen by then. `block: "nearest"` and not `"end"`: if the box already fits in what
+  // the person is looking at, nothing moves.
+  useEffect(() => {
+    if (composing === null) return;
+    document.querySelector(".reply-composer")?.scrollIntoView({ block: "nearest" });
+  }, [composing]);
+
+  // The focus a submit is owed. Two effects rather than one because they are two different waits:
+  // this one gives up after CARD_FOCUS_TIMEOUT_MS, and the one below hands the focus over the moment
+  // the card renders. Whichever happens first cancels the other, because both end with
+  // `awaitingBody` cleared.
+  useEffect(() => {
+    if (awaitingBody === null) return;
+    const timer = setTimeout(() => {
+      setAwaitingBody(null);
+      subject.current?.focus();
+    }, CARD_FOCUS_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [awaitingBody]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `approvals` is the trigger, not a read — the card is rendered from that list, so a new list is the only signal that its button may now be on screen. The lookup itself runs against the DOM the list produced, which no dependency can name.
+  useEffect(() => {
+    if (awaitingBody === null) return;
+    const approve = approveButtonFor(awaitingBody);
+    if (approve === null) return;
+    setAwaitingBody(null);
+    approve.focus();
+  }, [awaitingBody, approvals]);
 
   // §c.7's menu, shared by both tiers' bars. The two header disclosures moved into it: an icon whose
   // job is to open a panel is a menu row, and the pane's overflow is where they belong now that the
@@ -403,7 +486,13 @@ export function Thread({
               </time>
             )}
           </div>
-          <h2 className="thread-header__subject">{title}</h2>
+          {/* loop-r2-03: the subject is the screen's focus fallback — when a submitted reply's card
+              has not rendered within CARD_FOCUS_TIMEOUT_MS the focus lands here rather than on
+              `<body>`. `tabIndex={-1}` is what makes an `<h2>` a focus target; it does not put the
+              subject in the tab order, so nothing about Tab changes. */}
+          <h2 className="thread-header__subject" ref={subject} tabIndex={-1}>
+            {title}
+          </h2>
         </header>
         <div className="thread-header__segments">
           <SegmentedControl
@@ -498,6 +587,27 @@ export function Thread({
                 }}
               />
             ) : null}
+            {/* loop-r2-03: the composer is the last thing in the conversation — where a reply is
+                written in every mail client, and after the folded card so the box the person is
+                typing into is not above the reply they were just asked about (the reference's
+                reply block sits at the end of the thread, on the opaque body).
+                It proposes rather than sends: the `send` approval it raises arrives through Zero as
+                an ordinary inline card in the flow above this box, which is what the focus hand-off
+                above is waiting for. */}
+            {composing !== null && (
+              <ReplyComposer
+                destination={title}
+                channel={channel}
+                initialBody={composing.body}
+                onSubmit={async (body) => {
+                  await proposeReply(threadId, body);
+                  // The focus is owed to the card this raised, so the body is kept until it renders.
+                  setAwaitingBody(body);
+                  setComposing(null);
+                }}
+                onCancel={() => setComposing(null)}
+              />
+            )}
           </>
         )}
       </div>
