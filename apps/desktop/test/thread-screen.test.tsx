@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { type ThreadQueryItem, findDraftItem, threadSubline } from "../src/screens/Thread";
+import {
+  type ThreadQueryItem,
+  findDraftItem,
+  threadFlow,
+  threadSubline,
+} from "../src/screens/Thread";
 
 const items: ThreadQueryItem[] = [
   { id: "1", status: "read", body: "acknowledged" },
@@ -45,5 +50,55 @@ describe("threadSubline (US-D03: the reference's one grey line under the title)"
         lastActivity: null,
       }),
     ).toBe("Slack · A, B, C +2");
+  });
+});
+
+describe("threadFlow (US-D09 §c.5: approvals are events in the conversation, in document order)", () => {
+  const approval = (id: string, thread_id: string | null, created_at: number) => ({
+    id,
+    thread_id,
+    created_at,
+    risk: "normal",
+    action: "send" as const,
+    description: `${id} description`,
+    config: { allow_accept: true, allow_edit: false, allow_respond: false, allow_ignore: false },
+  });
+
+  const messages: ThreadQueryItem[] = [
+    { id: "m1", status: "read", body: "first", sent_at: 100 },
+    { id: "m2", status: "read", body: "second", sent_at: 300 },
+  ];
+
+  it("places an approval between the messages it came between", () => {
+    const flow = threadFlow(messages, [approval("a1", "t1", 200)], "t1");
+    expect(flow.map((node) => (node.kind === "item" ? node.item.id : node.approval.id))).toEqual([
+      "m1",
+      "a1",
+      "m2",
+    ]);
+  });
+
+  it("keeps another thread's approval out of this one", () => {
+    // The same scoping US-D03 gave the stack: the pane is about the conversation in front of you.
+    const flow = threadFlow(
+      messages,
+      [approval("a1", "other", 200), approval("a2", null, 250)],
+      "t1",
+    );
+    expect(flow).toHaveLength(2);
+  });
+
+  it("puts the message before an approval raised in the same millisecond", () => {
+    // Stable sort, and the push order is items-then-approvals: the thing that caused the approval
+    // is the thing above it.
+    const flow = threadFlow(messages, [approval("a1", "t1", 100)], "t1");
+    expect(flow.map((node) => node.kind)).toEqual(["item", "approval", "item"]);
+  });
+
+  it("keeps an item with no sent_at at the top rather than dropping it", () => {
+    // A fixture (and any row written before sent_at was filled) has no timestamp; the flow shows it
+    // rather than losing a message.
+    const flow = threadFlow([{ id: "m0", status: "read", body: "no clock" }], [], "t1");
+    expect(flow.map((node) => (node.kind === "item" ? node.item.id : ""))).toEqual(["m0"]);
   });
 });

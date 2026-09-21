@@ -196,13 +196,14 @@ function Shell() {
               <AgentSession sessionThreadId={open.threadId} />
             </>
           ) : (
-            <Thread threadId={open.threadId}>
-              <ApprovalStack
-                approvals={approvals as unknown as ApprovalStackItem[]}
-                openThreadId={open.threadId}
-                onDecide={onDecide}
-              />
-            </Thread>
+            // US-D09 §c.5: the thread's approvals go *into* the conversation, in document order,
+            // so this screen gets the list rather than a stack to draw above it. The stack still
+            // owns the pane with nothing open, where the queue is the whole subject.
+            <Thread
+              threadId={open.threadId}
+              approvals={approvals as unknown as ApprovalStackItem[]}
+              onDecide={onDecide}
+            />
           )}
         </section>
       )}

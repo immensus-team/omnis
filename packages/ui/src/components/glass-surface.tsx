@@ -21,6 +21,14 @@ export function GlassSurface({
   );
 }
 
-export function OpaqueSurface(props: { className?: string; children: ReactNode }) {
-  return <div className={cn("opaque-surface", props.className)}>{props.children}</div>;
+/** US-D09 §c.5: like GlassSurface, the remaining div attributes pass through. The content layer's
+ *  cards are the ones that carry state of their own — the tool-call badge is `aria-busy` and
+ *  `data-state` at the same time as it is an opaque surface — and a wrapper div per surface is what
+ *  that avoids. */
+export function OpaqueSurface({ className, children, ...rest }: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cn("opaque-surface", className)} {...rest}>
+      {children}
+    </div>
+  );
 }
