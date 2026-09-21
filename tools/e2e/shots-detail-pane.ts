@@ -349,24 +349,31 @@ async function main(): Promise<void> {
     await page.screenshot({ path: join(OUT, "detail-pane-open-390.png") });
 
     // The "resized" 390 shot. There is nothing on this tier to drag, so the picture is the sheet
-    // again — the assertion that carries the meaning is that a press where the divider *would* be
-    // finds no splitter at all, and the sheet keeps ignoring the 560px setting while it is pressed.
+    // again — the assertion that carries the meaning needs no interaction at all: no splitter is in
+    // the DOM, and the sheet draws the viewport less its 32px of margin whatever width is stored.
+    //
+    // An earlier version of this script pressed where the divider would be and asserted the sheet did
+    // not move. It proved nothing the two checks below do not (a press on an inert surface does
+    // nothing), and it started a text selection that ran across the sheet and the ask bar — so the
+    // evidence for "this tier cannot be resized" came with a photograph of a highlighted UI.
     console.log("390 — resized (nothing to resize)");
-    if ((await grip(page).count()) !== 0) throw new Error("a grip exists in the DOM at 390");
-    await page.mouse.move(2, 500);
-    await page.mouse.down();
-    await page.mouse.move(200, 500);
-    await page.mouse.up();
-    await page.waitForTimeout(SETTLE_MS);
-    const afterPress = await page.evaluate(
+    const splitters = await grip(page).count();
+    if (splitters !== 0) throw new Error(`${splitters} splitter(s) in the DOM at 390`);
+    await parkPointer(page);
+    const sheetAfter = await page.evaluate(
       () => document.querySelector(".app-shell__detail")?.getBoundingClientRect().width ?? 0,
     );
-    if (Math.abs(afterPress - hidden.sheet) > 1) {
-      throw new Error(`a press at the divider moved the sheet: ${hidden.sheet} -> ${afterPress}`);
+    // The tier's own margin arithmetic (16px each side), and the proof that a 560px setting is
+    // ignored here rather than clamped: `min(--detail-width, 100% - 32px)` would be 560 under a
+    // clamp and 358 under this rule, so the two are not the same statement.
+    if (Math.abs(sheetAfter - (hidden.viewport - 32)) > 1) {
+      throw new Error(
+        `the 390 sheet is ${sheetAfter}px, not the viewport less its 32px of margin — the stored 560px width is being honoured on a tier with no handle`,
+      );
     }
     await assertNoOverflowAt(page, "390 resized");
     await page.screenshot({ path: join(OUT, "detail-pane-resized-390.png") });
-    console.log("  no splitter to press; the sheet did not move");
+    console.log(`  no splitter in the DOM; the sheet draws ${sheetAfter}px regardless`);
 
     // ---- 390 collapsed: the tier's pane-less state ----------------------------------------------
     // Below 900 the collapsed flag deliberately does not apply — `paneCollapsed = collapsed &&
@@ -383,7 +390,9 @@ async function main(): Promise<void> {
         WHERE state = 'pending'`,
     );
     await pane(page).waitFor({ state: "detached", timeout: 30_000 });
-    await page.waitForTimeout(SETTLE_MS);
+    // Off the rows before the shot: the list's own `…` / Archive cluster is hover-revealed, so a
+    // pointer resting where the sheet used to be photographs an affordance the reader cannot place.
+    await parkPointer(page);
     const listAt390 = await page.evaluate(
       () => document.querySelector(".inbox-card")?.getBoundingClientRect().width ?? 0,
     );
