@@ -22,6 +22,7 @@
     "eval:draft": "tsx tools/eval/draft.ts",
     "eval:archive": "tsx tools/eval/auto-archive.ts",
     "eval:validate": "tsx tools/eval/validate.ts",
+    "spike:jev": "tsx tools/spikes/gate-jev/run.ts",
     "web:build": "pnpm --filter @omnis/web build",
     "auth:verify": "tsx tools/auth-kit/verify.ts",
     "db:migrate": "pnpm --filter @omnis/db migrate",

@@ -2,6 +2,9 @@
 // Phase A scope (A7 §7 US-A23b): default 'normal', plus 'personal' promotion when the sender is a VIP. Forced T2 routing is a Phase B cost-policy story.
 import type { Sensitivity } from "@omnis/protocol";
 import type { ClassifyCtx } from "./classify/rules.js";
+import { QUESTION, SENSITIVITY_OPTIONS, sensitivityRequest } from "./decision/decisions.js";
+import { decideOrNull } from "./decision/router.js";
+import { choiceOf } from "./decision/types.js";
 import type { ItemRow } from "./types.js";
 
 /** Highest first. The point of this order is that the same mail never gets a different value per run. */
@@ -20,7 +23,8 @@ export function pickSensitivity(...candidates: Sensitivity[]): Sensitivity {
   return "normal";
 }
 
-export async function sensitivityFor(item: ItemRow, ctx: ClassifyCtx): Promise<Sensitivity> {
+/** The T0 answer: the item's own labels, plus the VIP promotion of A7 §7 US-A23b. */
+async function t0Sensitivity(item: ItemRow, ctx: ClassifyCtx): Promise<Sensitivity> {
   if (ctx.authorPersonId === undefined) return pickSensitivity(item.sensitivity);
   const { rows } = await ctx.pool.query<{ vip: boolean }>(
     "SELECT vip FROM persons WHERE id = $1 AND merged_into IS NULL",
@@ -28,4 +32,15 @@ export async function sensitivityFor(item: ItemRow, ctx: ClassifyCtx): Promise<S
   );
   const vip = rows[0]?.vip === true;
   return pickSensitivity(item.sensitivity, ...(vip ? (["personal"] as const) : []));
+}
+
+export async function sensitivityFor(item: ItemRow, ctx: ClassifyCtx): Promise<Sensitivity> {
+  const t0 = await t0Sensitivity(item, ctx);
+  // The decision tier (decision #6) merges through pickSensitivity, whose order is a maximum — so
+  // a Jev answer can raise the level but never lower one the T0 path already found.
+  const jev = await decideOrNull(sensitivityRequest({ subject: item.subject, body: item.body }), {
+    pool: ctx.pool,
+  });
+  const answered = jev === null ? null : choiceOf(jev, QUESTION.sensitivity, SENSITIVITY_OPTIONS);
+  return answered === null ? t0 : pickSensitivity(t0, answered);
 }

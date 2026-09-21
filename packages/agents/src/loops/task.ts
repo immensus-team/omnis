@@ -2,8 +2,18 @@
 import { z } from "zod";
 import { buildContext } from "../context/assemble.js";
 import {
+  HOST_OPTIONS,
+  QUESTION,
+  RUNTIME_OPTIONS,
+  delegationRequest,
+} from "../decision/decisions.js";
+import { decideOrNull } from "../decision/router.js";
+import { choiceOf, probabilityOf } from "../decision/types.js";
+import {
   DELEGATION_DAILY_CAP,
   DELEGATION_THREAD_CAP_24H,
+  type DelegationHints,
+  type Routing,
   extractHints,
   hostHealth,
   routeByRule,
@@ -15,6 +25,8 @@ import { PROPOSE_TOOLS } from "../tools/propose.js";
 
 export const TASK_CONFIDENCE_MIN = 0.7;
 export const TASK_MAX_PER_ITEM = 3;
+/** Minimum P(eligible) before the decision tier hands a task to an agent (see routeDelegation). */
+export const DELEGATION_JEV_MIN = 0.7;
 
 export const TaskOutput = z.object({
   tasks: z
@@ -85,9 +97,10 @@ export const taskLoop: LoopSpec<TaskOutputT> = {
       // A4 §4.4: when owner='agent', run routeByRule inside the same execution (no LLM call, ~1ms).
       if (out === undefined || t.owner !== "agent" || t.duplicate_of !== undefined) continue;
       if (result.injection_flags.length > 0) continue; // runaway guard ④
-      const hints = extractHints(`${t.title}\n${t.detail ?? ""}\n${t.agent_hint ?? ""}`);
-      const routing = routeByRule(hints, await hostHealth());
-      if (routing === null) continue; // no rule matched → L4 wakes up
+      const hintText = `${t.title}\n${t.detail ?? ""}\n${t.agent_hint ?? ""}`;
+      const hints = extractHints(hintText);
+      const routing = await routeDelegation(hints, t.title, t.detail ?? "", hintText);
+      if (routing === null) continue; // neither a rule nor the decision tier could decide
       if (!(await underDelegationCaps(ctx.thread_id ?? null))) continue;
       await PROPOSE_TOOLS.propose_delegation?.execute?.(
         {
@@ -106,6 +119,32 @@ export const taskLoop: LoopSpec<TaskOutputT> = {
     }
   },
 };
+
+/**
+ * A4 §5.2 routing. The deterministic rules run first and win outright when one matches; only the
+ * `null` they leave behind goes to the decision tier. Delegation is an egress path, so the answer
+ * is still a proposal — `underDelegationCaps` and the pending-approval row are checked by the caller.
+ */
+export async function routeDelegation(
+  hints: DelegationHints,
+  title: string,
+  detail: string,
+  hintText: string,
+): Promise<Routing | null> {
+  const byRule = routeByRule(hints, await hostHealth());
+  if (byRule !== null) return byRule;
+  const jev = await decideOrNull(
+    delegationRequest({ taskTitle: title, taskDetail: detail, hints: hintText }),
+    {},
+  );
+  if (jev === null) return null;
+  const eligible = probabilityOf(jev, QUESTION.delegate);
+  const host = choiceOf(jev, QUESTION.host, HOST_OPTIONS);
+  const runtime = choiceOf(jev, QUESTION.runtime, RUNTIME_OPTIONS);
+  if (eligible === null || eligible < DELEGATION_JEV_MIN) return null;
+  if (host === null || runtime === null) return null;
+  return { host, runtime, rule_id: "jev_delegation" };
+}
 
 /** A4 §4.4 runaway guards ①②: 5 per day, 2 per thread in 24h. */
 async function underDelegationCaps(threadId: string | null): Promise<boolean> {

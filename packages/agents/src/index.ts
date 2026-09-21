@@ -37,6 +37,7 @@ export {
   type LoopBudget,
   type LoopId,
   type LoopKind,
+  type LoopSkip,
   type LoopResult,
   type LoopSpec,
   type LoopTrigger,
@@ -52,6 +53,55 @@ export {
   runLoopSpec,
 } from "./loop/run.js";
 export { T2_BASE_URL, T2_MODEL_ID, T2_RUN_MODEL } from "./t2/provider.js";
+export {
+  DeciderUnavailableError,
+  choiceOf,
+  probabilityOf,
+  type DecisionAnswer,
+  type DecisionKind,
+  type DecisionQuestion,
+  type DecisionRequest,
+  type DecisionResponse,
+  type Decider,
+} from "./decision/types.js";
+export { itemState, personState, threadTail } from "./decision/state.js";
+export {
+  HOST_OPTIONS,
+  PRIORITY_OPTIONS,
+  QUESTION,
+  RUNTIME_OPTIONS,
+  SCOPE_OPTIONS,
+  SENSITIVITY_OPTIONS,
+  autoArchiveRequest,
+  classifyRequest,
+  delegationRequest,
+  draftWorthinessRequest,
+  followupRequest,
+  sensitivityRequest,
+} from "./decision/decisions.js";
+export {
+  DECISION_PROVIDER_KEY,
+  DEFAULT_DECISION_PROVIDER,
+  activeDecisionProvider,
+  decideOrNull,
+  parseDecisionProvider,
+  type DecisionOptions,
+  type DecisionProvider,
+} from "./decision/router.js";
+export {
+  JEV_BASE_URL,
+  JEV_KEYCHAIN_ITEM,
+  JEV_MODEL_ID,
+  JEV_PRICE_IN_PER_MTOK,
+  JEV_RUN_MODEL,
+  JEV_RUN_PROVIDER,
+  JEV_TIMEOUT_MS,
+  JevDecider,
+  type JevOptions,
+  type KeychainReader,
+  jevApiKey,
+  keychainRead,
+} from "./providers/jev.js";
 export { PHANTOM_TOOLS, TOOL_NAMES, type ToolName } from "./tools/names.js";
 export { READ_TOOLS } from "./tools/read.js";
 export {
@@ -87,9 +137,11 @@ export {
   type Routing,
 } from "./delegate/route.js";
 export {
+  DELEGATION_JEV_MIN,
   TASK_CONFIDENCE_MIN,
   TASK_MAX_PER_ITEM,
   TaskOutput,
+  routeDelegation,
   taskLoop,
   type TaskOutputT,
 } from "./loops/task.js";
@@ -105,6 +157,7 @@ export {
 export {
   DRAFT_PLACEHOLDER_MS,
   DRAFT_SLA_MS,
+  DRAFT_WORTHINESS_VETO_BELOW,
   DraftOutput,
   draftLoop,
   shouldEscalate,
@@ -119,6 +172,7 @@ export {
   type RouteOutputT,
 } from "./loops/note-route.js";
 export {
+  FOLLOWUP_VETO_BELOW,
   FollowupOutput,
   INACTIVE_SWEEP_LIMIT,
   NO_COLD_OUTREACH_CHANNELS,

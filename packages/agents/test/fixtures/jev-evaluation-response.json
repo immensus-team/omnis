@@ -1,0 +1,50 @@
+{
+  "answers": {
+    "scope": {
+      "type": "choice",
+      "choice": "work",
+      "probabilities": { "work": 0.91, "personal": 0.07, "unknown": 0.02 }
+    },
+    "priority": {
+      "type": "choice",
+      "choice": "today",
+      "probabilities": { "now": 0.05, "today": 0.72, "week": 0.2, "fyi": 0.03 }
+    },
+    "archive": { "type": "boolean", "probability": 0.97 },
+    "worth_drafting": { "type": "boolean", "probability": 0.88 },
+    "reach_out": { "type": "boolean", "probability": 0.12 },
+    "kind": {
+      "type": "choice",
+      "choice": "pending_step",
+      "probabilities": {
+        "post_meeting": 0.1,
+        "first_contact": 0.05,
+        "dormant_revive": 0.15,
+        "pending_step": 0.7
+      }
+    },
+    "delegate": { "type": "boolean", "probability": 0.93 },
+    "runtime": {
+      "type": "choice",
+      "choice": "claude_ds",
+      "probabilities": { "omnis": 0.05, "codex": 0.1, "claude_code": 0.2, "claude_ds": 0.65 }
+    },
+    "sensitivity": {
+      "type": "choice",
+      "choice": "finance",
+      "probabilities": {
+        "normal": 0.02,
+        "personal": 0.05,
+        "finance": 0.85,
+        "legal": 0.06,
+        "health": 0.02
+      }
+    },
+    "urgency": { "type": "score", "score": 1.5, "probabilities": { "0": 0.1, "1": 0.3, "2": 0.6 } }
+  },
+  "usage": { "inputTokens": 412, "outputTokens": 0 },
+  "providerMetadata": {
+    "typesafe": { "confidence": { "scope": 0.88, "priority": 0.81, "archive": 0.91 } }
+  },
+  "modelId": "typesafe-ai/jev-latest"
+}

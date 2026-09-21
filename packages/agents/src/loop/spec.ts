@@ -35,6 +35,15 @@ export interface LoopBudget {
   maxSteps: number;
 }
 
+/**
+ * Returned by `decide()` to end the run with no model call AND no `apply()` — the veto the
+ * decision tier needs (a Jev "do not draft this" must not reach propose_draft). Distinct from
+ * returning null, which means "carry on to the model path".
+ */
+export interface LoopSkip {
+  skip: string;
+}
+
 /** Envelope holding what a loop runs against (delta §4 names this plan's Task 1 as the owner). */
 export interface TriggerContext {
   trigger_kind: "event" | "cron" | "manual";
@@ -72,9 +81,10 @@ export interface LoopSpec<TOut> {
    *  classify-t1.ts, propose.ts) have a parse input that differs from the output, so they do not
    *  fit `z.ZodType<TOut>`. We only parse, so pinning just the output type is enough. */
   outputSchema: z.ZodType<TOut, z.ZodTypeDef, unknown>;
-  /** T0 path that reaches a conclusion with no model. Returning null falls through to the model path.
-   *  Auto-archive ①③④ from A4 §9.2 goes in this slot. */
-  decide?(ctx: TriggerContext): Promise<Omit<LoopResult<TOut>, "run_id"> | null>;
+  /** T0 path that reaches a conclusion with no model generation. Returning null falls through to
+   *  the model path; returning a LoopSkip ends the run without applying anything.
+   *  Auto-archive ①③④ from A4 §9.2 and the decision tier's vetoes go in this slot. */
+  decide?(ctx: TriggerContext): Promise<Omit<LoopResult<TOut>, "run_id"> | LoopSkip | null>;
   assemble(ctx: TriggerContext): Promise<AssembledContext>;
   /** Writes proposals only. Egress modules must not be imported here either (A4 §1.1). */
   apply(result: LoopResult<TOut>, ctx: TriggerContext): Promise<void>;

@@ -2,6 +2,10 @@
 import type { Channel, Sensitivity } from "@omnis/protocol";
 import { z } from "zod";
 import { buildContext } from "../context/assemble.js";
+import { QUESTION, draftWorthinessRequest } from "../decision/decisions.js";
+import { decideOrNull } from "../decision/router.js";
+import { itemState, threadTail } from "../decision/state.js";
+import { probabilityOf } from "../decision/types.js";
 import { CHANNEL_DRAFT_SHAPE, pickRegister } from "../draft/register.js";
 import { selfCheck } from "../draft/selfcheck.js";
 import { registerLoop } from "../loop/registry.js";
@@ -12,6 +16,13 @@ import { PROPOSE_TOOLS } from "../tools/propose.js";
 /** A4 §3.1 SLA: a status='draft' row must exist within 60 seconds. We write a placeholder at 55s first. */
 export const DRAFT_SLA_MS = 60_000;
 export const DRAFT_PLACEHOLDER_MS = 55_000;
+
+/**
+ * Below this P(worth drafting) the decision tier vetoes the loop outright. The trigger's
+ * `needs_reply_score >= 0.5` already fired, so the bar is deliberately low: this is the case where
+ * replying is clearly pointless, not the case where it is merely debatable.
+ */
+export const DRAFT_WORTHINESS_VETO_BELOW = 0.15;
 
 /** LoopSpec.outputSchema is `z.ZodType<TOut>` (input = output), so .default() is not allowed —
  *  the model always fills array and boolean fields (omitting one routes into runLoopSpec's retry/escalation path). */
@@ -133,6 +144,28 @@ export const draftLoop: LoopSpec<DraftOutputT> = {
   outputSchema: DraftOutput,
 
   // The 7 slots of A4 §3.2. Slot names and numbers are exactly as in that table.
+  // Decision #3, veto-only (docs/decisions/2026-09-21-jev-decision-tier.md). A "yes" is not an
+  // approval: this returns null and the T1 model writes the draft exactly as before. Only a
+  // confident "no" acts, and it acts by ending the run before any placeholder row is written.
+  async decide(ctx: TriggerContext) {
+    const itemId = ctx.item_id;
+    const threadId = ctx.thread_id;
+    if (itemId === undefined || threadId === undefined) return null;
+    // Lazy: reading the item and the thread costs two queries, and with the flag off neither runs.
+    const jev = await decideOrNull(async () => {
+      const item = await itemState(itemId);
+      if (item === null) return null;
+      return draftWorthinessRequest({
+        subject: item.subject,
+        body: item.body,
+        threadTail: await threadTail(threadId),
+      });
+    });
+    const worth = jev === null ? null : probabilityOf(jev, QUESTION.worthDrafting);
+    if (worth === null || worth >= DRAFT_WORTHINESS_VETO_BELOW) return null;
+    return { skip: `decision model: no reply is needed (P(worth drafting) = ${worth.toFixed(2)})` };
+  },
+
   assemble: (ctx: TriggerContext) =>
     buildContext({
       selfModel: ["USER.md", "VOICE.md"],

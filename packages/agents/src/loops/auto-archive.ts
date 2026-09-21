@@ -3,6 +3,9 @@
 import type { Pool } from "pg";
 import { z } from "zod";
 import { buildContext } from "../context/assemble.js";
+import { QUESTION, autoArchiveRequest } from "../decision/decisions.js";
+import { decideOrNull } from "../decision/router.js";
+import { probabilityOf } from "../decision/types.js";
 import { registerLoop } from "../loop/registry.js";
 import type { LoopSpec, TriggerContext } from "../loop/spec.js";
 import { getAgentsPool } from "../pool.js";
@@ -86,15 +89,17 @@ export async function hardGate(pool: Pool, itemId: string): Promise<HardGateResu
   return { blocked: false, reason: null };
 }
 
-async function t0Verdict(itemId: string): Promise<AutoArchiveOutputT | null> {
-  const pool = getAgentsPool();
-  const { rows } = await pool.query<{
-    body: string;
-    handle: string;
-    meta: Record<string, unknown>;
-    i_replied: boolean;
-  }>(
-    `SELECT i.body, COALESCE(id2.handle, '') AS handle, i.meta,
+interface ArchiveRow {
+  body: string;
+  subject: string | null;
+  handle: string;
+  meta: Record<string, unknown>;
+  i_replied: boolean;
+}
+
+async function archiveRow(itemId: string): Promise<ArchiveRow | null> {
+  const { rows } = await getAgentsPool().query<ArchiveRow>(
+    `SELECT i.body, i.subject, COALESCE(id2.handle, '') AS handle, i.meta,
             EXISTS (SELECT 1 FROM items x
                      WHERE x.thread_id = i.thread_id AND x.author_is_me AND x.status = 'sent') AS i_replied
        FROM items i
@@ -102,9 +107,20 @@ async function t0Verdict(itemId: string): Promise<AutoArchiveOutputT | null> {
       WHERE i.id = $1 LIMIT 1`,
     [itemId],
   );
-  const r = rows[0];
-  if (r === undefined) return null;
+  return rows[0] ?? null;
+}
 
+/** The `List-Unsubscribe` probe nonHumanSender() uses, reused so the two cannot drift. */
+function hasUnsubscribe(meta: Record<string, unknown>): boolean {
+  const nested = meta.headers;
+  const headers = (typeof nested === "object" && nested !== null ? nested : meta) as Record<
+    string,
+    unknown
+  >;
+  return typeof headers["List-Unsubscribe"] === "string";
+}
+
+function t0Verdict(r: ArchiveRow): AutoArchiveOutputT | null {
   const rules: string[] = [];
   // ① the sender is not a human (T0, $0)
   if (!nonHumanSender({ handle: r.handle, meta: r.meta })) return null;
@@ -118,10 +134,9 @@ async function t0Verdict(itemId: string): Promise<AutoArchiveOutputT | null> {
   if (r.body.includes("?") || r.body.includes("？")) return null;
   rules.push(AUTO_ARCHIVE_RULES.noCta);
 
-  const headers = (r.meta as { headers?: Record<string, unknown> }).headers;
   return {
     archive: true,
-    reason: typeof headers?.["List-Unsubscribe"] === "string" ? "newsletter" : "notification email",
+    reason: hasUnsubscribe(r.meta) ? "newsletter" : "notification email",
     rule_ids: rules,
     tier: "T0",
     confidence: 0.95,
@@ -184,13 +199,54 @@ export const autoArchiveLoop: LoopSpec<AutoArchiveOutputT> = {
         unresolved: [],
       };
     }
-    const t0 = await t0Verdict(itemId);
-    if (t0 === null) return null; // ambiguous ② or ④-b → T1 path
+    const row = await archiveRow(itemId);
+    if (row === null) return null;
+    const t0 = t0Verdict(row);
+    if (t0 !== null) {
+      return {
+        loop: "auto_archive" as const,
+        output: t0,
+        confidence: t0.confidence,
+        rationale: t0.rationale,
+        escalate: false,
+        injection_flags: [],
+        unresolved: [],
+      };
+    }
+
+    // Ambiguous ② or ④-b. The decision tier answers here before the T1 model is woken, and it can
+    // only ever be more cautious than T0 was: it is asked after the five hard gates above, and
+    // applyArchive() re-checks the same threshold before the UPDATE runs.
+    const jev = await decideOrNull(
+      autoArchiveRequest({
+        from: row.handle,
+        subject: row.subject,
+        body: row.body,
+        hasUnsubscribe: hasUnsubscribe(row.meta),
+        hasReplied: row.i_replied,
+      }),
+      {},
+    );
+    const p = jev === null ? null : probabilityOf(jev, QUESTION.archive);
+    if (jev === null || p === null) return null; // → T1
+
+    const archive = p >= T1_ARCHIVE_CONFIDENCE_MIN;
+    const rationale = archive
+      ? `Archived: the decision model put the odds of automated bulk mail at ${p.toFixed(2)}.`
+      : `Kept: the decision model put the odds of automated bulk mail at only ${p.toFixed(2)}.`;
     return {
       loop: "auto_archive" as const,
-      output: t0,
-      confidence: t0.confidence,
-      rationale: t0.rationale,
+      output: {
+        archive,
+        reason: archive ? "jev_bulk_mail" : "jev_keep",
+        rule_ids: [],
+        tier: "T1" as const,
+        confidence: p,
+        rationale,
+        injection_flags: [],
+      },
+      confidence: p,
+      rationale,
       escalate: false,
       injection_flags: [],
       unresolved: [],
