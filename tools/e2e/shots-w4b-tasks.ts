@@ -112,11 +112,17 @@ const PLAN: PlannedTask[][] = [
     // §3.5 defines Delegated as a separate axis (`owner_kind='agent'`), never as "and nowhere else",
     // and a delegation due today that vanished from Today would be work the person never sees on the
     // day it is due.
+    //
+    // `inferred`, not `none`: A4 §4.2 has due_basis describe where the date came from, so "none" is
+    // the field's answer for a task with no date at all. Pairing "none" with a due_at is a state the
+    // model cannot legitimately emit — and it happens to be the one state `dueBasisFor` has no answer
+    // for, so it would have fallen through to the `created_by` guess and drawn a dashed marker for
+    // both the right and the wrong reason. The date was read out of the message; say so.
     {
       title: "Re-run the adapter contract suite and report what fails",
       detail: "The two failures from last night need a clean run on the current main.",
       owner: "agent",
-      due_basis: "none",
+      due_basis: "inferred",
       due_at: dueIn(0, 17),
       confidence: 0.86,
     },
@@ -323,9 +329,14 @@ async function main(): Promise<void> {
     closeBridge = seeded.closeBridge;
     await seedTasks(pool);
 
-    // What the screen will draw, asked of the database before the browser is even open. Each view
-    // tab's case is printed rather than assumed: if the fixture ever stops producing one of them the
-    // frame would still look like a screen — it would just be a screen missing a tab's worth of rows.
+    // What the screen will draw, asked of the database before the browser is even open.
+    //
+    // The bucket CASE is the screen's `filterTasksByView` restated in SQL, which is a second place for
+    // the same rule to live — accepted here because the alternative is asserting against the rendered
+    // page, and a page assertion cannot tell "the tab is short one row" from "the list rendered at
+    // all". The counts below are exact for this fixture, so a row that stops being extracted, lands in
+    // the wrong bucket, or loses its basis fails the run instead of quietly thinning a frame. A short
+    // list would still screenshot like a screen; that is the failure this exists to catch.
     const counts = await query<{ bucket: string; n: string }>(
       pool,
       `SELECT CASE
@@ -351,11 +362,21 @@ async function main(): Promise<void> {
     console.log(
       `inferred due dates=${String(basis?.n)} delegate approvals=${String(delegations?.n)}`,
     );
-    const buckets = new Map(counts.map((c) => [c.bucket, Number(c.n)]));
-    const missing = ["today", "week", "someday", "delegated"].filter((b) => !buckets.get(b));
-    if (missing.length > 0 || basis?.n === "0" || delegations?.n !== "1") {
+
+    // today 2 = the NDA (18:00) and the offsite headcount (12:00); week 1 = the Brightstone redlines
+    // (+3d); someday 1 = the undated headcount ask; delegated 1 = the contract suite, which the CASE
+    // files under its own axis even though its due date also puts it under today.
+    const expected: Record<string, number> = { today: 2, week: 1, someday: 1, delegated: 1 };
+    const got = new Map(counts.map((c) => [c.bucket, Number(c.n)]));
+    const wrong = Object.entries(expected).filter(([b, n]) => got.get(b) !== n);
+    // Two inferred due dates: the NDA's date and the delegation's. The other three are 'stated' or
+    // have no date — which is what makes the dashed marker in the frames a fact about the data rather
+    // than a decoration that would be drawn either way.
+    if (wrong.length > 0 || basis?.n !== "2" || delegations?.n !== "1") {
       throw new Error(
-        `the fixture did not produce what the Tasks screen draws (missing ${missing.join(",")})`,
+        `the fixture did not produce what the Tasks screen draws: expected ${JSON.stringify(expected)},` +
+          ` got ${JSON.stringify(Object.fromEntries(got))} (wrong: ${wrong.map(([b, n]) => `${b}≠${String(n)}`).join(",")})` +
+          `, inferred due dates ${String(basis?.n)} (want 2), delegate approvals ${String(delegations?.n)} (want 1)`,
       );
     }
 

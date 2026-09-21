@@ -149,7 +149,17 @@ export function Tasks({ now: nowProp, onOpenSource, onOpenDelegation, onToggleDo
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const now = useMemo(() => nowProp ?? new Date(), [nowProp]);
 
-  const [tasks, tasksR] = useQuery(zero.query.tasks);
+  // Ordered by `due_at`, the same key the three date tabs are defined by. A5 §3.5's example binding
+  // is a bare `zero.query('tasks')` with no order, and an unordered query over a table whose key is a
+  // random uuid is not merely "unsorted" — it is a different order per run, which is what the shot
+  // script showed: two runs of the same fixture drew Today's rows in two different sequences.
+  //
+  // `due_at` rather than `created_at` because it is the only key this screen already reasons about,
+  // and ordering by the tabs' own axis is the least inventive choice available. Undated tasks (the
+  // Someday tab) have no such key and keep whatever order the server returns — a bucket defined by
+  // the absence of a value has nothing to sort on, and inventing a second key for it would be a
+  // product decision this story was not given.
+  const [tasks, tasksR] = useQuery(zero.query.tasks.orderBy("due_at", "asc"));
   const [approvals, approvalsR] = useQuery(
     zero.query.pending_approvals.where("state", "=", "pending"),
   );
