@@ -5,7 +5,16 @@
 //
 // The reverse direction goes through the same bridge: `send()` signs the draft with the bridge token
 // and calls `capture.send` on the mini, which types it there (US-C13 gates that with the dry run).
-import type { Logger } from "@omnis/kernel";
+import { query } from "@omnis/db";
+import {
+  type EgressSpec,
+  type Kernel,
+  type Logger,
+  type PendingApproval,
+  kakaoSendState,
+  kakaoSendStep,
+  runEgress,
+} from "@omnis/kernel";
 import {
   type Adapter,
   type AdapterEvent,
@@ -23,6 +32,7 @@ import {
   type ThreadRef,
   signApproval,
 } from "@omnis/protocol";
+import type { Pool } from "pg";
 import type { AdapterFactories } from "./adapters.js";
 import type { BridgeHub } from "./bridge.js";
 
@@ -163,7 +173,13 @@ export class CaptureRelayAdapter implements Adapter {
     return this.#queue;
   }
 
-  async send(thread: ThreadRef, draft: Outbound): Promise<SendResult> {
+  /** The raw `capture.send` answer. `send()` (the Adapter contract) has no room for it, and US-C13's
+   *  dry run *is* that preview — the first execution stores it on the approval card and only the
+   *  second one asks for `dry_run: false`. */
+  async captureSend(
+    thread: ThreadRef,
+    draft: Outbound,
+  ): Promise<{ preview: string; sent: boolean }> {
     const approvalId = draft.meta?.approval_id;
     if (typeof approvalId !== "string" || approvalId === "") {
       throw new BridgeError(
@@ -178,7 +194,7 @@ export class CaptureRelayAdapter implements Adapter {
       text: draft.text,
       dry_run: dryRun,
     };
-    const result = await this.#deps.call<{ preview: string; sent: boolean }>(
+    return await this.#deps.call<{ preview: string; sent: boolean }>(
       this.#deps.host,
       "capture.send",
       {
@@ -187,8 +203,12 @@ export class CaptureRelayAdapter implements Adapter {
         sig: signApproval(this.#deps.token, approvalId, payload),
       },
     );
-    // `capture.send` answers {preview, sent} (contract §3) — the mini's real message id is not in the
-    // contract, and there is none to report anyway while `write` is closed: in W1 every send is dry.
+  }
+
+  async send(thread: ThreadRef, draft: Outbound): Promise<SendResult> {
+    const result = await this.captureSend(thread, draft);
+    // The mini's real message id is not in the contract, and there is none to report anyway while
+    // `write` is closed: in W1 every send is dry.
     return {
       externalId: `${result.sent ? "capture" : "dry-run"}:${thread.externalId}`,
       sentAt: new Date().toISOString(),
@@ -278,4 +298,229 @@ export async function intakeCaptureItems(
   }
   relay.push(events);
   return { accepted: events.length };
+}
+
+// ---- US-C13: the send gate's execution half ------------------------------------------------
+
+export interface CaptureSendExecDeps {
+  pool: Pool;
+  kernel: Kernel;
+  /** The relay table the bridge pushes items into. The send goes through the relay, so the approval
+   *  signature is minted in exactly one place (`CaptureRelayAdapter.captureSend`). */
+  relays: CaptureRelayLookup;
+  logger: Logger;
+}
+
+export interface CaptureSendExecutor {
+  /** Executes a decided `send` approval on a KakaoTalk thread. Safe to call twice: the claim inside
+   *  runEgress is the mutex, and the loser throws ApprovalStateError. */
+  execute(approvalId: string): Promise<void>;
+  stop(): void;
+}
+
+/** The thread as the mini names it: `capture.send` talks in chat ids, the approval in thread uuids. */
+interface KakaoThread {
+  accountExternalId: string;
+  threadExternalId: string;
+}
+
+/**
+ * US-C13's two-approval flow, driven off the approval NOTIFY the same way delegate-exec is. The
+ * first execution of an approved `send` types nothing: the preview the mini answers lands on that
+ * approval as `args.dry_run_preview`, and a second `send` approval carrying `args.confirm_of` is
+ * proposed. Only accepting that second one calls `capture.send` with `dry_run: false`.
+ */
+export function startCaptureSendExecutor(deps: CaptureSendExecDeps): CaptureSendExecutor {
+  const { pool, logger } = deps;
+
+  /** Direct row read, not `approvals.list()` — the same reason delegate-exec reads the row itself:
+   *  list is capped, and a decided approval outside that window would sit unexecuted forever. */
+  async function loadApproval(id: string): Promise<PendingApproval | null> {
+    const rows = await query<PendingApproval>(
+      pool,
+      "SELECT * FROM pending_approvals WHERE id = $1",
+      [id],
+    );
+    return rows[0] ?? null;
+  }
+
+  /** Null unless the approval hangs off a KakaoTalk thread: LinkedIn's write-back is its own
+   *  approval-only path (US-A07), and every other channel sends through its own adapter. */
+  async function loadKakaoThread(threadId: string | null): Promise<KakaoThread | null> {
+    if (threadId === null) return null;
+    const rows = await query<{
+      channel: string;
+      account_external_id: string;
+      thread_external_id: string;
+    }>(
+      pool,
+      `SELECT a.channel, a.external_id AS account_external_id, t.external_id AS thread_external_id
+         FROM threads t JOIN accounts a ON a.id = t.account_id
+        WHERE t.id = $1`,
+      [threadId],
+    );
+    const row = rows[0];
+    if (row === undefined || row.channel !== "kakaotalk") return null;
+    return { accountExternalId: row.account_external_id, threadExternalId: row.thread_external_id };
+  }
+
+  /** The confirm half is real only when the dry run it names actually ran. The executor proposes
+   *  those approvals itself, but an agent proposes `send` args too — one that sets `confirm_of`
+   *  itself would otherwise skip the dry run, which is the single thing US-C13 forbids. Null means
+   *  "the dry run is there"; a string is the failure reason. */
+  async function confirmGap(a: PendingApproval, confirmOf: string): Promise<string | null> {
+    const rows = await query<{ state: string; thread_id: string | null; preview: unknown }>(
+      pool,
+      `SELECT state, thread_id, args->'dry_run_preview' AS preview
+         FROM pending_approvals WHERE action = 'send' AND id::text = $1`,
+      [confirmOf],
+    );
+    const dry = rows[0];
+    if (dry === undefined) return `kakao send confirm_of ${confirmOf} is not a send approval`;
+    if (dry.state !== "executed") {
+      return `kakao send confirm_of ${confirmOf} is ${dry.state}, not an executed dry run`;
+    }
+    if (dry.preview === null || dry.preview === undefined) {
+      return `kakao send confirm_of ${confirmOf} has no dry run preview`;
+    }
+    // A dry run on another thread previewed another conversation, not this one.
+    if (dry.thread_id !== a.thread_id) {
+      return `kakao send confirm_of ${confirmOf} is on another thread`;
+    }
+    return null;
+  }
+
+  /** Claim then fail. A claim that loses the race means another caller owns the outcome — the
+   *  guarded UPDATE in beginExecution is the only mutex between the NOTIFY subscriber and an
+   *  explicit call. */
+  async function claimAndFail(id: string, reason: string): Promise<void> {
+    try {
+      await deps.kernel.approvals.beginExecution(id);
+    } catch (e) {
+      logger.debug("kakao send already claimed", {
+        id,
+        err: e instanceof Error ? e.message : String(e),
+      });
+      return;
+    }
+    await deps.kernel.approvals.failExecution(id, reason);
+    logger.warn("kakao send refused", { id, reason });
+  }
+
+  const spec = (a: PendingApproval, action: string): EgressSpec => ({
+    approvalId: a.id,
+    actor: "me",
+    action,
+    targetTable: "threads",
+    ...(a.thread_id === null ? {} : { targetId: a.thread_id }),
+  });
+
+  async function execute(approvalId: string): Promise<void> {
+    const a = await loadApproval(approvalId);
+    // A2 §5.1: only `send` executes, and only on a decision that means "do it".
+    if (a === null || a.action !== "send") return;
+    if (a.decision !== "accept" && a.decision !== "edit") return;
+    const thread = await loadKakaoThread(a.thread_id);
+    if (thread === null) return;
+
+    const args = { ...a.args, ...(a.decided_args ?? {}) } as Record<string, unknown>;
+    const step = kakaoSendStep(await kakaoSendState(pool), args);
+    if (step.kind === "closed") {
+      await claimAndFail(a.id, `kakao send closed (${step.reason})`);
+      return;
+    }
+    // The args come from an agent's proposal, so the text is untrusted input to an irreversible
+    // action — and once the message is typed there is nothing to roll back.
+    const text = typeof args.text === "string" ? args.text : "";
+    if (text.trim() === "") {
+      await claimAndFail(a.id, "kakao send carries no text");
+      return;
+    }
+    if (step.kind === "confirm") {
+      const gap = await confirmGap(a, step.confirmOf);
+      if (gap !== null) {
+        await claimAndFail(a.id, gap);
+        return;
+      }
+    }
+    const relay = deps.relays.get("kakaotalk");
+    if (relay === undefined) {
+      await claimAndFail(a.id, "no kakaotalk capture relay");
+      return;
+    }
+    // runEgress checks this too, but it does so before claiming: the row would stay `decided` and
+    // nothing re-drives a send, so the switch is checked here where it can fail visibly (the same
+    // choice delegate-exec made).
+    if (await deps.kernel.killSwitch.isOn()) {
+      await claimAndFail(a.id, "kill switch");
+      return;
+    }
+
+    const ref: ThreadRef = {
+      accountId: thread.accountExternalId,
+      externalId: thread.threadExternalId,
+    };
+
+    if (step.kind === "confirm") {
+      await runEgress(deps.kernel, spec(a, "item.sent"), async () => {
+        const r = await relay.captureSend(ref, {
+          text,
+          meta: { approval_id: a.id, dry_run: false },
+        });
+        // The mini answers for itself: its own `[capture] send_enabled` can still hold a send back
+        // (the adapter forces a dry run), and a refusal is not a sent message.
+        if (!r.sent) throw new Error(`the mini did not send: ${r.preview}`);
+      });
+      logger.info("kakao send executed", { approvalId: a.id, confirmOf: step.confirmOf });
+      return;
+    }
+
+    const preview = await runEgress(deps.kernel, spec(a, "item.send_dry_run"), async () => {
+      const r = await relay.captureSend(ref, { text, meta: { approval_id: a.id, dry_run: true } });
+      // The dry run's whole point is that nothing was typed; if the mini says otherwise, the gate in
+      // front of the real send was never there.
+      if (r.sent) throw new Error("the mini typed the message on a dry run");
+      // A5 §3.9: the preview is what the confirm card shows.
+      await query(
+        pool,
+        `UPDATE pending_approvals SET args = args || jsonb_build_object('dry_run_preview', $2::text)
+          WHERE id = $1`,
+        [a.id, r.preview],
+      );
+      return r.preview;
+    });
+
+    const confirmId = await deps.kernel.approvals.propose({
+      action: "send",
+      args: { ...args, dry_run_preview: preview, confirm_of: a.id },
+      description: `Confirm the KakaoTalk dry run: ${preview}`,
+      config: a.config,
+      risk: a.risk,
+      // The confirm belongs to the same ask, so it keeps the first approval's provenance.
+      ...(a.requested_by === null ? {} : { requested_by: a.requested_by }),
+      ...(a.thread_id === null ? {} : { thread_id: a.thread_id }),
+      ...(a.item_id === null ? {} : { item_id: a.item_id }),
+      ...(a.task_id === null ? {} : { task_id: a.task_id }),
+    });
+    logger.info("kakao send dry run complete — confirm proposed", {
+      approvalId: a.id,
+      confirmId,
+    });
+  }
+
+  // A3 §6.2: the DB trigger sends the approval NOTIFY, so a decision taken anywhere (the desktop,
+  // another hub process) reaches this executor without a caller.
+  const unsubscribe = deps.kernel.events.subscribe("omnis_approval", (p) => {
+    // A `pending` send waits for a human by definition — US-C13 has no allow rule that can pre-
+    // approve one, so unlike delegate-exec there is nothing to do until it is decided.
+    if (typeof p.id !== "string" || p.state !== "decided") return;
+    void execute(p.id).catch((e: unknown) => {
+      logger.error("capture send executor threw", {
+        approvalId: p.id,
+        err: e instanceof Error ? e.message : String(e),
+      });
+    });
+  });
+
+  return { execute, stop: unsubscribe };
 }

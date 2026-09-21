@@ -23,7 +23,12 @@ import {
   startAdapterLoops,
 } from "./adapters.js";
 import { type BridgeDeps, type BridgeHub, createBridgeHub } from "./bridge.js";
-import { type CaptureRelayRegistry, captureRelayRegistry } from "./capture-relay.js";
+import {
+  type CaptureRelayRegistry,
+  type CaptureSendExecutor,
+  captureRelayRegistry,
+  startCaptureSendExecutor,
+} from "./capture-relay.js";
 import { type HubConfig, readConfig } from "./config.js";
 import { type DelegateExecutor, startDelegateExecutor } from "./delegate-exec.js";
 import { createHubServer } from "./http.js";
@@ -136,6 +141,14 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
     killSwitch: kernel.killSwitch,
     logger,
   });
+  // US-C13: the other decided-approval executor. It resolves its relay per send, so it does not care
+  // that buildAdapters has not run yet — a `send` cannot be decided before an account row exists.
+  const captureSendExec: CaptureSendExecutor = startCaptureSendExecutor({
+    pool,
+    kernel,
+    relays: captureRelays,
+    logger,
+  });
   const hookFailed =
     (name: string) =>
     (e: unknown): void => {
@@ -245,8 +258,9 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
         stopIngestWatch();
         stopSummaryJob();
         stopLoops();
-        // Drop the approval NOTIFY subscription before the pool goes away.
+        // Drop the approval NOTIFY subscriptions before the pool goes away.
         delegateExec.stop();
+        captureSendExec.stop();
         // 3) Stop the scheduler and wait for an in-flight tick to release claimed_at (Task 14's stop()).
         // 4) Drop the LISTEN connection.
         await kernel.close();
