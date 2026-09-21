@@ -2432,6 +2432,7 @@ body {
 
 .today-screen__event-title {
   min-width: 0;
+  padding: 0;
   font-size: 13px;
   text-align: left;
   overflow-wrap: anywhere;
@@ -2452,7 +2453,13 @@ body {
   text-align: left;
 }
 
-.today-screen__brief-button {
+/* Both rows open their thread, so both get the same reset — without it the UA's default box turns
+   a text row into something that reads as a form field, which is what the first cut of these frames
+   showed in the schedule. Only the reset is shared: the brief row is a full-width block whose hover
+   is its own background, the event title is a run of text beside its time, and a background there
+   would box in one word of a line. */
+.today-screen__brief-button,
+button.today-screen__event-title {
   border: none;
   background: none;
   font: inherit;
@@ -2464,7 +2471,15 @@ body {
   background: var(--state-hover);
 }
 
-.today-screen__brief-button:focus-visible {
+/* The underline is the whole affordance here — at rest the title is plain body copy, matching the
+   event as it reads in a calendar rather than as a link farm. */
+button.today-screen__event-title:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.today-screen__brief-button:focus-visible,
+button.today-screen__event-title:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
