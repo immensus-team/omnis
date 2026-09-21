@@ -180,6 +180,11 @@ export function startCapture(blocks: CaptureConfig[], deps: CaptureDeps): Captur
         }
         return; // the stream ended on its own — a real end, not a failure, so do not reconnect
       } catch (cause) {
+        // stop() has already flushed what was pending and cleared every batch timer, so a push from
+        // here would arm a fresh timer and notify the hub after the agent said it had shut down.
+        // The subscribe() path above is guarded the same way; this one is reached when a connect()
+        // that stop() interrupted is followed by a failing subscribe().
+        if (stopped) return;
         const reason = cause instanceof Error ? cause.message : String(cause);
         deps.logger.error("capture adapter failed; restarting", {
           channel: block.channel,
@@ -195,7 +200,15 @@ export function startCapture(blocks: CaptureConfig[], deps: CaptureDeps): Captur
   for (const block of blocks) {
     const adapter = adapters.get(block.channel) ?? deps.makeAdapter(block.channel);
     adapters.set(block.channel, adapter);
-    void pump(block, adapter);
+    // pump() catches every failure path itself, so this never fires today — but an unhandled
+    // rejection crashes the whole agent, which is the opposite of what a per-channel restart loop
+    // is for, and `void` alone discards the promise that would report it.
+    void pump(block, adapter).catch((e: unknown) => {
+      deps.logger.error("capture loop ended unexpectedly", {
+        channel: block.channel,
+        err: e instanceof Error ? e.message : String(e),
+      });
+    });
   }
 
   return {

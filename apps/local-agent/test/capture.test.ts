@@ -166,6 +166,36 @@ describe("startCapture (US-C12)", () => {
     expect(handle.adapterFor("kakaotalk")).toBeDefined();
     expect(handle.adapterFor("linkedin")).toBeUndefined();
   });
+
+  it("does not notify after stop() when a failing adapter reports back late", async () => {
+    const out = notifications();
+    // A connect() that stop() interrupts: the loop is parked here when stop() runs, so the failing
+    // subscribe() is reached *after* stop() has flushed and cleared its timers. Before the `stopped`
+    // guard on the restart path this pushed a disconnected event, which armed a fresh timer and
+    // notified the hub after the agent had already shut down.
+    let release = (): void => undefined;
+    const gated = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const handle = startCapture([BLOCK], {
+      makeAdapter: () => ({
+        ...fakeAdapter(),
+        connect: () => gated,
+        subscribe: () => {
+          throw new Error("kmsg is not installed");
+        },
+      }),
+      notify: (_m, params) => out.push(params),
+      logger: logger(),
+      batchMs: 5,
+      restartMs: 5,
+    });
+
+    await handle.stop();
+    release();
+    await new Promise((r) => setTimeout(r, 40));
+    expect(out).toEqual([]);
+  });
 });
 
 describe("handleCaptureSend (US-C12)", () => {
