@@ -38,6 +38,10 @@ export interface ApprovalStackProps<T extends ApprovalStackItem> {
     decision: ApprovalCardDecision,
     decidedArgs?: Record<string, unknown>,
   ) => void;
+  /** loop-r2-01: the expanded card's header says where the action goes ("Reply in #omnis-launch"),
+   *  and only the caller knows that — the name is the thread's title, which the approval row stores
+   *  as an id. Omitted, the card drops that half of the sentence rather than guessing one. */
+  destinationFor?: (item: T) => string | null;
 }
 
 function riskRank(risk: string): number {
@@ -71,6 +75,7 @@ export function ApprovalStack<T extends ApprovalStackItem>({
   approvals,
   openThreadId,
   onDecide,
+  destinationFor,
 }: ApprovalStackProps<T>) {
   // null means "the scope's own choice" (scopeApprovalStack's primary). Picking a collapsed row
   // overrides it — one card is expanded at a time, whichever way it was chosen.
@@ -98,6 +103,8 @@ export function ApprovalStack<T extends ApprovalStackItem>({
         <ApprovalCardView
           interrupt={active}
           className="approval-stack__card"
+          destination={destinationFor?.(active) ?? null}
+          risk={active.risk}
           onDecide={(decision, decidedArgs) => onDecide(active.id, decision, decidedArgs)}
         />
       )}

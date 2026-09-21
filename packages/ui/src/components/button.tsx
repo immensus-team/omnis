@@ -22,7 +22,17 @@ export interface ButtonProps
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, ...rest }, ref) => (
-    <button ref={ref} className={cn(buttonVariants({ variant }), className)} {...rest} />
+    <button
+      ref={ref}
+      /* The variant's own styling is Tailwind utilities, and neither of the two apps compiles
+         Tailwind — so in the app the variant is a class string that resolves to nothing, and a
+         primary Button comes out looking exactly like a ghost one. The attribute is the same intent
+         in a form a plain stylesheet can read (app.css: the approval card's action row, where
+         "Approve" has to read as the primary decision — L2-37). */
+      data-variant={variant ?? "primary"}
+      className={cn(buttonVariants({ variant }), className)}
+      {...rest}
+    />
   ),
 );
 Button.displayName = "Button";

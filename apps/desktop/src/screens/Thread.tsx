@@ -394,6 +394,9 @@ export function Thread({
                   key={`approval-${node.approval.id}`}
                   interrupt={node.approval}
                   className="thread-screen__approval"
+                  // loop-r2-01: the card says where the action goes, and in a thread the answer is
+                  // the thread's own title — the same string this screen prints in its header.
+                  destination={title}
                   onDecide={(decision, decidedArgs) =>
                     onDecide?.(node.approval.id, decision, decidedArgs)
                   }

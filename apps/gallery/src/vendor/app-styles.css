@@ -1985,7 +1985,97 @@ body {
 .approval-card {
   border: 1px solid var(--border-hairline-strong);
   border-radius: 12px;
-  padding: 12px;
+  /* loop-r2-01/L2-37: the card's first paragraph used to carry the browser's 1em above it, so the
+     card opened with a band of empty space before its own first line. The header below has no
+     margin and the top padding is the trimmed one; the sides keep the 12px, so the header lines up
+     with the description and the body rather than sitting in its own indent. */
+  padding: 8px 12px 12px;
+}
+
+/* loop-r2-01/NC2-01, NC2-05, L2-08: the card's first line is its whole question — which action, on
+   which channel mark, to whom — instead of the old "Send needs your approval", which named the verb
+   and left the person to guess the rest. */
+.approval-card__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* A long thread title shortens the text block, not the card. */
+.approval-card__header-text {
+  min-width: 0;
+}
+
+/* The stack's own mark, riding the header row. `margin-left: auto` is the right alignment; the
+   mark's colour and radius stay the stack's (one risk mark in the product, not two). */
+.approval-card__header .approval-stack__risk {
+  margin-left: auto;
+}
+
+/* DESIGN-DIRECTION "full text": the body is the message the card would send, quoted, not an AI
+   summary of it. The clamp is a card-height guard — the editor behind "Edit" holds the same text
+   unclamped, so a clamp here never hides a message for good. */
+.approval-card__body {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  overflow: hidden;
+  margin: 8px 0 0;
+  padding-left: 10px;
+  /* 2px, and inset: the rule belongs to the quote, not to the card (v3 §e.3). */
+  border-left: 2px solid var(--border-hairline);
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+/* The edit and respond fields. Opaque and one hairline, like every other input (v3 §e.4 — glass is
+   chrome, and a field is not chrome); `--bg-base` is the fill the rest of the app's inputs use. */
+.approval-card__editor,
+.approval-card__respond {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border-hairline);
+  border-radius: 8px;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.approval-card__editor::placeholder,
+.approval-card__respond::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Four lines to start, ten at most. `field-sizing: content` grows the box with the text up to the
+   cap, so a long message scrolls at ten and a short one does not open a band of emptiness.
+   The floor is NOT the markup's `rows={4}`: Chromium ignores `rows` the moment `field-sizing:
+   content` applies, so the editor opened one line tall (~46px) in the browser that actually runs
+   this app, whatever the attribute said. The floor is written out in the same arithmetic as the
+   cap — 4 lines of 15px/1.45 plus the field's 8px vertical padding and 1px border, twice.
+   No resize handle — the box already sizes itself, and a manual grabber inside a card is a second,
+   worse answer to the same question. */
+.approval-card__editor {
+  resize: none;
+  field-sizing: content;
+  min-height: calc(4 * 1.45 * 15px + 18px);
+  max-height: calc(10 * 1.45 * 15px + 18px);
+  overflow-y: auto;
+}
+
+.approval-card__editor:focus-visible,
+.approval-card__respond:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* A5 §5.2 / §3.4: the morning/nightly digest entry card. One line of headline and, when there is
@@ -2028,14 +2118,27 @@ body {
 /* loop-r1-02/L-26, NC-27: four decisions on one line do not fit a 320px pane or a 390 window, and
    the row used to solve that by overflowing — "Ignore" was clipped and "Edit & approve" wrapped to
    two lines, which is a card whose right edge cuts off a decision the user is being asked to make.
-   Wrapping is the honest answer: the buttons stay whole and the card grows a second row. `nowrap` on
-   each button is the other half — without it a narrow pane breaks a label across two lines inside
-   its own button, which is the same clipping one level down. */
+   `nowrap` on each button is one half — a narrow pane must not break a label across two lines inside
+   its own button.
+   loop-r2-01/L2-37: the row no longer wraps to a second line either. Wrapping kept every button
+   whole but it also made the card's height depend on the width of the pane, and put "Approve" — the
+   primary decision — wherever the break happened to fall; the brief asks for one line with Approve
+   first and primary. So the row stays on one line and, when it genuinely cannot fit, it scrolls
+   inside the card (`overflow-x`) instead of pushing the card, or the pane, wider. */
 .approval-card__actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   margin-top: 8px;
+  overflow-x: auto;
+}
+
+/* "Ignore" sits at the far end, away from the three decisions that act on the message. On a row
+   that overflows, an auto margin resolves to zero and this costs nothing.
+   Only the read row: in the edit and respond states the last button is "Cancel", and a margin that
+   means "Ignore is the far one" would fling the cancel of a two-button row across the card. */
+.approval-card__actions--read > :last-child {
+  margin-left: auto;
 }
 
 .approval-card__actions button {
@@ -2047,6 +2150,28 @@ body {
   color: var(--text-primary);
   font: inherit;
   cursor: pointer;
+}
+
+/* loop-r2-01/L2-37: the primary decision has to read as primary. `Button`'s variant is Tailwind
+   utilities and apps/desktop compiles no Tailwind, so the class string on the element resolved to
+   nothing and every decision in this row wore the same hairline ghost — the round-2 complaint
+   verbatim ("four equal buttons, and Approve is not primary"). The variant is now on the element as
+   `data-variant` (button.tsx) and the fill is the app's own confirm pill — accent + inverse text
+   (`.confirm-prompt__button--confirm`, §c.8) — with the hairline dropped rather than drawn around
+   the edge of a filled button. Read, edit and respond each lead with their primary; the ghosts
+   after it keep the hairline. */
+.approval-card__actions button[data-variant="primary"] {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+/* A disabled decision has to look disabled. `Button` says so with Tailwind's `disabled:opacity-50`,
+   and apps/desktop compiles no Tailwind — the utility is inert here, so the same intent is written
+   out. Without it "Save & send" on an empty editor is a live-looking button that does nothing. */
+.approval-card__actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* US-D03 — the approval stack. It used to be a wall: every pending approval drew the identical
@@ -5411,6 +5536,24 @@ button.today-screen__event-title:focus-visible {
   max-width: 40ch;
   color: var(--text-secondary);
   font-size: 13px;
+}
+
+/* loop-r2-01: what the approval is about, one line each — the destination, then the message. Both
+   are spans inside the `<p>` above (see CONFIRM_COPY.approve), so the block behaviour is written
+   here rather than by the element. */
+.confirm-prompt__body-line {
+  display: block;
+  margin-top: 6px;
+}
+
+/* Three lines of the message, and no more. The card's own editor is where the whole thing is read
+   before it is sent, so this is a reminder of which message this is, not the message. */
+.confirm-prompt__body-quote {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  color: var(--text-primary);
 }
 
 /* See the TSX: `wrap-reverse` is what puts a wrapped confirm on top, and it only does that while

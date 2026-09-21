@@ -107,8 +107,18 @@ describe("ApprovalStack (US-D03)", () => {
     render(
       <ApprovalStack approvals={[highOld, calm, highNew]} openThreadId="t5" onDecide={vi.fn()} />,
     );
-    expect(screen.getAllByText("High risk")).toHaveLength(1);
-    expect(screen.getAllByText("Send")).toHaveLength(2);
+    // Scoped to the rows rather than counted across the stack: loop-r2-01 gave the expanded card the
+    // same risk mark and the same leading action word (its own header), so an unscoped count here
+    // would be measuring the card as well.
+    const riskyRow = within(screen.getByRole("button", { name: /approval high-old/ }));
+    expect(riskyRow.getByText("High risk")).toBeInTheDocument();
+    expect(riskyRow.getByText("Send")).toBeInTheDocument();
+    const calmRow = within(screen.getByRole("button", { name: /approval calm/ }));
+    expect(calmRow.queryByText("High risk")).not.toBeInTheDocument();
+    // ...and the card the ranking handed that risk to says so on its own header, not only on the row
+    // it left behind — the card is the one somebody actually reads before deciding.
+    const card = screen.getByText("approval high-new").closest(".approval-card") as HTMLElement;
+    expect(within(card).getByText("High risk")).toBeInTheDocument();
   });
 
   it("promotes a collapsed row when it is picked, and does not leave it behind in the list", () => {

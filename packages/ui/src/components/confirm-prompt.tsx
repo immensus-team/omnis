@@ -107,13 +107,54 @@ export function ConfirmPrompt({
   );
 }
 
+/** What an approval's confirmation can add beyond the question itself: where the action goes and
+ *  what it would say. Every field is optional and every unknown one is dropped rather than printed
+ *  as a hole — the kernel's `args` are untyped JSON and the card passes through whatever it found. */
+export interface ApproveCopyPayload {
+  destination?: string | null;
+  channelLabel?: string | null;
+  body?: string | null;
+}
+
 /** §c.8's three questions, in one place so the wording cannot drift between call sites. Plain
  *  sentences: the title is the question, the body says what happens (guard 12). */
 export const CONFIRM_COPY = {
-  approve: (what: string): { title: string; body: string } => ({
-    title: "Approve this action?",
-    body: what,
-  }),
+  /** loop-r2-01/NC2-05, L2-08: the prompt used to repeat the description and nothing else, so
+   *  "Approve this action?" was asked about a message the person could not see. Given a payload,
+   *  the body becomes a node — the description, then where it goes, then the message itself, each on
+   *  its own line. The one-argument form still returns the plain string every existing caller reads.
+   *
+   *  The lines are `<span>`s and not `<div>`s or a `<blockquote>`: `ConfirmPrompt` renders its body
+   *  inside a `<p>`, and a block element there is closed by the parser before it ever renders. */
+  approve: (what: string, payload?: ApproveCopyPayload): { title: string; body: ReactNode } => {
+    const to = [
+      typeof payload?.destination === "string" && payload.destination !== ""
+        ? `To ${payload.destination}`
+        : null,
+      typeof payload?.channelLabel === "string" && payload.channelLabel !== ""
+        ? payload.channelLabel
+        : null,
+    ]
+      .filter((part): part is string => part !== null)
+      .join(" · ");
+    const quote =
+      typeof payload?.body === "string" && payload.body.trim() !== "" ? payload.body : null;
+    return {
+      title: "Approve this action?",
+      body:
+        payload === undefined ? (
+          what
+        ) : (
+          <>
+            {what}
+            {to !== "" && <span className="confirm-prompt__body-line">{to}</span>}
+            {quote !== null && (
+              <span className="confirm-prompt__body-line confirm-prompt__body-quote">{quote}</span>
+            )}
+          </>
+        ),
+    };
+  },
   archiveThreads: (count: number): { title: string; body: string } => ({
     title: `Archive ${count} ${count === 1 ? "thread" : "threads"}?`,
     body: "They leave the inbox and stay in Archived. You can restore them from there.",

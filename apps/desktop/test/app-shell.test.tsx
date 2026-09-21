@@ -1172,10 +1172,14 @@ describe("App shell approval queue (loop-r1-02: the list comes first)", () => {
 
       // One slot, no queue: the second decision's toast replaces the first, and with the undo off
       // the screen the ignored approval goes out rather than waiting for a button nobody can press.
-      fireEvent.click(screen.getAllByRole("button", { name: "Edit" })[0] as HTMLElement);
+      // loop-r2-01: this used to take the second decision from a click on "Edit". Edit opens the
+      // message now and decides nothing by itself, so the second decision is an Approve — taken
+      // through its own confirmation, which is the shortest path from the card to a decision that
+      // leaves the machine. The subject of the check (the slot flush) is unchanged.
+      approveThroughConfirm();
       await act(async () => {});
 
-      expect(decisions(calls)).toEqual(["edit", "ignore"]);
+      expect(decisions(calls)).toEqual(["accept", "ignore"]);
     });
 
     it("says an approval did not go through, and puts the card back", async () => {
