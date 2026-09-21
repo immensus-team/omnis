@@ -6,7 +6,7 @@
    changes, re-copy the whole file below this comment — verbatim, do not hand-pick a subset, or a
    screen composing an unlisted selector silently loses its styling.
 
-   Source: apps/desktop/src/app.css at commit 73320db (5918 lines).
+   Source: apps/desktop/src/app.css at commit af0537c (5934 lines).
    apps/web/test/vendor-css.test.ts is what holds the line: it compares everything below this
    comment against that file byte for byte, so forgetting to re-copy fails a test rather than
    shipping a half-styled screen. */
@@ -3426,6 +3426,22 @@ body {
 .tasks-screen__quick-input:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/* The quick-add's one line of feedback, drawn as the Notes composer's notice is (same padding,
+   radius and 12px size — the two screens answer the same question the same way). No motion: it
+   appears and disappears, and the "added" half is the only one on a timer. */
+.tasks-screen__notice {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.tasks-screen__notice[data-kind="failed"] {
+  color: var(--danger-500);
 }
 
 .tasks-screen__list {
