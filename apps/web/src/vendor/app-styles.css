@@ -6,7 +6,7 @@
    changes, re-copy the whole file below this comment — verbatim, do not hand-pick a subset, or a
    screen composing an unlisted selector silently loses its styling.
 
-   Source: apps/desktop/src/app.css at commit f3b75ff (6055 lines).
+   Source: apps/desktop/src/app.css at commit aa173fa (6255 lines).
    apps/web/test/vendor-css.test.ts is what holds the line: it compares everything below this
    comment against that file byte for byte, so forgetting to re-copy fails a test rather than
    shipping a half-styled screen. */
