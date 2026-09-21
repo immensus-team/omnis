@@ -91,11 +91,39 @@ describe('CommandPalette mode="inline" (the U1 kinso ask/search pill bar)', () =
     expect(onOpenChange).toHaveBeenCalledWith(true);
   });
 
-  it("focusing the pill also opens the palette", () => {
+  // loop-r2-04 (L2-13): the press is what opens the bar, not the focus. Tab onto the bar used to
+  // open the panel, which then stayed up after the caret had left and swallowed the presses on the
+  // pills under it.
+  it("pressing the pill opens the palette", () => {
     const onOpenChange = vi.fn();
     render(<CommandPalette mode="inline" open={false} onOpenChange={onOpenChange} actions={[]} />);
-    fireEvent.focus(screen.getByPlaceholderText("Start typing to ask or search"));
+    fireEvent.pointerDown(askPill());
+    fireEvent.focus(askInput());
     expect(onOpenChange).toHaveBeenCalledWith(true);
+  });
+
+  it("taking the focus with the keyboard does not open it", () => {
+    const onOpenChange = vi.fn();
+    render(<CommandPalette mode="inline" open={false} onOpenChange={onOpenChange} actions={[]} />);
+    fireEvent.focus(askInput());
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it("closes when the focus leaves the bar, and not when it moves within it", async () => {
+    const onOpenChange = vi.fn();
+    render(
+      <>
+        <CommandPalette mode="inline" open onOpenChange={onOpenChange} actions={[]} />
+        <button type="button">outside the bar</button>
+      </>,
+    );
+    // jsdom moves focus for real here, which is what makes this a `focusout` with a `relatedTarget`
+    // rather than a synthesized `blur` React would not read.
+    await act(async () => askPill().querySelector("button")?.focus());
+    expect(onOpenChange).not.toHaveBeenCalled();
+
+    await act(async () => screen.getByRole("button", { name: "outside the bar" }).focus());
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it("when open, renders the same grouped actions as the dialog mode does", () => {
@@ -169,8 +197,8 @@ describe('CommandPalette mode="inline", the narrow tier (motion-OSS S5)', () => 
 
   /** `open` follows `onOpenChange`, which is what App.tsx's `askOpen` does. A spy on its own could
    *  not carry this regression: the reopen is a state change the drawer then follows. It starts
-   *  closed and is opened by focusing the bar, which is the app's own path — and the reason the
-   *  drawer's return-focus has anywhere to land that reopens it. */
+   *  closed and is opened by a press on the bar, which is the app's own path since loop-r2-04 — and
+   *  the reason the drawer's return-focus has anywhere to land that reopens it. */
   function Harness() {
     const [open, setOpen] = useState(false);
     return <CommandPalette mode="inline" open={open} onOpenChange={setOpen} actions={[]} />;
@@ -180,7 +208,8 @@ describe('CommandPalette mode="inline", the narrow tier (motion-OSS S5)', () => 
     stubTier(true);
     render(<Harness />);
     await act(async () => {
-      screen.getByPlaceholderText("Start typing to ask or search").focus();
+      fireEvent.pointerDown(askPill());
+      askInput().focus();
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(document.querySelector("[data-vaul-drawer].ask-panel")).not.toBeNull();
@@ -216,9 +245,38 @@ describe('CommandPalette mode="inline" model picker persistence (US-D01)', () =>
 
     expect(screen.getByRole("button", { name: askModelLabel(FLASH_ID) })).toBeInTheDocument();
   });
+
+  // loop-r2-04 (NC2-12): one Escape closes one layer. The menu's press was the palette root's as
+  // well, so a single Esc closed the menu, the panel, the typed text and — through the shell's own
+  // listener — the open thread. The menu takes it now, and the panel stays up.
+  const modelMenu = () => screen.queryByRole("group", { name: "Model" });
+
+  it("Escape closes the open model menu and leaves the panel up", () => {
+    const onOpenChange = vi.fn();
+    render(<CommandPalette mode="inline" open onOpenChange={onOpenChange} actions={[]} />);
+    const toggle = screen.getByRole("button", { name: askModelLabel(DEFAULT_ASK_MODEL) });
+    fireEvent.click(toggle);
+    expect(modelMenu()).toBeInTheDocument();
+
+    fireEvent.keyDown(toggle, { key: "Escape" });
+
+    expect(modelMenu()).not.toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalled();
+    // The toggle is where the menu came from, so it is where the caret goes back.
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  it("Escape with no menu open is still the palette's own close", () => {
+    const onOpenChange = vi.fn();
+    render(<CommandPalette mode="inline" open onOpenChange={onOpenChange} actions={[]} />);
+    fireEvent.keyDown(askInput(), { key: "Escape" });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
 });
 
 const askInput = () => screen.getByPlaceholderText("Start typing to ask or search");
+/** The bar itself — the box a press on the ask bar lands on (loop-r2-04). */
+const askPill = () => askInput().closest(".ask-bar__pill") as HTMLElement;
 
 describe('CommandPalette mode="inline" typing path (US-D01 regression)', () => {
   const actions: PaletteAction[] = [

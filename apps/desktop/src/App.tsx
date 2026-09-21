@@ -45,7 +45,7 @@ import {
 import { approvalDecideUrl, decideApproval } from "./api/approvals.js";
 import { type SearchHit, search, toUiSearchGroups } from "./api/search.js";
 import { fetchSettings, putSetting } from "./api/settings.js";
-import { isEditableTarget, useKeymap } from "./hooks/use-keymap.js";
+import { isEditableTarget, isInsideOverlay, useKeymap } from "./hooks/use-keymap.js";
 import { AgentSession } from "./screens/AgentSession.js";
 import { Digest } from "./screens/Digest.js";
 import { Inbox, type OpenTarget } from "./screens/Inbox.js";
@@ -794,6 +794,14 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
     function onKey(e: KeyboardEvent) {
       if (e.key !== "Escape" || e.defaultPrevented) return;
       if (isEditableTarget(e.target)) return;
+      // loop-r2-04: an overlay owns its own Escape and the press must not travel on to the pane
+      // behind it. `isInsideOverlay` is the app's shared guard (hooks/use-keymap.ts). The two checks
+      // after it are this listener's own: the ask bar is not a dialog, but the model menu inside it
+      // is a layer and takes its own Escape, and below 900 the thread sheet *is* an `aria-modal`
+      // drawer — there the press belongs to Radix's dismissal, which hands focus back to the row that
+      // opened it, and the guard deliberately lets the sheet through as the document being read.
+      if (isInsideOverlay(e.target)) return;
+      if (e.target instanceof Element && e.target.closest(".ask-bar") !== null) return;
       if (document.querySelector('[aria-modal="true"]') !== null) return;
       if (!paneVisible) return;
       // Read before the close: `open` is the target this press is putting away, and it is gone from

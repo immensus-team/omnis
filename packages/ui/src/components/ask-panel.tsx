@@ -189,6 +189,12 @@ function AskPanelCard({
     <AuroraSurface
       variant="dawn"
       className={cn("ask-panel", closing && "ask-panel--closing")}
+      // loop-r2-04: the close spring holds the card in the DOM for its 320ms, and until now a press
+      // landing on it in that window hit a panel the user had already dismissed. `inert` takes the
+      // whole subtree out of the pointer's reach for the length of the exit. An empty string rather
+      // than a boolean: React 18 passes unknown attributes through as written, and `inert=""` is the
+      // attribute the browser reads.
+      {...(closing ? { inert: "" } : {})}
       // biome-ignore lint/a11y/useSemanticElements: AuroraSurface is a shared presentational wrapper (rail/toolbar/palette all use it) — a native <dialog> would need its own backdrop/blur styling duplicated here.
       role="dialog"
       aria-label="AI panel"
