@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { isEditableTarget, reduceKeySequence } from "../src/hooks/use-keymap";
 
-describe("reduceKeySequence (A5 §2.4 go-to 접두 g+letter, 300ms 창)", () => {
+describe("reduceKeySequence (A5 §2.4 go-to prefix g+letter, 300ms window)", () => {
   it("g then i within 300ms resolves to 'go-inbox'", () => {
     const r1 = reduceKeySequence(null, "g", 1000);
     expect(r1.pending).toBe("g");
@@ -20,12 +20,12 @@ describe("reduceKeySequence (A5 §2.4 go-to 접두 g+letter, 300ms 창)", () => 
   });
 });
 
-describe("US-A36 보관 키", () => {
-  it("'u' resolves to 'unarchive' (보관 취소, A5 §2.4 표의 'e' 짝)", () => {
+describe("US-A36 archive keys", () => {
+  it("'u' resolves to 'unarchive' (the undo of archive, 'e' in A5 §2.4's table)", () => {
     expect(reduceKeySequence(null, "u", 1000).resolved).toBe("unarchive");
   });
 
-  it("ignores keys typed into the ask bar / Composer — 'e'가 보관으로 새면 안 된다", () => {
+  it("ignores keys typed into the ask bar / Composer — an 'e' must not leak into archive", () => {
     const input = document.createElement("input");
     expect(isEditableTarget(input)).toBe(true);
     expect(isEditableTarget(document.createElement("div"))).toBe(false);
