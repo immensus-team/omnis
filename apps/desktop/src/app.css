@@ -2601,10 +2601,16 @@ body {
   }
 
   /* §c.9's 52px compose circle — the one piece bigger than the pill's own radius would suggest,
-     because it is the bar's primary action. */
+     because it is the bar's primary action.
+     `margin-left: auto` is what makes it the bar's *trailing* piece. While the ask pill is there
+     the pill's `flex: 1 1 auto` already takes every spare pixel, so this margin is zero and the two
+     are equivalent; with a thread open the shell hands the bar no pill (the ask bar is the list's
+     own control), and without this the circle slides left to sit 8px after the filters — right
+     where US-D09's floating action bar stands, so the bar covered it. */
   .bottom-bar__piece--compose {
     width: 52px;
     height: 52px;
+    margin-left: auto;
   }
 
   /* The same 0.55 floor the rail's gated tiles and the ask panel's un-wired actions use (the
@@ -3165,18 +3171,31 @@ body {
    the two stylesheets happen to be bundled in — `@omnis/ui/tokens.css` owns that rule. */
 /* biome-ignore lint/correctness/noUnknownMediaFeatureName: prefers-reduced-transparency is a real Media Queries L5 feature (WebKit implements it); Biome's list simply has not caught up. */
 @media (prefers-reduced-transparency: reduce) {
+  /* The blur is switched off here as well as the fill, and it has to be said on the two-class
+     selector for the same reason: `@omnis/ui/tokens.css` turns the blur off on a bare
+     `.glass-surface`, but that media block sits *before* the `.glass-surface` rule it means to
+     override — a media query adds no specificity, so the base rule's `backdrop-filter` wins the
+     cascade by source order and the preference is ignored. Two classes beat it wherever the two
+     stylesheets land. (The same dead rule leaves the sidebar and the rail blurring; that block is
+     not this story's file — see the note in the D9 report.) */
   .glass-surface.sheet {
     background: var(--bg-sheet);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   .glass-surface.confirm-prompt {
     background: var(--bg-sheet);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   /* §c.7's menu is the row's `…`, so it is the one popover a pointer reaches without a keyboard.
      It falls back with the rest of them. */
   .glass-surface.context-menu {
     background: var(--bg-elevated);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }
 
@@ -3327,8 +3346,13 @@ body {
     left: calc(var(--bar-gap) + 44px + 8px);
     right: calc(var(--bar-gap) + 52px + 8px);
     bottom: calc(56px + var(--bar-gap));
-    height: var(--bar-h);
-    min-height: var(--bar-h);
+    /* `--bar-h` is the BottomBar's own size, and this capsule stands in that row — but the box is
+       content-box, so the 2px of padding and the 1px hairline on each side come *out* of the
+       number: the six pixels of chrome are subtracted here so the total is the row's 52 and the
+       capsule's centre line matches the two circles beside it. (Set as `height: var(--bar-h)` the
+       bar measured 58 — three pixels proud of the controls it stands between.) */
+    height: calc(var(--bar-h) - 6px);
+    min-height: calc(var(--bar-h) - 6px);
     /* §c.9's bar is the tier's own line of controls, on top of the pane it floats over — the
        BottomBar's stacking order, since it stands in the BottomBar's row. */
     z-index: 30;

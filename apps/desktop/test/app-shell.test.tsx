@@ -278,4 +278,47 @@ describe("App shell thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
     expect(solid).toContain("background: var(--bg-base);");
     expect(solid).toMatch(/backdrop-filter: none;/);
   });
+
+  // The compose circle is the bar's *trailing* piece, and the auto margin is what keeps it there:
+  // with a thread open the shell hands the bar no ask pill (`App.tsx` renders `null` for children),
+  // so the pill's `flex: 1 1 auto` is gone and the circle slid left to sit 8px after the filters —
+  // exactly where the floating action bar stands. The 390 shot had the bar covering it.
+  it("keeps the compose circle at the bar's trailing edge when there is no ask pill", () => {
+    expect(ruleBody(narrowTier(), ".bottom-bar__piece--compose")).toContain("margin-left: auto;");
+  });
+
+  // `--bar-h` is the BottomBar's own row height and this capsule stands in that row, but the box is
+  // content-box: said as `height: var(--bar-h)` the 2px of padding and the 1px hairline per side
+  // landed *outside* it and the bar measured 58 — three pixels proud of the two circles it stands
+  // between. The subtraction is the chrome (2 × 2px + 2 × 1px), which is the one thing a test can
+  // hold: the rule may not go back to the bare token.
+  it("sizes the floating capsule to the row rather than to the row plus its own chrome", () => {
+    const body = ruleBody(
+      atRuleBody("@media (max-width: 899.98px) {"),
+      ".thread-toolbar--floating",
+    );
+    expect(body).toContain("height: calc(var(--bar-h) - 6px);");
+    expect(body).toContain("min-height: calc(var(--bar-h) - 6px);");
+    expect(body).not.toContain("height: var(--bar-h);");
+  });
+
+  // §c.6/§c.7/§c.8 under reduced transparency: the three D9 surfaces go flat, and the fill is only
+  // half of that. The blur has to be switched off on the two-class selector here: tokens.css says
+  // it on a bare `.glass-surface`, but that media block sits before the `.glass-surface` rule it
+  // means to override, so the base rule's `backdrop-filter` wins the cascade by source order and
+  // the preference is ignored — a rule that reads right and does nothing.
+  it("flattens the sheet, the prompt and the menu under reduced transparency", () => {
+    const body = atRuleBody("@media (prefers-reduced-transparency: reduce) {");
+    const sheet = ruleBody(body, ".glass-surface.sheet");
+    expect(sheet).toContain("background: var(--bg-sheet);");
+    expect(sheet).toContain("backdrop-filter: none;");
+
+    const prompt = ruleBody(body, ".glass-surface.confirm-prompt");
+    expect(prompt).toContain("background: var(--bg-sheet);");
+    expect(prompt).toContain("backdrop-filter: none;");
+
+    const menu = ruleBody(body, ".glass-surface.context-menu");
+    expect(menu).toContain("background: var(--bg-elevated);");
+    expect(menu).toContain("backdrop-filter: none;");
+  });
 });
