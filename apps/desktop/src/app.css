@@ -1658,6 +1658,22 @@ body {
   flex: 0 0 auto;
 }
 
+/* US-B30 (A5 §3.6): the relationship dot has three levels, the chip's word has six states. The dot
+   therefore takes its colour from `data-dot`, not from the chip's tone — `New` and `Warming` are
+   both tone="info" and must draw the same amber dot. `unknown` draws no dot at all (the card drops
+   the row), so there is no fourth rule here. */
+.status-pill__dot[data-dot="active"] {
+  background: var(--success-500);
+}
+
+.status-pill__dot[data-dot="warming"] {
+  background: var(--warn-500);
+}
+
+.status-pill__dot[data-dot="dormant"] {
+  background: var(--text-secondary);
+}
+
 /* ponytail: no data-theme="dark" override — light is this project's decision
    (DESIGN-DIRECTION.md) and nothing sets data-theme="dark" yet (tokens.css only holds the block).
    On the day dark actually turns on, the four tone labels land at L0.4 against an L0.25 tint,
@@ -2070,12 +2086,58 @@ body {
   object-fit: cover;
 }
 
+.person-card__identity {
+  display: flex;
+  flex-direction: column;
+  /* A 2px step, not the card's 10px: the affiliation belongs to the name above it, not to the
+     badge row below. */
+  gap: 2px;
+  min-width: 0;
+}
+
 .person-card__name {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
   /* The reference's name sits tight against its own line height rather than the body's 1.5. */
   line-height: 1.3;
+}
+
+/* US-B30: on the Network screen the name is the control that opens the detail pane. It is stripped
+   back to the heading it replaces — a person's name on a card is not a link-coloured word, and the
+   whole card cannot be the button because the card can hold its own buttons (the follow-up draft's
+   "Edit & send") and a button inside a button is invalid. */
+.person-card__name--open {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+
+.person-card__name--open:hover {
+  text-decoration: underline;
+}
+
+.person-card__name--open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+/* A5 §3.6's "affiliation and title" (persons.org · persons.role). Secondary weight because it
+   qualifies the name rather than introducing a second subject. */
+.person-card__org {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .person-card__badges {
@@ -2527,6 +2589,349 @@ body {
   /* No room for the indent at 390 — the card keeps the full column and only drops its left inset. */
   .tasks-screen__approval {
     margin-left: 0;
+  }
+}
+
+/* ==========================================================================================
+   US-B30 §3.6 Network — the personal CRM.
+
+   Same opaque 20px-radius surface in the shell's main column as the Inbox card, Today and Tasks,
+   so switching screens does not move the ground under the reader.
+
+   The grid is `auto-fill` with a 260px floor rather than a fixed column count: at 1440 the main
+   column fits three cards, and at 900 it fits one — neither number is told to the CSS. The floor is
+   what keeps the card's own two-column key-value table from being squeezed into a stack of one-word
+   lines, which is what a narrower track produces.
+   ========================================================================================== */
+.network-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  /* Vertical only, for the same reason as Today and Tasks: `hidden` on the cross axis turns a
+     wrapping miss into a visible defect instead of a page-level scrollbar at 390. */
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 16px 20px;
+  border-radius: 20px;
+  box-shadow: var(--shadow-row-selected);
+}
+
+.network-screen__banner {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.network-screen__banner[data-state="error"] {
+  color: var(--danger-500);
+}
+
+.network-screen__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.network-screen__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* The follow-up queue strip. It is a section rather than a floating panel: everything on this
+   screen is a list of people, and the queue is the same list filtered to the ones who have gone
+   quiet — giving it glass or a border would make it a second kind of object. */
+.network-screen__queue {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+}
+
+.network-screen__queue-title {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.network-screen__queue-empty {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.network-screen__queue-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.network-screen__queue-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+  border: var(--hairline);
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.network-screen__queue-chip:hover {
+  border-color: var(--border-hairline-strong);
+}
+
+.network-screen__queue-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.network-screen__queue-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.network-screen__queue-due {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.network-screen__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.network-screen__cell {
+  min-width: 0;
+}
+
+.network-screen__empty {
+  margin: 0;
+  padding: 8px 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.network-screen__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.network-screen__merge-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* The screen's two actions — "Draft a follow-up" on every queued card and "This is the same person"
+   in the footer. They are plain `<button>`s styled here, not `@omnis/ui`'s `Button`, because that
+   component styles itself only with Tailwind utilities and apps/desktop compiles no Tailwind: the
+   `variant="ghost"` it was given was inert, and both actions drew as the UA's grey system-font box
+   next to fully styled cards. Same reset and the same shape as `.network-screen__queue-chip`, so the
+   strip's chips and the actions read as one family of quiet controls; the background stays
+   transparent because this one class sits both inside a card and on the paper canvas. */
+.network-screen__action {
+  border: var(--hairline);
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.network-screen__action:hover {
+  border-color: var(--border-hairline-strong);
+  background: var(--state-hover);
+}
+
+.network-screen__action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* A5 §3.6's follow-up suggestion on the card. Inside the card it is a distinct block — a rule above
+   it is the one hairline allowed here, and it separates "this is who they are" from "this is what
+   to do about it". */
+.person-card__followup {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: var(--hairline);
+}
+
+.person-card__followup-body {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* ==========================================================================================
+   US-B30 §3.6 — the person detail pane (the shell's third column at 1440, its sheet at 390).
+   The pane's own width is the shell's business; everything here is a column that fits it.
+   ========================================================================================== */
+.person-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.person-detail__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.person-detail__name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.person-detail__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.person-detail__section-title {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.person-detail__empty {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.person-detail__conversations,
+.person-detail__notes,
+.person-detail__handles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+/* No hairline and no card: these are rows in a list, and the pane's selected/elevated row rule
+   applies here exactly as it does in the Inbox. */
+.person-detail__conversation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.person-detail__conversation:hover {
+  background: var(--bg-elevated);
+}
+
+.person-detail__conversation:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.person-detail__conversation-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.person-detail__conversation-time {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.person-detail__note {
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.person-detail__handle {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.person-detail__handle-channel {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.person-detail__handle-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+@container shell (max-width: 899.98px) {
+  /* One column: a 260px floor would overflow a 390px window the moment the card's own padding is
+     counted, so the grid becomes a plain stack. */
+  .network-screen__grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

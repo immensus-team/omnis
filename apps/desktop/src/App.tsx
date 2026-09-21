@@ -17,6 +17,7 @@ import { decideApproval } from "./api/approvals.js";
 import { type SearchHit, search, toUiSearchGroups } from "./api/search.js";
 import { AgentSession } from "./screens/AgentSession.js";
 import { Inbox, type OpenTarget } from "./screens/Inbox.js";
+import { Network, PersonDetail } from "./screens/Network.js";
 import { Tasks } from "./screens/Tasks.js";
 import { Thread } from "./screens/Thread.js";
 import { Today } from "./screens/Today.js";
@@ -46,7 +47,7 @@ function useCommandPaletteKey(toggle: () => void) {
 
 /** The screens the shell can show. The rail switches between them by screen, not by route —
  *  there is no URL router in the desktop app (src-tauri loads one documents). */
-export type ShellScreen = "inbox" | "today" | "tasks";
+export type ShellScreen = "inbox" | "today" | "tasks" | "network";
 
 export function App({ screen = "inbox" }: { screen?: ShellScreen }) {
   // Without ZeroProvider, useQuery dies with "useZero must be used within a ZeroProvider".
@@ -60,6 +61,10 @@ export function App({ screen = "inbox" }: { screen?: ShellScreen }) {
 function Shell({ screen }: { screen: ShellScreen }) {
   const zero = useZeroClient();
   const [open, setOpen] = useState<OpenTarget | null>(null);
+  // US-B30: a person is not a thread, so the detail pane's target is its own state rather than a
+  // second variant on OpenTarget — the pane draws PersonDetail or Thread, never a mix, and one
+  // nullable string says that more plainly than a discriminated union with two members.
+  const [openPersonId, setOpenPersonId] = useState<string | null>(null);
   const [askOpen, setAskOpen] = useState(false);
   const [railChannel, setRailChannel] = useState<RailSelection>(null);
   // US-D01 decision: Cmd+K opens the ask bar's floating AI panel rather than a separate modal
@@ -129,6 +134,14 @@ function Shell({ screen }: { screen: ShellScreen }) {
   // A5 §3.4: a briefing item on Today deep-links to its Thread — the one navigation that screen
   // does (the approvals stay inline, so the detail pane opens only for this).
   const openThread = useCallback((threadId: string) => {
+    setOpen({ threadId, agentSession: false });
+  }, []);
+
+  // Opening a conversation from a person's timeline replaces the person in the pane rather than
+  // stacking a second view under them: at 1440 the pane is one column, and a thread pushed below a
+  // person would be a conversation read through someone else's file card.
+  const openThreadFromPerson = useCallback((threadId: string) => {
+    setOpenPersonId(null);
     setOpen({ threadId, agentSession: false });
   }, []);
 
@@ -209,7 +222,8 @@ function Shell({ screen }: { screen: ShellScreen }) {
   // no navigation (A5 §3.4) — so the shell leaves the pane closed for it until a thread is actually
   // opened. Opening it on the queue's account would draw the same approvals twice on one screen,
   // and at 390 the sheet would cover the screen it duplicates.
-  const detail = open !== null || (screen === "inbox" && approvals.length > 0);
+  const detail =
+    open !== null || openPersonId !== null || (screen === "inbox" && approvals.length > 0);
 
   return (
     <main
@@ -230,6 +244,8 @@ function Shell({ screen }: { screen: ShellScreen }) {
         />
         {screen === "today" ? (
           <Today onOpenThread={openThread} />
+        ) : screen === "network" ? (
+          <Network onOpenPerson={setOpenPersonId} onOpenThread={openThreadFromPerson} />
         ) : screen === "tasks" ? (
           <Tasks
             onOpenSource={setSourceItemId}
@@ -266,7 +282,9 @@ function Shell({ screen }: { screen: ShellScreen }) {
               thread open the stack is handed to the screen instead, which draws it under the
               thread's own title: the pane has to open on what it is about. (An agent session has
               no header of its own, so there it stays on top.) */}
-          {open === null ? (
+          {openPersonId !== null ? (
+            <PersonDetail personId={openPersonId} onOpenThread={openThreadFromPerson} />
+          ) : open === null ? (
             <ApprovalStack
               approvals={approvals as unknown as ApprovalStackItem[]}
               openThreadId={null}
