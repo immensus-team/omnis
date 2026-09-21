@@ -507,4 +507,21 @@ describe("Settings screen (A5 §3.9)", () => {
     });
     expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load your settings");
   });
+
+  it("never draws the internal cost.last_state key, on any of the four sections", async () => {
+    // delta §5 marks it internal: the cost job writes it (`jobs/cost-daily.ts`) and A4 §12.4 reads it,
+    // but it is a machine's own record of yesterday's tier state — not something a person sets. The
+    // hub hands the whole map over (`GET /settings` enumerates every SettingKey), so the screen is the
+    // only thing standing between that key and the frame.
+    vi.mocked(api.fetchSettings).mockResolvedValue(
+      settingsPayload({ "cost.last_state": "frozen" }),
+    );
+    render(<Settings />);
+    await ready();
+    for (const name of ["Accounts", "Autonomy", "Model tiers", "General"]) {
+      tab(name);
+      expect(document.body.textContent ?? "").not.toContain("cost.last_state");
+      expect(document.body.textContent ?? "").not.toContain("frozen");
+    }
+  });
 });
