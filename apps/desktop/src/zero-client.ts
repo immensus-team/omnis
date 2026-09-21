@@ -2,32 +2,49 @@ import { zeroSchema } from "@omnis/kernel/zero";
 import { Zero } from "@rocicorp/zero";
 import { useZero } from "@rocicorp/zero/react";
 
-// OMNIS_HUB_HTTP_URL: 인터페이스 계약 §9 환경변수 목록(계약 리뷰 M11) — api/approvals.ts와 같은 기본값.
+// OMNIS_HUB_HTTP_URL: interface contract §9's environment-variable list (contract review M11) — the
+// same default as api/approvals.ts.
 const HUB_HTTP_URL = import.meta.env.OMNIS_HUB_HTTP_URL ?? "http://127.0.0.1:8787";
 
 let cachedToken: string | undefined;
 
 /**
- * US-A21b: zeroSchema의 permissions는 토큰의 `sub`가 설정된 유저일 때만 row를 내려준다.
- * 토큰 없이 붙으면 쿼리는 resolve되지만 행은 0개다 — US-A22가 본 증상이 정확히 이것이다.
+ * US-A21b: zeroSchema's permissions hand down rows only when the token's `sub` names the user, and
+ * with no token the query still resolves — with zero rows, which is exactly US-A22's symptom.
+ *
+ * `signal` is loop-r2-05's. The boot path has to give up on a hub that is not answering rather than
+ * hold a blank screen while it waits, and `AbortSignal.timeout(4000)` (main.tsx) is how that
+ * deadline reaches `fetch` itself; a timeout rejects this promise like any other failure.
  */
-export async function fetchZeroToken(hubUrl: string = HUB_HTTP_URL): Promise<string> {
-  const res = await fetch(`${hubUrl}/api/zero-token`);
+export async function fetchZeroToken(
+  hubUrl: string = HUB_HTTP_URL,
+  signal?: AbortSignal,
+): Promise<string> {
+  const res = await fetch(`${hubUrl}/api/zero-token`, { signal });
   if (!res.ok) throw new Error(`zero token fetch failed: HTTP ${res.status}`);
   return ((await res.json()) as { token: string }).token;
 }
 
-/**
- * 부팅 때 한 번(main.tsx) 호출해 토큰을 받아 둔다. `initZero`는 계약 §7대로 동기 함수이고
- * (Inbox/Thread/AgentSession이 useMemo로 그렇게 쓴다) Zero의 나중-인증 경로
- * `connection.connect({auth})`는 이미 하이드레이션된 쿼리를 다시 태우지 않아 첫 화면이 빈 채로
- * 남는다(2026-09-20 확인). 그래서 토큰은 생성자에 실어야 한다.
- */
-export async function loadZeroToken(hubUrl?: string): Promise<void> {
-  cachedToken = await fetchZeroToken(hubUrl);
+/** Whether a token has landed. loop-r2-05's connection rule reads it: with no token the answer is
+ *  `unreachable` and not `connecting`, because in that case nothing is retrying on its own — Zero
+ *  was built without auth and will sit there. */
+export function hasZeroToken(): boolean {
+  return cachedToken !== undefined;
 }
 
-/** zero-cache는 JWT의 sub와 클라이언트 userID가 다르면 토큰을 거부한다(JWTClaimValidationFailed). */
+/**
+ * Called once at boot (main.tsx) to take the token before the app renders. `initZero` is a
+ * synchronous function by contract §7 (Inbox/Thread/AgentSession call it inside a useMemo), and
+ * Zero's late-auth path `connection.connect({auth})` does not re-run queries that are already
+ * hydrated — the first screen would stay empty (verified 2026-09-20). The token therefore has to
+ * ride the constructor.
+ */
+export async function loadZeroToken(hubUrl?: string, signal?: AbortSignal): Promise<void> {
+  cachedToken = await fetchZeroToken(hubUrl, signal);
+}
+
+/** zero-cache rejects a token whose JWT `sub` differs from the client's userID
+ *  (JWTClaimValidationFailed). */
 function jwtSub(token: string): string | undefined {
   try {
     const payload = token.split(".")[1];
@@ -43,7 +60,8 @@ export function initZero(opts?: { server?: string; userID?: string; auth?: strin
   const auth = opts?.auth ?? cachedToken;
   return new Zero({
     server: opts?.server ?? import.meta.env.OMNIS_ZERO_URL ?? "http://127.0.0.1:4848",
-    // 토큰이 있으면 sub를 따라간다 — OMNIS_USER_ID를 바꿔도 양쪽이 저절로 맞는다.
+    // With a token, the userID follows its `sub` — changing OMNIS_USER_ID keeps the two in step on
+    // their own.
     userID: opts?.userID ?? (auth === undefined ? undefined : jwtSub(auth)) ?? "logan",
     schema: zeroSchema,
     auth,
@@ -53,9 +71,10 @@ export function initZero(opts?: { server?: string; userID?: string; auth?: strin
 export type ZeroClient = ReturnType<typeof initZero>;
 
 /**
- * 셸(App.tsx)이 ZeroProvider에 실어 준 클라이언트를 꺼낸다. @rocicorp/zero/react의 useQuery는
- * 내부적으로 useZero()를 부르므로 provider 없이는 "useZero must be used within a ZeroProvider"로
- * 죽는다 — 화면들이 각자 initZero()를 부르던 A26~A31 배선으로는 브라우저에서 한 화면도 뜨지 않았다.
+ * Takes the client the shell (App.tsx) put on the ZeroProvider back out of it. `useQuery` from
+ * @rocicorp/zero/react calls `useZero()` internally, so without a provider it dies with "useZero
+ * must be used within a ZeroProvider" — under the A26~A31 wiring, where each screen called
+ * `initZero()` for itself, not one screen rendered in the browser.
  */
 export function useZeroClient(): ZeroClient {
   return useZero() as unknown as ZeroClient;
