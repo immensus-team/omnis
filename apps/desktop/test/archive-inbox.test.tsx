@@ -4,10 +4,10 @@
 // file tags queries by table name and returns different rows per table (Inbox runs seven).
 import "./setup";
 
-import { TOAST_MS, Toast, type ToastRequest, type ToastSpec } from "@omnis/ui";
+import { TOAST_MS, type ToastRequest, Toaster, toast as raiseToast } from "@omnis/ui";
 import { LEAVE_MS, REDUCED_FADE_MS } from "@omnis/ui/lib/motion";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { useRef, useState } from "react";
+import { type MouseEvent as ReactMouseEvent, useRef } from "react";
 import { VirtuosoMockContext } from "react-virtuoso";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -183,44 +183,68 @@ describe("Inbox archive/restore (US-A36)", () => {
   });
 });
 
-/** loop-r1-06: the toast slot, in miniature. The screen raises a spec and the shell draws it — that
- *  is the whole contract — so the two have to be rendered together for "Archived · Undo" to be
- *  something a test can click. What it keeps is the one line this file's assertions rest on: the
- *  work a toast was handed runs when the toast goes. The rest of App.tsx's notify — cancelling that
- *  work when the action is taken, and running it when a newer toast replaces this one — is the
- *  shell's own subject and is covered in app-shell.test.tsx, where the real one runs. */
+/** loop-r1-06, in S6's vocabulary: the toast slot, in miniature. The screen raises a request and the
+ *  host draws it — that is the whole contract — so the two have to be rendered together for
+ *  "Archived · Undo" to be something a test can click. The host is the app's own (`@omnis/ui`'s
+ *  `Toaster`, mounted once in main.tsx), and what this miniature keeps is App.tsx's `notify` at the
+ *  size this file needs: one slot, and the work a toast was handed runs when the toast goes. The
+ *  rest of the shell's — cancelling that work when the action is taken, and running it when a newer
+ *  toast replaces this one — is the shell's own subject, covered in app-shell.test.tsx where the
+ *  real one runs. */
 function Harness() {
-  const [toast, setToast] = useState<ToastSpec | null>(null);
   const held = useRef<(() => void) | null>(null);
-  /** App.tsx's id counter, in miniature, and here for the same reason: a toast that replaces one
-   *  saying the same words is still a new toast, and the pill's countdown depends on being told. */
-  const nextId = useRef(0);
-  const notify = (spec: ToastRequest, deferred?: { run: () => void }) => {
-    held.current = deferred?.run ?? null;
-    nextId.current += 1;
-    setToast({ ...spec, id: nextId.current });
-  };
-  const dismiss = () => {
-    const run = held.current;
+  const runHeld = () => {
+    const outgoing = held.current;
     held.current = null;
-    setToast(null);
-    run?.();
+    outgoing?.();
+  };
+  const notify = (spec: ToastRequest, deferred?: { run: () => void }) => {
+    runHeld();
+    held.current = deferred?.run ?? null;
+    const action = spec.action;
+    raiseToast(spec.message, {
+      // The shell's one slot, by the same id: a second archive updates the toast rather than
+      // stacking a second one, exactly as `notify` does in App.tsx.
+      id: TOAST_SLOT_ID,
+      duration: TOAST_MS,
+      action:
+        action === undefined
+          ? undefined
+          : {
+              label: action.label,
+              onClick: (event: ReactMouseEvent<HTMLButtonElement>) => {
+                event.preventDefault();
+                held.current = null;
+                action.onAction();
+              },
+            },
+      onDismiss: runHeld,
+      onAutoClose: runHeld,
+    });
   };
   return (
     <VirtuosoMockContext.Provider value={{ viewportHeight: 600, itemHeight: 72 }}>
       <Inbox notify={notify} />
-      <Toast
-        id={toast?.id ?? 0}
-        message={toast?.message ?? null}
-        action={toast?.action}
-        onDismiss={dismiss}
-      />
+      <Toaster />
     </VirtuosoMockContext.Provider>
   );
 }
 
+/** App.tsx's slot id. Repeated rather than exported: what is under test is that this file's own
+ *  harness and the shell agree about "one toast", and sharing the constant would hide a drift. */
+const TOAST_SLOT_ID = "omnis-toast-slot";
+
 describe("Inbox archive toasts (loop-r1-06)", () => {
-  const toast = () => screen.getByRole("status");
+  /** The toast on screen. sonner renders no `role="status"` (its list is the live region and the
+   *  toast inside it carries no role), so the element app.css styles is the handle. The zero-length
+   *  advance is sonner's batching, not one of this file's timings: it publishes through its store on
+   *  a zero-delay timer, so under these fake timers the element is one tick behind the raise. */
+  const toast = () => {
+    act(() => vi.advanceTimersByTime(0));
+    const el = document.querySelector("[data-sonner-toast]");
+    if (el === null) throw new Error("no toast on screen");
+    return el;
+  };
 
   /** Archive the first row with `e`, the way the triage keys do. "New mail" is the only thread in
    *  the inbox — "Older mail" is the archived one this file starts from. */

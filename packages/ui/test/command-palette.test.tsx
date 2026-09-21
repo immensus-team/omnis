@@ -4,6 +4,7 @@
 import "./setup";
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CommandPalette,
@@ -143,6 +144,54 @@ describe('CommandPalette mode="inline" close paths (U1 regression)', () => {
     render(<CommandPalette mode="inline" open={false} onOpenChange={onOpenChange} actions={[]} />);
     fireEvent.pointerDown(document.body);
     expect(onOpenChange).not.toHaveBeenCalled();
+  });
+});
+
+// motion-OSS S5: below 900px the panel is `vaul`'s drawer, and a drawer hands focus back to whatever
+// opened it on the way out — here the ask bar's own input, whose `onFocus` opens the panel. So the
+// dismissal and the focus return fought: Escape (and the scrim) closed the drawer and the focus it
+// restored opened it again, which left the panel with no way out at that tier. The first run of the
+// evidence script is where this surfaced — it waits for the AI drawer to detach after Escape and
+// timed out on a drawer that was open again.
+describe('CommandPalette mode="inline", the narrow tier (motion-OSS S5)', () => {
+  const REAL_MATCH_MEDIA = window.matchMedia;
+  afterEach(() => {
+    window.matchMedia = REAL_MATCH_MEDIA;
+  });
+  /** `useNarrowShell` reads `window.matchMedia`, so the tier is this stub and nothing else. */
+  function stubTier(narrow: boolean): void {
+    window.matchMedia = (() => ({
+      matches: narrow,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+  }
+
+  /** `open` follows `onOpenChange`, which is what App.tsx's `askOpen` does. A spy on its own could
+   *  not carry this regression: the reopen is a state change the drawer then follows. It starts
+   *  closed and is opened by focusing the bar, which is the app's own path — and the reason the
+   *  drawer's return-focus has anywhere to land that reopens it. */
+  function Harness() {
+    const [open, setOpen] = useState(false);
+    return <CommandPalette mode="inline" open={open} onOpenChange={setOpen} actions={[]} />;
+  }
+
+  it("closes on Escape, and the focus it hands back does not reopen it", async () => {
+    stubTier(true);
+    render(<Harness />);
+    await act(async () => {
+      screen.getByPlaceholderText("Start typing to ask or search").focus();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(document.querySelector("[data-vaul-drawer].ask-panel")).not.toBeNull();
+
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    // Radix runs its unmount-autofocus on a `setTimeout(…, 0)` of its own, after the drawer is gone.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    expect(document.querySelector("[data-vaul-drawer].ask-panel")).toBeNull();
   });
 });
 

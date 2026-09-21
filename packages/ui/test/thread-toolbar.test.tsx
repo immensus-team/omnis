@@ -12,7 +12,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { Archive, Reply } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
 import { PHASE_B_TITLE } from "../src/components/channel-rail";
-import { THREAD_TOOLBAR_FLOATING_CLASS, ThreadToolbar } from "../src/components/thread-toolbar";
+import { ThreadToolbar } from "../src/components/thread-toolbar";
 
 const actions = [
   {
@@ -101,15 +101,5 @@ describe("ThreadToolbar (US-D09 §c.5 / §c.9)", () => {
     unmount();
     render(<ThreadToolbar actions={actions} />);
     expect(screen.queryByRole("button", { name: "Thread options" })).not.toBeInTheDocument();
-  });
-
-  it("carries the class app.css positions the narrow tier's bar by", () => {
-    const { container } = render(
-      <ThreadToolbar actions={actions} className={THREAD_TOOLBAR_FLOATING_CLASS} />,
-    );
-    // The literal is shared with app-shell.test.tsx, which reads it back out of the stylesheet —
-    // a typo on either side would silently drop the tier's bar, so the value itself is asserted.
-    expect(container.querySelector(".thread-toolbar--floating")).not.toBeNull();
-    expect(THREAD_TOOLBAR_FLOATING_CLASS).toBe("thread-toolbar--floating");
   });
 });

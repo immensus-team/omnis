@@ -1,5 +1,6 @@
+import { useDrag } from "@use-gesture/react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { type KeyboardEvent, useRef, useState } from "react";
+import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "../lib/cn.js";
 import {
   DETAIL_MIN_WIDTH,
@@ -9,7 +10,6 @@ import {
   maxDetailWidth,
   steppedDetailWidth,
 } from "../lib/detail-pane.js";
-import { pointerDrag } from "../lib/pointer-drag.js";
 
 // US-D10 §c.5 — the detail pane's own controls: the collapse chevron, the drag grip, and the two
 // ways out the floating tiers needed (loop-r1-02: the sheet's `‹ Inbox` row and the ✕).
@@ -143,33 +143,94 @@ export function DetailPaneHandle({
   className,
 }: DetailPaneHandleProps) {
   const [dragging, setDragging] = useState(false);
-  /** Where the gesture started. A ref and not state: `onMove` is the closure React attached when
+  /** Where the gesture started. A ref and not state: the handler is the closure React attached when
    *  the pointer went down, and a state write would re-render before the gesture reads it — the
    *  origin has to be the value at the press, not the value one frame later. */
   const from = useRef(width);
+  /** The press point, in clientX. The gesture reports absolute pointer coordinates (`xy`), and the
+   *  pane's own arithmetic is written against the *travel* from the press — `detailWidthFromDrag`
+   *  takes a dx. Subtracting the two here rather than reading the library's `movement` is
+   *  deliberate: `movement` is re-based on the frame the 6px slop is crossed, so a drag would start
+   *  6px behind the finger. The pane has followed the pointer one-for-one since US-D10 and the
+   *  pinned tests say so, so the raw travel is what this file keeps. */
+  const originX = useRef(0);
+  /** Whether this gesture crossed the slop at all — the difference between a press that writes a
+   *  width and a click that must not. */
+  const moved = useRef(false);
+  /** Escape ended this gesture. The release still arrives after it, and must not commit: a gesture
+   *  that never happened is not a setting. */
+  const aborted = useRef(false);
 
-  const onPointerDown = pointerDrag(
-    {
-      onStart: () => {
-        from.current = width;
-        setDragging(true);
-      },
-      onMove: (dx) => onWidthChange(detailWidthFromDrag(from.current, dx, shellWidth)),
-      onEnd: (dx) => {
-        setDragging(false);
-        onWidthCommit(
-          clampDetailWidth(detailWidthFromDrag(from.current, dx, shellWidth), shellWidth),
-        );
-      },
-      // Escape, or a cancelled pointer. Nothing was committed, so the pane goes back to the width
-      // it had at the press and no write is made — a gesture that never happened is not a setting.
-      onCancel: () => {
-        setDragging(false);
+  /** The gesture's config. `capture: false` is load-bearing and is the same decision
+   *  `pointer-drag.ts` documents at length: listeners go on `window`, not on the grip, so a pointer
+   *  that leaves the 8px-wide grip mid-drag keeps driving the pane, and a synthetic move dispatched
+   *  on `window` (what the tests do) reaches it. `threshold: 6` is the primitive's own start slop —
+   *  below it the gesture has not started, so a click and a double-click stay clicks. */
+  const config = {
+    axis: "x",
+    threshold: 6,
+    pointer: { capture: false },
+  } as const;
+
+  const bind = useDrag(({ first, last, active, xy: [pointerX], event }) => {
+    if (first) {
+      from.current = width;
+      moved.current = false;
+      aborted.current = false;
+    }
+    // The release, and the cancel. Checked before `active` because the state reports the gesture
+    // as *inactive* on its own last frame — `active` there is the value the gesture had a moment
+    // ago, so a `!active` guard written first would swallow every release and the pane would
+    // never commit. (The library's `cancel` field is a method for aborting the gesture, not a
+    // flag saying one was cancelled; probed. A pointer the browser took away arrives here as a
+    // `pointercancel` on the event instead, which is what the type test below reads.)
+    if (last) {
+      moved.current = false;
+      setDragging(false);
+      // Escape already reported the cancel; the release that follows it must not commit.
+      if (aborted.current) return;
+      if (event?.type === "pointercancel") {
         onCancel();
-      },
-    },
-    { axis: "x" },
-  );
+        return;
+      }
+      onWidthCommit(
+        clampDetailWidth(
+          detailWidthFromDrag(from.current, pointerX - originX.current, shellWidth),
+          shellWidth,
+        ),
+      );
+      return;
+    }
+    // Below the slop: no width has been decided yet, so nothing is drawn and a click stays a
+    // click — which is what makes the double-click reset work.
+    if (!active) return;
+    if (!moved.current) {
+      moved.current = true;
+      setDragging(true);
+    }
+    // Every frame at the banded width; the release above is the only commit.
+    onWidthChange(detailWidthFromDrag(from.current, pointerX - originX.current, shellWidth));
+  }, config);
+
+  /** Escape, while a drag is running. Bound to the window because the pointer is: the gesture's
+   *  listeners are the library's, and a key has no target inside the grip once the finger has left
+   *  it. The ref indirection keeps one listener across renders rather than re-binding per frame. */
+  const abort = useCallback(() => {
+    if (!moved.current) return;
+    moved.current = false;
+    aborted.current = true;
+    setDragging(false);
+    onCancel();
+  }, [onCancel]);
+  const abortRef = useRef(abort);
+  abortRef.current = abort;
+  useEffect(() => {
+    const onKeyDown = (e: globalThis.KeyboardEvent): void => {
+      if (e.key === "Escape") abortRef.current();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>): void {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
@@ -183,8 +244,10 @@ export function DetailPaneHandle({
     onWidthCommit(steppedDetailWidth(width, delta, shellWidth));
   }
 
+  const bindProps = bind();
   return (
     <div
+      {...bindProps}
       className={cn("detail-pane__grip", dragging && "detail-pane__grip--dragging", className)}
       // biome-ignore lint/a11y/useSemanticElements: a window splitter is a focusable separator with a range. The rule's suggestion, <hr>, carries no value range and no tab stop, so it would trade the whole resize pattern for the element name.
       role="separator"
@@ -195,7 +258,13 @@ export function DetailPaneHandle({
       aria-valuemax={Math.round(maxDetailWidth(shellWidth))}
       tabIndex={0}
       title="Drag to resize · double-click to reset"
-      onPointerDown={onPointerDown}
+      // After the spread, so this is the handler that runs: the library's start handler is called
+      // from it rather than chained into it, which is what puts the origin capture ahead of it.
+      onPointerDown={(e) => {
+        originX.current = e.clientX;
+        aborted.current = false;
+        bindProps.onPointerDown?.(e);
+      }}
       onKeyDown={onKeyDown}
       onDoubleClick={onReset}
     >

@@ -1106,6 +1106,9 @@ export function Inbox({
         {...CONFIRM_COPY.archiveThreads(archiveAll?.length ?? 0)}
         confirmLabel="Archive"
         onConfirm={() => {
+          // One toast for the press, not one per row: every toggle raises into the shell's single
+          // slot, so three archives in the same tick update one toast rather than stacking three —
+          // and the count the user agreed to is already on the question they just answered.
           for (const threadId of archiveAll ?? []) toggleArchive(threadId, true);
         }}
       />

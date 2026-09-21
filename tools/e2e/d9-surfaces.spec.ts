@@ -24,18 +24,33 @@ interface Assertion {
 }
 const results: Assertion[] = [];
 
+/** Playwright colours its matcher errors, and the escapes end up in `.tmp/assertions.json` and in
+ *  REPORT.md. Spelled rather than typed: biome rejects a literal control character in a regex, and
+ *  a note is not the place to argue with it about that. */
+const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+
+/** A failed row's note, values included. Playwright names the matcher on the first line and puts
+ *  what it read on the third and fourth, so a note built from the first line alone records *that*
+ *  something failed rather than what it saw — the last motion-OSS run's `.tmp/assertions.json` holds
+ *  "expect(received).toBe(expected) // Object.is equality" for two failures and nothing else, which
+ *  is unreadable evidence and cost a second run to diagnose. Six lines fit in the report's cell. */
+function noteOf(e: unknown): string {
+  const plain = (e instanceof Error ? e.message : String(e)).replace(ANSI, "");
+  return plain
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .slice(0, 6)
+    .join(" | ")
+    .slice(0, 400);
+}
+
 async function check(name: string, fn: () => Promise<string | undefined>): Promise<void> {
   const started = Date.now();
   try {
     const note = await fn();
     results.push({ name, ok: true, ms: Date.now() - started, ...(note ? { note } : {}) });
   } catch (e) {
-    results.push({
-      name,
-      ok: false,
-      ms: Date.now() - started,
-      note: e instanceof Error ? e.message.split("\n")[0] : String(e),
-    });
+    results.push({ name, ok: false, ms: Date.now() - started, note: noteOf(e) });
   }
 }
 
@@ -123,13 +138,12 @@ function readSurfaces(): SurfaceCheck[] {
   const reference = getComputedStyle(probe);
 
   const out: SurfaceCheck[] = [];
-  const selectors = [
-    ".sheet",
-    ".confirm-prompt",
-    ".context-menu",
-    ".thread-toolbar--floating",
-    ".bottom-bar__piece",
-  ];
+  // The surfaces that are the shared glass recipe and nothing else. The pane's action bar is
+  // deliberately not one of them any more: S5 made the pane a `vaul` drawer below 900, the bar is
+  // that drawer's chrome row (`variant="chrome"`, no material of its own) and a `.glass-surface`
+  // inside the drawer's own glass field is the ACCENT §4.4 nesting. What it *is* is asserted in
+  // `readGlassStack` above, which reports what the browser painted rather than what the class says.
+  const selectors = [".sheet", ".confirm-prompt", ".context-menu", ".bottom-bar__piece"];
   for (const sel of selectors) {
     const found = Array.from(document.querySelectorAll(sel));
     let glass = found.length > 0;
@@ -168,11 +182,27 @@ function readBodyType(): TypeReading {
   return { fontSize: style.fontSize, lineHeight: style.lineHeight };
 }
 
-/** Runs in the page (same constraints as readGlassStack). */
-function readSheetMotion(): string {
+/** Where the sheet's arrival is written, which is what changed under S5. Before it, `.sheet` was an
+ *  animated panel and this read its `animation-name` — `sheet-in`, which the preference swapped for
+ *  `fade-in`. Now it is a `vaul` drawer with snap points, and such a drawer arrives on the
+ *  `transition: transform .5s …` that `vaul`'s own injected stylesheet puts on every
+ *  `[data-vaul-drawer]`: the element mounts a viewport below and *travels* to the snap point. So the
+ *  preference is read where it is written — the duration of that travel — and the animation name is
+ *  carried along for the note, because the drawer's blocks turn it off on purpose (an animation and
+ *  a transition on one transform is the double-animation the S5 block exists to prevent).
+ *
+ *  Milliseconds, and only the transform's share: a duration list is per property, and summing the
+ *  whole list would count a property that does not move. */
+function readSheetMotion(): { animation: string; property: string; travel: number } {
   const el = document.querySelector(".sheet");
-  if (el === null) return "missing";
-  return getComputedStyle(el).animationName;
+  if (el === null) return { animation: "missing", property: "missing", travel: Number.NaN };
+  const style = getComputedStyle(el);
+  const properties = style.transitionProperty.split(",").map((s) => s.trim());
+  const durations = style.transitionDuration.split(",").map((s) => s.trim());
+  const at = properties.indexOf("transform");
+  const raw = at === -1 ? "0s" : (durations[at] ?? "0s");
+  const ms = raw.endsWith("ms") ? Number.parseFloat(raw) : Number.parseFloat(raw) * 1000;
+  return { animation: style.animationName, property: style.transitionProperty, travel: ms };
 }
 
 /** The two measured tiers plus the boundaries either side of 900 and 1280, where the pane changes
@@ -288,8 +318,10 @@ test("US-D09 surfaces (nested glass, surface material, type scale)", async ({ pa
       return `${layers.length} glass layers, 0 nested`;
     });
 
-    // >=900 is where the bar is the pane's own bar rather than the floating one; below that it is
-    // out of the pane's flow entirely and there is no header for it to sit over.
+    // >=900 is the only tier with a clearance to measure: 900–1279.98 draws the bar as the sheet's
+    // chrome row (no material, nothing to cast) and below 900 the pane is a `vaul` drawer whose own
+    // chrome row is the same shape — the band `--shadow-glass` needs exists only where the bar is
+    // the glass itself.
     if (width >= 900) {
       await check(`the pane's bar clears the header at rest at ${width}px (§c.5)`, async () => {
         const { gap, needs, glass } = await page.evaluate(readHeaderClearance);
@@ -305,10 +337,16 @@ test("US-D09 surfaces (nested glass, surface material, type scale)", async ({ pa
     }
   }
 
-  // The three D9 chrome surfaces, at the widths they actually render at: the action bar and the
-  // bottom bar exist below 900, the sheet and the popover at every width.
+  // The D9 chrome surfaces, at the widths they actually render at: the bottom bar exists below 900,
+  // the sheet and the popover at every width.
   await page.setViewportSize({ width: 390, height: 1000 });
   await page.waitForTimeout(600);
+  // S5: the open thread is a modal `vaul` drawer at this tier, and Radix puts `pointer-events: none`
+  // on everything outside the drawer — so the BottomBar's Filters circle cannot be pressed until the
+  // thread sheet is down. (The press would land on the scrim, which is a click outside: the drawer
+  // would close and the sheet would never open.)
+  await page.keyboard.press("Escape");
+  await page.locator("[data-vaul-drawer].app-shell__detail").waitFor({ state: "detached" });
   await page.getByRole("button", { name: "Filters" }).click();
   await page.getByRole("dialog", { name: "Filters" }).waitFor({ timeout: 10_000 });
   await page.waitForTimeout(400);
@@ -317,10 +355,10 @@ test("US-D09 surfaces (nested glass, surface material, type scale)", async ({ pa
     "the D9 chrome surfaces are the shared glass, with no fill of their own",
     async () => {
       const surfaces = await page.evaluate(readSurfaces);
-      const bar = surfaces.find((s) => s.sel === ".thread-toolbar--floating");
       const sheet = surfaces.find((s) => s.sel === ".sheet");
-      expect(bar?.count, "the action bar did not render at 390").toBeGreaterThan(0);
+      const bar = surfaces.find((s) => s.sel === ".bottom-bar__piece");
       expect(sheet?.count, "the Filters sheet did not render").toBeGreaterThan(0);
+      expect(bar?.count, "the BottomBar did not render at 390").toBeGreaterThan(0);
       for (const surface of surfaces) {
         if (surface.count === 0) continue;
         expect(surface.glass, `${surface.sel}: ${surface.detail}`).toBe(true);
@@ -334,16 +372,31 @@ test("US-D09 surfaces (nested glass, surface material, type scale)", async ({ pa
   );
 
   await check("the sheet arrives without moving under reduced motion (§c.6)", async () => {
-    const animated = await page.evaluate(readSheetMotion);
-    expect(animated, "the sheet animates under the default preference").not.toBe("fade-in");
+    const moving = await page.evaluate(readSheetMotion);
+    expect(
+      moving.travel,
+      `the sheet has no travel to speak of at rest: ${JSON.stringify(moving)}`,
+    ).toBeGreaterThan(0);
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.waitForTimeout(300);
-    expect(await page.evaluate(readSheetMotion)).toBe("fade-in");
+    const still = await page.evaluate(readSheetMotion);
+    expect(still.travel, `the sheet still travels under reduce: ${JSON.stringify(still)}`).toBe(0);
     await page.emulateMedia({ reducedMotion: null });
-    return `${animated} → fade-in under reduce`;
+    return `${String(moving.travel)}ms travel → 0ms under reduce (animation ${moving.animation})`;
   });
 
   await page.keyboard.press("Escape");
+  await page.waitForTimeout(400);
+
+  // The pane again for the two checks below. Opening the Filters sheet is what closed it — the
+  // thread sheet had to be down for that press (see above) — and a row press is how the shell opens
+  // a thread at every tier. Its exit is waited for by the class rather than by a duration: while the
+  // sheet is still mounted its overlay is the topmost element on screen, and the click would be a
+  // press on the scrim.
+  await page.locator(".sheet").waitFor({ state: "detached", timeout: 10_000 });
+  await page.locator(".inbox-row").first().click();
+  await page.mouse.move(2, 2);
+  await page.locator('[data-testid="detail-pane"]').waitFor({ timeout: 15_000 });
   await page.waitForTimeout(400);
 
   // §c.5/§c.8's body scale: 15px at the desk, 17px at arm's length, 1.5 in both.

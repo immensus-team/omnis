@@ -3,9 +3,13 @@
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   // .claude/** is vendored (skills, templates, fixtures) — not our code; the skills tsconfig
   // templates/fixtures were blocking `pnpm lint` with 136 errors (since 353f0a7).
-  // docs/planning/** holds Workflow-tool scripts: they are the top-level body of a workflow, not
-  // modules, so they use a bare `return` and the tool's own `agent()`/`phase()` globals. Biome parses
-  // them as modules and fails on the `return` alone — 17 errors (since ce580af).
+  //
+  // docs/planning/*.js are Workflow-tool scripts, not modules: their final `return` is the script's
+  // own API (the tool reads the returned value), and Biome is right to reject a top-level return in
+  // a module — the two are not the same kind of file and no parse error here is a real defect. They
+  // were committed by ce580af and were failing `pnpm lint` with 17 errors before this line existed.
+  // Scoped to *.js rather than the whole directory: docs/planning/design and .../ux-research are
+  // Markdown and stay linted.
   "files": {
     "ignore": [
       "**/dist/**",
@@ -13,7 +17,7 @@
       ".claude/**",
       ".omc/**",
       "tools/spikes/**",
-      "docs/planning/**"
+      "docs/planning/*.js"
     ]
   },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },

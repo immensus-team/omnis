@@ -229,10 +229,17 @@ async function main(): Promise<void> {
     // to leave the DOM rather than sleeping past it.
     await page.mouse.move(2, 2);
     await page.locator(".row-hover-card").waitFor({ state: "hidden", timeout: 5000 });
-    // The key-value table is behind the More icon by design (the pane's body is the conversation),
-    // so the screenshot opens it: otherwise the one component this story adds to the pane is the
-    // one thing the pane's own evidence cannot show.
-    await page.getByRole("button", { name: "More details" }).click();
+    // The key-value table is behind the overflow menu by design (the pane's body is the
+    // conversation), so the screenshot opens it: otherwise the one component this story adds to the
+    // pane is the one thing the pane's own evidence cannot show. It is two steps, not one, because
+    // US-D09 (af2edcf) moved the disclosure into the "Thread options" menu when the pane header lost
+    // the controls it used to carry — this line was not updated then, and named a button that no
+    // longer existed (`grep -rn "More details"` finds this file and nothing else).
+    // `exact` is load-bearing: the pane's own toggle is named "Expand details" / "Collapse details"
+    // (detail-pane.tsx:36), and getByRole's default name match is a case-insensitive *substring*, so
+    // a bare "Details" would be ambiguous the moment the pane is expanded.
+    await page.getByRole("button", { name: "Thread options" }).click();
+    await page.getByRole("button", { name: "Details", exact: true }).click();
     await page.waitForTimeout(600);
     await page
       .locator('[data-testid="detail-pane"]')

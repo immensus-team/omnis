@@ -1,7 +1,30 @@
-import { useEffect, useRef, useState } from "react";
+import { Toaster as SonnerToaster, type ToasterProps, toast } from "sonner";
 import { cn } from "../lib/cn.js";
-import { FAST_MS, useClosingSpring } from "../lib/motion.js";
-import { GlassSurface } from "./glass-surface.js";
+
+// motion-OSS S6: the app's one toast surface, and the first one it has had. `grep -rn "toast"` before
+// this landed found exactly one hit in the whole repo — a comment in screens/Digest.tsx naming the
+// seam where a toast library would go — so "Archived · Undo" was an affordance the product was
+// missing, not one it was implementing twice.
+//
+// Why a wrapper rather than importing sonner at the call site: this package is the design system, and
+// every other surface in it is fronted here for the same reason. The app imports `Toaster` and `toast`
+// from @omnis/ui and does not learn which library is underneath — which is what keeps a future swap
+// (or a second toast host) from being an app-wide change. It also gives the styling rules one home.
+//
+// The element sonner renders is styled from apps/desktop/src/app.css against the design tokens, via
+// the `omnis-toast*` class names below. Sonner sets its own defaults as CSS custom properties on
+// `[data-sonner-toaster]` (`--normal-bg`, `--normal-text`, `--normal-border`, `--border-radius`), and
+// that stylesheet is imported by the app entry beside `tokens.css` — CSS is only ever imported by the
+// app entry in this repo, never from inside a packages/ui component.
+//
+// loop-r1-06's toasts are raised through this host too (the merge of plan/motion-oss into main): the
+// one pill the shell used to draw was a second surface for the same job, so the vocabulary below —
+// a message and an optional action, no id and no library — is what the shell and the Inbox still
+// speak, and `App.tsx`'s `notify` is the single place that turns it into sonner's own options.
+
+/** The undo window Gmail's own archive toast gives. Every caller here inherits it — the number is
+ *  not a parameter anyone passes. */
+export const TOAST_MS = 5000;
 
 /** A toast's pressable half — the Undo, or a Retry. */
 export interface ToastAction {
@@ -9,138 +32,46 @@ export interface ToastAction {
   onAction: () => void;
 }
 
-/** What the shell's one toast slot holds. A new spec replaces whatever is there: there is no queue,
- *  because there is one thing the user just did and one thing they might want taken back, and a
- *  stack of them would be a second place to look for the one that matters.
- *
- *  `id` is the toast's identity, and it is deliberately not the message: two toasts in a row can say
- *  the same words — `j e j e` across two rows raises "Archived" twice, and two ignored approvals can
- *  share a description — and the second one must not inherit whatever is left of the first one's
- *  clock. The slot stamps a fresh number on every notify, so a replacement that reads identically is
- *  still a new toast to the pill, with a full duration of its own. */
-export interface ToastSpec {
-  id: number;
+/** A toast as the screen raising it describes it: what to say, and the one action that might be
+ *  wanted. Identity, timing and rendering belong to the host, so a raiser never names either. */
+export interface ToastRequest {
   message: string;
   action?: ToastAction;
 }
 
-/** A toast as the screen raising it describes it: everything the raiser knows, which is everything
- *  but the id. Identity belongs to the one slot that holds the toast, not to the row that raised it,
- *  so a raiser never invents one and can never collide with another raiser's. */
-export type ToastRequest = Omit<ToastSpec, "id">;
-
-/** The undo window Gmail's own archive toast gives. Every caller here inherits it — the number is
- *  not a parameter anyone passes. */
-export const TOAST_MS = 5000;
-
-export interface ToastProps {
-  /** Which toast this is — the timer's identity, and the reason it is a prop at all rather than
-   *  something this component could work out for itself. Two consecutive renders with the same
-   *  `message` are indistinguishable otherwise, and the second one has to start a fresh countdown
-   *  rather than inherit the first one's. A caller that passes a new id is showing a new toast. */
-  id: number;
-  /** The toast to show, or null for "nothing to show". The wrapper below is mounted either way — a
-   *  live region has to be in the DOM *before* its content is, or the change is not announced. */
-  message: string | null;
-  /** `| undefined` because the shell passes the slot's spec straight through: a toast without an
-   *  action writes the property as undefined rather than omitting it, and this repo compiles with
-   *  `exactOptionalPropertyTypes`. */
-  action?: ToastAction | undefined;
-  /** The toast has been up for its full duration. The caller owns the slot; this component never
-   *  clears itself, so the dismissal is one decision in one place (App.tsx's notify/clear pair). */
-  onDismiss: () => void;
-  durationMs?: number;
-}
-
-/** loop-r1-06: the one thing the shell says back after a write. It is a floating panel, so it is
- *  glass — the toolbar slot, and no background of its own (ACCENT §4.4): the plate's tint, blur and
- *  hairline are `.glass-surface`'s, and app.css draws the pill around them.
+/** The app's one toast host. Mount it once, at the root, inside `MotionConfig`.
  *
- *  The action is the point of it. Every toast this story raises is either reversible (Undo) or
- *  retryable (Retry), so the pill holds a message and one text button and nothing else. */
-export function Toast({ id, message, action, onDismiss, durationMs = TOAST_MS }: ToastProps) {
-  /** True while the pointer or the focus is on the pill. The Undo is why the toast is on screen at
-   *  all, so a clock that runs down while someone is reaching for the button takes away the thing
-   *  it was showing. The countdown restarts when they leave rather than resuming mid-flight:
-   *  ponytail, carrying the remaining milliseconds is a second clock for a difference nobody can
-   *  see, and restarting is the friendlier half of the same behaviour. */
-  const [held, setHeld] = useState(false);
-  // A ref, not a dependency: the shell's `onDismiss` is stable, but the timer effect must not be
-  // re-armed by a caller that passes a fresh arrow on every render — that would reset the countdown
-  // sixty times a second and the toast would never dismiss.
-  const dismiss = useRef(onDismiss);
-  useEffect(() => {
-    dismiss.current = onDismiss;
-  }, [onDismiss]);
-
-  /** The pill outlives `message` by one leave animation, so the last thing it drew is kept here: a
-   *  null message means "leaving", not "blank", and a pill that emptied itself out would fade a hole
-   *  rather than the sentence the user is reading. */
-  const last = useRef<{ message: string; action?: ToastAction | undefined } | null>(null);
-  useEffect(() => {
-    if (message !== null) last.current = { message, action };
-  }, [message, action]);
-
-  // The hold the leave is given, the same shape the ask panel and the detail pane use: `closing` is
-  // true for one exit animation after the message goes (lib/motion.ts).
-  const closing = useClosingSpring(message !== null, FAST_MS);
-  const content = message !== null ? { message, action } : closing ? last.current : null;
-  const shownAction = content?.action;
-  /** The pill is in the DOM, which is not the same as there being a message: it outlives the
-   *  message by its leave animation, so "gone" is the only state in which nothing can be holding
-   *  it. */
-  const showing = content !== null;
-
-  // The hold belongs to the pill that took it, and it has to be given up when that pill goes. The
-  // browser fires no `mouseleave` or `blur` for a node that has been removed from under the pointer
-  // or the focus, so the hold taken by the click that *cleared* the toast — mouse on Undo, or the
-  // keyboard's focus ring on it — would outlive its own pill and mute the countdown of the next
-  // one, which would then sit there indefinitely. Reset it the moment the pill leaves.
-  useEffect(() => {
-    if (!showing) setHeld(false);
-  }, [showing]);
-
-  // `id`, not `message`, is what makes this a *new* toast: keyed on the message alone, a replacement
-  // saying the same words changes nothing, the outgoing toast's timer keeps running, and the newer
-  // one is dismissed early — the second archive of a `j e j e` loses the tail of its own undo
-  // window. It is in the array and nowhere in the body on purpose. It is not an input to the
-  // timeout, it is what the timeout belongs to, and re-arming is the whole effect; the linter reads
-  // that as a dependency nobody uses.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `id` is the timer's identity, not one of its inputs — see above.
-  useEffect(() => {
-    if (message === null || held) return;
-    const timer = window.setTimeout(() => dismiss.current(), durationMs);
-    return () => window.clearTimeout(timer);
-  }, [id, message, durationMs, held]);
-
-  // The wrapper is `<output>` rather than a div with role="status": the element already carries the
-  // role and the polite live region (the same call Network.tsx's merge note makes), and it is
-  // always mounted, empty while there is nothing to say. The pill renders inside it only while it
-  // is shown, so the region an announcement lands in outlives the toast that carried it.
+ *  `position="bottom-center"` rather than a corner: the two gestures that raise a toast (archiving a
+ *  row, and the bulk archive confirm) are both actions on the list, and the list's own bottom edge is
+ *  where the row that just left was — a toast in a far corner makes the user travel to read a message
+ *  about something they were already looking at. */
+export function Toaster({ toastOptions, ...props }: ToasterProps) {
+  // A caller's class names are composed with ours, not substituted for them: app.css hangs the token
+  // styling off `omnis-toast`, so a call site passing its own `classNames.toast` (a wider toast, say)
+  // must add a class and not silently drop the one that makes it look like the rest of the app.
+  const caller = toastOptions?.classNames;
   return (
-    <output className="toast" aria-live="polite">
-      {content !== null && (
-        <GlassSurface
-          slot="toolbar"
-          className={cn("toast__pill", closing && "toast__pill--closing")}
-          onMouseEnter={() => setHeld(true)}
-          onMouseLeave={() => setHeld(false)}
-          // React's focus events bubble, so these two catch the button inside the pill as well as
-          // the pill itself — a focus ring on the Undo holds the toast exactly as a hover does.
-          onFocus={() => setHeld(true)}
-          onBlur={() => setHeld(false)}
-        >
-          <span className="toast__message">{content.message}</span>
-          {shownAction !== undefined && (
-            // No dismissal here: taking the action is not the same as ignoring the toast, and what
-            // happens next belongs to the caller — the archive's Undo raises the restore's own
-            // toast, and a dismissal from here would take that one away instead.
-            <button type="button" className="toast__action" onClick={shownAction.onAction}>
-              {shownAction.label}
-            </button>
-          )}
-        </GlassSurface>
-      )}
-    </output>
+    <SonnerToaster
+      position="bottom-center"
+      // `gap`/`offset` are left at sonner's defaults; the narrow tier's BottomBar sits over the
+      // toaster's resting place and app.css lifts it there. That has to be a viewport media query
+      // rather than the `@container shell` query the rest of the layout uses, because sonner portals
+      // its list to document.body — outside #root, which is the container.
+      toastOptions={{
+        ...toastOptions,
+        classNames: {
+          ...caller,
+          toast: cn("omnis-toast", caller?.toast),
+          actionButton: cn("omnis-toast__action", caller?.actionButton),
+          description: cn("omnis-toast__description", caller?.description),
+        },
+      }}
+      {...props}
+    />
   );
 }
+
+/** Re-exported so a call site can raise a toast without importing sonner itself. `toast(...)` is the
+ *  whole API the app uses; the `.success`/`.error`/… variants come along with it. */
+export { toast };
+export type { ToasterProps };

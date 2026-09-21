@@ -6,7 +6,6 @@ import {
   AttachmentCardView,
   type AttachmentItem,
   DraftCard,
-  FolderInputIcon,
   InfoIcon,
   type KeyValueRow,
   KeyValueTable,
@@ -15,7 +14,6 @@ import {
   RotateCcwIcon,
   SegmentedControl,
   StatusBadge,
-  THREAD_TOOLBAR_FLOATING_CLASS,
   TagIcon,
   ThreadToolbar,
   type ThreadToolbarAction,
@@ -29,7 +27,6 @@ import { formatRelativeTime } from "@omnis/ui/lib/relative-time";
 import { type CHANNEL_LABEL, initialsFromName, pastelFromName } from "@omnis/ui/lib/row-meta";
 import { useQuery } from "@rocicorp/zero/react";
 import { type ReactNode, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 import { setThreadArchived } from "../api/threads.js";
 import { useZeroClient } from "../zero-client.js";
 
@@ -279,6 +276,18 @@ export function Thread({
     ],
   };
 
+  // One bar, two homes and never two at once. `narrow` joins the sheet tier because below 900 the
+  // pane *is* a sheet — S5 made it the same `vaul` drawer the filters come up in — so the bar is
+  // that drawer's chrome row, exactly where it stands from 900 to 1279.98.
+  //
+  // There used to be a third home: a floating action bar portaled into the BottomBar's line between
+  // the filters circle and the compose circle, with an archive · move · reply set. A modal drawer
+  // owns the pointer for everything outside itself — Radix sets `pointer-events: none` on the body —
+  // so a bar sitting in a line under the drawer's scrim would be visible and untouchable, which is
+  // worse than the disabled "Move to folder" its set carried. The three-action set is gone with it;
+  // archive and reply are the two the pane's bar has always had at every other width.
+  const toolbarHome = narrow || floatingPane ? "chrome" : "flow";
+
   // The pane's bar: reply · archive · more. It is one element with one material per tier, because
   // the surface it stands on changes. Wide (>=1280) the pane is an opaque grid column, so the bar
   // is the glass capsule §c.5 specs. From 900 to 1279.98 the pane is itself a floating glass sheet
@@ -289,42 +298,11 @@ export function Thread({
   const paneToolbar = (
     <ThreadToolbar
       className="thread-toolbar--pane"
-      variant={floatingPane ? "chrome" : "glass"}
+      variant={toolbarHome === "chrome" ? "chrome" : "glass"}
       actions={[replyAction, archiveAction]}
       menu={toolbarMenu}
     />
   );
-
-  // The <900 bar: archive · move · reply, in the BottomBar's own line between the filters circle and
-  // the compose circle. It carries the same `more` menu as the wide tier's, so the two disclosures
-  // are reachable in this tier too instead of being a wide-layout privilege.
-  //
-  // It is portaled to the body rather than rendered inside the pane. At this tier the pane is a fixed
-  // sheet that carries `backdrop-filter`, which makes it a containing block for its fixed
-  // descendants — an element inside it would position against the sheet's own box and land a row too
-  // high, above the BottomBar instead of in its line.
-  const floatingToolbar = (
-    <ThreadToolbar
-      className={THREAD_TOOLBAR_FLOATING_CLASS}
-      actions={[
-        archiveAction,
-        {
-          id: "move",
-          label: "Move to folder",
-          icon: FolderInputIcon,
-          onSelect: () => {},
-          disabled: true,
-          title: PHASE_B_TITLE,
-        },
-        replyAction,
-      ]}
-      menu={toolbarMenu}
-    />
-  );
-
-  // One bar, three homes and never two at once. `narrow` wins over `floatingPane` because the <900
-  // tier is also a floating pane — there the bar belongs to the BottomBar's row, not to the sheet.
-  const toolbarHome = narrow ? "floating" : floatingPane ? "chrome" : "flow";
 
   return (
     <>
@@ -332,11 +310,7 @@ export function Thread({
           material because the sheet behind it is the material. */}
       {toolbarHome === "chrome" && paneToolbar}
       <div className="thread-screen">
-        {toolbarHome === "floating"
-          ? createPortal(floatingToolbar, document.body)
-          : toolbarHome === "flow"
-            ? paneToolbar
-            : null}
+        {toolbarHome === "flow" && paneToolbar}
         {archived !== null && (
           <div className="thread-screen__archived-banner">
             <span>Archived</span>

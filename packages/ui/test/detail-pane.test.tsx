@@ -22,21 +22,47 @@ function setupHandle(width = 420) {
   };
   const { unmount } = render(<DetailPaneHandle {...props} />);
   const grip = screen.getByRole("separator");
-  /** One gesture, driven through the events React actually dispatched: the primitive reads
-   *  `e.currentTarget` and binds its listeners from it, so hand-rolled event objects would not
-   *  reach it. `down` is a press at the origin; each `to` is an absolute clientX. */
-  const drag = (to: number[]) => {
+  /** The three halves of a gesture, separately, so a test can stop in the middle of one. Each is
+   *  driven through the events React actually dispatched — the gesture layer binds its listeners
+   *  from the press — with `pointerType` and `buttons` on all of them, which is what a browser
+   *  sends: a `pointermove` with neither is not a move a real pointer can make and the gesture
+   *  layer drops it (probed, not assumed). */
+  const pressAt = (clientX = 0): void => {
     fireEvent.pointerDown(grip, {
       button: 0,
+      buttons: 1,
       pointerId: 1,
       pointerType: "mouse",
-      clientX: 0,
+      clientX,
       clientY: 0,
     });
-    for (const clientX of to) fireEvent.pointerMove(window, { pointerId: 1, clientX, clientY: 0 });
-    fireEvent.pointerUp(window, { pointerId: 1, clientX: to.at(-1) ?? 0, clientY: 0 });
   };
-  return { ...props, grip, drag, unmount };
+  const moveTo = (clientX: number): void => {
+    fireEvent.pointerMove(window, {
+      pointerId: 1,
+      pointerType: "mouse",
+      buttons: 1,
+      clientX,
+      clientY: 0,
+    });
+  };
+  const releaseAt = (clientX: number): void => {
+    fireEvent.pointerUp(window, {
+      pointerId: 1,
+      pointerType: "mouse",
+      buttons: 0,
+      clientX,
+      clientY: 0,
+    });
+  };
+  /** One whole gesture: press at the origin, every `to` as an absolute clientX, release at the
+   *  last of them. */
+  const drag = (to: number[]) => {
+    pressAt();
+    for (const clientX of to) moveTo(clientX);
+    releaseAt(to.at(-1) ?? 0);
+  };
+  return { ...props, grip, drag, pressAt, moveTo, releaseAt, unmount };
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -122,15 +148,9 @@ describe("DetailPaneHandle drag (US-D10: rubber band, then a settle)", () => {
   // double-click only works because the press that preceded it committed nothing.
   it("writes nothing for a press that never moved", () => {
     const h = setupHandle(500);
-    fireEvent.pointerDown(h.grip, {
-      button: 0,
-      pointerId: 1,
-      pointerType: "mouse",
-      clientX: 0,
-      clientY: 0,
-    });
-    fireEvent.pointerMove(window, { pointerId: 1, clientX: 3, clientY: 0 });
-    fireEvent.pointerUp(window, { pointerId: 1, clientX: 3, clientY: 0 });
+    h.pressAt();
+    h.moveTo(3);
+    h.releaseAt(3);
 
     expect(h.onWidthChange).not.toHaveBeenCalled();
     expect(h.onWidthCommit).not.toHaveBeenCalled();
@@ -138,14 +158,8 @@ describe("DetailPaneHandle drag (US-D10: rubber band, then a settle)", () => {
 
   it("drops the gesture when it is cancelled instead of walking the pane back", () => {
     const h = setupHandle(420);
-    fireEvent.pointerDown(h.grip, {
-      button: 0,
-      pointerId: 1,
-      pointerType: "mouse",
-      clientX: 0,
-      clientY: 0,
-    });
-    fireEvent.pointerMove(window, { pointerId: 1, clientX: -100, clientY: 0 });
+    h.pressAt();
+    h.moveTo(-100);
     expect(h.onWidthChange).toHaveBeenLastCalledWith(520);
 
     fireEvent.keyDown(window, { key: "Escape" });
@@ -158,9 +172,31 @@ describe("DetailPaneHandle drag (US-D10: rubber band, then a settle)", () => {
     expect(h.onWidthChange).toHaveBeenLastCalledWith(520);
 
     // And the gesture is over: a late release cannot commit it.
-    fireEvent.pointerUp(window, { pointerId: 1, clientX: -100, clientY: 0 });
+    h.releaseAt(-100);
     expect(h.onWidthCommit).not.toHaveBeenCalled();
     expect(h.onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  // The pointer being taken away mid-drag (the platform turned the gesture into a scroll, the
+  // device was unplugged) is the other way a gesture ends without a decision. It is the *same*
+  // outcome as Escape and reaches the component by a different route — a `pointercancel` on the
+  // release, where Escape is the component's own window listener.
+  it("drops the gesture when the pointer is cancelled, not just on Escape", () => {
+    const h = setupHandle(420);
+    h.pressAt();
+    h.moveTo(-100);
+    expect(h.onWidthChange).toHaveBeenLastCalledWith(520);
+
+    fireEvent.pointerCancel(window, {
+      pointerId: 1,
+      pointerType: "mouse",
+      buttons: 0,
+      clientX: -100,
+      clientY: 0,
+    });
+
+    expect(h.onCancel).toHaveBeenCalledTimes(1);
+    expect(h.onWidthCommit).not.toHaveBeenCalled();
   });
 });
 

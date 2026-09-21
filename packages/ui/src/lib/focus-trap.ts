@@ -1,4 +1,10 @@
-import { type KeyboardEvent as ReactKeyboardEvent, type RefObject, useEffect } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type RefObject,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from "react";
 
 // US-D09: the focus trap and the return-focus rule the two modal surfaces share — the Sheet (§c.6)
 // and the ConfirmPrompt (§c.8). One implementation, because "focus is trapped while open and comes
@@ -50,18 +56,48 @@ export function trapTab(e: ReactKeyboardEvent<HTMLElement>): void {
  *  the dialog was open has nothing to return to, and focusing a detached node silently moves focus
  *  to <body> — which is how "focus returned" becomes "focus was thrown away".
  *
- *  **Declare this before `useInitialFocus`.** Effects run in declaration order, and this one has to
- *  read `document.activeElement` while it is still the trigger. React's `autoFocus` prop cannot be
- *  used for the move-in instead: ReactDOM applies it during the commit, i.e. before any effect, so
- *  the trigger is already gone by the time this runs and the dialog returns focus to itself. */
+ *  **The read is a layout effect, and that is what makes it portable.** This has to run before
+ *  anything moves focus into the dialog. React's `autoFocus` prop cannot be used for the move-in
+ *  instead — it applies during the commit, before any effect — but a *library's* move-in can, and
+ *  `vaul`'s does: Radix's `FocusScope` autofocuses the first control in a passive effect, and a
+ *  layout effect in an ancestor runs before every passive effect in the tree. So the same helper
+ *  captures the trigger for the hand-rolled dialog (where nothing has moved focus yet either way)
+ *  and for the drawer (where Radix has not run yet but is about to). Reading it in a passive effect
+ *  instead would capture the dialog's own first control and return focus to itself.
+ *
+ *  **Declare this before `useInitialFocus`** at the wide tier, for the same reason in miniature:
+ *  that one is a passive effect and would otherwise run first. */
 export function useReturnFocus(open: boolean): void {
-  useEffect(() => {
+  const target = useReturnFocusTarget(open);
+  useLayoutEffect(() => {
     if (!open) return;
-    const previous = document.activeElement;
-    return () => {
-      if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
-    };
+    return () => restoreFocus(target.current);
+  }, [open, target]);
+}
+
+/** The read half of `useReturnFocus`, on its own, for a caller that cannot do the write in a
+ *  cleanup. `vaul`'s drawer is that caller: Radix's `FocusScope` keeps a `focusout` listener on the
+ *  document that pulls focus back into the panel, and a *cleanup* runs during the mutation phase —
+ *  while the scope is still mounted and listening — so focusing the trigger there is undone on the
+ *  spot (probed: the trigger gets focus and immediately loses it to the panel's own button). The
+ *  write has to wait for Radix's `onCloseAutoFocus`, which is dispatched after the scope's listeners
+ *  are gone. This is the read that hook needs, kept apart so both tiers share one capture rule. */
+export function useReturnFocusTarget(open: boolean): RefObject<HTMLElement | null> {
+  const target = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    // Written on open only, never cleared on close — and that is load-bearing rather than an
+    // omission. The close commit is *earlier* than Radix's `onCloseAutoFocus` (which is a task), so
+    // a `target.current = null` here erases the trigger one beat before the handler that needs it
+    // reads the ref (probed: the handler saw `undefined`). The next open overwrites it anyway.
+    if (open && document.activeElement instanceof HTMLElement)
+      target.current = document.activeElement;
   }, [open]);
+  return target;
+}
+
+/** The write half: focus the captured element, if it is still in the document. */
+export function restoreFocus(target: HTMLElement | null | undefined): void {
+  if (target?.isConnected) target.focus();
 }
 
 /** Moves focus onto the dialog's own first control once it is open. Takes the element rather than

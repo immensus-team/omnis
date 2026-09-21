@@ -11,7 +11,13 @@ export * from "./components/ask-panel.js";
 export * from "./lib/ask-model.js";
 export * from "./lib/motion.js";
 export * from "./lib/focus-trap.js";
+export * from "./components/narrow-drawer.js";
 export * from "./components/sheet.js";
+// loop-r1-06 + motion-OSS S6: the app's one toast host. The shell's toasts are raised through it,
+// which is why the request type travels with it — the app names a message and an action, never the
+// library underneath or the spec the host ends up holding.
+export * from "./components/toast.js";
+export * from "./components/animated-list.js";
 export * from "./components/confirm-prompt.js";
 export * from "./lib/pointer-drag.js";
 export * from "./lib/rail-order.js";
@@ -39,10 +45,6 @@ export * from "./components/approval-stack.js";
 export { CHANNEL_LABEL } from "./lib/row-meta.js";
 export * from "./components/channel-glyph.js";
 export * from "./components/detail-pane.js";
-// loop-r1-06: the write-feedback toast. It is raised by the shell (one slot, one pill) and by the
-// Inbox through it, which is why the request type travels with it — the app names a message and an
-// action, never the id or the spec the slot ends up holding.
-export * from "./components/toast.js";
 export { ChevronRight as ChevronRightIcon } from "lucide-react";
 export { Tag as TagIcon } from "lucide-react";
 export { MoreHorizontal as MoreHorizontalIcon } from "lucide-react";

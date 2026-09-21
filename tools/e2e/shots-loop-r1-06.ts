@@ -48,6 +48,18 @@ const IGNORED = "Ignored: ";
 const APPROVED = "Approved: ";
 const UNDO = "Undo";
 
+/** The toast element as sonner renders it. The merge of plan/motion-oss replaced the shell's own
+ *  pill with this host, so the class names this script used to query (`.toast__pill` and its two
+ *  parts) are gone; `[data-sonner-toast]` is what every sonner toast carries, and it is the same
+ *  handle tools/e2e/shots-motion-oss.ts measures against.
+ *
+ *  `:not([data-removed="true"])` is the half that matters for the checks below: sonner keeps a
+ *  dismissed toast's element mounted for the length of its exit, and reading that one would be
+ *  reading the sentence that just expired — which is exactly the bug check 1b is hunting for. React
+ *  writes the false case as `data-removed="false"` rather than dropping the attribute, so a bare
+ *  `:not([data-removed])` would exclude nothing. */
+const TOAST = '[data-sonner-toast]:not([data-removed="true"])';
+
 /** Poll a read until it says what the write was supposed to. The writes go to the hub over HTTP and
  *  the screens read through Zero's replica, so a database assertion is always "eventually" — a
  *  one-shot read right after the click would be a race dressed as a check. */
@@ -68,19 +80,22 @@ async function poll<T>(
   }
 }
 
-/** What the toast is saying, or null when there is no pill on screen. Read from the pill's two parts
- *  rather than the pill's whole text, so "the sentence is right" and "the button is there" are two
+/** What the toast is saying, or null when there is none on screen. Read from the toast's two parts
+ *  rather than its whole text, so "the sentence is right" and "the button is there" are two
  *  assertions instead of one string that could pass on a reworded message. The message comes from
- *  `.toast__message` and not the `<output>` wrapper: the wrapper is always mounted and empty while
- *  nothing is being said (that is the live region working as intended). */
+ *  `[data-title]` and not the toast element's own text: sonner renders the action button as a
+ *  sibling of that div, so the element's text is `ArchivedUndo`.
+ *
+ *  `.first()` throughout because the app keeps one toast slot (`App.tsx` raises every message under
+ *  one id), so more than one of these on screen is itself the failure the next check would report. */
 async function readToast(page: Page): Promise<{ message: string; action: string | null } | null> {
-  if ((await page.locator(".toast__pill").count()) === 0) return null;
-  const message = await page.locator(".toast__message").textContent();
-  const action = await page.locator(".toast__action").count();
+  const toast = page.locator(TOAST).first();
+  if ((await toast.count()) === 0) return null;
+  const message = await toast.locator("[data-title]").textContent();
+  const button = toast.locator("[data-button]");
   return {
     message: (message ?? "").trim(),
-    action:
-      action === 0 ? null : ((await page.locator(".toast__action").textContent()) ?? "").trim(),
+    action: (await button.count()) === 0 ? null : ((await button.textContent()) ?? "").trim(),
   };
 }
 
@@ -102,17 +117,30 @@ async function waitForToast(
 }
 
 /** Let the enter animation finish before a screenshot. Waiting for the *message* is not enough: the
- *  pill's `toast-in` starts at opacity 0, so a shot taken the moment the text exists catches the
- *  toast as a ghost and the artifact shows a design nobody ever sees. `getAnimations()` is the
- *  browser's own answer to "is this still moving", which beats guessing at --dur-base. */
+ *  toast animates in from opacity 0 (app.css's `.omnis-toast` block re-points sonner's own entrance),
+ *  so a shot taken the moment the text exists catches the toast as a ghost and the artifact shows a
+ *  design nobody ever sees. `getAnimations()` is the browser's own answer to "is this still moving",
+ *  which beats guessing at --dur-base.
+ *
+ *  Asked of the document and filtered to the toast's own subtree, rather than of the element: what
+ *  is animating here is sonner's keyframes on descendants (the toast, its list, its wrapper), and
+ *  the filter is what keeps the row that is leaving *behind* the toast — the other half of these
+ *  shots — out of it. */
 async function settleToast(page: Page): Promise<void> {
   await poll(
     () =>
-      page
-        .locator(".toast__pill")
-        .evaluate((pill) =>
-          pill.getAnimations().every((a) => a.playState === "finished" || a.playState === "idle"),
-        ),
+      page.evaluate(
+        (selector) =>
+          document
+            .getAnimations()
+            .filter((animation) => {
+              const target =
+                animation.effect instanceof KeyframeEffect ? animation.effect.target : null;
+              return target instanceof Element && target.closest(selector) !== null;
+            })
+            .every((a) => a.playState === "finished" || a.playState === "idle"),
+        TOAST,
+      ),
     (settled) => settled,
     "the toast's enter animation to finish",
     5_000,
@@ -416,7 +444,7 @@ async function main(): Promise<void> {
       );
     }
     const [pillBox, barBox] = await Promise.all([
-      page.locator(".toast__pill").boundingBox(),
+      page.locator(TOAST).first().boundingBox(),
       page.locator(".bottom-bar").boundingBox(),
     ]);
     if (pillBox === null || barBox === null) {

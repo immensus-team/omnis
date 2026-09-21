@@ -13,25 +13,35 @@ import {
   DetailPaneClose,
   DetailPaneHandle,
   DetailPaneToggle,
+  DrawerGrabber,
   LEAVE_MS,
+  NarrowDrawer,
   type PaletteAction,
   type RailScreen,
   type RailSelection,
-  Toast,
+  TOAST_MS,
   type ToastRequest,
-  type ToastSpec,
   type UiChannel,
   type UiSearchGroup,
   type UiSearchHit,
   clampDetailWidth,
   readDetailCollapsed,
   readDetailWidth,
+  toast,
   useClosingSpring,
   useFloatingPane,
   useNarrowShell,
 } from "@omnis/ui";
 import { ZeroProvider, useQuery } from "@rocicorp/zero/react";
-import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { approvalDecideUrl, decideApproval } from "./api/approvals.js";
 import { type SearchHit, search, toUiSearchGroups } from "./api/search.js";
 import { fetchSettings, putSetting } from "./api/settings.js";
@@ -46,6 +56,11 @@ import { Tasks } from "./screens/Tasks.js";
 import { Thread } from "./screens/Thread.js";
 import { Today } from "./screens/Today.js";
 import { initZero, useZeroClient } from "./zero-client.js";
+
+/** loop-r1-06 in S6's vocabulary: the app raises ONE toast at a time, and this is its name. sonner
+ *  keys a toast by id, so raising another with this id updates the one on screen — the whole of "one
+ *  slot, no queue" — and dismissing it by id is how a taken undo takes the toast down. */
+const TOAST_SLOT_ID = "omnis-toast-slot";
 
 // Created at module scope it would open a WebSocket on import alone — deferred to first render.
 let zeroClient: ReturnType<typeof initZero> | undefined;
@@ -155,6 +170,12 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
   // own filter state — so the open flag lives here (the trigger is in this file's bar) while the
   // rows live in Inbox.tsx (which owns what they change).
   const [filtersOpen, setFiltersOpen] = useState(false);
+  /** Set when the user pulls the narrow pane's drawer away. Below 900 the pane has no toggle to
+   *  collapse it, so that gesture *is* the decision the collapse flag is above — and it has to be
+   *  remembered separately, because the reason the pane opened on its own (the inbox's pending
+   *  approvals, see `paneVisible`) is still true a frame later and would spring the drawer back up.
+   *  An explicit open outranks it: see the effect below. */
+  const [paneDismissed, setPaneDismissed] = useState(false);
   // US-D08 §c.9: below 900 the ask bar leaves the top of the list and becomes the BottomBar's
   // middle piece. One element in one of two places, never both — a second render of the palette
   // would be a second cmdk list, a second action list to keep in sync, and two things answering
@@ -206,7 +227,8 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
   // which is the real one, so they are merged into one.
   // CommandPalette mode="dialog" itself stays in @omnis/ui with its tests — the shell just does
   // not use it.
-  useCommandPaletteKey(() => setAskOpen((v) => !v));
+  // (The binding itself is below `paneVisible`: in the narrow tier it has to know whether a drawer
+  // is already up.)
 
   // Approvals are read through Zero (the read-only path) and only the decision goes to the hub
   // over HTTP — contract §5.
@@ -217,25 +239,29 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
    *  answered with nothing at all — the row slid away, the card silently became the next one — and a
    *  write that *failed* answered with even less.
    *
-   *  One slot, no queue: a new toast replaces the current one. The alternative is a stack of them
-   *  competing for the same corner of the window, and with one thing just done there is one thing
-   *  the user might want taken back. */
-  const [toast, setToast] = useState<ToastSpec | null>(null);
-  /** The next toast's id. Every `notify` takes one, so the pill can tell a replacement from a
-   *  re-render — including the replacement that says exactly what its predecessor said, which is
-   *  what two archives in a row are. A ref rather than a second piece of state: it is an input to
-   *  the slot, not a thing anything renders, and it has to be the value the `setToast` beside it
-   *  carries, never a render behind. */
-  const toastId = useRef(0);
+   *  S6 gave the app a toast library (packages/ui's `Toaster`, mounted once in main.tsx) and the
+   *  merge kept it: the pill this used to render was a second surface for the same job, so `notify`
+   *  is now the one place that turns a `ToastRequest` into sonner's own options — including the
+   *  identity below, which is what makes "one slot, no queue" true for the library too. Nothing
+   *  about *what* is said moved: the raisers (this file's decisions, the Inbox's archives) still
+   *  name a message and an action and nothing else. */
   /** The work a toast is holding back until it goes away, and (for the ignore) the approval the
    *  `beforeunload` beacon would have to re-send. Only the ignore defers a hub call today: its whole
    *  point is that the user may take it back, so the decision waits for the toast to leave. */
   const held = useRef<{ run: () => void; ignoreId?: string } | null>(null);
 
-  const clearToast = useCallback(() => {
+  /** The toast is going — by its own timer, by a swipe, or by the user's close button. Running the
+   *  held work is what every one of those means, and the ref is cleared first so that two of them
+   *  arriving in either order still run it once. */
+  /** Takes the toast down without running what it held. The ignore's Undo is the caller: the
+   *  decision has just been taken back, so the work the toast was deferring is dropped rather than
+   *  run. The dismissal still routes through `onDismiss` like any other, which is `runHeld` — and
+   *  `held` is empty by then, so nothing runs twice. */
+  const dismissToast = useCallback(() => toast.dismiss(TOAST_SLOT_ID), []);
+
+  const runHeld = useCallback(() => {
     const outgoing = held.current;
     held.current = null;
-    setToast(null);
     outgoing?.run();
   }, []);
 
@@ -250,30 +276,44 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
    *  there. No caller has to remember that. */
   const notify = useCallback(
     (spec: ToastRequest, deferred?: { run: () => void; ignoreId?: string }) => {
-      const outgoing = held.current;
-      held.current = null;
-      outgoing?.run();
+      // The toast being replaced finishes that work first — "replaced by another toast" and "timed
+      // out" are the same event for anything deferred — and it runs *before* the new slot is armed,
+      // so the outgoing work does not find the new toast when it looks.
+      runHeld();
       held.current = deferred ?? null;
       const action = spec.action;
-      toastId.current += 1;
-      const id = toastId.current;
-      setToast(
-        action === undefined
-          ? { ...spec, id }
-          : {
-              ...spec,
-              id,
-              action: {
+      toast(spec.message, {
+        // One slot: a toast raised while another is up updates it in place rather than stacking a
+        // second one. sonner re-arms the dwell when it does, which is what makes two archives in a
+        // row two full windows rather than the tail of one.
+        id: TOAST_SLOT_ID,
+        duration: TOAST_MS,
+        action:
+          action === undefined
+            ? undefined
+            : {
                 label: action.label,
-                onAction: () => {
+                // Wrapped rather than passed through, so that taking the action calls the deferred
+                // work off: an Undo on the ignore means the ignore is not sent, whichever screen put
+                // the button there. No caller has to remember that.
+                //
+                // `preventDefault` is load-bearing. sonner dismisses the toast itself after an
+                // action click unless the press says otherwise (dist's `onClick` for `data-action`),
+                // and a dismissal runs the handlers below — so pressing Undo, which raises the toast
+                // for the write it just made, would fire that brand-new toast's deferred work on the
+                // same tick and disarm the undo the user is looking at. Cancelling the press leaves
+                // the toast up, showing what the undo did, for its own full window.
+                onClick: (event: ReactMouseEvent<HTMLButtonElement>) => {
+                  event.preventDefault();
                   held.current = null;
                   action.onAction();
                 },
               },
-            },
-      );
+        onDismiss: runHeld,
+        onAutoClose: runHeld,
+      });
     },
-    [],
+    [runHeld],
   );
 
   /** loop-r1-06: `/approvals/:id/decide` re-sent as the window closes. A fetch would be cancelled
@@ -389,7 +429,7 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
               label: "Undo",
               onAction: () => {
                 unhide();
-                clearToast();
+                dismissToast();
               },
             },
           },
@@ -419,7 +459,7 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
           });
         });
     },
-    [visibleApprovals, notify, clearToast],
+    [visibleApprovals, notify, dismissToast],
   );
 
   // A5 §3.4: a briefing item on Today deep-links to its Thread — the one navigation that screen
@@ -600,7 +640,29 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
     // loop-r1-06: `visibleApprovals`, not `approvals` — an ignored card must not hold the pane open
     // for the round trip it no longer needs, and on a one-approval inbox that is the difference
     // between the pane closing on the click and the pane closing five seconds later.
-    (!floating && !paneCollapsed && screen === "inbox" && visibleApprovals.length > 0);
+    // loop-r1-02/S5: `!floating` is main's half of this rule — below 1280 an approval must not open
+    // the pane on its own, which at 390 is what kept the inbox unreachable until the queue was
+    // empty. `!paneDismissed` is motion's: below 900 the pane is a drawer, and a drawer the user has
+    // dragged away stays away rather than springing back from the approval that opened it.
+    (!floating &&
+      !paneCollapsed &&
+      !paneDismissed &&
+      screen === "inbox" &&
+      visibleApprovals.length > 0);
+  // An explicit target is a newer decision than a dismissal, so it releases it. An effect rather
+  // than a wrapper around every `setOpen` call: the render that carries the new target already
+  // shows the pane whatever this flag says, so nothing is waiting on it to be right.
+  useEffect(() => {
+    if (open !== null || openPersonId !== null) setPaneDismissed(false);
+  }, [open, openPersonId]);
+  // Below 900 the ask panel is a drawer too, and `vaul`'s drawer is modal: its scrim covers the
+  // shell, and Cmd+K is a window listener that no scrim can intercept. So the tier is what keeps a
+  // second drawer from stacking on the one already up. Above 900 the pane is a column and the
+  // shortcut is the panel's way in — which is why this is not simply `paneVisible`.
+  useCommandPaletteKey(() => {
+    if (narrow && (paneVisible || filtersOpen)) return;
+    setAskOpen((v) => !v);
+  });
   // The pane stays mounted while it leaves, because the close is animated and CSS cannot animate a
   // node React has already unmounted (lib/motion.ts — the same hold the ask panel uses).
   const closing = useClosingSpring(paneVisible, LEAVE_MS);
@@ -723,6 +785,19 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
   // owns the narrow tier's action-band when one is open. It is the same condition Thread.tsx uses
   // to decide whether to portal its floating bar, and it has to be, or the band would hold both the
   // pill and the bar.
+  /** Below 900 the pane is a drawer and this is what its drag, its scrim and Escape call. Clearing
+   *  the two targets is what closes a pane this shell opened for a thread or a person, and
+   *  `queueOpen` goes with them — below 1280 the queue's own button is the tier's way in (loop-r1's
+   *  NC-03 took the auto-open away there), and a dismissal that left the flag set would put the
+   *  drawer straight back up on the next render. `paneDismissed` is the other half: the flag that
+   *  closes a pane which opened *itself*, whose reason is still true on the next render. */
+  const onPaneDismiss = useCallback(() => {
+    setOpen(null);
+    setOpenPersonId(null);
+    setQueueOpen(false);
+    setPaneDismissed(true);
+  }, []);
+
   const threadOpen = open !== null && !open.agentSession;
 
   /** US-B27's search mode and US-D08 §c.9's two homes, in one element: the shell builds it once and
@@ -785,6 +860,48 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
       />
     );
 
+  /** What the pane draws, whichever box it draws it in. One expression rather than two because the
+   *  breakpoint changes the surface, not the subject — the rules in here (US-B30's person, US-D03's
+   *  scoped approval queue, US-D09 §c.5's in-flow approvals) did not move with the box: S5 made the
+   *  pane a drawer below 900, and this is what it draws.
+   *
+   *  US-B30: a person is not a thread, so it is the pane's own branch rather than a second variant
+   *  of the thread route.
+   *
+   *  US-D03: one approval is the expanded card, the rest are one-line rows under a count. The scope
+   *  is the open thread — an approval that belongs to the conversation in front of you is the one
+   *  you are working on; with nothing open the whole queue is the scope. The decision still goes to
+   *  the hub over HTTP (contract §5) — Zero only carries the read.
+   *
+   *  With nothing open the pane *is* the queue, so the stack is the whole pane. With a thread open
+   *  the stack is handed to the screen instead, which draws it under the thread's own title: the
+   *  pane has to open on what it is about. loop-r1-07 gives an agent session a title of its own, so
+   *  it takes the same two props and does the same thing with them.
+   *
+   *  `visibleApprovals` and not `approvals`, here as in the auto-open rule above: a card that has
+   *  just been decided has already left the pane, and the toast offering the undo is what it left
+   *  behind. */
+  const paneBody =
+    openPersonId !== null ? (
+      <PersonDetail personId={openPersonId} onOpenThread={openThreadFromPerson} />
+    ) : open === null ? (
+      <ApprovalStack approvals={visibleApprovals} openThreadId={null} onDecide={onDecide} />
+    ) : open.agentSession ? (
+      // loop-r1-07: the approvals go *into* the session screen, under its new header, rather than
+      // sitting above it — a stack with no subject over a pane with no title was the shape that let
+      // a "Blocked" session say nothing about what it was blocked on.
+      <AgentSession
+        sessionThreadId={open.threadId}
+        approvals={visibleApprovals}
+        onDecide={onDecide}
+      />
+    ) : (
+      // US-D09 §c.5: the thread's approvals go *into* the conversation, in document order, so this
+      // screen gets the list rather than a stack to draw above it. The stack still owns the pane
+      // with nothing open, where the queue is the whole subject.
+      <Thread threadId={open.threadId} approvals={visibleApprovals} onDecide={onDecide} />
+    );
+
   return (
     <main
       data-testid="app-shell"
@@ -833,15 +950,12 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
           grid; it lives inside <main> because that is what makes it a descendant of the container
           the shell's container queries are measured on.
 
-          US-D09 §c.5: with a thread open in this tier the middle piece is not the ask pill — that
-          band belongs to the thread's floating action bar, which Thread.tsx portals to the body so
-          it can sit in the BottomBar's line between the two circles. Rendering the pill as well
-          would put two controls in one slot (§e guard 11 wants a twin, not a duplicate). */}
-      {narrow ? (
-        <BottomBar onOpenFilters={() => setFiltersOpen(true)}>
-          {threadOpen ? null : askBar}
-        </BottomBar>
-      ) : null}
+          US-D09 §c.5 gave this band to the thread's floating action bar while a thread was open.
+          That bar is gone with S5's port: below 900 a thread is a drawer, a modal one covers this
+          whole line with its scrim, and an action bar underneath a scrim is a row of controls the
+          eye can see and the finger cannot reach. The thread's bar is the drawer's chrome row now
+          (Thread.tsx), so the middle piece is the ask pill in every state. */}
+      {narrow ? <BottomBar onOpenFilters={() => setFiltersOpen(true)}>{askBar}</BottomBar> : null}
       {/* US-D02b/US-D09: the detail pane no longer carries `.glass-surface`. It used to, and app.css
           took the glass back off at >=1280 — but the class itself stayed in the DOM, and §c.5 puts a
           glass toolbar inside the pane, which would then be a glass surface nested in a glass
@@ -859,7 +973,46 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
           className="detail-pane__toggle--floating"
         />
       ) : null}
-      {paneRendered && (
+      {/* S5: below 900 the pane is `vaul`'s drawer — the same mechanism, the same two snap points and
+          the same scrim as the filters sheet and the AI panel (narrow-drawer.tsx). It is mounted
+          whenever the tier is narrow rather than only while it is up, because `vaul` animates its
+          own exit and a node React had already unmounted has no animation left to run.
+          `className` lands on `Drawer.Content`, which *is* the pane's box in this tier — hence
+          `.app-shell__detail` here rather than on the section, and hence app.css's
+          `[data-vaul-drawer].app-shell__detail` block: the pane's box rewritten for a drawer (flush
+          to the bottom edge, a full viewport tall, rounded at the top only). */}
+      {narrow ? (
+        <NarrowDrawer
+          open={paneVisible}
+          onOpenChange={(next) => {
+            if (!next) onPaneDismiss();
+          }}
+          className="app-shell__detail"
+          label="Details"
+        >
+          <section data-testid="detail-pane">
+            {/* The drawer's chrome row is the grabber: its edge is the viewport's, so there is no
+                column to collapse and no divider to drag — the gesture at this edge is the drawer's
+                own. */}
+            <DrawerGrabber />
+            {/* loop-r1-02/NC-37: "the way to close it is the same as it has always been" was not
+                true of this tier — a drawer with no close control is a one-way door — so the sheet
+                draws the back row the other branch draws, and app.css shows it here and hides it
+                above 900. The chrome row comes with it for the same reason main draws it in every
+                tier's markup: it stays `display: none` below 900 (the drawer's box has no edge to
+                hang a chevron on), and keeping it in both branches is what makes the `floating` ✕
+                a decision the stylesheet makes rather than a second JS tier read. */}
+            <div className="detail-pane__sheet-head">
+              <DetailPaneBack onBack={closePane} />
+            </div>
+            <div className="detail-pane__chrome">
+              {floating ? <DetailPaneClose onClose={closePane} /> : null}
+              <DetailPaneToggle collapsed={paneCollapsed} onToggle={onPaneToggle} />
+            </div>
+            {paneBody}
+          </section>
+        </NarrowDrawer>
+      ) : paneRendered ? (
         <section data-testid="detail-pane" className="app-shell__detail">
           {/* loop-r1-02/NC-37: below 900 the pane is the window and `.detail-pane__chrome` is
               `display: none` there, so this is the tier's own way back to the list. It is drawn in
@@ -876,41 +1029,9 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
             {floating ? <DetailPaneClose onClose={closePane} /> : null}
             <DetailPaneToggle collapsed={paneCollapsed} onToggle={onPaneToggle} />
           </div>
-          {/* US-B30: a person is not a thread, so it is the pane's own branch rather than a second
-              variant of the thread route.
-
-              US-D03: one approval is the expanded card, the rest are one-line rows under a count.
-              The scope is the open thread — an approval that belongs to the conversation in front
-              of you is the one you are working on; with nothing open the whole queue is the scope.
-              The decision still goes to the hub over HTTP (contract §5) — Zero only carries the
-              read.
-
-              With nothing open the pane *is* the queue, so the stack is the whole pane. With a
-              thread open the stack is handed to the screen instead, which draws it under the
-              thread's own title: the pane has to open on what it is about. loop-r1-07 gives an
-              agent session a title of its own, so it takes the same two props and does the same
-              thing with them. */}
-          {openPersonId !== null ? (
-            <PersonDetail personId={openPersonId} onOpenThread={openThreadFromPerson} />
-          ) : open === null ? (
-            <ApprovalStack approvals={visibleApprovals} openThreadId={null} onDecide={onDecide} />
-          ) : open.agentSession ? (
-            // loop-r1-07: the approvals go *into* the session screen, under its new header, rather
-            // than sitting above it — a stack with no subject over a pane with no title was the
-            // shape that let a "Blocked" session say nothing about what it was blocked on.
-            <AgentSession
-              sessionThreadId={open.threadId}
-              approvals={visibleApprovals}
-              onDecide={onDecide}
-            />
-          ) : (
-            // US-D09 §c.5: the thread's approvals go *into* the conversation, in document order,
-            // so this screen gets the list rather than a stack to draw above it. The stack still
-            // owns the pane with nothing open, where the queue is the whole subject.
-            <Thread threadId={open.threadId} approvals={visibleApprovals} onDecide={onDecide} />
-          )}
+          {paneBody}
         </section>
-      )}
+      ) : null}
       {/* US-D10 §c.1: the grip on the pane's left edge, and a sibling of the pane rather than a
           child of it. Two reasons, both structural. The grip is `position: fixed` (it must not
           scroll with the pane's own scroller), and a fixed box is positioned against the nearest
@@ -944,18 +1065,9 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
           }}
         />
       ) : null}
-      {/* loop-r1-06: the write-feedback toast — the last child of the shell, and mounted whether or
-          not there is anything to say. The wrapper is the live region (see toast.tsx): a status that
-          appears out of nowhere is announced by some screen readers and missed by others, while one
-          that is already in the tree and then fills in is announced by all of them.
-          `message={toast?.message ?? null}` rather than a conditional render, for the same reason —
-          the toast needs a frame of `null` to play its exit in before the pill is unmounted. */}
-      <Toast
-        id={toast?.id ?? 0}
-        message={toast?.message ?? null}
-        action={toast?.action}
-        onDismiss={clearToast}
-      />
+      {/* The write-feedback toast is not drawn here any more: S6's host is mounted once in
+          main.tsx, beside the motion config, so that a toast outlives the screen that raised it.
+          This shell is only a raiser now — `notify` above. */}
     </main>
   );
 }

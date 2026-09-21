@@ -1364,34 +1364,24 @@ body {
    left to animate, so the rows below jump up by one row's height with no explanation of where the
    row went. Inbox.tsx holds the row in the list for --dur-move (motion.ts's LEAVE_MS) while this
    runs, then lets it go.
-   Height is a measured pixel value, not `auto`: `height: auto` cannot interpolate without
-   `interpolate-size: allow-keywords`, which macOS's WKWebView does not ship — inbox-row.tsx writes
-   --row-collapse-h from getBoundingClientRect() the moment `leaving` turns on. Padding collapses
-   with it (see the note on --row-pad-y above) and overflow clips the grid rows as they fold. */
+   The height and the opacity are `motion`'s since the motion-OSS S4 port (inbox-row.tsx's
+   LEAVE_EXIT) — it owns the `height: auto` measurement the old keyframe needed, which is why
+   --row-collapse-h and the @keyframes rule that consumed it are gone.
+   Padding is the half that stays here, and deliberately: it is a layout property this file already
+   owns as --row-pad-y, and animating it from JavaScript would mean either hardcoding 12px in the
+   component or measuring the computed style. So CSS collapses its own padding over the same
+   --dur-move rung while motion collapses the box — two engines, two properties, one token, and no
+   property is animated by both. overflow clips the grid rows as they fold. */
 .inbox-row--leaving {
-  height: var(--row-collapse-h, auto);
   overflow: hidden;
   /* The row is still in the list but is no longer a thing to press — pointer-events is switched off
      on the same frame the archive click lands, so a second click during the 240ms cannot re-archive
      or re-open what is already on its way out. */
   pointer-events: none;
-  will-change: height, opacity;
-  animation: inbox-row-leave var(--dur-move) var(--ease-spring) forwards;
-}
-
-@keyframes inbox-row-leave {
-  from {
-    opacity: 1;
-    height: var(--row-collapse-h);
-    padding-top: var(--row-pad-y);
-    padding-bottom: var(--row-pad-y);
-  }
-  to {
-    opacity: 0;
-    height: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-  }
+  padding-top: 0;
+  padding-bottom: 0;
+  transition: padding-top var(--dur-move) var(--ease-spring), padding-bottom var(--dur-move)
+    var(--ease-spring);
 }
 
 /* §c.7: the reveal belongs to the cluster now that it has two controls in it. `:focus-within`
@@ -1926,7 +1916,7 @@ body {
 
 /* v3 §e guard 10 / SKILLS.md #10: the pulse is the only animation this story adds, and it is
    decoration — the sentence beside it already says the session is working. Its reduce override
-   lives in the shared reduced-motion block at the end of the toast section, where every story's
+   lives in the shared reduced-motion block at the end of this stylesheet, where every story's
    moving surface is collected (a block of its own here would sit in front of that one, and
    motion.test.tsx reads the stylesheet from the first such block to the end). */
 
@@ -3228,9 +3218,9 @@ body {
      user opened by tapping a row. The grip would also land on top of the sheet's own edge at this
      size, where a divider between one thing and nothing reads as a bug.
      loop-r1-02/NC-37: "the way to close it is the same as it has always been" was not true — the
-     sheet had no way out at all, so opening a thread at 390 was a one-way door. The chrome row
-     stays `display: none` (there is no column for a chevron to collapse) and the tier draws its own
-     back row instead, below. */
+     sheet had no way out at all, so opening a thread at 390 was a one-way door. The chrome row keeps
+     its place in the DOM (narrow-thread-sheet.test.tsx reads it) but stays `display: none`: there is
+     no column for a chevron to collapse, and the tier draws its own back row instead — below. */
   .detail-pane__grip,
   .detail-pane__chrome {
     display: none;
@@ -3247,19 +3237,13 @@ body {
     margin: -8px 0 4px;
   }
 
-  /* There is no room to keep 420px — full width, with 16px of margin each side. */
-  .app-shell__detail {
-    width: calc(100% - 32px);
-    /* The sheet's 16px bottom margin is right for the list, and wrong for the bars: the rail bar is
-       the only navigation this tier has, it is `position: fixed` along the bottom 56px, and it has
-       no `z-index` — while this sheet is positioned *and* carries `z-index: 20`, so it paints over
-       the bar and takes its hit area. Measured at 390: `elementFromPoint` at a tile's own centre
-       returned the sheet, so the tiles were visible and untouchable — and with them the rail's
-       touch reorder, which is D7's whole narrow-tier path. The sheet stops above both bars instead,
-       on the same sum `.app-shell__main` reserves — US-D08 §c.9 raised it from the rail's 72px to
-       include the BottomBar, so the sheet does not swallow the composition bar either. */
-    bottom: calc(56px + var(--bar-h) + var(--bar-gap) * 2);
-  }
+  /* S5: the pane's box in this tier is `[data-vaul-drawer].app-shell__detail` (with the sheet's own
+     block, near the top of this file). It used to be stated here — `width: calc(100% - 32px)` and a
+     `bottom` clearing both fixed bars — because the pane was a floating panel with 16px of margin
+     and `z-index: 20`, which is why it had to stop above the rail bar and the BottomBar rather than
+     cover them. A drawer is flush to the bottom edge and paints above both, so those two numbers
+     have no meaning here; the tier's numbers that *do* still matter are the ones the bars
+     themselves reserve, in `.app-shell__main` above. */
 
   /* The rail has gone from a column to a toolbar, and a toolbar is a place glass belongs
      (DESIGN-DIRECTION). The values are .glass-surface's own set, copied rather than reinvented as
@@ -3386,11 +3370,12 @@ body {
 
   /* §c.9's 52px compose circle — the one piece bigger than the pill's own radius would suggest,
      because it is the bar's primary action.
-     `margin-left: auto` is what makes it the bar's *trailing* piece. While the ask pill is there
-     the pill's `flex: 1 1 auto` already takes every spare pixel, so this margin is zero and the two
-     are equivalent; with a thread open the shell hands the bar no pill (the ask bar is the list's
-     own control), and without this the circle slides left to sit 8px after the filters — right
-     where US-D09's floating action bar stands, so the bar covered it. */
+     `margin-left: auto` is what makes it the bar's *trailing* piece. While the ask pill is in the
+     row the pill's `flex: 1 1 auto` already takes every spare pixel, so this margin is zero and the
+     two are equivalent; it is kept for the case the slot is rendered without one, where the circle
+     would otherwise slide left to sit 8px after the filters. (The shell used to hand the bar no pill
+     whenever a thread was open — S5 removed that: the pane is a modal drawer now, so the ask bar
+     stays in the BottomBar and is covered by the scrim rather than replaced.) */
   .bottom-bar__piece--compose {
     width: 52px;
     height: 52px;
@@ -3406,21 +3391,12 @@ body {
     cursor: not-allowed;
   }
 
-  /* The panel can only open upward in this tier: under the bar there is a 12px gap and then the
-     rail. `fixed` rather than `absolute` because the pill it belongs to is ~246px wide at 390 —
-     two circles and their gaps have taken the rest — and a 420px panel clipped to 246px is a
-     column of ellipses. Pinned to the shell's own gutters it is the width of the bar instead; and
-     being pinned on both sides it cannot widen the page, whatever its content. */
-  .bottom-bar .ask-panel {
-    top: auto;
-    left: var(--bar-gap);
-    right: var(--bar-gap);
-    /* The same sum .app-shell__main reserves: rail + bar + a gap either side. */
-    bottom: calc(56px + var(--bar-h) + var(--bar-gap) * 2);
-    width: auto;
-    max-width: none;
-    transform-origin: bottom center;
-  }
+  /* S5: there is no `.bottom-bar .ask-panel` rule here any more. It pinned the card above the bar in
+     this tier — up and out of the pill's ~246px, since a 420px panel clipped to the pill is a column
+     of ellipses. The panel is the `vaul` drawer at this width now
+     (`[data-vaul-drawer].ask-panel`, with the sheet's own block), and a portal is outside `#root`:
+     no container query reaches it, so the rule could not have stayed here even if the geometry were
+     the same. */
 }
 
 /* <=419.98: the ask pill's avatar comes off the line. Below this the pill is down to the input and
@@ -4722,116 +4698,6 @@ button.today-screen__event-title:focus-visible {
   font-size: 12px;
 }
 
-/* ==========================================================================================
-   loop-r1-06 — the toast: what the shell says back after a write the list cannot show.
-
-   It is a floating panel, so it is glass, and it declares no background of its own: the tint, the
-   blur and the hairline are `.glass-surface`'s (ACCENT §4.4 — a second `background` here is the
-   "flat tinted panel" tell that section rejects). The plate is drawn as a pill, with the one
-   `--shadow-glass` the glass recipe already puts on it (v3 §e guard 11).
-
-   Position: bottom-centre, above whatever holds the bottom of the window in the current tier.
-   `z-index: 35` is above the detail pane's 20 and the BottomBar's 30 and below the sheet's 40 — a
-   toast belongs to the list, and while a sheet is up the sheet is the thing being read.
-
-   Its reduced-motion override is in the block directly below this one, with the other moving
-   surfaces'.
-   ========================================================================================== */
-.toast {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 35;
-  display: flex;
-  justify-content: center;
-  /* A sentence and a button on one line, and never wider than the window: the brief's 480, and
-     below that the viewport less 12px a side. */
-  width: max-content;
-  max-width: min(480px, calc(100vw - 24px));
-  bottom: var(--bar-gap);
-}
-
-/* Below 900 the BottomBar stands on the window's bottom edge — its top edge is
-   56px + --bar-gap + --bar-h above it, the three numbers `.bottom-bar` itself uses — so the toast
-   takes one more --bar-gap on top of that. Lower, and it would be under the thumb that just made
-   the archive, with half of it behind the bar's own circles.
-   `@container`, not `@media`, because the toast is a child of #root and the rest of the narrow
-   tier is written this way: the toolbar's `@media` block is the exception it documents itself as
-   (Thread.tsx portals it outside the container), and a new `@media (max-width: 899.98px)` here
-   would also be the first one in the file, which is not a thing this section gets to be by
-   accident. */
-@container shell (max-width: 899.98px) {
-  .toast {
-    bottom: calc(56px + var(--bar-h) + var(--bar-gap) * 2);
-  }
-}
-
-.toast__pill {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 44px;
-  /* Asymmetric on purpose: the message leads at 16px so the text clears the rounded edge, and the
-     action keeps 8px of its own from the pill's cap. */
-  padding: 0 8px 0 16px;
-  border-radius: 999px;
-  animation: toast-in var(--dur-base) var(--ease-spring);
-}
-
-/* The exit. A fade rather than a slide: the toast is going away, and a thing that travels as it
-   leaves is a second movement on a surface that was only ever one sentence. */
-.toast__pill--closing {
-  animation: fade-out var(--dur-fast) var(--ease-spring) forwards;
-}
-
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* One line, ellipsised. It is a toast, not a paragraph, and the pill is 44px: a message long
-   enough to wrap would be a second row. */
-.toast__message {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text-primary);
-  font-size: 14px;
-}
-
-/* The action is a text button — the accent is the only thing that makes it look pressable, which
-   is what "Undo" should look like beside a sentence. 32px inside the 44px pill keeps the touch
-   target inside the toast's own height. */
-.toast__action {
-  flex: none;
-  height: 32px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 999px;
-  background: none;
-  color: var(--accent);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.toast__action:hover {
-  background: var(--state-hover);
-}
-
-.toast__action:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
 @media (prefers-reduced-motion: reduce) {
   /* The ask panel: 320ms of lift-and-scale becomes a cross-fade. */
   .ask-panel {
@@ -4868,10 +4734,17 @@ button.today-screen__event-title:focus-visible {
     animation-name: fade-out;
   }
 
-  /* The archived row. It keeps its height and fades: the collapse is the part with the movement in
-     it, and the list closing the gap is a one-frame change of position, not an animation. */
+  /* The archived row. It keeps its height *and its padding* and only fades: the collapse is the part
+     with the movement in it, and the list closing the gap is a one-frame change of position, not an
+     animation. The height half of that is motion's (inbox-row.tsx's LEAVE_EXIT_REDUCED, which drops
+     the height from the exit target); the padding half is here, and it has to be restated rather
+     than merely left alone, because the rule above zeroes it on `.inbox-row--leaving` — without this
+     the row would jump 24px shorter on the frame the archive landed, which is the one thing
+     reduced motion is asking not to happen. */
   .inbox-row--leaving {
-    animation-name: fade-out;
+    padding-top: var(--row-pad-y);
+    padding-bottom: var(--row-pad-y);
+    transition: none;
   }
 
   /* §c.4: the row's swipe settles where it was released instead of travelling — the same override
@@ -4890,23 +4763,31 @@ button.today-screen__event-title:focus-visible {
     --dur-reorder: 0ms;
   }
 
-  /* loop-r1-06: the toast's entrance — the 8px it rises by becomes the shared cross-fade, which
-     carries no transform. Its exit was already a fade and keeps its own name, so the two states
-     stay told apart by name as much as by duration. */
-  .toast__pill {
-    animation-name: fade-in;
-  }
-
-  .toast__pill--closing {
-    animation-name: fade-out;
-  }
-
   /* loop-r1-07: the working dot under a session with no output yet. `none` here rather than a
      second, slower opacity: the sentence beside it already says the session is working, and a
      static dot is the mark the other two empty states draw. This is the one surface in the block
      that is not a fade — nothing is entering or leaving, so there is no unmount waiting on it. */
   .agent-session-screen__empty-dot {
     animation: none;
+  }
+
+  /* §c.6 narrow: the drawer does not travel.
+     The travel is the *movement* — a modal sheet sliding a full viewport height is exactly what the
+     preference asks not to see — so it collapses to nothing, the way the rail's reorder and the
+     row's swipe already do. The scrim is not in this list on purpose: its cross-fade is opacity,
+     which is not motion, and `--dur-base` already brings it down to the shared 80ms fade for free.
+
+     Duration rather than `transition: none`, and `!important` because `vaul` writes the drawer's
+     transition inline on every settle. Zeroing the duration is also the safer of the two: `vaul`
+     reads the computed duration to decide *whether* it is transitioning at all, so removing the
+     property outright would change what the gesture does rather than only how fast it looks.
+
+     One bare attribute selector for all three drawers, not one rule per surface: S5 made the thread
+     sheet and the AI panel drawers too, and the preference is about the mechanism — a fourth
+     surface would otherwise have to remember to add itself here. */
+  [data-vaul-drawer] {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
   }
 }
 
@@ -5133,6 +5014,189 @@ button.today-screen__event-title:focus-visible {
     width: min(480px, calc(100% - 48px));
     border-radius: 20px;
   }
+}
+
+/* ==========================================================================================
+   §c.6, narrow tier — the same sheet as a `vaul` drawer.
+
+   The rules below are the second half of the split sheet.tsx documents: below 900px the panel is
+   `vaul`'s `Drawer.Content`, which is *not* a child of the overlay (they are siblings in the
+   portal) and is not sized by flexbox. `vaul` supplies the mechanism — the drag, the snap points,
+   the modal — and the geometry is still ours.
+
+   Three things `vaul` does that the rules below have to answer, all of them read off its bundle
+   rather than guessed:
+
+   1. It positions nothing. `[data-vaul-drawer]` carries a transform and a transition and no box,
+      so `.sheet` places itself. Its `--snap-point-height` is a **translate**, not a height: for a
+      bottom drawer the offset is `viewport - snap * viewport` (`index.mjs`'s `snapPointsOffset`),
+      which means the element has to be a full viewport tall for the offset to leave the snap
+      fraction on screen.
+   2. It hides the overlay at every snap point but the one `fadeFromIndex` names
+      (`shouldFade` → `data-vaul-snap-points-overlay`). That is the right model for a drawer that
+      opens as a non-modal peek and becomes modal at full height; it is the wrong one for this
+      sheet, which is a modal dialog at both of its snaps — so the overlay is pinned visible and
+      the scrim's cross-fade moves to a pseudo-element, which is the one part of it that may not be
+      pinned.
+   3. Its durations are inline (`set(drawerRef.current, { transition: ... })` on every settle), so
+      nothing in a stylesheet can shorten them without `!important`. That is the reduce block at
+      the end of this file, and it is the same shape as sonner's.
+   ========================================================================================== */
+[data-vaul-drawer].sheet {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  /* Full viewport: the snap offset is measured *from* the bottom edge, so a shorter box would show
+     the snap fraction of a shorter box and the two would drift apart. */
+  height: 100dvh;
+  /* The wide tier's cap is the opposite decision — there the box *is* the sheet, so a sheet taller
+     than the viewport would be a second scroller with no way back to the header. */
+  max-height: none;
+  /* M125's sheet is flush with the bottom edge and rounded only at the top; the full-height box
+     above reaches past it, so the bottom corners are squared off the same way. */
+  border-radius: 20px 20px 0 0;
+  /* The entrance is `vaul`'s transform transition, not the wide tier's `sheet-in` keyframe — two
+     animations on one property is the double-animation guard's reject. */
+  animation: none;
+}
+
+[data-vaul-drawer].sheet .sheet__body {
+  /* The drawer is a fixed viewport tall, so the body is the only thing that scrolls — the wide
+     tier's `max-height` cap plays that role there. */
+  flex: 1 1 auto;
+}
+
+/* The grabber. `vaul` ships a 32x5 grey pill and a 44px hit area; this paints the pill with the
+   design tokens instead of its hardcoded `#e2e2e4`, and leaves the hit area alone — it is the
+   reason `handleOnly` can put the whole gesture on a 5px element.
+   One class for all three drawers (`DrawerGrabber`, narrow-drawer.tsx): the filters sheet, the
+   thread sheet and the AI panel want the same pill, and this rule was written for the first of them
+   while the other two did not exist. */
+[data-vaul-handle].drawer__grabber {
+  flex: none;
+  width: 36px;
+  height: 5px;
+  margin: 8px auto 0;
+  background: var(--gray-300);
+  opacity: 0.55;
+}
+
+[data-vaul-handle].drawer__grabber:hover,
+[data-vaul-handle].drawer__grabber:active {
+  opacity: 0.9;
+}
+
+/* ------------------------------------------------------------------------------------------
+   S5: the other two `<900` surfaces — the thread sheet and the AI panel.
+
+   Both are the drawer above, with a different box. Each already carries its geometry in the tier it
+   is *not* a drawer in (the pane's glass and radius in the `<=1279.98` container block, the panel's
+   in `.ask-panel`), and none of that reaches here: a portal puts these elements outside `#root`, so
+   `@container shell` never matches them and the rules below have to be media-independent — which is
+   also why they need no media query of their own. The class combination only exists below 900.
+   ------------------------------------------------------------------------------------------ */
+
+/* The thread sheet — the pane a row opens into (App.tsx). `.app-shell__detail` is on
+   `Drawer.Content` in this tier, so this is that class's own box, replaced. */
+[data-vaul-drawer].app-shell__detail {
+  position: fixed;
+  inset-inline: 0;
+  /* The base rule's `width: var(--detail-width, 420px)` and its 16px grip gutter are a floating
+     pane's; a drawer is the window's width, flush to the bottom edge. */
+  top: auto;
+  bottom: 0;
+  width: auto;
+  margin-left: 0;
+  /* Full viewport, for the reason the sheet's block gives in full: `vaul`'s snap offset is
+     `viewport - snap * viewport`, so a shorter box would show a fraction of the wrong height. */
+  height: 100dvh;
+  max-height: none;
+  border-radius: 20px 20px 0 0;
+  /* The column's fold and the floating sheet's slide are the two shapes this box is not — `vaul`
+     moves it, through a transform, and a second animation on the same property would fight it. */
+  animation: none;
+  /* Topmost while it is up, over the BottomBar's 30 — the same order the filters sheet takes. */
+  z-index: 40;
+  /* The glass recipe the `<=1279.98` block writes out for the floating sheet, restated rather than
+     borrowed: that block is a container query and cannot reach this element (see the note above).
+     It is written out there instead of carried as a `.glass-surface` class because §c.5 puts a
+     glass toolbar inside the pane at the wide tier — that toolbar is `variant="chrome"` at this
+     one, so nothing here is glass inside glass. */
+  background: var(--bg-overlay);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: var(--hairline);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), var(--shadow-glass);
+  /* The sheet's skeleton: a fixed-height column, with the conversation as its only scroller. */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+[data-vaul-drawer].app-shell__detail .thread-screen {
+  flex: 1 1 auto;
+  /* Without this a flex item's automatic minimum size is its content height, and the column would
+     grow to fit the conversation instead of scrolling it. */
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* §c.5/§b.4's arm's-length body type. The 17px step lives in the `max-width: 899.98px` container
+   block, and that block cannot reach this element either — the reason above — so the step is
+   restated here. It was missed when S5 landed and the pane's conversation rendered at the desk's
+   15px inside a full-width sheet; `d9-surfaces.spec.ts`'s "the detail body measures 17px/1.5 at
+   390px" is what caught it, and that check is the reason this rule exists rather than being an
+   oversight nobody would have seen in a screenshot. */
+[data-vaul-drawer].app-shell__detail .thread-screen__item p {
+  font-size: 17px;
+}
+
+/* The AI panel — the ask bar's panel below 900 (ask-panel.tsx). `.ask-panel` is on `Drawer.Content`
+   in this tier, and the class it shares with the floating card is the aurora wrapper; the glass
+   inside it is the same element at both tiers. */
+[data-vaul-drawer].ask-panel {
+  position: fixed;
+  inset-inline: 0;
+  top: auto;
+  bottom: 0;
+  width: auto;
+  height: 100dvh;
+  max-height: none;
+  border-radius: 20px 20px 0 0;
+  animation: none;
+  /* `z-index: 5` is the card's number: it hangs under the ask pill (the pill's own 6/7 are what put
+     the model menu above the panel it belongs to), and a drawer is above the scrim instead. */
+  z-index: 40;
+  transform-origin: bottom center;
+  /* The aurora is the drawer's own paint here, so the glass has to fill the box it is inside
+     (`flex: 1 1 auto` on `.ask-panel__glass` below) — and the wrapper is the column that lets it. */
+  display: flex;
+  flex-direction: column;
+}
+
+[data-vaul-drawer].ask-panel .ask-panel__glass {
+  /* The drawer is a full viewport tall and shows its top `snap * viewport`. The card's
+     `max-height: min(60vh, 420px)` is the opposite decision — a floating panel must not outgrow the
+     screen — and it is the one number that would leave a band of bare aurora under the glass. */
+  flex: 1 1 auto;
+  max-height: none;
+}
+
+/* The pin from note 2. `!important` because `vaul` writes the overlay's opacity inline as well as
+   in its injected stylesheet, and an inline custom declaration beats a stylesheet one. The scrim's
+   own cross-fade is the pseudo-element's animation, which the pin cannot reach. */
+[data-vaul-overlay].sheet-overlay {
+  opacity: 1 !important;
+  animation: none !important;
+  background: none;
+}
+
+[data-vaul-overlay].sheet-overlay::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: oklch(0 0 0 / 0.18);
+  animation: fade-in var(--dur-base) var(--ease-spring);
 }
 
 @keyframes sheet-in {
@@ -6220,36 +6284,115 @@ button.today-screen__event-title:focus-visible {
   }
 }
 
-/* <900: the floating action bar. §c.5 pins it at `bottom: var(--bar-gap)`, which is where §c.9
-   leaves the rail bar — the same adaptation the BottomBar needed, one rail-height above it. It fills
-   the band the ask pill otherwise occupies, between the BottomBar's 44px filters circle and its 52px
-   compose circle, so the three pieces read as one Mail line rather than as a fourth row of chrome.
-   `@media`, not `@container`: Thread.tsx portals it to the body, outside #root and outside the
-   `shell` container, so the shell query would never match it. The numbers are the same ones the
-   BottomBar's own rules use, which is the point — a `@media` block has to restate them. */
-@media (max-width: 899.98px) {
-  .thread-toolbar--floating {
-    position: fixed;
-    left: calc(var(--bar-gap) + 44px + 8px);
-    right: calc(var(--bar-gap) + 52px + 8px);
-    bottom: calc(56px + var(--bar-gap));
-    /* `--bar-h` is the BottomBar's own size, and this capsule stands in that row — but the box is
-       content-box, so the 2px of padding and the 1px hairline on each side come *out* of the
-       number: the six pixels of chrome are subtracted here so the total is the row's 52 and the
-       capsule's centre line matches the two circles beside it. (Set as `height: var(--bar-h)` the
-       bar measured 58 — three pixels proud of the controls it stands between.) */
-    height: calc(var(--bar-h) - 6px);
-    min-height: calc(var(--bar-h) - 6px);
-    /* §c.9's bar is the tier's own line of controls, on top of the pane it floats over — the
-       BottomBar's stacking order, since it stands in the BottomBar's row. */
-    z-index: 30;
-    justify-content: space-around;
-  }
+/* <900: the same chrome row the 900–1279.98 block describes, in the drawer S5 made the pane. The
+   declarations repeat that block because the two tiers arrive at "the pane is a sheet" differently —
+   900–1279.98 is a container query on a pane inside the shell, and this one is the `vaul` drawer
+   portaled to the body, which no container query can match. The selector itself is the media query:
+   `[data-vaul-drawer].app-shell__detail` only happens below 900.
 
-  /* §c.5/M103: 44px icon buttons in this tier, against the wide tier's 36px — a touch target, and
-     the size the BottomBar's own circles already are. */
-  .thread-toolbar--floating .thread-toolbar__button {
-    width: 44px;
-    height: 44px;
+   There was a third shape here until S5: a floating action bar portaled into the BottomBar's line,
+   with archive · move · reply. A modal drawer owns the pointer for everything outside itself, so
+   that bar would have sat visible under the scrim and untouchable. */
+[data-vaul-drawer].app-shell__detail .thread-toolbar--pane {
+  /* A row of the drawer's chrome, not a capsule floating over the message. */
+  position: static;
+  flex: 0 0 auto;
+  align-self: flex-end;
+  width: max-content;
+  /* The chrome row carries no material, so it casts nothing onto the message below it — the band
+     the sticky tier reserves is for that shadow, and here it would only be a hole. */
+  margin-bottom: 0;
+}
+
+/* §c.5/M103: 44px icon buttons in this tier, against the wide tier's 36px — a touch target, and the
+   size the BottomBar's own circles already are. */
+[data-vaul-drawer].app-shell__detail .thread-toolbar__button {
+  width: 44px;
+  height: 44px;
+}
+
+/* ==========================================================================================
+   motion-OSS S6 — the toast ("Archived · Undo").
+
+   sonner's own stylesheet is imported by main.tsx beside tokens.css. It declares its defaults as
+   custom properties on `[data-sonner-toaster]` (`--normal-bg`, `--normal-text`, `--normal-border`,
+   `--border-radius`), and the block below re-points those at the design tokens — so the toast is
+   themed by changing tokens, not by overriding sonner's rules one at a time.
+
+   The toast is deliberately **opaque** (`--bg-elevated`), not glass. A toast is transient content
+   that lands over the list, and `.glass-surface` on it would be glass over body content rather
+   than chrome over a surface — ACCENT §4.4's rule read to its conclusion. `--shadow-glass` still
+   gives it the lift that says "this is floating above what you were reading".
+
+   Portalled to <body>, so the narrow-tier rule below is a viewport media query, not the
+   `@container shell` query the rest of this file uses — the same reason and the same shape as the
+   Sheet's block above.
+   ========================================================================================== */
+
+/* Three attributes, not one. sonner declares its own defaults on
+   `[data-sonner-toaster][data-sonner-theme='light']` — (0,2,0) — so the `[data-sonner-toaster]` this
+   block used to be, (0,1,0), lost outright rather than to import order: the toast on screen was
+   sonner's `#fff` with its `--gray12` text, and none of the four tokens below reached it.
+   `data-sonner-theme` is the other half of the rule that beat it, and `data-y-position` is one
+   sonner always writes (`position="bottom-center"`), so the two together put this block one step
+   above that rule whatever order the two stylesheets load in. */
+[data-sonner-toaster][data-sonner-theme][data-y-position] {
+  --normal-bg: var(--bg-elevated);
+  --normal-text: var(--text-primary);
+  --normal-border: var(--border-hairline);
+  --border-radius: var(--radius-group);
+  /* One type scale step down from body: a toast is a confirmation, not a message to read at
+     length, and at the row's 15px it competed with the list it was talking about. */
+  font-family: inherit;
+}
+
+/* sonner's own rules for the toast's box, and for the button inside it, are
+   `[data-sonner-toast][data-styled='true']` (0,2,0) and `… [data-button]` (0,3,0). A bare
+   `.omnis-toast*` class is (0,1,0), so both blocks below were dead CSS — measured in the first
+   run's row-leave-1440-239ms.png, where the toast wore sonner's 16px padding, its 13px type and a
+   dark-grey Undo. Each selector repeats sonner's own chain and then adds its class, which is the one
+   step above it. */
+[data-sonner-toast][data-styled="true"].omnis-toast {
+  box-shadow: var(--shadow-glass);
+  font-size: 14px;
+  /* The action ('Undo') is the only thing to press, so the padding gives it a real target without
+     making the toast a button. */
+  padding: 10px 12px;
+}
+
+[data-sonner-toast][data-styled="true"] [data-button].omnis-toast__action {
+  /* `--accent` is this app's one blue and it means "the primary thing to do here" (v3 §b.1); the
+     Undo in a toast is exactly that. */
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-radius: calc(var(--radius-group) / 2);
+  font-weight: 600;
+  padding: 4px 10px;
+}
+
+/* The narrow tier's bars occupy the bottom edge, which is exactly where a bottom-centred toaster
+   rests, so the offset has to clear §c.9's whole band: the rail bar's 56px, the BottomBar's
+   `--bar-h`, and a `--bar-gap` on each side of it (132px at the tokens' current values), plus 8px
+   of air. The two variables are both needed and they are not interchangeable: sonner reads
+   `--offset-bottom` down to its own 600px breakpoint and `--mobile-offset-bottom` below it
+   (`styles.css`, `@media (max-width: 600px)`), and `assignOffset` writes *both* of them inline —
+   24px and 16px — whether or not a caller passes `offset`. So the first version of this rule
+   changed a variable that at 390 nothing reads, and at 600–899 used a sum (72px) that lands inside
+   the bar's own band: the toast sat on the Inbox tile in both frames of the 390 leave sequence.
+   `!important` because those values are inline styles, and an `!important` stylesheet declaration
+   is the only thing that beats one. `--bar-h`/`--bar-gap` are on :root in tokens.css, so the
+   portalled toaster can still read them. */
+@media (max-width: 899.98px) {
+  [data-sonner-toaster] {
+    --offset-bottom: calc(56px + var(--bar-h) + var(--bar-gap) * 2 + 8px) !important;
+    --mobile-offset-bottom: calc(56px + var(--bar-h) + var(--bar-gap) * 2 + 8px) !important;
   }
 }
+
+/* Reduced motion: sonner ships its own `@media (prefers-reduced-motion)` rule that sets
+   `transition: none; animation: none` on the toast and its children. It is left in place. It is a
+   *stronger* reduction than this repo's own convention — tokens.css collapses every duration onto
+   an 80ms fade rather than onto zero, because a zero-length exit is what unmounts a node before its
+   animation can run — but the difference is deliberate here: a toast's information is its text,
+   which stays on screen for its full dwell either way, and stripping a library's shipped
+   accessibility CSS back out with `!important` would be a worse trade than the inconsistency. */

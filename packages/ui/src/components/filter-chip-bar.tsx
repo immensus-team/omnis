@@ -1,3 +1,4 @@
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 import * as Popover from "@radix-ui/react-popover";
 import { Command } from "cmdk";
 import { Plus, Search } from "lucide-react";
@@ -37,13 +38,20 @@ export interface FilterChipBarProps {
 }
 
 export function FilterChipBar({ chips, addOptions }: FilterChipBarProps) {
+  // motion-OSS S6. A removed chip's neighbours close the gap and an added one opens it, instead of
+  // the row snapping. Auto-animate rather than `motion`'s `layout` because this is a list whose
+  // members are reordered by React re-rendering them, not a component being animated — and it is
+  // three lines against a `LayoutGroup` that would wrap every chip. It respects
+  // `prefers-reduced-motion` on its own (it bails out before touching the DOM), which is the same
+  // preference the rest of the wave reads through `useMotionPrefs`.
+  const [listRef] = useAutoAnimate();
   return (
     // The reference's chip is `[Priority][is any of][2 priorities][x]` — the fills alternate cell
     // by cell, with only the middle operator cell pale. Here the operator is folded into the value
     // phrase, so there are two cells rather than three. The alternating fill carries over: the
     // field cell pale, the value cell tinted — what matters is that the chip does not collapse
     // into one undifferentiated tag.
-    <div className="filter-chip-bar">
+    <div className="filter-chip-bar" ref={listRef}>
       {chips.map((chip) => (
         <span key={chip.id} className="filter-chip">
           <span className="filter-chip__field">{chip.field}</span>

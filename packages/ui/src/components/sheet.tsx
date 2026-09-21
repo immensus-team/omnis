@@ -1,13 +1,24 @@
 import { X } from "lucide-react";
-import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useRef, useState } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
+import { Drawer } from "vaul";
 import { cn } from "../lib/cn.js";
 import { trapTab, useInitialFocus, useReturnFocus } from "../lib/focus-trap.js";
+import { useNarrowShell } from "../lib/media-query.js";
 import { pointerDrag } from "../lib/pointer-drag.js";
 import { GlassSurface, OpaqueSurface } from "./glass-surface.js";
+import { DrawerGrabber, NarrowDrawer } from "./narrow-drawer.js";
 
 // US-D09 §c.6: the sheet. M125 (Filters) and M115 (grouped menu) are the two references; one
-// component serves both, so the grammar is written once.
+// component serves both, so the grammar is written once — the groups, the rows, the confirm, the
+// glass, and the portal below are shared by both tiers.
 //
 // It renders through a portal to document.body, and that is not decoration. #root is
 // `container-type: inline-size` (app.css), which is `contain: layout` — a containing block for
@@ -16,8 +27,28 @@ import { GlassSurface, OpaqueSurface } from "./glass-surface.js";
 // `container-type: inline-size` is the `list` query) it would size against that card and cover only
 // the list. The portal is also what keeps `.glass-surface` off an ancestor chain that already
 // carries one: the sheet is glass, and ACCENT §4.4 forbids glass inside glass.
+//
+// **Two implementations, one grammar.** Below 900px the surface is `vaul`'s drawer; at and above it
+// it is the hand-rolled dialog this file has always had. That split is the brief's ("S5: mobile
+// sheets via vaul"), and the reason the wide tier is not ported is that a drawer is a different
+// *shape*, not a different implementation of the same one: `vaul` is full-height and translated to
+// a snap offset, its dismissal threshold is a fraction of its own height rather than a distance
+// travelled, and its modal behaviour comes from Radix — all three are things M125 has and a centred
+// 480px desktop card does not. Porting the wide tier would be a redesign of a surface the brief
+// leaves alone, so the wide tier keeps the durations and the geometry it was signed off with.
+//
+// What the narrow tier gets out of `vaul` is the three things `pointerDrag` + `trapTab` were
+// approximating: a drag that measures its own velocity and snaps between rest points, the snap
+// points themselves (0.5 and 0.92 of the viewport), and a modal's focus machinery — trap, initial
+// focus and return-to-trigger — from Radix rather than from `focus-trap.ts`. That half is
+// `NarrowDrawer` (narrow-drawer.tsx) rather than code in this file, because it turned out to be the
+// mechanism every `<900` surface wants: the two sheets and the AI panel are the same drawer with
+// different boxes, and the fourth and fifth copy of `handleOnly`/`snapPoints`/`autoFocus` would be
+// three chances to drift.
 
-/** §c.6: a downward drag past this dismisses the sheet (M125's drag-to-close). */
+/** §c.6: a downward drag past this dismisses the wide tier's sheet (M125's drag-to-close). The
+ *  narrow tier's dismissal is `vaul`'s: it is measured against the drawer's own height, and it is
+ *  the velocity-aware version of the same gesture. */
 export const SHEET_DISMISS_PX = 96;
 
 export interface SheetConfirm {
@@ -37,11 +68,93 @@ export interface SheetProps {
   children: ReactNode;
 }
 
-export function Sheet({ open, onOpenChange, title, confirm, children }: SheetProps) {
+/** The tier switch. Both branches are components rather than one function with a branch inside:
+ *  they use different hooks, and a conditional hook is not a hook. */
+export function Sheet(props: SheetProps) {
+  return useNarrowShell() ? <SheetDrawer {...props} /> : <SheetDialog {...props} />;
+}
+
+interface SheetHeaderProps {
+  /** The title element: an `<h2>` at the wide tier, `vaul`'s `Drawer.Title` at the narrow one —
+   *  Radix derives the dialog's accessible name from it, and a bare `<h2>` there would leave the
+   *  dialog unnamed and Radix warning about it. */
+  title: ReactNode;
+  confirm?: SheetConfirm;
+  /** Whichever header control this sheet has — the confirm, or the ✕ when it has none. Where the
+   *  wide tier's initial focus lands; the narrow tier's comes from Radix. */
+  actionRef: RefObject<HTMLButtonElement>;
+  onClose: () => void;
+  /** Set only by the wide tier. There the header *is* the drag handle; at the narrow tier the
+   *  handle is `vaul`'s own element and `handleOnly` keeps the header plain. */
+  onPointerDown?: (e: ReactPointerEvent<HTMLDivElement>) => void;
+}
+
+/** The 44px header both tiers draw. The two controls are mutually exclusive by construction (see
+ *  `SheetConfirm`), which is what makes "two ways out of the same header" unrepresentable. */
+function SheetHeader({ title, confirm, actionRef, onClose, onPointerDown }: SheetHeaderProps) {
+  return (
+    <div className="sheet__header" onPointerDown={onPointerDown}>
+      {confirm ? null : (
+        <button
+          type="button"
+          ref={actionRef}
+          className="sheet__close"
+          aria-label="Close"
+          onClick={onClose}
+        >
+          <X size={16} aria-hidden="true" />
+        </button>
+      )}
+      {title}
+      {confirm && (
+        <button
+          type="button"
+          // The header's own button is where focus lands on open: a sheet that opens with focus
+          // left on the trigger behind it is a sheet a keyboard cannot get into, and the trap
+          // below would then be holding focus outside the dialog it is trapping.
+          ref={actionRef}
+          className="sheet__confirm"
+          onClick={() => {
+            confirm.onConfirm();
+            onClose();
+          }}
+        >
+          {confirm.label}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** The narrow tier: the shared `vaul` drawer (narrow-drawer.tsx), which is where the four
+ *  load-bearing props and the return-to-trigger live now that three surfaces are drawers. What is
+ *  this sheet's own is the box it draws in (`.sheet`, positioned by app.css), its `Drawer.Title` —
+ *  Radix derives the dialog's name from it, so the narrow header is the one element the two tiers
+ *  cannot share — and the grabber the drag is bound to. */
+function SheetDrawer({ open, onOpenChange, title, confirm, children }: SheetProps) {
+  const headerAction = useRef<HTMLButtonElement>(null);
+  return (
+    <NarrowDrawer open={open} onOpenChange={onOpenChange} className="sheet">
+      <GlassSurface slot="sheet">
+        <DrawerGrabber />
+        <SheetHeader
+          title={<Drawer.Title className="sheet__title">{title}</Drawer.Title>}
+          {...(confirm ? { confirm } : {})}
+          actionRef={headerAction}
+          onClose={() => onOpenChange(false)}
+        />
+        <div className="sheet__body">{children}</div>
+      </GlassSurface>
+    </NarrowDrawer>
+  );
+}
+
+/** The wide tier: the dialog this file has always drawn. Unchanged but for the header, which moved
+ *  into `SheetHeader` so the two tiers cannot drift on the controls. */
+function SheetDialog({ open, onOpenChange, title, confirm, children }: SheetProps) {
   /** The finger's travel while the header is being dragged; null between gestures, which is also
    *  what tells the panel to leave its transform alone and let the entrance animation own it. */
   const [dragY, setDragY] = useState<number | null>(null);
-  /** Whichever header control this sheet has — the confirm, or the ✕ when it has none. */
   const headerAction = useRef<HTMLButtonElement>(null);
 
   useReturnFocus(open);
@@ -99,36 +212,13 @@ export function Sheet({ open, onOpenChange, title, confirm, children }: SheetPro
         // finger has travelled, so there is no second value for CSS to hold.
         style={dragY === null ? undefined : { transform: `translateY(${dragY}px)` }}
       >
-        <div className="sheet__header" onPointerDown={startHeaderDrag}>
-          {confirm ? null : (
-            <button
-              type="button"
-              ref={headerAction}
-              className="sheet__close"
-              aria-label="Close"
-              onClick={() => onOpenChange(false)}
-            >
-              <X size={16} aria-hidden="true" />
-            </button>
-          )}
-          <h2 className="sheet__title">{title}</h2>
-          {confirm && (
-            <button
-              type="button"
-              // The header's own button is where focus lands on open: a sheet that opens with focus
-              // left on the trigger behind it is a sheet a keyboard cannot get into, and the trap
-              // below would then be holding focus outside the dialog it is trapping.
-              ref={headerAction}
-              className="sheet__confirm"
-              onClick={() => {
-                confirm.onConfirm();
-                onOpenChange(false);
-              }}
-            >
-              {confirm.label}
-            </button>
-          )}
-        </div>
+        <SheetHeader
+          title={<h2 className="sheet__title">{title}</h2>}
+          {...(confirm ? { confirm } : {})}
+          actionRef={headerAction}
+          onClose={() => onOpenChange(false)}
+          onPointerDown={startHeaderDrag}
+        />
         <div className="sheet__body">{children}</div>
       </GlassSurface>
     </div>,

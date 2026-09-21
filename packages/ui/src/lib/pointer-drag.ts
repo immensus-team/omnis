@@ -5,6 +5,13 @@ import type * as React from "react";
 // drag library. The check is a grep for those package names, so this header deliberately does not
 // spell them: a comment naming a banned dependency reads as a use of one. Two consumers: the rail's
 // reorder (D7) and the row's swipe (D8). No second drag implementation may appear.
+//
+// Amended by the motion-OSS wave, which §e guard 6 now allows to add five vetted libraries (§c.1.1).
+// The rule above survives it with one clarification: this file is the *gesture* layer — slop, the
+// touch hold, Escape, click suppression, the hit-testing a library would re-derive — and it stays
+// the one place those are written. The divider's resize is not a second implementation of them: it
+// binds a library that does the same window-level job, and what it kept here is the arithmetic
+// (§c.1.1's S3). Both consumers above are still this file's, unchanged.
 
 export interface DragHandlers {
   onStart(): void;

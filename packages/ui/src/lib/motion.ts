@@ -1,4 +1,6 @@
+import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import { useReducedTransparency } from "./media-query.js";
 
 /** US-D04: the durations CSS cannot tell JS about.
  *
@@ -17,8 +19,22 @@ import { useEffect, useRef, useState } from "react";
  *  to read as a fade, short enough not to be a transition anyone waits on (apple-design §14). */
 export const REDUCED_FADE_MS = 80;
 
+/** The three motion tiers of the v3 ladder, in ms, as tokens.css declares them. This table is the
+ *  one place the numbers live in TypeScript; the two long-standing aliases below read off it rather
+ *  than restating it, so adding a tier cannot leave one of them behind.
+ *
+ *  Note the names are the *token* rungs, not the task brief's: the brief called the three tiers
+ *  "fast 160 / base 240 / panel 320", but tokens.css's ladder is `--dur-fast: 100ms` (hover),
+ *  `--dur-base: 160ms` (the entry rung), `--dur-move: 240ms` (the transition rung) and
+ *  `--dur-panel: 320ms` (the layer rung). The three numbers 160/240/320 are the brief's and are
+ *  what matter; the keys are the repo's names for them, because a preset keyed `fast` at 160ms
+ *  would contradict the `--dur-fast` token sitting right beside it at 100ms. */
+export const TIER_MS = { base: 160, move: 240, panel: 320 } as const;
+
+export type MotionTier = keyof typeof TIER_MS;
+
 /** `--dur-panel` — the layer rung of DESIGN-DIRECTION's ladder: a floating panel's arrival. */
-export const PANEL_MS = 320;
+export const PANEL_MS = TIER_MS.panel;
 
 /** `--dur-fast` — the fastest rung, and the only one that is an *exit* rather than a transition: the
  *  toast's fade. It is here for the same reason as the two below (a node has to be held in the DOM
@@ -28,7 +44,62 @@ export const PANEL_MS = 320;
 export const FAST_MS = 100;
 
 /** `--dur-move` — the transition rung: a row collapsing out of a list. */
-export const LEAVE_MS = 240;
+export const LEAVE_MS = TIER_MS.move;
+
+/** A spring that lands on a given rung of the same ladder. `visualDuration` is the *perceived*
+ *  length in seconds, which is what makes one preset per `--dur-*` token honest: the token says how
+ *  long the movement reads as, and this says the same thing to motion's spring solver. */
+export interface MotionSpring {
+  type: "spring";
+  visualDuration: number;
+  bounce: number;
+}
+
+function springOn(tier: MotionTier, bounce: number): MotionSpring {
+  return { type: "spring", visualDuration: TIER_MS[tier] / 1000, bounce };
+}
+
+/** The shared spring presets, one per tier — the motion-side twin of the `--dur-*`/`--ease-spring`
+ *  brackets in tokens.css.
+ *
+ *  `bounce` is deliberately small and it *rises* as the rung shortens: a settling chip (160ms) can
+ *  carry 0.15 and still read as crisp, while a 320ms panel at the same bounce would visibly wobble
+ *  on its way in. That is the whole tuning rule, and it is the reason these are three presets and
+ *  not one — §e guard 5 rejects a bounce nobody asked for, and a single high-bounce spring applied
+ *  to a floating layer is exactly that bounce. */
+export const SPRING = {
+  /** `--dur-base` 160ms — the entry rung: a chip landing, a row lifting into place. */
+  base: springOn("base", 0.15),
+  /** `--dur-move` 240ms — the transition rung: a row collapsing out, the pane resizing. */
+  move: springOn("move", 0.12),
+  /** `--dur-panel` 320ms — the layer rung: a floating panel or sheet arriving. */
+  panel: springOn("panel", 0.1),
+} as const satisfies Record<MotionTier, MotionSpring>;
+
+/** What the app has been asked to do less of. Two separate requests, deliberately not folded into
+ *  one flag: `prefers-reduced-motion` asks for less *movement*, `prefers-reduced-transparency` asks
+ *  for less *blur*. Someone can want the glass gone and the springs kept. */
+export interface MotionPrefs {
+  /** Reduce travel: springs become instant, entrances become fades. Read by every animated surface
+   *  that has to decide in JavaScript; CSS-side decisions stay in the stylesheet's own media block. */
+  reducedMotion: boolean;
+  /** Reduce blur: glass surfaces fall back to an opaque fill. */
+  reducedTransparency: boolean;
+}
+
+/** The one hook an animated component asks about the user's preferences.
+ *
+ *  `useReducedMotion` is motion's own, so the value it returns is the same one `MotionConfig`'s
+ *  `reducedMotion="user"` acts on — a component that branches on this and a component that lets its
+ *  transition be overridden cannot disagree. It returns `null` when the answer is not known yet
+ *  (SSR, or a runtime with no `matchMedia`); that coalesces to `false`, the open branch, which is
+ *  the same fallback `prefersReducedMotion()` above has always taken. */
+export function useMotionPrefs(): MotionPrefs {
+  return {
+    reducedMotion: useReducedMotion() ?? false,
+    reducedTransparency: useReducedTransparency(),
+  };
+}
 
 /** jsdom's matchMedia always reports matches:false, and a bare Node environment has none at all —
  *  the same defence channel-rail.tsx and command-palette.tsx already carry. No matchMedia means the

@@ -120,14 +120,19 @@ describe("US-D04 reduced motion keeps the fade and drops the travel", () => {
   // switching its animation off, and the two that JavaScript unmounts on `animationend` (the ask
   // panel through useClosingSpring, the hover card through Radix Presence) would hang in the DOM
   // forever if the animation were removed rather than re-pointed.
+  //
+  // The leaving inbox row is no longer in this list, and that is the motion-OSS S4 port: its
+  // collapse is `motion`'s now, so there is no `animation-name` here to re-point — the reduced
+  // branch is a *target* in inbox-row.tsx (`LEAVE_EXIT_REDUCED`, opacity with no height) and the
+  // row's padded half is the `.inbox-row--leaving` rule below this block. `.inbox-row--leaving`
+  // still keeps one job in the reduced block, but it is the opposite of a fade re-point: it
+  // *restores* the padding the full-motion rule zeroes, so the row does not jump.
   const MOVING_SURFACES = [
     ".ask-panel",
     ".ask-panel--closing",
     '.row-hover-card[data-state="open"]',
     '.row-hover-card[data-state="closed"]',
     ".app-shell__detail",
-    ".inbox-row--leaving",
-    ".toast__pill",
   ];
 
   it("lands the rail's reorder in the same slots with no travel", () => {
