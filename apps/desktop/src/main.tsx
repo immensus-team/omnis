@@ -32,6 +32,7 @@ function previewElement() {
   if (screen === "onboarding") return <OnboardingPreview />;
   if (screen === "today") return <App screen="today" />;
   if (screen === "tasks") return <App screen="tasks" />;
+  if (screen === "network") return <App screen="network" />;
   return <App />;
 }
 
