@@ -1,3 +1,9 @@
+// @vitest-environment jsdom
+// The root `pnpm test` does not read apps/web/vitest.config.ts, so this file declares its own
+// environment and setup — the same line apps/desktop's tsx tests carry for the same reason. Without
+// it the file runs in node and dies on `document is not defined`.
+import "./setup";
+
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -15,6 +21,14 @@ vi.mock("@rocicorp/zero/react", () => ({
   ZeroProvider: ({ children }: { children: ReactNode }) => children,
   useZero: () => ({ query: zqlChain }),
   useQuery: () => [[], { type: "complete" }],
+}));
+
+/** The client module is stubbed for the same reason: App's getZero() builds a real Zero, which opens
+ *  a WebSocket to the zero-cache port. A unit test that dials a socket is a network call, and this one
+ *  logs a connection failure on every run, which makes a green suite look broken. */
+vi.mock("../src/zero-client.js", () => ({
+  initZero: () => ({}),
+  useZeroClient: () => ({ query: zqlChain }),
 }));
 
 /** jsdom has no matchMedia, and the shell asks it one question at mount ("is this installed?").

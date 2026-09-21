@@ -1,3 +1,7 @@
+// @vitest-environment jsdom
+// The root `pnpm test` does not read apps/web/vitest.config.ts — see app.test.tsx.
+import "./setup";
+
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { InstallGuideCard } from "../src/components/InstallGuideCard.js";
