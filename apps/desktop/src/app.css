@@ -2456,12 +2456,54 @@ body {
   letter-spacing: 0.02em;
 }
 
+/* loop-r2-06/L2-24: the description and the thread it belongs to, stacked. The column is a child of
+   the row's baseline-aligned flex, so the body's own baseline is still its first line's — the action
+   label and the risk pill stay on the description's line and do not drop to the second one. */
+.approval-stack__row-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .approval-stack__row-text {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* The thread's name, in the caption scale the header above the rows already uses. It is the answer
+   to "a decision about *what*", so it is quieter than the description it sits under, not louder. */
+.approval-stack__row-where {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+/* loop-r2-06/L2-24: the way back from the queue into the conversation the card is about. A ghost
+   button wearing the decision row's own hairline (`.approval-card__actions button`) — it is a way
+   out of the card, not a fifth decision to make on it, so it does not get a fill. */
+.approval-open-link {
+  align-self: flex-start;
+  margin-top: 8px;
+  border: var(--hairline);
+  border-radius: 8px;
+  padding: 4px 12px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.approval-open-link:hover {
+  background: var(--state-hover);
 }
 
 .approval-stack__risk {

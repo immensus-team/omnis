@@ -5,6 +5,7 @@ import {
   type ApprovalCardInterrupt,
   ApprovalCardView,
 } from "./approval-card.js";
+import { Button } from "./button.js";
 
 /** US-D03: what the detail pane's approval area gets instead of a wall of identical cards. Every
  *  pending approval used to render as the same 12px-radius card with the same four buttons, so
@@ -47,6 +48,11 @@ export interface ApprovalStackProps<T extends ApprovalStackItem> {
    *  and only the caller knows that — the name is the thread's title, which the approval row stores
    *  as an id. Omitted, the card drops that half of the sentence rather than guessing one. */
   destinationFor?: (item: T) => string | null;
+  /** loop-r2-06/L2-24: the same title, used a second time — a collapsed row says which conversation
+   *  it belongs to, and the expanded card offers a way back into it. The queue is reached from the
+   *  Inbox, where every row names a thread; the queue's rows named nothing, so "Send the deck?" was
+   *  a decision with no visible subject. */
+  onOpenThread?: (threadId: string) => void;
 }
 
 function riskRank(risk: string): number {
@@ -81,6 +87,7 @@ export function ApprovalStack<T extends ApprovalStackItem>({
   openThreadId,
   onDecide,
   destinationFor,
+  onOpenThread,
 }: ApprovalStackProps<T>) {
   // null means "the scope's own choice" (scopeApprovalStack's primary). Picking a collapsed row
   // overrides it — one card is expanded at a time, whichever way it was chosen.
@@ -102,6 +109,11 @@ export function ApprovalStack<T extends ApprovalStackItem>({
   // both are "nothing of mine to decide here", and the pane simply does not raise the subject.
   if (active === null && rest.length === 0) return null;
 
+  // Bound to `const`s so the guards below still hold inside the click handler: TypeScript drops the
+  // narrowing of a property read (`active.thread_id`) as soon as a closure captures it.
+  const activeThreadId = active?.thread_id ?? null;
+  const activeTitle = active === null ? null : (destinationFor?.(active) ?? null);
+
   return (
     <section className="approval-stack" aria-label="Pending approvals">
       {active && (
@@ -113,20 +125,43 @@ export function ApprovalStack<T extends ApprovalStackItem>({
           onDecide={(decision, decidedArgs) => onDecide(active.id, decision, decidedArgs)}
         />
       )}
-      {rest.length > 0 && <p className="approval-stack__header">{rest.length} more waiting</p>}
-      {rest.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          className="approval-stack__row"
-          aria-expanded={false}
-          onClick={() => setPickedId(item.id)}
+      {/* loop-r2-06/L2-24: under the card, so it reads as a footnote to the thing being decided
+          rather than as a fifth decision button in the card's own row. The label names the thread
+          when the caller could name it and falls back to the plain noun when it could not — an
+          "Open" with no object is worse than a slightly vaguer one. */}
+      {onOpenThread !== undefined && activeThreadId !== null && (
+        <Button
+          variant="ghost"
+          className="approval-open-link"
+          onClick={() => onOpenThread(activeThreadId)}
         >
-          <span className="approval-stack__row-action">{ACTION_LABEL[item.action]}</span>
-          <span className="approval-stack__row-text">{item.description}</span>
-          {item.risk === "high" && <span className="approval-stack__risk">High risk</span>}
-        </button>
-      ))}
+          {activeTitle !== null ? `Open ${activeTitle}` : "Open thread"}
+        </Button>
+      )}
+      {rest.length > 0 && <p className="approval-stack__header">{rest.length} more waiting</p>}
+      {rest.map((item) => {
+        // The caller names threads, not this component (see `destinationFor`). Reused for the row's
+        // second line: "which conversation is this" is the same question the card's header asks.
+        const where = destinationFor?.(item) ?? null;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            className="approval-stack__row"
+            aria-expanded={false}
+            onClick={() => setPickedId(item.id)}
+          >
+            <span className="approval-stack__row-action">{ACTION_LABEL[item.action]}</span>
+            {/* The text and its thread stack in a column of their own so the action label and the
+                risk pill keep sitting on the row's first line (align-items: baseline). */}
+            <span className="approval-stack__row-body">
+              <span className="approval-stack__row-text">{item.description}</span>
+              {where !== null && <span className="approval-stack__row-where">in {where}</span>}
+            </span>
+            {item.risk === "high" && <span className="approval-stack__risk">High risk</span>}
+          </button>
+        );
+      })}
     </section>
   );
 }
