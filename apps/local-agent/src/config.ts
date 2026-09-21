@@ -24,6 +24,9 @@ export interface HttpRuntimeConfig {
   base_url: string;
   token_keychain_item: string;
   session_header_mode: "hermes_v1";
+  /** US-C06 (C-D6): the per-host switch that lets this Hermes accept `origin:'delegation'` turns. Off unless the
+   *  TOML says `delegation = true` — A2-D9 keeps Hermes read-only until S-A2-5 confirms its approval surface. */
+  delegation?: boolean;
 }
 export type RuntimeConfig = ProcessRuntimeConfig | HttpRuntimeConfig;
 
@@ -50,7 +53,7 @@ export const HOST_DEFAULTS: Record<HostId, { hub_url: string; token_keychain_ite
 
 const PROCESS_KINDS = new Set(["claude_code", "codex", "claude_ds"]);
 const PROCESS_ONLY_FIELDS = ["binary", "allowed_roots", "pinned_version", "default_model", "bare"];
-const HTTP_ONLY_FIELDS = ["base_url", "session_header_mode"];
+const HTTP_ONLY_FIELDS = ["base_url", "session_header_mode", "delegation"];
 
 /** The A6 §10 plist passes `--hub http://127.0.0.1:8787`. What the bridge uses is ws(s) + /bridge. */
 export function normalizeHubUrl(input: string): string {
@@ -121,11 +124,14 @@ function parseRuntime(raw: Record<string, unknown>, homeDir: string): RuntimeCon
     const token = raw.token_keychain_item;
     if (typeof token !== "string")
       throw new ConfigError("[[runtime]] kind='hermes' requires token_keychain_item");
+    if (raw.delegation !== undefined && typeof raw.delegation !== "boolean")
+      throw new ConfigError("[[runtime]] kind='hermes' delegation must be a boolean");
     return {
       kind: "hermes",
       base_url: typeof raw.base_url === "string" ? raw.base_url : "http://127.0.0.1:8642",
       token_keychain_item: token,
       session_header_mode: "hermes_v1",
+      delegation: raw.delegation === true, // default false (C-D6)
     };
   }
   throw new ConfigError(`unknown runtime kind: ${kind}`);

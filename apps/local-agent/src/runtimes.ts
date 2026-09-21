@@ -70,7 +70,12 @@ async function defaultMake(c: RuntimeConfig, secret: string | null): Promise<Run
       });
     }
     case "hermes":
-      return new HermesAdapter({ baseUrl: c.base_url, token: secret ?? "" });
+      // US-C06: the TOML `delegation` flag has to reach the adapter, or the host would stay read-only forever.
+      return new HermesAdapter({
+        baseUrl: c.base_url,
+        token: secret ?? "",
+        delegation: c.delegation === true,
+      });
   }
 }
 
