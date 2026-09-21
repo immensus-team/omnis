@@ -3,7 +3,9 @@
 // made against a real render — that the pane never holds two toolbars, that no glass surface ends up
 // inside another one, and that the approval card and the tool-call badge are opaque and *in* the
 // message flow rather than in a column beside it. thread-screen.test.tsx covers the merge itself as
-// a pure function; this file renders the screen and inspects the tree.
+// a pure function; this file renders the screen and inspects the tree. US-C17's composer slot is the
+// same kind of check — `composerBlockFor` decides, and this file is where the pane is asked whether
+// that decision reaches the DOM.
 //
 // archive-inbox.test.tsx's table-tagged store is reused rather than invented: Thread runs seven
 // queries and app-shell.test.tsx's single-value proxy would answer all seven the same.
@@ -261,5 +263,44 @@ describe("Thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
 
     // The other thread's approval is not in this conversation.
     expect(screen.queryByText("Another thread's approval")).not.toBeInTheDocument();
+  });
+});
+
+/** US-C17: `composerBlockFor` picks the state (composer-state.test.tsx pins which) and Thread draws
+ *  it in the composer's slot. That last step is the screen's own branch, so it is asserted against a
+ *  render: the account's `capabilities` is what the answer is made of, and an account without one is
+ *  the case where the pane must stay out of the way. */
+describe("Thread composer slot (US-C17)", () => {
+  const accounts = store.accounts;
+  afterEach(() => {
+    store.accounts = accounts;
+  });
+
+  it("draws the channel's state at the end of the conversation when its send is closed", () => {
+    store.accounts = [
+      { id: "acct-1", channel: "kakaotalk", capabilities: { write: false, kakaoDaysRemaining: 9 } },
+    ];
+
+    renderThread();
+
+    const block = document.querySelector(".composer-state");
+    expect(block).not.toBeNull();
+    expect(block).toHaveAttribute("data-kind", "kakao_countdown");
+    expect(screen.getByText("Sending opens in 9 days")).toBeInTheDocument();
+    // The slot, not a message: it follows the conversation's last item rather than sitting in it.
+    const last = screen.getByText("Second message");
+    expect(
+      block !== null &&
+        last !== null &&
+        (last.compareDocumentPosition(block) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+    ).toBe(true);
+  });
+
+  it("draws nothing extra for a channel with nothing to announce", () => {
+    // The store's own account is gmail and carries no capabilities — the composer's slot is empty,
+    // and a block here would be a claim about a channel that has no capture-side state to report.
+    renderThread();
+
+    expect(document.querySelector(".composer-state")).toBeNull();
   });
 });
