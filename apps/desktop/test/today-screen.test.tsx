@@ -1,11 +1,43 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+// The screen's pure rules (the greeting, the state machine, the briefing parser) plus, since
+// loop-r2-06, the render that shows its approvals come from the shell rather than from a query of
+// its own. Everything above the render block is a function call.
+import "./setup";
+
+import type { ApprovalStackItem } from "@omnis/ui/components/approval-stack";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import {
   STATE_COPY,
+  Today,
   greetingLine,
   isSameLocalDay,
   parseMorningBriefing,
   screenState,
 } from "../src/screens/Today.js";
+
+/** `vi.hoisted` because the mock factories below run before this file's static imports: a plain
+ *  `const` would still be in its temporal dead zone when the screen is first loaded. Every chain
+ *  reads back as itself, so the screen can walk as far along a query as it likes. */
+const { zero } = vi.hoisted(() => {
+  const chain: unknown = new Proxy({}, { get: () => () => chain });
+  return { zero: { query: new Proxy({}, { get: () => chain }) } };
+});
+
+vi.mock("../src/zero-client.js", () => ({
+  initZero: () => zero,
+  useZeroClient: () => zero,
+  loadZeroToken: async () => {},
+  hasZeroToken: () => true,
+}));
+
+// Every query answers with no rows. loop-r2-06's point is that this screen's approval count is a
+// prop now: a number that still came from a query here could only read 0.
+vi.mock("@rocicorp/zero/react", () => ({
+  useQuery: () => [[], { type: "complete" }],
+  useZero: () => zero,
+  ZeroProvider: ({ children }: { children: unknown }) => children,
+}));
 
 describe("greetingLine (A5 §3.4 greeting <h1>)", () => {
   it("includes the pending item count and approval count", () => {
@@ -46,22 +78,26 @@ describe("isSameLocalDay (today-calendar filter decision)", () => {
   });
 });
 
-describe("screenState (US-B28 4 states — loading/empty/error/offline)", () => {
-  const ok = { online: true, resultTypes: ["complete", "complete"] as const };
+describe("screenState (US-B28's states, less the one loop-r2-05 moved to the shell)", () => {
+  const ok = { resultTypes: ["complete", "complete"] as const };
   it("error wins over everything — a failed query is the most specific thing we know", () => {
-    expect(
-      screenState({ online: false, resultTypes: ["error", "unknown"], hasContent: true }),
-    ).toBe("error");
+    expect(screenState({ resultTypes: ["error", "unknown"], hasContent: true })).toBe("error");
   });
-  it("offline beats loading — offline queries never reach 'complete', so 'loading' would hang forever", () => {
-    expect(
-      screenState({ online: false, resultTypes: ["unknown", "complete"], hasContent: false }),
-    ).toBe("offline");
+  // loop-r2-05: there is no `offline` state here any more. Whether this window can see the hub is
+  // one fact about the whole shell, and Today saying "You're offline" while the Inbox's subline
+  // said "Updated now" was two screens telling different stories about the same socket. The
+  // screen's own answer while a query has not answered is `loading`, and the shell's banner above
+  // it says what the connection is doing.
+  it("never reports offline — the shell's connection banner is the one place that is said", () => {
+    expect(screenState({ resultTypes: ["unknown", "complete"], hasContent: false })).toBe(
+      "loading",
+    );
+    expect(Object.keys(STATE_COPY)).not.toContain("offline");
   });
   it("loading while any query is still 'unknown'", () => {
-    expect(
-      screenState({ online: true, resultTypes: ["unknown", "complete"], hasContent: false }),
-    ).toBe("loading");
+    expect(screenState({ resultTypes: ["unknown", "complete"], hasContent: false })).toBe(
+      "loading",
+    );
   });
   it("empty when every query completed and there is nothing to show", () => {
     expect(screenState({ ...ok, hasContent: false })).toBe("empty");
@@ -69,12 +105,12 @@ describe("screenState (US-B28 4 states — loading/empty/error/offline)", () => 
   it("ready when every query completed and there is something to show", () => {
     expect(screenState({ ...ok, hasContent: true })).toBe("ready");
   });
-  // Even offline, already-synced local data stays on screen — only the banner appears, the lists
-  // stay alive: the return value is a state word, never a reason to blank the body. `ready` is the
-  // one state with nothing to say, and it says it with an empty string rather than a third state
-  // of the banner.
-  it("offline still reports content so the caller keeps rendering the cached lists", () => {
-    expect(STATE_COPY.offline).not.toBe("");
+  // Already-synced local data stays on screen through a failed query — only the banner appears,
+  // the lists stay alive: the return value is a state word, never a reason to blank the body.
+  // `ready` is the one state with nothing to say, and it says it with an empty string rather than
+  // a fourth state of the banner.
+  it("keeps a state word for the caller, and says nothing when there is nothing to say", () => {
+    expect(STATE_COPY.error).not.toBe("");
     expect(STATE_COPY.ready).toBe("");
   });
 });
@@ -145,5 +181,88 @@ describe("parseMorningBriefing (digests.body for kind='morning' is JSON, not pro
       line: "L",
       why: "",
     });
+  });
+});
+
+// loop-r2-06 (L2-07, L2-24): Today used to run its own `pending_approvals` query and call
+// `decideApproval` directly, so it counted a different set from the Inbox's subline — three numbers
+// for one queue — and a card decided from here left no toast, no undo, and no `hiddenApprovalIds`
+// entry, so the same card was still sitting in the Inbox a moment later. It reads and decides
+// through the shell now, and writes nothing to the hub itself.
+describe("Today's approval strip (loop-r2-06)", () => {
+  const fixture = (over: Partial<ApprovalStackItem> = {}): ApprovalStackItem => ({
+    id: "ap-1",
+    action: "send",
+    description: "Send the deck to Dana?",
+    args: {},
+    config: { allow_accept: true, allow_edit: true, allow_respond: false, allow_ignore: true },
+    thread_id: "t1",
+    risk: "normal",
+    created_at: Date.now(),
+    ...over,
+  });
+
+  const expand = (description: string) =>
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(description) }));
+
+  it("counts the shell's queue, not a query of its own", () => {
+    // The mock answers every query with no rows, so both numbers can only come from the prop.
+    const { container } = render(<Today approvals={[fixture()]} onDecide={vi.fn()} />);
+    expect(container.querySelector(".today-screen__greeting")).toHaveTextContent(
+      "1 approvals pending",
+    );
+    expect(screen.getByRole("heading", { name: "Pending approvals (1)" })).toBeInTheDocument();
+  });
+
+  it("decides through the shell and writes nothing to the hub itself", () => {
+    const onDecide = vi.fn();
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    render(<Today approvals={[fixture()]} onDecide={onDecide} />);
+
+    expand("Send the deck to Dana");
+    // The card's Accept asks first (§c.8), so the decision is behind the prompt's own Approve.
+    fireEvent.click(screen.getByText("Approve"));
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Approve" }),
+    );
+
+    // The id is the approval's, and the screen collapses its own chip; the decision — and with it
+    // the toast, the undo and the removal from the Inbox — is the shell's.
+    expect(onDecide).toHaveBeenCalledWith("ap-1", "accept", undefined);
+    expect(screen.queryByText("Approve")).not.toBeInTheDocument();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("names the destination on the card and offers a way into the thread", () => {
+    const onOpenThread = vi.fn();
+    render(
+      <Today
+        approvals={[fixture()]}
+        onDecide={vi.fn()}
+        destinationFor={() => "#omnis-launch"}
+        onOpenThread={onOpenThread}
+      />,
+    );
+
+    expand("Send the deck to Dana");
+    // The card's own header sentence, from the shell's map — the same name the queue's rows use.
+    expect(screen.getByText("Reply in #omnis-launch")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open thread" }));
+    expect(onOpenThread).toHaveBeenCalledWith("t1");
+  });
+
+  it("offers no way into a thread it does not have", () => {
+    // An approval raised outside any thread has no conversation to go back to; `onOpenThread` being
+    // present is not enough on its own.
+    render(
+      <Today
+        approvals={[fixture({ thread_id: null })]}
+        onDecide={vi.fn()}
+        onOpenThread={vi.fn()}
+      />,
+    );
+    expand("Send the deck to Dana");
+    expect(screen.queryByRole("button", { name: "Open thread" })).not.toBeInTheDocument();
   });
 });

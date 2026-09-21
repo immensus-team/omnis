@@ -165,6 +165,70 @@ describe("Inbox archive/restore (US-A36)", () => {
     vi.useRealTimers();
   });
 
+  /** Real timers, and one awaited frame: the Archived view focuses its heading a frame after the
+   *  key, because the empty list it leaves behind only renders on the next commit. The component's
+   *  frame is requested before this one, so a single frame is enough (the same reading as
+   *  inbox-keyboard.test.tsx's `nextFrame`). */
+  const nextFrame = async (): Promise<void> => {
+    await act(async () => {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    });
+  };
+
+  it("moves the focus to the heading when the last restore empties the Archived view (L2-28)", async () => {
+    renderInbox();
+    // "Older mail" is the only archived thread this file starts from, so restoring it leaves the
+    // view with no rows at all — and a list with no rows has no row to hold the focus.
+    fireEvent.click(archivedPill());
+    fireEvent.click(screen.getByRole("option", { name: /Older mail/ }));
+    fireEvent.keyDown(window, { key: "u" });
+    expect(url(0)).toContain(`/api/threads/${THREAD_B}/unarchive`);
+
+    // loop-r2-08/L2-28: it used to land on `<body>`, so the next Tab restarted at the top of the
+    // document. A screen with no content puts the focus on its own `h1` — the same target, and the
+    // same element, that a screen switch uses (App.tsx).
+    await nextFrame();
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading).toHaveClass("inbox-card__title");
+    expect(document.activeElement).toBe(heading);
+  });
+
+  /** loop-r2-08/L2-28: requirement 7 is not only the `u` key's path. The undo stack restores a
+   *  thread from the Archived view as well, and the row it brings back *leaves that list* — so the
+   *  row is a target that exists for one leave animation and then unmounts, taking the focus to
+   *  `<body>` with it: the same symptom, one key over. Real timers, because what has to be shown is
+   *  the focus *after* the animation has run out. */
+  const settleLeave = async (): Promise<void> => {
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, LEAVE_MS + 60));
+    });
+  };
+
+  it("moves the focus to the heading when ⌘Z restores out of the Archived view (L2-28)", async () => {
+    renderInbox();
+    // An archive to take back, made where a user makes one — and then the Archived view, which is
+    // where that thread now is and where the restore therefore happens.
+    fireEvent.click(screen.getByRole("option", { name: /New mail/ }));
+    fireEvent.keyDown(window, { key: "e" });
+    expect(url(0)).toContain(`/api/threads/${THREAD_A}/archive`);
+    await settleLeave();
+
+    fireEvent.click(archivedPill());
+    expect(rowNames()).toEqual(["New mail", "Older mail"]);
+    fireEvent.keyDown(window, { key: "z", metaKey: true });
+    expect(url(1)).toContain(`/api/threads/${THREAD_A}/unarchive`);
+
+    // The frame the row is back on is not the answer: it is still mounted for its leave animation,
+    // so the row would be focused here and the unmount below would be what loses it.
+    await nextFrame();
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(document.activeElement).toBe(heading);
+
+    await settleLeave();
+    expect(document.activeElement).toBe(heading);
+    expect(rowNames()).toEqual(["Older mail"]);
+  });
+
   it("the hover action archives the row it belongs to without opening it", () => {
     vi.useFakeTimers();
     const onOpen = vi.fn();
@@ -265,7 +329,9 @@ describe("Inbox archive toasts (loop-r1-06)", () => {
     vi.useFakeTimers();
     archiveWithE();
 
-    expect(toast()).toHaveTextContent("Archived");
+    // loop-r2-08/L2-10, NC2-09: the copy names the thread. "Archived" alone could not be acted on
+    // by anyone with two archives in a row — the Undo under it was a guess about which one.
+    expect(toast()).toHaveTextContent('Archived "New mail"');
     expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
@@ -279,7 +345,7 @@ describe("Inbox archive toasts (loop-r1-06)", () => {
   it("undoes with `z` — the keyboard twin of that button", () => {
     vi.useFakeTimers();
     archiveWithE();
-    expect(toast()).toHaveTextContent("Archived");
+    expect(toast()).toHaveTextContent('Archived "New mail"');
 
     fireEvent.keyDown(window, { key: "z" });
     expect(url(1)).toContain(`/api/threads/${THREAD_A}/unarchive`);
@@ -287,16 +353,47 @@ describe("Inbox archive toasts (loop-r1-06)", () => {
     vi.useRealTimers();
   });
 
-  it("undoes with ⌘Z too, and stops once the toast has gone", () => {
+  it("undoes with ⌘Z, bound by the undo stack rather than by the toast's lifetime", () => {
     vi.useFakeTimers();
     archiveWithE();
     fireEvent.keyDown(window, { key: "z", metaKey: true });
     expect(url(1)).toContain(`/api/threads/${THREAD_A}/unarchive`);
 
-    // The undo is the toast's, not the screen's: five seconds after the archive there is no button
-    // on screen, so ⌘Z has nothing left to take back. (The Ctrl variant is the same branch — the
-    // listener takes either modifier.)
+    // loop-r2-08: the undo used to be the toast's. Five seconds after the archive the button was
+    // gone and ⌘Z had nothing to take back — the keys went dead on a timer, which is half of what
+    // both testers hit. The stack is a data fact and the toast is a UI one, so the archive below is
+    // taken back with the toast long dismissed. (The Ctrl variant is the same branch — the listener
+    // takes either modifier.)
     act(() => vi.advanceTimersByTime(TOAST_MS));
+    fireEvent.click(screen.getByRole("option", { name: /New mail/ }));
+    fireEvent.keyDown(window, { key: "e" });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    act(() => vi.advanceTimersByTime(TOAST_MS));
+    fireEvent.keyDown(window, { key: "z", metaKey: true });
+    expect(url(3)).toContain(`/api/threads/${THREAD_A}/unarchive`);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+
+    // And what stops it is the stack being empty, not a clock: the second undo consumed the second
+    // entry, so a third press posts nothing at all.
+    fireEvent.keyDown(window, { key: "z", metaKey: true });
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    vi.useRealTimers();
+  });
+
+  it("does not take the same archive back twice when the button and the key are both used", () => {
+    vi.useFakeTimers();
+    archiveWithE();
+    // sonner publishes its store one tick behind the raise; `toast()` is that tick, and without it
+    // the button is not on screen yet (see the helper).
+    expect(toast()).toHaveTextContent('Archived "New mail"');
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(url(1)).toContain(`/api/threads/${THREAD_A}/unarchive`);
+
+    // loop-r2-08: the button undoes *its own* entry and consumes it, rather than both it and the
+    // keyboard reading "whatever is on top" — which is how a press followed by ⌘Z took two things
+    // back when only one had been done. Here the press spent the stack, so ⌘Z has nothing.
     fireEvent.keyDown(window, { key: "z", metaKey: true });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     vi.useRealTimers();

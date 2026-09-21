@@ -32,11 +32,18 @@ export interface LabelChip {
 
 /** U2 avatar: a person's photo when there is one, otherwise the initials+pastel fallback; an
  * agent_session row shows its runtime logo (DESIGN-DIRECTION.md U2 — identities has no photo field
- * yet, so "photo" is the slot held open for when that data arrives). */
+ * yet, so "photo" is the slot held open for when that data arrives).
+ *
+ * loop-r2-07/L2-32: `omnis` is the fourth case and the one that is neither — omnis's own row and a
+ * session omnis itself is running wear the product's mark, which is a real brand PNG in the same set
+ * as the channels (`system@1x/2x`), not an identity and not a runtime. The old fallback was a pastel
+ * "OM" monogram for the row and a black "O" tile for the session: two invented marks for the one
+ * product whose mark is already in the asset set. */
 export type RowAvatar =
   | { kind: "photo"; url: string; name: string }
   | { kind: "initials"; name: string }
-  | { kind: "runtime"; runtime: AgentRuntimeKind };
+  | { kind: "runtime"; runtime: AgentRuntimeKind }
+  | { kind: "omnis" };
 
 export interface InboxRowProps {
   /** thread id — since U2 a row is one per thread, not one per item. */
@@ -152,8 +159,9 @@ function pickChips(labels: LabelChip[]): { shown: LabelChip[]; more: number } {
 }
 
 /** loop-r1-07: exported for the session header, which is the second surface that draws a runtime's
- *  own tile (32px there, 40px here). The four branches below — a brand mark, a letter fallback, a
- *  photo and initials — are the whole reason this is one component and not a second copy. */
+ *  own tile (32px there, 40px here). The five branches below — a brand mark, a letter fallback,
+ *  omnis's own mark (loop-r2-07), a photo and initials — are the whole reason this is one component
+ *  and not a second copy. */
 export function RowAvatarView({ avatar }: { avatar: RowAvatar }) {
   if (avatar.kind === "runtime") {
     // U5: a runtime with a real brand mark (Claude, DeepSeek, ...) shows that logo; one without
@@ -166,6 +174,17 @@ export function RowAvatarView({ avatar }: { avatar: RowAvatar }) {
         aria-label={`${RUNTIME_LABEL[avatar.runtime]} session`}
       >
         {Icon ? <Icon size={16} aria-hidden="true" /> : RUNTIME_LETTER[avatar.runtime]}
+      </span>
+    );
+  }
+  if (avatar.kind === "omnis") {
+    // loop-r2-07/L2-32: the mark at the avatar's own size — it *is* the tile, so nothing is drawn
+    // behind it (the PNG's squircle is the tile; app.css's --omnis rule drops the base fill and
+    // clips to the same corner the runtime tiles use). It is an <img>, so it carries an aria-label
+    // rather than text: a screen reader says "omnis", not "OM".
+    return (
+      <span className="inbox-row__avatar inbox-row__avatar--omnis" aria-label="omnis">
+        <ChannelGlyph channel="system" size={40} />
       </span>
     );
   }
@@ -190,8 +209,11 @@ export function RowAvatarView({ avatar }: { avatar: RowAvatar }) {
 export function InboxRow(props: InboxRowProps) {
   const { shown, more } = pickChips(props.labels);
   const summaryText = props.isDraft ? `Draft: ${props.summary}` : props.summary;
-  // US-D03: a runtime avatar is the one row shape with nobody behind it.
-  const isPerson = props.avatar.kind !== "runtime";
+  // US-D03 + loop-r2-07: the brand-mark avatars are the row shapes with nobody behind them — a
+  // runtime session's and omnis's own. Both are product marks, not identities, and neither may be
+  // handed to PersonCard: it would draw a pastel disc, a relationship badge and a channel list for
+  // something no person is behind.
+  const isPerson = props.avatar.kind !== "runtime" && props.avatar.kind !== "omnis";
   const unreadRows =
     props.unreadCount !== undefined && props.unreadCount > 0
       ? [{ label: "Unread", value: props.unreadCount, numeric: true }]
@@ -565,8 +587,9 @@ export function InboxRow(props: InboxRowProps) {
             rather than a private <dl>, so the inbox and the future Network screen draw an identity
             the same way. The card still says only what the row had to cut — the summary the row
             clamped, and the labels it clipped to two chips plus "+N".
-            An agent_session row has no person behind it (its avatar slot holds the runtime logo),
-            so it keeps the plain title + table form instead of claiming to be somebody. */}
+            An agent_session row has no person behind it — its avatar slot holds a product mark, the
+            runtime's logo or omnis's own (loop-r2-07) — so it keeps the plain title + table form
+            instead of claiming to be somebody. */}
         <HoverCard.Content
           className="glass-surface row-hover-card"
           data-glass-slot="sheet"

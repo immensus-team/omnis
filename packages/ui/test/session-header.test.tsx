@@ -73,4 +73,22 @@ describe("SessionHeader (loop-r1-07: who is running, where, since when)", () => 
     expect(screen.queryByText(/token/i)).not.toBeInTheDocument();
     expect(document.body.textContent ?? "").not.toContain("$");
   });
+
+  // loop-r2-07/L2-32: omnis's runtime is not a stranger runtime whose icon is missing — it is the
+  // app this header is drawn inside. The tile is reused from the inbox row, so "a runtime that gains
+  // a brand mark gains it in both places at once" has to hold here too: the same session row drew
+  // the real mark while the pane above it drew a black "O".
+  it("draws omnis's own mark for the omnis runtime, not the O letter fallback", () => {
+    const { container } = render(<SessionHeader {...SESSION} runtime="omnis" host="mini" />);
+
+    // The label row is unaffected — it still names the runtime and the machine it is on.
+    expect(screen.getByText("omnis on mini")).toBeInTheDocument();
+    const slot = container.querySelector(".session-header__avatar");
+    const mark = slot?.querySelector(".inbox-row__avatar--omnis");
+    expect(mark).toBeInTheDocument();
+    expect(mark?.querySelector("img")).toBeInTheDocument();
+    // No letter behind it: the fallback is the thing this test exists to keep out of the header.
+    expect(mark?.textContent).toBe("");
+    expect(slot?.textContent ?? "").not.toContain("O");
+  });
 });

@@ -62,22 +62,57 @@ const personQuery: unknown = new Proxy(() => personQuery, {
   get: () => personQuery,
   apply: () => personQuery,
 });
+// loop-r2-06: `tasks` (the checkbox's row) and `threads` (the name the queue's rows and Today's
+// cards give an approval's conversation) are the two relations the new behaviours read. Same
+// pattern as `persons`: they answer [] until a case fills them, which is what keeps every test
+// above unchanged. `threads` answers every threads query with the same rows — the shell reads it
+// once for the queue's titles and once for the open thread, and no case below has a thread open.
+const tasks: { rows: unknown[] } = { rows: [] };
+const tasksQuery: unknown = new Proxy(() => tasksQuery, {
+  get: () => tasksQuery,
+  apply: () => tasksQuery,
+});
+const threads: { rows: unknown[] } = { rows: [] };
+const threadsQuery: unknown = new Proxy(() => threadsQuery, {
+  get: () => threadsQuery,
+  apply: () => threadsQuery,
+});
 const chain: unknown = new Proxy(() => chain, {
   get: (_target, prop) =>
-    prop === "pending_approvals" ? queue : prop === "persons" ? personQuery : chain,
+    prop === "pending_approvals"
+      ? queue
+      : prop === "persons"
+        ? personQuery
+        : prop === "tasks"
+          ? tasksQuery
+          : prop === "threads"
+            ? threadsQuery
+            : chain,
   apply: () => chain,
 });
 vi.mock("../src/zero-client.js", () => ({
   initZero: () => chain,
   useZeroClient: () => chain,
   loadZeroToken: async () => {},
+  // loop-r2-05: the shell now asks whether a token was ever issued, so the mock has to answer —
+  // without this every App test would draw the "Can't reach omnis" banner.
+  hasZeroToken: () => true,
 }));
 vi.mock("@rocicorp/zero/react", () => ({
   useQuery: (q: unknown) => [
-    q === queue ? approvals.rows : q === personQuery ? persons.rows : [],
+    q === queue
+      ? approvals.rows
+      : q === personQuery
+        ? persons.rows
+        : q === tasksQuery
+          ? tasks.rows
+          : q === threadsQuery
+            ? threads.rows
+            : [],
     { type: "complete" },
   ],
   useZero: () => chain,
+  useConnectionState: () => ({ name: "connected" }),
   ZeroProvider: ({ children }: { children: unknown }) => children,
 }));
 
@@ -171,6 +206,61 @@ describe("App shell screen navigation (loop-r1-01)", () => {
 
     fireEvent.click(screen.getByText("Go to Tasks"));
     expect(screen.getByRole("radiogroup", { name: "Task views" })).toBeInTheDocument();
+  });
+});
+
+/** loop-r2-08/L2-09, L2-14: focus lands somewhere. `g`+letter, a rail tile and a palette "Go to …"
+ *  all route through the shell's one `goTo`, and before this all three left `document.activeElement`
+ *  on `<body>` — or on the rail button that was clicked — so the next Tab restarted at the top of the
+ *  document and a screen reader announced nothing about the screen that had just arrived. The shell
+ *  moves the focus itself, in a frame, to the new screen's own `h1`; on the Inbox it prefers the row
+ *  the user left, which is the other half of the same finding and is asserted in Inbox's own tests. */
+describe("App shell screen focus (loop-r2-08)", () => {
+  /** The shell focuses inside a `requestAnimationFrame` — see App.tsx for why the new screen has to
+   *  have mounted first. One await is enough: the shell's frame is requested before this one. */
+  const nextFrame = async (): Promise<void> => {
+    await act(async () => {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    });
+  };
+
+  const go = async (letter: string): Promise<void> => {
+    fireEvent.keyDown(window, { key: "g" });
+    fireEvent.keyDown(window, { key: letter });
+    await nextFrame();
+  };
+
+  it("focuses the new screen's heading on `g t`", async () => {
+    render(<App />);
+    expect(document.activeElement).toBe(document.body);
+
+    await go("t");
+    // `tabIndex={-1}` on the heading is what makes this possible at all: a heading is not focusable
+    // by default, and putting it in the tab order is the one thing it must not do — so the target is
+    // the `h1` itself and the ring is suppressed for this focus (app.css).
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(document.activeElement).toBe(heading);
+    // The greeting's own words, not just "an h1": that is what tells the user which screen arrived.
+    expect(heading.textContent ?? "").toMatch(/^Good (morning|afternoon|evening), /);
+  });
+
+  it("focuses the Inbox heading on `g i` when nothing was selected there", async () => {
+    render(<App screen="today" />);
+    await go("i");
+
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading).toHaveClass("inbox-card__title");
+    expect(document.activeElement).toBe(heading);
+  });
+
+  it("leaves the focus alone on a cold render", async () => {
+    render(<App />);
+    await nextFrame();
+    // Moving it here would take the first Tab stop away from the skip link and would announce a
+    // screen the user has not navigated to. The guard is a ref compared against the screen rather
+    // than a "first render" flag, because StrictMode mounts, unmounts and remounts and would re-run
+    // the effect with the same screen — the flag would let that second run through.
+    expect(document.activeElement).toBe(document.body);
   });
 });
 
@@ -401,14 +491,14 @@ describe("App shell bottom bars (US-D08 §c.9)", () => {
     expect(baseRule("[data-vaul-drawer].ask-panel")).toContain("bottom: 0;");
   });
 
-  // §c.9's three pieces: a 44px circle, a pill of --bar-h, a 52px circle. The pill's height is the
-  // one that has to be said here — it is 44px at the top of the list (`.ask-bar__pill`) and the
-  // bar's own rule is what raises it.
-  it("sizes the pieces as the brief does: 44px, --bar-h, 52px", () => {
+  // §c.9's pieces: a 44px circle and a pill of --bar-h. The pill's height is the one that has to be
+  // said here — it is 44px at the top of the list (`.ask-bar__pill`) and the bar's own rule is what
+  // raises it. loop-r2-03 removed the third piece (the 52px compose circle), so the two that remain
+  // are asserted and nothing else is.
+  it("sizes the pieces as the brief does: a 44px circle and a pill of --bar-h", () => {
     const css = narrowTier();
     expect(ruleBody(css, ".bottom-bar .ask-bar__pill")).toContain("height: var(--bar-h);");
     expect(ruleBody(css, ".bottom-bar__piece")).toMatch(/width: 44px;/);
-    expect(ruleBody(css, ".bottom-bar__piece--compose")).toMatch(/width: 52px;/);
   });
 
   // The panel used to open upward inside the shell, pinned to the bar's own gutters (a panel clipped
@@ -458,10 +548,12 @@ describe("App shell ask bar placement (US-D08 §c.9)", () => {
     expect(document.querySelector(".bottom-bar > .ask-bar")).not.toBeNull();
     expect(document.querySelectorAll(".ask-bar")).toHaveLength(1);
     // Both bars of the tier are on screen: the rail's fixed bar and, above it, the BottomBar with
-    // its two circles.
+    // the filters circle and the ask pill. NC2-03: no compose circle — a new message needs a
+    // recipient picker that does not exist, so the circle is not rendered rather than shown disabled,
+    // and the pill takes the width it used to share.
     expect(document.querySelector(".channel-rail")).not.toBeNull();
     expect(screen.getByRole("button", { name: "Filters" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Compose" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Compose" })).toBeNull();
   });
 });
 
@@ -616,14 +708,13 @@ describe("App shell thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
     );
   });
 
-  // The compose circle is the bar's *trailing* piece, and the auto margin is what keeps it there.
-  // The pill's `flex: 1 1 auto` already takes every spare pixel, so with the ask bar in the row the
-  // margin is zero and the two are equivalent — it is kept for the case the slot is rendered without
-  // one, which is how the circle ended up 8px after the filters once before. (S5 removed the
-  // floating action bar that used to stand there, so that shot cannot repeat; the rule stays because
-  // the BottomBar takes its middle piece as children and is not the shell's private component.)
-  it("keeps the compose circle at the bar's trailing edge whatever the slot holds", () => {
-    expect(ruleBody(narrowTier(), ".bottom-bar__piece--compose")).toContain("margin-left: auto;");
+  // loop-r2-03/NC2-03: the compose circle is not rendered and its rules are gone with it. They were
+  // the 52px box and the `margin-left: auto` that made it the bar's trailing piece; leaving them in
+  // app.css would be a rule for a control that no longer exists, which is the dead-code half of the
+  // same defect the reviewers named (a disabled glyph under a tooltip explaining a phase). The pill
+  // is the bar's only grown piece now, which the rule above it already states.
+  it("leaves no compose circle in the bar or in app.css", () => {
+    expect(narrowTier()).not.toContain(".bottom-bar__piece--compose");
   });
 
   // S5's two new drawers, stated as the box `vaul` needs rather than as a look. The full height is
@@ -681,6 +772,56 @@ describe("App shell thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
     const menu = ruleBody(body, ".glass-surface.context-menu");
     expect(menu).toContain("background: var(--bg-elevated);");
     expect(menu).toContain("backdrop-filter: none;");
+  });
+});
+
+/* loop-r2-03/NC2-03: the reply composer's box. What the story asks for here is a claim about
+   *selectors* — the composer takes the approval card's radius, padding, margin, field style, action
+   row and buttons by being added to the rules that already declare them — so these read the shared
+   selector rather than the numbers under it. A copy would satisfy a numeric check and drift from the
+   card it is standing in for, which is the whole failure mode (the box becomes the card the moment
+   the proposal lands, and a jump in radius or padding at that moment is the thing being avoided). */
+describe("App shell reply composer (loop-r2-03: `r` opens a box that proposes a send)", () => {
+  const css = (): string => readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
+
+  it("is the card's box, by sharing its rules rather than restating them", () => {
+    // The box, the field, its placeholder and its focus ring: four rules, each naming both.
+    expect(css()).toMatch(/\.approval-card,\n\.reply-composer \{/);
+    expect(css()).toMatch(
+      /\.approval-card__editor,\n\.approval-card__respond,\n\.reply-composer__editor \{/,
+    );
+    expect(css()).toMatch(
+      /\.approval-card__editor::placeholder,\n\.approval-card__respond::placeholder,\n\.reply-composer__editor::placeholder \{/,
+    );
+    expect(css()).toMatch(
+      /\.approval-card__editor:focus-visible,\n\.approval-card__respond:focus-visible,\n\.reply-composer__editor:focus-visible \{/,
+    );
+    // And the margin that keeps it off the message above it — asserted against the neighbour that
+    // makes the group unambiguous, because `.reply-composer,` on its own is in three groups.
+    expect(css()).toMatch(/\n\.reply-composer,\n\.digest-card,/);
+  });
+
+  // 3 rows to start, 12 at most. `rows` is what the component passes and Chromium ignores it once
+  // `field-sizing` applies, so the heights are the row arithmetic and not an attribute.
+  it("sizes the field from its row count", () => {
+    // Not `baseRule`: `.reply-composer__editor {` is the *last line of the three-way field selector*
+    // before it is a rule of its own, and that grouped rule comes first in the file. The standalone
+    // one is found from the end, the way the chrome-row tier is.
+    const text = css();
+    const start = text.lastIndexOf("\n.reply-composer__editor {");
+    expect(start, "the composer's own editor rule is not in app.css").toBeGreaterThan(-1);
+    const body = text.slice(start, text.indexOf("\n}", start));
+    expect(body).toContain("field-sizing: content;");
+    expect(body).toContain("min-height: calc(3 * 1.45 * 15px + 18px);");
+    expect(body).toContain("max-height: calc(12 * 1.45 * 15px + 18px);");
+    expect(body).toContain("overflow-y: auto;");
+  });
+
+  // A phone has no ⌘ key. The hint is text, not a control, so hiding it leaves nothing unlabelled —
+  // the primary button beside it is the whole affordance there.
+  it("hides the send chord from a thumb", () => {
+    const body = atRuleBody("@media (pointer: coarse) {");
+    expect(body).toMatch(/\.reply-composer__hint \{\n\s*display: none;/);
   });
 });
 
@@ -1235,15 +1376,22 @@ describe("App shell approval queue (loop-r1-02: the list comes first)", () => {
     it("flushes the held-back ignore as a beacon if the window goes first", async () => {
       stubDecide();
       const sent: { url: string; body: BodyInit | null }[] = [];
-      vi.stubGlobal(
-        "navigator",
-        Object.assign(Object.create(navigator), {
-          sendBeacon: (url: string, body?: BodyInit | null): boolean => {
+      // loop-r2-05: `Object.assign` is not enough to build this stand-in any more. The shell reads
+      // `navigator.onLine` for the connection banner, and jsdom's is an own accessor with no setter,
+      // so assignment down the prototype chain throws. Own properties shadow it and leave the rest
+      // of `navigator` — the parts the shell also touches — inherited and real.
+      const fakeNavigator = Object.create(navigator) as Navigator;
+      Object.defineProperties(fakeNavigator, {
+        onLine: { value: navigator.onLine, configurable: true },
+        sendBeacon: {
+          configurable: true,
+          value: (url: string, body?: BodyInit | null): boolean => {
             sent.push({ url, body: body ?? null });
             return true;
           },
-        }),
-      );
+        },
+      });
+      vi.stubGlobal("navigator", fakeNavigator);
       approvals.rows = [approval("a1")];
       render(<App />);
       openQueue();
@@ -1262,5 +1410,178 @@ describe("App shell approval queue (loop-r1-02: the list comes first)", () => {
       vi.useRealTimers();
       expect(await readBody(sent[0]?.body ?? null)).toContain('"decision":"ignore"');
     });
+  });
+});
+
+/** loop-r2-06: the shell is the queue's one owner, and these are the two places that shows. The
+ *  queue's rows and Today's cards learn a thread's name from the shell (L2-24), and the task
+ *  checkbox's write goes up to the shell so that the toast, its undo and the optimistic box are the
+ *  same code for every screen that ticks one (L2-04). Neither is observable from a screen on its
+ *  own — `destinationFor` reaching `ApprovalStack` and `onToggleDone` reaching `Tasks` is exactly
+ *  what a screen-level test cannot see, because the screen is handed the prop either way. */
+describe("App shell queue destinations and task completion (loop-r2-06)", () => {
+  const approval = (id: string, threadId = `thread-${id}`) => ({
+    id,
+    thread_id: threadId,
+    risk: "normal",
+    created_at: 1,
+    action: "send",
+    description: `Approval ${id}`,
+    config: { allow_accept: true, allow_edit: true, allow_respond: true, allow_ignore: true },
+  });
+  /** A row of Today's tab: open, due today, mine. */
+  const task = (over: Record<string, unknown> = {}) => ({
+    id: "t1",
+    title: "Send Dana deck comments",
+    detail: null,
+    kind: "todo",
+    state: "open",
+    owner_kind: "me",
+    source_item_id: null,
+    person_id: null,
+    delegated_session_id: null,
+    due_at: Date.now(),
+    done_at: null,
+    created_at: Date.now(),
+    created_by: "me",
+    ...over,
+  });
+
+  interface HubCall {
+    url: string;
+    init?: RequestInit;
+  }
+
+  function stubHub(ok = true): HubCall[] {
+    const calls: HubCall[] = [];
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit): Promise<Response> => {
+      calls.push({ url, init });
+      return { ok, status: ok ? 200 : 500, json: async () => ({}) } as unknown as Response;
+    });
+    return calls;
+  }
+
+  const bodiesFor = (calls: HubCall[], path: string): unknown[] =>
+    calls
+      .filter((call) => call.url.includes(path))
+      .map((call) => JSON.parse(String(call.init?.body)));
+
+  beforeEach(() => {
+    approvals.rows = [];
+    tasks.rows = [];
+    threads.rows = [];
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("names the queue's threads and opens one from the card", () => {
+    threads.rows = [{ id: "thread-a1", title: "#omnis-launch", external_id: "C0123" }];
+    approvals.rows = [approval("a1"), approval("a2", "thread-a1")];
+
+    const { container } = render(<App />);
+
+    // Two approvals in one thread: the newer takes the card (a1, the first on a tie), so a2 is the
+    // collapsed row — and that row is the one that had nothing but a description on it before.
+    expect(screen.getByText("1 more waiting")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("button", { name: /Approval a2/ })).getByText("in #omnis-launch"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open #omnis-launch" }));
+    // The link opened the conversation the card was about: the pane is a thread now, not the queue.
+    expect(container.querySelector(".thread-screen")).not.toBeNull();
+    expect(screen.queryByRole("region", { name: "Pending approvals" })).toBeNull();
+  });
+
+  it("falls back to the plain noun for a thread the shell cannot name, and draws no link at all without one", () => {
+    // No thread row has synced for this approval's id. A row must not invent a name and must not
+    // leave a dangling "in" — but the way back into the conversation is still there, under a label
+    // that promises less than it cannot deliver.
+    approvals.rows = [approval("a1"), approval("a2")];
+    const { container, unmount } = render(<App />);
+    expect(container.querySelector(".approval-stack__row-where")).toBeNull();
+    expect(screen.getByRole("button", { name: "Open thread" })).toBeInTheDocument();
+    unmount();
+
+    // An approval raised outside any thread has no conversation to go back to, so the link is gone
+    // rather than pointing at nothing.
+    approvals.rows = [{ ...approval("a1"), thread_id: null }];
+    const second = render(<App />);
+    expect(second.container.querySelector(".approval-open-link")).toBeNull();
+  });
+
+  it("gives Today the shell's queue, counted from the same list the Inbox reads", () => {
+    approvals.rows = [approval("a1"), approval("a2")];
+    render(<App screen="today" />);
+
+    // The strip is a prop now; this screen runs no query of its own for it. Two approvals, and the
+    // greeting's second number is the same two.
+    expect(screen.getByRole("heading", { name: "Pending approvals (2)" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("2 approvals pending");
+  });
+
+  it("lets Today decide through the shell — one write, from the same path as the queue", () => {
+    approvals.rows = [approval("a1")];
+    const calls = stubHub();
+    render(<App screen="today" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Approval a1/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Approve" }),
+    );
+
+    // Before loop-r2-06 this screen called `decideApproval` itself, which worked but left the card
+    // in the Inbox and raised no toast. The write is the shell's now, so there is exactly one.
+    expect(bodiesFor(calls, "/approvals/a1/decide")).toEqual([{ decision: "accept" }]);
+  });
+
+  it("ticks a task through the hub, says so, and reopens it from the toast's Undo", async () => {
+    tasks.rows = [task()];
+    const calls = stubHub();
+    render(<App screen="tasks" />);
+
+    const box = screen.getByRole("checkbox", { name: "Send Dana deck comments" });
+    expect(box).not.toBeChecked();
+
+    fireEvent.click(box);
+
+    // The box fills on the click — the write is still in flight — and the hub is told "done".
+    expect(box).toBeChecked();
+    await waitFor(() => expect(bodiesFor(calls, "/tasks/t1/state")).toEqual([{ state: "done" }]));
+    // The title travels with the callback, so the toast names the task rather than saying
+    // "Completed" about nothing in particular.
+    const toast = await waitFor(() => {
+      const el = document.querySelector("[data-sonner-toast]");
+      if (el === null) throw new Error("no toast yet");
+      return el;
+    });
+    expect(toast.textContent).toContain('Completed "Send Dana deck comments"');
+
+    fireEvent.click(within(toast as HTMLElement).getByRole("button", { name: "Undo" }));
+    await waitFor(() =>
+      expect(bodiesFor(calls, "/tasks/t1/state")).toEqual([{ state: "done" }, { state: "open" }]),
+    );
+  });
+
+  it("puts the box back when the hub refuses, and offers a retry", async () => {
+    tasks.rows = [task()];
+    const calls = stubHub(false);
+    render(<App screen="tasks" />);
+
+    const box = screen.getByRole("checkbox", { name: "Send Dana deck comments" });
+    fireEvent.click(box);
+    expect(box).toBeChecked();
+
+    // A refusal is not silently kept: the box goes back to the row's own state, and the toast says
+    // what happened without claiming the task moved.
+    await waitFor(() => expect(box).not.toBeChecked());
+    const toast = await waitFor(() => {
+      const el = document.querySelector("[data-sonner-toast]");
+      if (el === null) throw new Error("no toast yet");
+      return el;
+    });
+    expect(toast.textContent).toContain("Couldn't update the task.");
+    expect(within(toast as HTMLElement).getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(bodiesFor(calls, "/tasks/t1/state")).toEqual([{ state: "done" }]);
   });
 });

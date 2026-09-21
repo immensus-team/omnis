@@ -333,6 +333,52 @@ describe("Tasks screen (A5 §3.5)", () => {
   });
 });
 
+// loop-r2-06/L2-04: the checkbox is a write. What the row's *state* is comes back through Zero a
+// replica behind, so the box the person just clicked has to hold its new position on its own —
+// and let go of it if the hub refused.
+describe("Tasks checkbox (loop-r2-06/L2-04)", () => {
+  const box = () => screen.getByRole("checkbox", { name: "Review the Brightstone redlines" });
+
+  it("fills the box on the click, with the task's title handed to the shell", () => {
+    const onToggleDone = vi.fn(() => Promise.resolve());
+    render(<Tasks now={now} onToggleDone={onToggleDone} />);
+    expect(box()).not.toBeChecked();
+
+    fireEvent.click(box());
+
+    expect(onToggleDone).toHaveBeenCalledWith("t1", true, "Review the Brightstone redlines");
+    // The replica still says "open" — this is the override, not the row.
+    expect(box()).toBeChecked();
+  });
+
+  it("keeps the row in the tab it was ticked in", () => {
+    // A finished task leaves every tab (`filterTasksByView`), and it must leave on the hub's own
+    // state rather than on the click: filtering by the override would unmount the row and its box,
+    // so ticking a task would read as the row vanishing instead of as a box filling.
+    render(<Tasks now={now} onToggleDone={() => Promise.resolve()} />);
+    fireEvent.click(box());
+    expect(box()).toBeInTheDocument();
+    expect(screen.getByText("Review the Brightstone redlines")).toBeInTheDocument();
+  });
+
+  it("puts the box back when the hub refuses the write", async () => {
+    const onToggleDone = vi.fn(() => Promise.reject(new Error("task update failed: HTTP 500")));
+    render(<Tasks now={now} onToggleDone={onToggleDone} />);
+    fireEvent.click(box());
+    expect(box()).toBeChecked();
+
+    await waitFor(() => expect(box()).not.toBeChecked());
+  });
+
+  // Without a writer the row is drawn as it came — the behaviour this screen had before the shell
+  // passed one, and the reason the override lives behind a guard rather than being unconditional.
+  it("leaves the box on the row's own state when the shell passes nothing", () => {
+    render(<Tasks now={now} />);
+    fireEvent.click(box());
+    expect(box()).not.toBeChecked();
+  });
+});
+
 // ─── the quick-add write (loop-r1-05) ───────────────────────────────────────────────────────────
 
 /** `fetch` at the global, so the real `src/api/tasks.ts` is what builds the URL and the body — the

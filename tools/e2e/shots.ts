@@ -95,6 +95,9 @@ export async function densify(pool: Pool): Promise<void> {
     ["ended", "Label rule cleanup", "labels:tidy", "Finished merging 4 duplicate labels"],
     ["ended", "Spam filter training", "spam:train", "Finished folding in 6 false positives"],
   ];
+  // loop-r2-07: the waiting_approval session's own thread id, kept from the INSERT below so the
+  // approval this session is blocked on can be re-linked to it afterwards.
+  let sessionThreadId: string | null = null;
   for (const [state, title, key, summary] of extra) {
     const thread = await one<{ id: string }>(
       pool,
@@ -102,6 +105,7 @@ export async function densify(pool: Pool): Promise<void> {
          VALUES ($1, $2, 'agent_session', $3, 'work', 0, now()) RETURNING id`,
       [account.id, `shots-${key}`, title],
     );
+    if (key === "billing:reissue") sessionThreadId = thread.id;
     await query(
       pool,
       `INSERT INTO agent_sessions (runtime_id, thread_id, session_key, state, started_at, last_turn_at)
@@ -113,6 +117,19 @@ export async function densify(pool: Pool): Promise<void> {
       `INSERT INTO items (thread_id, account_id, kind, status, scope, body, sent_at)
          VALUES ($1, $2, 'message', 'received', 'work', $3, now())`,
       [thread.id, account.id, summary],
+    );
+  }
+  // loop-r2-07: link the invoice approval to the session that is blocked on it — the same link
+  // apps/hub/src/bridge.ts's `onApprovalRequested` writes (it sets `thread_id` to the asking
+  // session's thread). No runtime is connected in this fixture, so nothing writes it for us: the
+  // asks above propose on the ordinary threads, and without this UPDATE the session would sit in
+  // waiting_approval with the approval it is waiting for filed under somebody else's thread.
+  if (sessionThreadId !== null) {
+    await query(
+      pool,
+      `UPDATE pending_approvals SET thread_id = $1
+        WHERE description LIKE 'Answer the invoice reissue request%' AND state = 'pending'`,
+      [sessionThreadId],
     );
   }
   // Raise the seed session to waiting_approval so the blocked group lands at the top.

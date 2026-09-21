@@ -175,15 +175,74 @@ describe("AgentSession states (loop-r1-07/NC-08)", () => {
     );
   });
 
-  it("tells a blocked session with nothing to decide that there is nothing to decide", () => {
+  it("says why a blocked session is blocked, and where the question went (loop-r2-07/L2-06)", () => {
     render(<AgentSession sessionThreadId={SESSION_THREAD} />);
-    expect(screen.getByText("Blocked · nothing to decide here yet")).toBeInTheDocument();
+    // Blocked is read off the DB state; the runtime and its host come off agent_runtimes. Nothing
+    // in omnis holds a question for this session, so the terminal is the only place left to ask.
+    const note = screen.getByRole("note");
+    expect(note).toHaveClass("agent-session-screen__blocked");
+    expect(note).toHaveTextContent(
+      "Blocked · No approval is waiting in omnis. Claude Code may be asking in its own terminal on macbook.",
+    );
+  });
+
+  it("leads with the session's own summary when there is one", () => {
+    // The row above the pane already says this; a pane that opens with less than its own row is the
+    // defect the story closes, so the sentence is carried through rather than reinvented.
+    tables.agent_sessions = [
+      { ...sessionRow, summary: "Waiting for approval of the reply wording" },
+    ];
+    render(<AgentSession sessionThreadId={SESSION_THREAD} />);
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "Blocked · Waiting for approval of the reply wording. No approval is waiting in omnis.",
+    );
+  });
+
+  it('never says "nothing to decide here yet" (the sentence is gone)', () => {
+    render(<AgentSession sessionThreadId={SESSION_THREAD} />);
+    expect(document.body.textContent ?? "").not.toContain("nothing to decide here yet");
   });
 
   it("says so plainly when a finished session recorded nothing", () => {
     tables.agent_sessions = [{ ...sessionRow, state: "ended" }];
     render(<AgentSession sessionThreadId={SESSION_THREAD} />);
     expect(screen.getByText("No activity recorded for this session.")).toBeInTheDocument();
+  });
+});
+
+describe("AgentSession transcript (loop-r2-07/NC2-07: the pane shows at least what the row shows)", () => {
+  beforeEach(seed);
+
+  it("renders a 'message' item's body as a turn", () => {
+    // The kind a session's own prose arrives as, and the one the inbox row has always summarised
+    // the session with — without it the pane drew "Working · no output yet" over a session whose
+    // row read "Writing drafts for 3 received mails (2/3)".
+    tables.items = [
+      {
+        id: "item-1",
+        kind: "message",
+        tool: null,
+        body: "Writing drafts for 3 received mails (2/3)",
+      },
+    ];
+    render(<AgentSession sessionThreadId={SESSION_THREAD} />);
+
+    const turn = screen.getByText("Writing drafts for 3 received mails (2/3)");
+    expect(turn).toHaveClass("agent-session-screen__turn");
+  });
+
+  it("draws the blocked note under a transcript that ended in '✓ Turn completed'", () => {
+    tables.items = [
+      { id: "item-1", kind: "agent_turn", tool: null, body: "Reading the draft." },
+      { id: "item-2", kind: "system", tool: null, body: "✓ Turn completed" },
+    ];
+    render(<AgentSession sessionThreadId={SESSION_THREAD} />);
+
+    expect(screen.getByText("✓ Turn completed")).toBeInTheDocument();
+    const note = screen.getByRole("note");
+    // After, not before: "✓ Turn completed" is how the record ends, and the reason the session is
+    // still blocked is the answer to it. The note is the last child of the screen.
+    expect(document.querySelector(".agent-session-screen")?.lastElementChild).toBe(note);
   });
 });
 
@@ -248,12 +307,14 @@ describe("AgentSession approvals (loop-r1-07: the queue moved under the header)"
       <AgentSession sessionThreadId={SESSION_THREAD} approvals={[APPROVAL]} onDecide={() => {}} />,
     );
 
-    expect(screen.getByText("Waiting on you")).toBeInTheDocument();
+    // loop-r2-07: the label names the connection, not just the reader — this session is blocked on
+    // *this* approval.
+    expect(screen.getByText("Waiting for your approval")).toBeInTheDocument();
     expect(
       screen.getByText("Send the countersigned NDA back to Northwind legal?"),
     ).toBeInTheDocument();
-    // The card is the answer to "blocked on what", so the blocked line above does not also appear.
-    expect(screen.queryByText("Blocked · nothing to decide here yet")).not.toBeInTheDocument();
+    // The card *is* the answer to "blocked on what", so the note is not drawn beside it.
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
 
   it("does not claim to be waiting on another thread's approval", () => {
@@ -265,7 +326,7 @@ describe("AgentSession approvals (loop-r1-07: the queue moved under the header)"
       />,
     );
 
-    expect(screen.queryByText("Waiting on you")).not.toBeInTheDocument();
-    expect(screen.getByText("Blocked · nothing to decide here yet")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for your approval")).not.toBeInTheDocument();
+    expect(screen.getByRole("note")).toHaveTextContent("No approval is waiting in omnis");
   });
 });

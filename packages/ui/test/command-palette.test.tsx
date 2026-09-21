@@ -91,11 +91,39 @@ describe('CommandPalette mode="inline" (the U1 kinso ask/search pill bar)', () =
     expect(onOpenChange).toHaveBeenCalledWith(true);
   });
 
-  it("focusing the pill also opens the palette", () => {
+  // loop-r2-04 (L2-13): the press is what opens the bar, not the focus. Tab onto the bar used to
+  // open the panel, which then stayed up after the caret had left and swallowed the presses on the
+  // pills under it.
+  it("pressing the pill opens the palette", () => {
     const onOpenChange = vi.fn();
     render(<CommandPalette mode="inline" open={false} onOpenChange={onOpenChange} actions={[]} />);
-    fireEvent.focus(screen.getByPlaceholderText("Start typing to ask or search"));
+    fireEvent.pointerDown(askPill());
+    fireEvent.focus(askInput());
     expect(onOpenChange).toHaveBeenCalledWith(true);
+  });
+
+  it("taking the focus with the keyboard does not open it", () => {
+    const onOpenChange = vi.fn();
+    render(<CommandPalette mode="inline" open={false} onOpenChange={onOpenChange} actions={[]} />);
+    fireEvent.focus(askInput());
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it("closes when the focus leaves the bar, and not when it moves within it", async () => {
+    const onOpenChange = vi.fn();
+    render(
+      <>
+        <CommandPalette mode="inline" open onOpenChange={onOpenChange} actions={[]} />
+        <button type="button">outside the bar</button>
+      </>,
+    );
+    // jsdom moves focus for real here, which is what makes this a `focusout` with a `relatedTarget`
+    // rather than a synthesized `blur` React would not read.
+    await act(async () => askPill().querySelector("button")?.focus());
+    expect(onOpenChange).not.toHaveBeenCalled();
+
+    await act(async () => screen.getByRole("button", { name: "outside the bar" }).focus());
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it("when open, renders the same grouped actions as the dialog mode does", () => {
@@ -169,8 +197,8 @@ describe('CommandPalette mode="inline", the narrow tier (motion-OSS S5)', () => 
 
   /** `open` follows `onOpenChange`, which is what App.tsx's `askOpen` does. A spy on its own could
    *  not carry this regression: the reopen is a state change the drawer then follows. It starts
-   *  closed and is opened by focusing the bar, which is the app's own path — and the reason the
-   *  drawer's return-focus has anywhere to land that reopens it. */
+   *  closed and is opened by a press on the bar, which is the app's own path since loop-r2-04 — and
+   *  the reason the drawer's return-focus has anywhere to land that reopens it. */
   function Harness() {
     const [open, setOpen] = useState(false);
     return <CommandPalette mode="inline" open={open} onOpenChange={setOpen} actions={[]} />;
@@ -180,7 +208,8 @@ describe('CommandPalette mode="inline", the narrow tier (motion-OSS S5)', () => 
     stubTier(true);
     render(<Harness />);
     await act(async () => {
-      screen.getByPlaceholderText("Start typing to ask or search").focus();
+      fireEvent.pointerDown(askPill());
+      askInput().focus();
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(document.querySelector("[data-vaul-drawer].ask-panel")).not.toBeNull();
@@ -192,6 +221,105 @@ describe('CommandPalette mode="inline", the narrow tier (motion-OSS S5)', () => 
     });
 
     expect(document.querySelector("[data-vaul-drawer].ask-panel")).toBeNull();
+  });
+});
+
+// loop-r2-08 (L2-14, NC2-11): the other half of the restore above — Escape hands the caret back to
+// what had it. Two things make that a restore rather than a hope, and neither had a test. The opener
+// is only worth storing if it is something the user was *on*: `<body>` is what "nothing is focused"
+// looks like, it is connected, and `body.focus()` puts the caret back on nothing — so a cold ⌘K would
+// have made the fallback below unreachable. And the fallback has to resolve to the Inbox's row rather
+// than to one of the palette's own options: cmdk's items are `role="option"` with
+// `aria-selected="true"` too, they sit *earlier* in the document than the list does (the ask bar is
+// above the screen body, and the wide tier's panel is a card rather than a portal), and cmdk puts no
+// `tabindex` on them — so a document-wide query matches one of those first, and `.focus()` on a
+// `role="option"` div without a tabindex is a silent no-op that leaves the caret exactly where the
+// bug left it. The fake list below is the Inbox's own shape: the scroller carries `#inbox-list`
+// (Inbox.tsx) and the rows are its `aria-selected` options.
+describe('CommandPalette mode="inline", Escape hands the focus back (loop-r2-08)', () => {
+  /** The Inbox's selected row, in the shape the fallback reads it: inside `#inbox-list` (the id the
+   *  Inbox puts on the scroller) and `aria-selected`. `tabIndex={-1}` is what makes a `role="option"`
+   *  div focusable at all — the roving tab stop the Inbox builds, and the reason a `focus()` on it
+   *  lands where a `focus()` on cmdk's own options does not. */
+  const inboxList = (
+    <div id="inbox-list">
+      <div role="option" aria-selected="true" tabIndex={-1} data-testid="inbox-row" />
+    </div>
+  );
+
+  /** The panel's own rows, one query away: `actions={[]}` makes any query a search, and a hit is a
+   *  cmdk item — a `role="option"` with `aria-selected="true"` and no tabindex, the decoy the scope
+   *  exists for. This is the real markup rather than a stand-in for it. It is rendered first, the
+   *  way the ask bar sits above the screen body in App.tsx. */
+  const groups: UiSearchGroup[] = [
+    { kind: "threads", label: "Threads", results: [hit("thread", "t1", "omnis launch sync", "")] },
+  ];
+
+  /** `open` follows `onOpenChange`, so Escape really closes it — and the palette is opened by a
+   *  click on a plain button rather than by a press on the bar, which is the cold case: a click in
+   *  jsdom leaves `document.activeElement` on `<body>`. */
+  function Harness() {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)}>
+          open the palette
+        </button>
+        <CommandPalette
+          mode="inline"
+          open={open}
+          onOpenChange={setOpen}
+          actions={[]}
+          search={{ groups, loading: false, onQueryChange: () => {}, onSelectHit: () => {} }}
+        />
+      </>
+    );
+  }
+
+  it("falls back to the Inbox's selected row when nothing was focused to return to", () => {
+    render(
+      <>
+        <Harness />
+        {inboxList}
+      </>,
+    );
+    expect(document.activeElement).toBe(document.body);
+
+    fireEvent.click(screen.getByText("open the palette"));
+    fireEvent.change(askInput(), { target: { value: "launch" } });
+    // The precondition that makes the scope load-bearing rather than tidy: the document-wide query
+    // the fallback used to run resolves to one of the panel's own rows, not to the Inbox's.
+    expect(document.querySelector('[role="option"][aria-selected="true"]')).not.toBe(
+      screen.getByTestId("inbox-row"),
+    );
+
+    fireEvent.keyDown(askInput(), { key: "Escape" });
+
+    expect(document.activeElement).toBe(screen.getByTestId("inbox-row"));
+  });
+
+  it("gives the caret back to what it was on when the palette opened", async () => {
+    render(
+      <>
+        <Harness />
+        {inboxList}
+      </>,
+    );
+    // A row the user was reading, focused the way the Inbox focuses one, and *not* the row the
+    // fallback would pick — so the two answers cannot be confused for each other.
+    const reading = document.createElement("div");
+    reading.id = "reading";
+    reading.tabIndex = -1;
+    document.body.appendChild(reading);
+    try {
+      await act(async () => reading.focus());
+      fireEvent.click(screen.getByText("open the palette"));
+      fireEvent.keyDown(askInput(), { key: "Escape" });
+
+      expect(document.activeElement).toBe(reading);
+    } finally {
+      reading.remove();
+    }
   });
 });
 
@@ -216,9 +344,38 @@ describe('CommandPalette mode="inline" model picker persistence (US-D01)', () =>
 
     expect(screen.getByRole("button", { name: askModelLabel(FLASH_ID) })).toBeInTheDocument();
   });
+
+  // loop-r2-04 (NC2-12): one Escape closes one layer. The menu's press was the palette root's as
+  // well, so a single Esc closed the menu, the panel, the typed text and — through the shell's own
+  // listener — the open thread. The menu takes it now, and the panel stays up.
+  const modelMenu = () => screen.queryByRole("group", { name: "Model" });
+
+  it("Escape closes the open model menu and leaves the panel up", () => {
+    const onOpenChange = vi.fn();
+    render(<CommandPalette mode="inline" open onOpenChange={onOpenChange} actions={[]} />);
+    const toggle = screen.getByRole("button", { name: askModelLabel(DEFAULT_ASK_MODEL) });
+    fireEvent.click(toggle);
+    expect(modelMenu()).toBeInTheDocument();
+
+    fireEvent.keyDown(toggle, { key: "Escape" });
+
+    expect(modelMenu()).not.toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalled();
+    // The toggle is where the menu came from, so it is where the caret goes back.
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  it("Escape with no menu open is still the palette's own close", () => {
+    const onOpenChange = vi.fn();
+    render(<CommandPalette mode="inline" open onOpenChange={onOpenChange} actions={[]} />);
+    fireEvent.keyDown(askInput(), { key: "Escape" });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
 });
 
 const askInput = () => screen.getByPlaceholderText("Start typing to ask or search");
+/** The bar itself — the box a press on the ask bar lands on (loop-r2-04). */
+const askPill = () => askInput().closest(".ask-bar__pill") as HTMLElement;
 
 describe('CommandPalette mode="inline" typing path (US-D01 regression)', () => {
   const actions: PaletteAction[] = [

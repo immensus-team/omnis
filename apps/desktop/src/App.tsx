@@ -6,6 +6,7 @@ import {
   ChannelRail,
   CommandPalette,
   type CommandPaletteSearch,
+  ConnectionBanner,
   DETAIL_COLLAPSED_KEY,
   DETAIL_DEFAULT_WIDTH,
   DETAIL_WIDTH_KEY,
@@ -32,7 +33,8 @@ import {
   useFloatingPane,
   useNarrowShell,
 } from "@omnis/ui";
-import { ZeroProvider, useQuery } from "@rocicorp/zero/react";
+import { formatRelativeTime } from "@omnis/ui/lib/relative-time";
+import { ZeroProvider, useConnectionState, useQuery } from "@rocicorp/zero/react";
 import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
@@ -45,7 +47,9 @@ import {
 import { approvalDecideUrl, decideApproval } from "./api/approvals.js";
 import { type SearchHit, search, toUiSearchGroups } from "./api/search.js";
 import { fetchSettings, putSetting } from "./api/settings.js";
-import { isEditableTarget, useKeymap } from "./hooks/use-keymap.js";
+import { setTaskDone } from "./api/tasks.js";
+import { isEditableTarget, isInsideOverlay, useKeymap } from "./hooks/use-keymap.js";
+import { useConnection } from "./lib/connection.js";
 import { AgentSession } from "./screens/AgentSession.js";
 import { Digest } from "./screens/Digest.js";
 import { Inbox, type OpenTarget } from "./screens/Inbox.js";
@@ -68,6 +72,27 @@ function getZero() {
   zeroClient ??= initZero();
   return zeroClient;
 }
+
+/** loop-r2-05: the banner's freshness word. The formatter is the same one the Inbox subline reads
+ *  ("3m", "2h", "just now"), and the sentence around it is the banner's, so what the shell adds
+ *  here is only the " ago" — with no second suffix on a time that is already "now". */
+function syncedAgo(timestampMs: number): string {
+  const relative = formatRelativeTime(timestampMs);
+  return relative === "now" ? "just now" : `${relative} ago`;
+}
+
+/** The banner's two buttons both end here in the cases Zero cannot fix (see `onRetry`): a token is
+ *  issued by `loadZeroToken` at boot and nowhere else, so the only way to get a fresh one is to run
+ *  the boot again. Module scope for a stable identity — the banner takes it as a prop. */
+function reloadPage(): void {
+  window.location.reload();
+}
+
+/** loop-r2-08: how long the shell keeps looking for the Inbox row it remembers, in animation frames
+ *  (~330ms at 60Hz). It is only ever spent when a row was selected and the screen is being returned
+ *  to, and the fallback below it is the heading, so running out costs the old behaviour and nothing
+ *  worse. Measured on the live stack: the first frame has no rows, the next two have all ten. */
+const ROW_FOCUS_FRAMES = 20;
 
 /** The other half of A5 §2.4's go-to pair. The letters live in hooks/use-keymap.ts (GOTO_KEYS:
  *  `i` → `go-inbox`, …) next to the rest of the map; this is what those action names mean to the
@@ -154,6 +179,16 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
   // two owners for one value. The prop the shell is handed is where it *starts*.
   const [screen, setScreen] = useState<ShellScreen>(initialScreen);
   const zero = useZeroClient();
+  /** loop-r2-05: one source for "can this window see omnis" (lib/connection.ts), drawn once by the
+   *  banner below and read once more by the Inbox's subline — before this, the Inbox said "Updated
+   *  now" and Today said "You're offline" about the same socket at the same moment.
+   *
+   *  Zero's own state is read a second time here rather than folded into `connection`, because the
+   *  banner's Retry button needs the raw name: `connection.kind` has already collapsed `error` and
+   *  `needs-auth` into `unreachable` and `session`, and those two are exactly the cases Zero's
+   *  `connect()` answers (it "does not reconnect from `disconnected` or `closed`"). */
+  const connection = useConnection();
+  const zeroConnection = useConnectionState();
   const [open, setOpen] = useState<OpenTarget | null>(null);
   // US-B30: a person is not a thread, so the detail pane's target is its own state rather than a
   // second variant on OpenTarget — the pane draws PersonDetail or Thread, never a mix, and one
@@ -355,6 +390,37 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
     return ids;
   }, [approvals, hiddenApprovalIds]);
 
+  /** loop-r2-06/L2-24: the queue's rows have to say which conversation they belong to, and an
+   *  approval row stores that as an id (pending_approvals.thread_id). The titles are read once for
+   *  the whole visible queue rather than per row. `[""]` when there is nothing to ask for, because
+   *  the number of hooks cannot depend on the queue being non-empty — the same rule the open
+   *  thread's query below follows. */
+  const approvalThreadIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const a of visibleApprovals) if (a.thread_id !== null) ids.add(a.thread_id);
+    return ids.size === 0 ? [""] : [...ids];
+  }, [visibleApprovals]);
+  const [approvalThreadRows] = useQuery(zero.query.threads.where("id", "IN", approvalThreadIds));
+  /** The name a person would recognize: the title the hub gave the thread, or — for a thread that
+   *  has none, which is most agent sessions — the platform's own id for it. Never a fabricated one:
+   *  a row whose thread is missing from this map says nothing about where it is from. */
+  const approvalThreadTitles = useMemo(() => {
+    const titles = new Map<string, string>();
+    for (const row of approvalThreadRows as unknown as {
+      id: string;
+      title?: string | null;
+      external_id: string;
+    }[]) {
+      titles.set(row.id, row.title ?? row.external_id);
+    }
+    return titles;
+  }, [approvalThreadRows]);
+  const destinationFor = useCallback(
+    (item: { thread_id: string | null }) =>
+      item.thread_id === null ? null : (approvalThreadTitles.get(item.thread_id) ?? null),
+    [approvalThreadTitles],
+  );
+
   // US-D01: the selected thread's AI summary (threads.meta.summary, filled by the T1 summary loop
   // in packages/agents). No new backend call is needed — it is the same query shape Thread.tsx
   // uses to read archived_at. With nothing selected it queries the empty string (an empty result),
@@ -474,6 +540,51 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
     [visibleApprovals, notify, dismissToast],
   );
 
+  /** loop-r2-06/L2-04: the task checkbox's write and its two answers. Ticking is undoable — the
+   *  task is gone from Today's list the moment it is done, so "Completed" carries the way back;
+   *  reopening is not, because the task is already back where it was and the toast would be offering
+   *  to undo what the person just asked for. A failure says so and offers the same retry the archive
+   *  toast does, and it is *rethrown* rather than swallowed: the optimistic box lives in `Tasks`, and
+   *  a failure this shell ate would leave a checkbox claiming something the hub never agreed to.
+   *
+   *  The title is passed down from the row (see Tasks.tsx's `onToggleDone`) because this shell does
+   *  not query the tasks table and two identical "Completed" toasts about different tasks would be
+   *  indistinguishable. */
+  const onToggleDone = useCallback(
+    function toggleDone(taskId: string, done: boolean, title: string) {
+      const retry = () =>
+        void toggleDone(taskId, done, title).catch(() => {
+          notify({ message: "Couldn't update the task." });
+        });
+      return setTaskDone(taskId, done)
+        .then(() => {
+          if (done) {
+            notify({
+              message: `Completed "${title}"`,
+              action: {
+                label: "Undo",
+                onAction: () => {
+                  void setTaskDone(taskId, false).catch(() =>
+                    notify({ message: "Couldn't update the task." }),
+                  );
+                },
+              },
+            });
+            return;
+          }
+          notify({ message: `Reopened "${title}"` });
+        })
+        .catch((error: unknown) => {
+          notify({
+            message: "Couldn't update the task.",
+            action: { label: "Retry", onAction: retry },
+          });
+          throw error;
+        });
+    },
+    [notify],
+  );
+
   // A5 §3.4: a briefing item on Today deep-links to its Thread — the one navigation that screen
   // does (the approvals stay inline, so the detail pane opens only for this).
   const openThread = useCallback((threadId: string) => {
@@ -499,6 +610,83 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
     setOpenPersonId(null);
     if (next === "inbox") setRailChannel(null);
   }, []);
+
+  /** loop-r2-08/L2-09: the Inbox's selection, kept here rather than in the Inbox. The screen
+   *  unmounts when the shell switches away from it and React state does not outlive that, so
+   *  `g t` then `g i` used to come back with nothing selected and `j` landed on row 1 instead of
+   *  the row the user left. A ref, not state: nothing renders from it — the Inbox is handed it as
+   *  its *initial* selection and reports every later move back — so a copy in state would be a
+   *  second owner of a value that is already on screen. */
+  const lastInboxSelection = useRef<string | null>(null);
+  const onInboxSelectionChange = useCallback((id: string | null) => {
+    lastInboxSelection.current = id;
+  }, []);
+
+  /** loop-r2-08/L2-09, L2-14: focus has to land somewhere when the screen changes. Every way of
+   *  changing it routes through `goTo` — `g` + a letter, a rail tile, a palette "Go to …" — and
+   *  before this all three left `document.activeElement` on `<body>` (or on the rail button that was
+   *  clicked), so the next Tab restarted at the top of the document and a screen reader announced
+   *  nothing about the screen that had just arrived.
+   *
+   *  Two targets, in this order. The Inbox row the shell remembers, when the screen is the Inbox and
+   *  that row is on screen; otherwise the new screen's own `h1`, which every screen now has one of
+   *  and which each takes `tabIndex={-1}` for (that is what makes a heading focusable without
+   *  adding a tab stop — app.css suppresses the ring on this focus and keeps it for Tab).
+   *
+   *  Two guards, both load-bearing:
+   *  - the ref compares the screen against the one focus was last moved for. A *first* render must
+   *    not move it at all — a cold load that focused the heading would take the first Tab stop away
+   *    from the skip link, and would announce a screen the user has not navigated to. Comparing
+   *    values rather than flipping a "first render" boolean is what survives StrictMode's
+   *    mount/unmount/remount, which re-runs this effect without the screen having changed.
+   *  - the lookup is a *frame*, not a call, and on the Inbox it is a few of them. The rows live in
+   *    the virtualiser, which mounts them in its own layout effect; and coming back to a screen that
+   *    was unmounted re-subscribes its queries, so the frame this effect asks for lands on an Inbox
+   *    with no rows at all — measured on the live stack: zero rows on that frame, ten by the next
+   *    50ms, which is why a single frame focused the heading and left `g i` a screen switch that
+   *    remembered the selection in state and lost it on screen. The retry is bounded and only runs
+   *    for a remembered row: a screen with no row to find focuses its heading on the first frame,
+   *    and a remembered thread that is genuinely gone falls back to the heading a third of a second
+   *    later rather than never.
+   *
+   *  Every frame is cancelled on the way out — on a second screen switch, and on unmount. A frame
+   *  that outlives the screen it was asked for focuses whatever is on screen when it lands, and the
+   *  case that makes that a bug rather than a near miss is the palette: a "Go to Tasks" row both
+   *  changes the screen *and* closes the palette, so a frame arriving late would move the focus off
+   *  the ask input, whose `onBlur` closes the panel — measured as a search whose results never
+   *  appeared, because a previous test's frame had closed the panel under it. */
+  const focusMovedForScreen = useRef<ShellScreen>(screen);
+  const focusFrame = useRef<number | null>(null);
+  useEffect(() => {
+    if (focusMovedForScreen.current === screen) return;
+    focusMovedForScreen.current = screen;
+    const focusHeading = (): void => {
+      const heading = document.querySelector(".app-shell__main h1");
+      if (heading instanceof HTMLElement) heading.focus({ preventScroll: true });
+    };
+    const remembered = screen === "inbox" ? lastInboxSelection.current : null;
+    let frames = 0;
+    const look = (): void => {
+      if (remembered !== null) {
+        const row = document.querySelector(`[data-thread-id="${remembered}"]`);
+        if (row instanceof HTMLElement) {
+          row.focus({ preventScroll: true });
+          return;
+        }
+        if (frames < ROW_FOCUS_FRAMES) {
+          frames += 1;
+          focusFrame.current = requestAnimationFrame(look);
+          return;
+        }
+      }
+      focusHeading();
+    };
+    focusFrame.current = requestAnimationFrame(look);
+    return () => {
+      if (focusFrame.current !== null) cancelAnimationFrame(focusFrame.current);
+      focusFrame.current = null;
+    };
+  }, [screen]);
 
   // A5 §2.4's go-to half of the keymap. Inbox.tsx registers its own for the row actions (archive,
   // unarchive, …) and the two handle disjoint action names, so `g` followed by a letter resolves
@@ -794,6 +982,14 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
     function onKey(e: KeyboardEvent) {
       if (e.key !== "Escape" || e.defaultPrevented) return;
       if (isEditableTarget(e.target)) return;
+      // loop-r2-04: an overlay owns its own Escape and the press must not travel on to the pane
+      // behind it. `isInsideOverlay` is the app's shared guard (hooks/use-keymap.ts). The two checks
+      // after it are this listener's own: the ask bar is not a dialog, but the model menu inside it
+      // is a layer and takes its own Escape, and below 900 the thread sheet *is* an `aria-modal`
+      // drawer — there the press belongs to Radix's dismissal, which hands focus back to the row that
+      // opened it, and the guard deliberately lets the sheet through as the document being read.
+      if (isInsideOverlay(e.target)) return;
+      if (e.target instanceof Element && e.target.closest(".ask-bar") !== null) return;
       if (document.querySelector('[aria-modal="true"]') !== null) return;
       if (!paneVisible) return;
       // Read before the close: `open` is the target this press is putting away, and it is gone from
@@ -852,11 +1048,47 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
     />
   );
 
+  /** loop-r2-05: the shell's one line about sync. Zero's own `connect()` is the right call exactly
+   *  when Zero is paused waiting for the app to hand it something — `error` and `needs-auth` — and
+   *  useless in every other case: it does not reconnect a `disconnected` socket (1.9.0
+   *  `connection.d.ts`; Zero already retries those on its own), and with no token at all there is
+   *  nothing to reconnect *with*, because the token rides the client's constructor and only a boot
+   *  can supply one. So the fallback is a reload, which re-runs that boot. */
+  const onRetry = useCallback(() => {
+    if (zeroConnection.name === "error" || zeroConnection.name === "needs-auth") {
+      void zero.connection.connect();
+      return;
+    }
+    reloadPage();
+  }, [zero, zeroConnection.name]);
+
+  /** Rendered in exactly one of the two places below, like `askBar` — directly under the ask bar at
+   *  >=900, and the first thing in the list column at <900 (where the ask bar is the BottomBar's
+   *  pill instead, and a banner inside a fixed bar would be the wrong surface). One element, one
+   *  mount: there is never a second banner to keep in step. */
+  const connectionBanner = (
+    <ConnectionBanner
+      kind={connection.kind}
+      lastSyncedAt={connection.lastSyncedAt === null ? null : syncedAgo(connection.lastSyncedAt)}
+      onRetry={onRetry}
+      onReload={reloadPage}
+    />
+  );
+
   /** The list column's body: one screen at a time, and the Inbox is the default. The rail switches
    *  between them by screen — there is no URL router in the desktop app. */
   const screenBody =
     screen === "today" ? (
-      <Today onOpenThread={openThread} />
+      // loop-r2-06: Today's chips are the shell's queue, read and decided through the shell. It used
+      // to run its own `pending_approvals` query and call `decideApproval` directly, so it counted a
+      // different set from the Inbox's subline — and a card decided from here left no toast, no undo
+      // and no `hiddenApprovalIds` entry, so the same card was still on the Inbox a moment later.
+      <Today
+        approvals={visibleApprovals}
+        onDecide={onDecide}
+        destinationFor={destinationFor}
+        onOpenThread={openThread}
+      />
     ) : screen === "network" ? (
       <Network onOpenPerson={setOpenPersonId} onOpenThread={openThreadFromPerson} />
     ) : screen === "notes" ? (
@@ -878,10 +1110,17 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
         // tasks.delegated_session_id is the agent_session thread itself, which is what
         // AgentSession renders — the same route the Inbox uses for an agent session row.
         onOpenDelegation={(sessionId) => setOpen({ threadId: sessionId, agentSession: true })}
+        // loop-r2-06/L2-04: the checkbox's write. The screen draws the tick optimistically and puts
+        // it back if this rejects; the toast and its undo are the shell's.
+        onToggleDone={onToggleDone}
       />
     ) : (
       <Inbox
         onOpen={setOpen}
+        // loop-r2-08/L2-09: where the selection starts, and where every move of it is reported
+        // back to. The screen owns the selection while it is mounted; this is how it outlives it.
+        initialSelectedId={lastInboxSelection.current}
+        onSelectedIdChange={onInboxSelectionChange}
         channelFilter={railChannel}
         onChannelFilterChange={setRailChannel}
         filtersOpen={filtersOpen}
@@ -890,6 +1129,10 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
         // what is waiting to be decided, and a list filtered to one channel still has all of them.
         pendingApprovals={visibleApprovals.length}
         onOpenApprovals={() => setQueueOpen(true)}
+        // loop-r2-05: the subline's "Updated 3m ago" is a freshness claim, and it is only true
+        // while the connection is. When it is not, the banner above says what actually happened
+        // and the subline drops that segment rather than contradicting it.
+        connectionOk={connection.kind === "ok"}
         // loop-r1-06: the toast slot lives here, not in the screen, so that "Archived · Undo" from
         // the Inbox and "Approved: …" from a card are the same object in the same corner of the
         // window. The Inbox raises its own toasts through this.
@@ -922,7 +1165,13 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
     openPersonId !== null ? (
       <PersonDetail personId={openPersonId} onOpenThread={openThreadFromPerson} />
     ) : open === null ? (
-      <ApprovalStack approvals={visibleApprovals} openThreadId={null} onDecide={onDecide} />
+      <ApprovalStack
+        approvals={visibleApprovals}
+        openThreadId={null}
+        onDecide={onDecide}
+        destinationFor={destinationFor}
+        onOpenThread={openThread}
+      />
     ) : open.agentSession ? (
       // loop-r1-07: the approvals go *into* the session screen, under its new header, rather than
       // sitting above it — a stack with no subject over a pane with no title was the shape that let
@@ -931,6 +1180,7 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
         sessionThreadId={open.threadId}
         approvals={visibleApprovals}
         onDecide={onDecide}
+        onOpenThread={openThread}
       />
     ) : (
       // US-D09 §c.5: the thread's approvals go *into* the conversation, in document order, so this
@@ -985,6 +1235,9 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
       <div className="app-shell__main">
         {/* The wide tier keeps the ask bar at the top of the list, where it has been since US-D01. */}
         {narrow ? null : askBar}
+        {/* loop-r2-05: under the ask bar, above the rows — the one place in the shell that says
+            whether what is below it is live. */}
+        {connectionBanner}
         {screenBody}
       </div>
       {/* §c.9: the narrow tier's bar, above the rail bar rather than stacked into it. It is

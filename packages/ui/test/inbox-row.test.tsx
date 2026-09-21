@@ -184,6 +184,19 @@ describe("InboxRow avatar (U2: photo -> initials+pastel fallback; agent_session 
     expect(avatarEl).toHaveTextContent("H");
     expect(avatarEl.querySelector("svg")).not.toBeInTheDocument();
   });
+
+  // loop-r2-07/L2-32: omnis's own row and a session omnis itself runs wear the product's mark —
+  // the real brand PNG the rail and Settings already use, not an invented monogram. The assertion
+  // is on the <img> and on the *absence* of initials: "OM" over a pastel disc was the defect.
+  it("draws the omnis mark for an omnis row, with no monogram beside it", () => {
+    const { container } = render(
+      <InboxRow {...baseProps} name="omnis" avatar={{ kind: "omnis" }} />,
+    );
+    const avatarEl = container.querySelector(".inbox-row__avatar--omnis");
+    expect(avatarEl).toBeInTheDocument();
+    expect(avatarEl?.querySelector("img")).toBeInTheDocument();
+    expect(avatarEl?.textContent).toBe("");
+  });
 });
 
 describe("InboxRow pending-approval badge", () => {

@@ -365,6 +365,68 @@ function InlinePalette({
   const inputRef = useRef<HTMLInputElement>(null);
   const narrow = useNarrowShell();
   const closing = useClosingSpring(open);
+  /** loop-r2-08/L2-14, NC2-11: what had the focus when the panel opened, so Escape can put it back.
+   *  It is captured *before* the autofocus below (this effect is declared first, and React runs
+   *  effects in declaration order), which is the only moment the answer exists: one tick later the
+   *  caret is on the ask input and the element the user was reading is unreachable.
+   *
+   *  "Unless it is the ask input itself": a pointer press on the bar focuses the input natively
+   *  before `onFocus` opens the panel, so by the time this runs the input *is* the active element —
+   *  and storing it would make Escape focus what it is already focused on, which is the same as
+   *  leaving focus where the (now closed) panel put it. The previous answer is kept instead: press
+   *  the bar while reading a thread and Escape still returns to the thread's row.
+   *
+   *  And `<body>` is the same case said another way: it is what "nothing is focused" looks like, and
+   *  it is connected, so storing it makes the check below pass and the fallback unreachable — a
+   *  cold ⌘K (`document.activeElement` on `<body>`) would put the caret back on `<body>`, which is
+   *  the bug this function exists to fix. Nothing is what the previous answer keeps. */
+  const openerRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== document.body && active !== inputRef.current) {
+      openerRef.current = active;
+    }
+  }, [open]);
+
+  /** loop-r2-08/L2-14: Escape gives the focus back. Without this, closing the panel dropped it to
+   *  `<body>` — the input was the only thing that had it, and the panel's own tree is gone from the
+   *  next render — so a keyboard user who opened ⌘K over a row had to Tab in from the top of the
+   *  document to get back to the list.
+   *
+   *  Blur first: the input is about to stop existing, and on a surface that keeps the caret in the
+   *  closed bar (the inline mode's bar is always in the DOM above 900) leaving it there would make
+   *  the bar look focused while the panel it was open for is gone.
+   *
+   *  The fallback is the list's own selected row, for the case the opener is gone: the palette can
+   *  open from a row that a `g`-key has since replaced, and a `focus()` on a detached node is a
+   *  silent no-op that leaves the focus on `<body>` again — the bug, quietly restored. The row is
+   *  found exactly the way the Inbox finds it (`[role="option"]` with `aria-selected="true"`), so
+   *  the two cannot disagree about which row "the selected one" is.
+   *
+   *  Scoped to `#inbox-list`, and that is load-bearing rather than tidy: cmdk's own items are
+   *  `role="option"` with `aria-selected="true"` as well, they sit *earlier* in the document than
+   *  the list does (the ask bar is above the screen body, and the wide tier's panel is a card rather
+   *  than a portal), and cmdk puts no `tabindex` on them — so a document-wide query matches one of
+   *  those first and `.focus()` on it is a silent no-op. The fallback would then do nothing on
+   *  exactly the close it exists for. */
+  function returnFocusAfterClose(): void {
+    const opener = openerRef.current;
+    openerRef.current = null;
+    inputRef.current?.blur();
+    if (opener?.isConnected === true) {
+      opener.focus();
+      return;
+    }
+    document
+      .querySelector<HTMLElement>('#inbox-list [role="option"][aria-selected="true"]')
+      ?.focus();
+  }
+  /** loop-r2-04 (L2-13): a press on the bar is what opens the panel, and this is the flag that tells
+   *  the press's focus from a focus nobody pressed for. Tab onto the bar used to open the panel,
+   *  which then stayed up after the caret left and swallowed the clicks on the pills under it; so
+   *  `onFocus` opens only when a press put the caret there, and clears the flag as it does. */
+  const pressed = useRef(false);
   // Nothing is focused when ⌘K opens it — you have to be able to type straight away (the palette's
   // basic promise), and the Escape/typing handlers only fire while focus is inside the Command root.
   useEffect(() => {
@@ -401,6 +463,22 @@ function InlinePalette({
       label="omnis ask/search"
       // US-B27: same reason as the dialog — those rows are not cmdk's to filter (see `manualFilter`).
       shouldFilter={!manualFilter}
+      // loop-r2-04 (L2-13): the panel goes when the caret does. It used to stay up with the focus
+      // gone, which is the half of the bug a click could feel: an invisible panel over the pills
+      // under the bar, swallowing every press that landed on it. React's `onBlur` is `focusout`, so
+      // it bubbles and a move *within* the bar arrives here too — hence the containment test.
+      onBlur={(e) => {
+        const next = e.relatedTarget as Node | null;
+        // Below 900 the drawer is portaled out of this subtree, so its own controls are not
+        // contained by this element however much they belong to it.
+        const inDrawer = next instanceof Element && next.closest("[data-vaul-drawer]") !== null;
+        if (next !== null && (e.currentTarget.contains(next) || inDrawer)) return;
+        // A tap on a non-focusable spot inside the drawer blurs with nowhere for the focus to go
+        // (`null`), and the drawer at that tier is modal: it owns the press, so the caret leaving is
+        // not the drawer closing.
+        if (open && narrow && next === null) return;
+        onOpenChange(false);
+      }}
       onKeyDown={(e) => {
         // loop-r1-08: an IME owns Enter and Escape while it is composing — that Enter commits the
         // composition and is not a request to open a row, and that Escape is the IME's own "cancel".
@@ -413,6 +491,7 @@ function InlinePalette({
         if (e.key === "Escape") {
           e.preventDefault();
           onOpenChange(false);
+          returnFocusAfterClose();
           return;
         }
         // loop-r1-08 (L-15): Enter runs the highlighted row. cmdk's own Enter dispatches to
@@ -433,15 +512,27 @@ function InlinePalette({
         }
       }}
     >
-      <GlassSurface slot="toolbar" className="ask-bar__pill">
+      <GlassSurface
+        slot="toolbar"
+        className="ask-bar__pill"
+        // The press, wherever on the bar it lands, is what the input's focus is read against below.
+        onPointerDown={() => {
+          pressed.current = true;
+        }}
+      >
         <span className="ask-bar__orb" aria-hidden="true" />
         <Command.Input
           ref={inputRef}
           placeholder={placeholder}
           value={query}
-          // Focus coming back while it is already open (⌘K's own autofocus included) is not a state change.
           onFocus={() => {
-            if (!open) onOpenChange(true);
+            // Focus coming back while it is already open (⌘K's own autofocus included) is not a state
+            // change, and a focus with no press behind it — Tab, or a programme moving the caret —
+            // must not open the panel at all (L2-13). The flag is cleared either way: it belongs to
+            // one press, not to the input.
+            const wasPressed = pressed.current;
+            pressed.current = false;
+            if (wasPressed && !open) onOpenChange(true);
           }}
           onValueChange={(value) => {
             onQueryChange(value);
@@ -485,6 +576,7 @@ function InlinePalette({
           threadTitle={threadTitle}
           summary={threadSummary}
           query={query}
+          onQueryChange={onQueryChange}
           searchActive={searchActive}
           closing={closing}
           onClose={() => onOpenChange(false)}
@@ -507,9 +599,28 @@ function InlinePalette({
 function ModelPicker() {
   const [model, setModel] = useState<AskModelId>(readAskModel);
   const [menuOpen, setMenuOpen] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
   return (
-    <div className="ask-bar__model">
+    <div
+      className="ask-bar__model"
+      // loop-r2-04 (NC2-12): one Escape closes one layer. With the menu open the press reached the
+      // palette root *and* the shell, so a single Esc closed the menu, the panel, the typed text and
+      // the open thread at once. `stopPropagation` is what takes it off the palette root, whose
+      // handler is an ancestor in React's synthetic tree, and `preventDefault` marks the press as
+      // dealt with. The shell's own listener is not in that tree — it is on `window` in the capture
+      // phase, so it runs before both — and that is why it stands down for a target inside `.ask-bar`
+      // instead (App.tsx). The handler hangs on the wrapper rather than on the menu because the press
+      // that opens the menu leaves focus on the toggle, and that is where the key arrives.
+      onKeyDown={(e) => {
+        if (!menuOpen || e.key !== "Escape") return;
+        e.preventDefault();
+        e.stopPropagation();
+        setMenuOpen(false);
+        toggleRef.current?.focus();
+      }}
+    >
       <button
+        ref={toggleRef}
         type="button"
         className="ask-bar__model-toggle"
         aria-expanded={menuOpen}

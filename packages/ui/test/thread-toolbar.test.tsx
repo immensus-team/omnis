@@ -11,8 +11,12 @@ import "./setup";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { Archive, Reply } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
-import { PHASE_B_TITLE } from "../src/components/channel-rail";
 import { ThreadToolbar } from "../src/components/thread-toolbar";
+
+/** The reason a gated action gives. The shared "not wired up yet — Phase B" string is gone from the
+ *  product (loop-r2-03 wired the last control that used it), but the bar's `disabled` + `title` pair
+ *  is generic and a caller with a control it cannot offer still says why. */
+const GATED_TITLE = "Reply is not available on an archived thread";
 
 const actions = [
   {
@@ -21,7 +25,7 @@ const actions = [
     icon: Reply,
     onSelect: vi.fn(),
     disabled: true,
-    title: PHASE_B_TITLE,
+    title: GATED_TITLE,
   },
   { id: "archive", label: "Archive thread", icon: Archive, onSelect: vi.fn() },
 ];
@@ -46,7 +50,7 @@ describe("ThreadToolbar (US-D09 §c.5 / §c.9)", () => {
     // §e guard 9: the icon is decoration; the label is what a screen reader reads.
     expect(reply.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
     // A gated control says why rather than just refusing to respond.
-    expect(reply).toHaveAttribute("title", PHASE_B_TITLE);
+    expect(reply).toHaveAttribute("title", GATED_TITLE);
 
     const archive = screen.getByRole("button", { name: "Archive thread" });
     expect(archive).toBeEnabled();

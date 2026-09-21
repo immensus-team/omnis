@@ -194,6 +194,8 @@ async function openSettings(page: Page, before: Seeded, write: boolean): Promise
   const TONES: Record<string, string> = {
     Connected: "success",
     "Read only": "neutral",
+    // loop-r2-07: the omnis account is not a connection — it reads "Built in" on the neutral tone.
+    "Built in": "neutral",
     Paused: "warning",
     Broken: "danger",
   };

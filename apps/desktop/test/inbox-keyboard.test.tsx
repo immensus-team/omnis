@@ -10,6 +10,7 @@
 // gesture rather than two that have to be kept in step.
 import "./setup";
 
+import type { ToastRequest } from "@omnis/ui";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { VirtuosoMockContext } from "react-virtuoso";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -101,10 +102,10 @@ beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
 });
 
-const renderInbox = (): void => {
+const renderInbox = (notify?: (spec: ToastRequest) => void): void => {
   render(
     <VirtuosoMockContext.Provider value={{ viewportHeight: 600, itemHeight: 72 }}>
-      <Inbox />
+      <Inbox notify={notify} />
     </VirtuosoMockContext.Provider>,
   );
 };
@@ -117,6 +118,16 @@ const writtenIds = (): string[] =>
     (call) =>
       String(call[0]).match(/\/api\/threads\/([^/]+)\/(?:un)?archive$/)?.[1] ?? "(not a write)",
   );
+
+/** The same list, with the verb on it — `unarchive:2222…`. loop-r2-08's undo tests need it: an
+ *  undo of an archive is only an undo if the call it makes is `unarchive`, and a toggle that had
+ *  re-armed itself with the inverse would send `archive` for the same id and read as a restore to
+ *  a reader who only looked at `writtenIds`. Same reading and the same reason as above. */
+const writes = (): string[] =>
+  fetchMock.mock.calls.map((call) => {
+    const match = String(call[0]).match(/\/api\/threads\/([^/]+)\/(unarchive|archive)$/);
+    return match === null ? "(not a write)" : `${match[2]}:${match[1]}`;
+  });
 
 const rows = (): HTMLElement[] => screen.queryAllByRole("option");
 const rowById = (threadId: string): HTMLElement => {
@@ -300,5 +311,86 @@ describe("Inbox keyboard triage (loop-r1-03)", () => {
     fireEvent.pointerOver(rowById(THREADS[0]));
     await pastCardDelay();
     expect(personCard()).not.toBeNull();
+  });
+});
+
+/** loop-r2-08/L2-10, NC2-09: the undo is a stack, not a toggle. What both testers did was archive
+ *  two rows and press ⌘Z twice, expecting two threads back; the toggle gave them one, because the
+ *  second ⌘Z undid the undo (it re-armed `lastToggle` with the inverse action, so `z` archived the
+ *  thread the first ⌘Z had just restored). The keys also went dead when their toast expired, which
+ *  is the other half of the same finding. */
+describe("Inbox undo stack (loop-r2-08)", () => {
+  /** `j` to a row and archive it, the way the triage keys do. */
+  const selectAndArchive = async (downs: number): Promise<void> => {
+    for (let i = 0; i < downs; i += 1) {
+      fireEvent.keyDown(window, { key: "j" });
+      await nextFrame();
+    }
+    fireEvent.keyDown(window, { key: "e" });
+    await nextFrame();
+  };
+
+  it("restores two threads across two ⌘Z presses, newest first", async () => {
+    renderInbox();
+    await selectAndArchive(1); // row 1 archived, selection advances to row 2
+    await selectAndArchive(0); // row 2 archived, selection advances to row 3
+    expect(writes()).toEqual([`archive:${THREADS[0]}`, `archive:${THREADS[1]}`]);
+
+    fireEvent.keyDown(window, { key: "z", metaKey: true });
+    await nextFrame();
+    // The newest first: the thread archived last is the one the first undo takes back.
+    expect(writes()[2]).toBe(`unarchive:${THREADS[1]}`);
+
+    fireEvent.keyDown(window, { key: "z", metaKey: true });
+    await nextFrame();
+    expect(writes()[3]).toBe(`unarchive:${THREADS[0]}`);
+  });
+
+  it("does nothing at all on a third ⌘Z — the stack is what bounds it, not a toast", async () => {
+    renderInbox();
+    await selectAndArchive(1);
+    await selectAndArchive(0);
+
+    for (const key of ["z", "z", "z"]) {
+      fireEvent.keyDown(window, { key, metaKey: true });
+      await nextFrame();
+    }
+    // Four calls: two archives and the two undos they earned. The third press has an empty stack,
+    // and an empty stack posts nothing — the old ref was disarmed by its toast expiring, which is
+    // why this press used to be a no-op for the wrong reason and a live toggle before that.
+    expect(writes()).toHaveLength(4);
+    expect(writes().filter((w) => w.startsWith("archive:"))).toHaveLength(2);
+  });
+
+  it("selects and focuses the row it restored", async () => {
+    renderInbox();
+    // Two archives, so the selection has advanced one row *past* the one the undo brings back and
+    // nothing about the result is a leftover of where the triage run had got to.
+    await selectAndArchive(1);
+    await selectAndArchive(0);
+    expect(selected(THREADS[1])).toBe("false");
+    expect(selected(THREADS[2])).toBe("true");
+
+    fireEvent.keyDown(window, { key: "z", metaKey: true });
+    await nextFrame();
+
+    expect(selected(THREADS[1])).toBe("true");
+    expect(document.activeElement).toBe(rowById(THREADS[1]));
+    expect(tabStops()).toEqual([rowById(THREADS[1])]);
+  });
+
+  it("says which thread it archived, not just that something was", async () => {
+    const notify = vi.fn();
+    renderInbox(notify);
+    fireEvent.keyDown(window, { key: "j" });
+    await nextFrame();
+    fireEvent.keyDown(window, { key: "e" });
+    await nextFrame();
+
+    // L2-10/NC2-09: "Archived" alone is a sentence about nothing — with two archives in a row it
+    // named neither, and the undo it offered was a guess. The title is the row's own title.
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ message: `Archived "${TITLES[0]}"` }),
+    );
   });
 });

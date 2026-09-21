@@ -1,5 +1,13 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+// The screen's pure rules (filtering, titles, summaries, ordering, grouping) plus, since loop-r2-05,
+// its loading shape: eight placeholder rows while the items query has not answered. The render at
+// the bottom is the only part that needs a DOM or a Zero; everything above it is a function call.
+import "./setup";
+
+import { render } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import {
+  Inbox,
   type InboxFilter,
   type InboxQueryItem,
   type SortableInboxRow,
@@ -9,6 +17,30 @@ import {
   sortInboxRows,
   threadSummary,
 } from "../src/screens/Inbox";
+
+/** `vi.hoisted` because the mock factories below run before this file's static imports: a plain
+ *  `const` would still be in its temporal dead zone when the screen is first loaded. */
+const { zero } = vi.hoisted(() => {
+  /** Any chain reads back as itself — `zero.query.items.where(...).orderBy(...).related(...)
+   *  .limit(...)` — so the screen can walk as far along a query as it likes. */
+  const chain: unknown = new Proxy({}, { get: () => () => chain });
+  return { zero: { query: new Proxy({}, { get: () => chain }) } };
+});
+
+vi.mock("../src/zero-client.js", () => ({
+  initZero: () => zero,
+  useZeroClient: () => zero,
+  loadZeroToken: async () => {},
+  hasZeroToken: () => true,
+}));
+
+vi.mock("@rocicorp/zero/react", () => ({
+  // Every query resolves to `unknown` with no rows, which is the first paint of a screen whose
+  // replica has not synced: the shape production shows behind a slow hub.
+  useQuery: () => [[], { type: "unknown" }],
+  useZero: () => zero,
+  ZeroProvider: ({ children }: { children: unknown }) => children,
+}));
 
 const items: InboxQueryItem[] = [
   { id: "1", scope: "work", hasPendingApproval: false, authorKind: "person" },
@@ -181,5 +213,48 @@ describe("groupByAgentState (US-D02: blocked first, rows with no session left un
       ["idle", ["i"]],
     ]);
     expect(ungrouped.map((r) => r.id)).toEqual(["x"]);
+  });
+});
+
+// loop-r2-05 (L2-05, NC2-13): the screen's loading shape. The brief's "the page is completely
+// white for the whole wait" was two bugs — main.tsx awaiting the token before mounting anything,
+// and the list having no state between "no rows" and "rows" — and this is the half that lives in
+// the screen.
+describe("Inbox skeleton rows (loop-r2-05)", () => {
+  it("draws eight placeholder rows and marks the list busy while no query has answered", () => {
+    const { container } = render(<Inbox />);
+    expect(container.querySelectorAll(".inbox-row--skeleton")).toHaveLength(8);
+    expect(container.querySelector(".inbox-card__list")?.getAttribute("aria-busy")).toBe("true");
+  });
+
+  it("hides the placeholders from the accessibility tree — they are not rows", () => {
+    const { container } = render(<Inbox />);
+    for (const row of container.querySelectorAll(".inbox-row--skeleton")) {
+      expect(row.getAttribute("aria-hidden")).toBe("true");
+    }
+  });
+});
+
+// loop-r2-06 (L2-07, NC2-08): one screen used to show three disagreeing approval numbers, and the
+// rows below them had a vote in two of the three. The pill's badge and the subline both read the
+// shell's `visibleApprovals` now — the mock in this file answers every query with zero rows, so a
+// number that still came from the list could only read 0 here.
+describe("Inbox approval count (loop-r2-06)", () => {
+  it("takes the pill badge and the subline from the shell's number, not from the rows", () => {
+    const { container } = render(<Inbox pendingApprovals={8} onOpenApprovals={() => {}} />);
+
+    expect(container.querySelector(".inbox-card__pill-count")).toHaveTextContent("8");
+    expect(container.querySelector(".inbox-card__subline")).toHaveTextContent("8 need approval");
+  });
+
+  it("singularises one, and draws no badge at zero", () => {
+    const { container } = render(<Inbox pendingApprovals={1} onOpenApprovals={() => {}} />);
+    expect(container.querySelector(".inbox-card__subline")).toHaveTextContent("1 needs approval");
+
+    const none = render(<Inbox pendingApprovals={0} />);
+    expect(none.container.querySelector(".inbox-card__pill-count")).toBeNull();
+    expect(none.container.querySelector(".inbox-card__subline")?.textContent ?? "").not.toContain(
+      "approval",
+    );
   });
 });

@@ -177,3 +177,86 @@ describe("ApprovalStack (US-D03)", () => {
     expect(onDecide).toHaveBeenCalledWith("b", "accept", undefined);
   });
 });
+
+// loop-r2-06/L2-24: the queue is reached from the Inbox, where every row names a conversation, and
+// its own rows named nothing — a decision about "Send the deck?" with no visible subject. The names
+// come from `destinationFor`, the same function that already answers the card's "where does this
+// go", so nothing new has to be fetched to say which thread a row belongs to.
+describe("ApprovalStack thread names (loop-r2-06/L2-24)", () => {
+  const names: Record<string, string> = { t1: "#omnis-launch", t2: "#dana-deck" };
+  const destinationFor = (a: ApprovalStackItem): string | null => names[a.thread_id ?? ""] ?? null;
+
+  it("names the thread on a collapsed row, under the description", () => {
+    render(
+      <ApprovalStack
+        approvals={ALL}
+        openThreadId="t1"
+        onDecide={vi.fn()}
+        destinationFor={destinationFor}
+      />,
+    );
+    // t1's collapsed row only — the card above is B, and a card is not a row.
+    const row = within(screen.getByRole("button", { name: /approval a/ }));
+    expect(row.getByText("in #omnis-launch")).toBeInTheDocument();
+  });
+
+  it("leaves the line off when the caller cannot name the thread", () => {
+    // No `destinationFor` at all: an approval whose thread has no title must not leave a dangling
+    // "in" with nothing after it, or a fabricated one.
+    const { container } = render(
+      <ApprovalStack approvals={ALL} openThreadId="t1" onDecide={vi.fn()} />,
+    );
+    expect(container.querySelector(".approval-stack__row-where")).toBeNull();
+  });
+
+  it("offers the way back into the card's thread, named", () => {
+    const onOpenThread = vi.fn();
+    render(
+      <ApprovalStack
+        approvals={ALL}
+        openThreadId="t1"
+        onDecide={vi.fn()}
+        destinationFor={destinationFor}
+        onOpenThread={onOpenThread}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Open #omnis-launch" }));
+    // The card's own thread, not the first row's and not the queue's newest.
+    expect(onOpenThread).toHaveBeenCalledWith("t1");
+  });
+
+  it("falls back to the plain noun when the thread cannot be named", () => {
+    // Same hole as the row's line, one level up: the link still has somewhere to go, so it is drawn
+    // — with a label that does not promise a name it does not have.
+    render(
+      <ApprovalStack
+        approvals={ALL}
+        openThreadId="t1"
+        onDecide={vi.fn()}
+        destinationFor={() => null}
+        onOpenThread={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Open thread" })).toBeInTheDocument();
+  });
+
+  it("draws no link when the caller has nowhere to open, or the approval has no thread", () => {
+    const { container, rerender } = render(
+      <ApprovalStack approvals={ALL} openThreadId="t1" onDecide={vi.fn()} />,
+    );
+    expect(container.querySelector(".approval-open-link")).toBeNull();
+
+    // An approval raised outside any thread has no conversation to go back to, so `onOpenThread`
+    // being present is not enough on its own.
+    const loose = approval({ id: "loose", thread_id: null });
+    rerender(
+      <ApprovalStack
+        approvals={[loose]}
+        openThreadId={null}
+        onDecide={vi.fn()}
+        onOpenThread={vi.fn()}
+      />,
+    );
+    expect(container.querySelector(".approval-open-link")).toBeNull();
+  });
+});

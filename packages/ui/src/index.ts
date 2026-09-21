@@ -6,6 +6,7 @@ export * from "./types.js";
 export * from "./components/status-badge.js";
 export * from "./components/digest-card.js";
 export * from "./components/draft-card.js";
+export * from "./components/reply-composer.js";
 export * from "./components/command-palette.js";
 export * from "./components/ask-panel.js";
 export * from "./lib/ask-model.js";
@@ -29,6 +30,9 @@ export * from "./components/tool-call-badge.js";
 export * from "./components/channel-rail.js";
 export * from "./components/bottom-bar.js";
 export * from "./components/status-pill.js";
+// loop-r2-05: the shell's line about whether it can see the hub. It lives here rather than in the
+// desktop app because both apps draw the same shell chrome and only one of them has a Zero socket.
+export * from "./components/connection-banner.js";
 export * from "./components/session-header.js";
 export * from "./components/group-header.js";
 export * from "./components/filter-chip-bar.js";

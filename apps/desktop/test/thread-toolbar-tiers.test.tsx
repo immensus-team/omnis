@@ -164,9 +164,11 @@ describe("Thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
     // The pane is an opaque grid column at this tier, so the bar is a child of it — that is the
     // arrangement the glass recipe is for.
     expect(document.querySelector(".thread-screen")?.contains(bar ?? null)).toBe(true);
-    // archive is the one write this screen owns; reply is gated on Phase B.
+    // Both controls are live: loop-r2-03 wired Reply to the composer, so nothing on this bar is
+    // gated behind a build phase any more, and each button's tooltip is its own name.
     expect(screen.getByRole("button", { name: "Archive thread" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Reply" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Reply" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Reply" })).toHaveAttribute("title", "Reply");
   });
 
   // 900–1279.98: `@container shell (max-width: 1279.98px)` makes the pane itself a glass sheet, so
@@ -198,7 +200,7 @@ describe("Thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
     ).toBe(true);
     // Same controls as the wide tier, so nothing is lost by the material change.
     expect(screen.getByRole("button", { name: "Archive thread" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Reply" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Reply" })).toBeEnabled();
   });
 
   // S5: below 900 the pane is the same `vaul` drawer the filters come up in, so the bar is that
@@ -222,7 +224,7 @@ describe("Thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
     // the sheet's did, so a bar in the flow would scroll away with the conversation.
     expect(document.querySelector(".thread-screen")?.contains(bar ?? null)).toBe(false);
     expect(screen.getByRole("button", { name: "Archive thread" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Reply" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Reply" })).toBeEnabled();
   });
 
   it("never puts a glass surface inside another one, in any tier", () => {

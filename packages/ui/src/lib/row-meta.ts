@@ -98,7 +98,15 @@ export const RUNTIME_ICON: Partial<Record<AgentRuntimeKind, ElementType>> = {
 
 /** The letter fallback for a runtime with no mark in RUNTIME_ICON (today: hermes, omnis) — the same
  * idea as the avatar fallback (initialsFromName), one runtime initial instead of a person's
- * (DESIGN-DIRECTION.md P1: Hermes -> "H"). */
+ * (DESIGN-DIRECTION.md P1: Hermes -> "H").
+ *
+ * loop-r2-07: nothing in the desktop shell reaches the "omnis" entry any more. Both places it draws
+ * a runtime tile — an inbox row, whose builder maps an omnis runtime to RowAvatarView's `omnis` kind,
+ * and the session header above a pane — ask for the mark itself (the same `system` brand PNG the
+ * rail and Settings draw), so the letter would only have spelled "O" beside the real thing. The key
+ * stays because this is a `Record<AgentRuntimeKind, string>` and a missing key is a compile error,
+ * and because apps/web's own row builder still hands RowAvatarView a raw runtime: the PWA is a
+ * surface this story did not reach, and "O" is at least honest there until it does. */
 export const RUNTIME_LETTER: Record<AgentRuntimeKind, string> = {
   claude_code: "C",
   claude_ds: "DS",

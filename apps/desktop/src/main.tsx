@@ -9,21 +9,38 @@ import "@omnis/ui/tokens.css";
 import "./app.css";
 import { Toaster } from "@omnis/ui";
 import { App } from "./App.js";
+import { BootSkeleton } from "./components/BootSkeleton.js";
 import { type OAuthClient, Onboarding } from "./screens/Onboarding.js";
 import { loadZeroToken } from "./zero-client.js";
 
 const root = document.getElementById("root");
 if (root === null) throw new Error("#root not found in index.html");
 
+const reactRoot = createRoot(root);
+
+/** loop-r2-05: paint before the token. This file used to build its root *inside* the `.finally()` of
+ *  the token fetch, so with the hub down there was nothing mounted to look at and the document was
+ *  blank white until the socket gave up — measured at still-white after 8s. The shell's own outline
+ *  goes up first now, and the real tree replaces it in the same root.
+ *
+ *  The deadline is 4s: long enough that a hub on the same LAN always wins the race, short enough
+ *  that a hub which is simply not there does not hold the boot open. When it expires the app mounts
+ *  *without* a token rather than not at all — Zero reports itself as broken, the connection banner
+ *  above the list says "Can't reach omnis", and every row already in the replica still renders.
+ *  That is the state the banner exists for, so it should be reachable from the boot too. */
+const TOKEN_DEADLINE_MS = 4_000;
+
+reactRoot.render(<BootSkeleton />);
+
 // US-A21b: Zero permissions hand down not a single row without a hub-signed token, so one is
 // fetched before the screen appears. A failure (the hub is not up yet, say) still mounts the app —
 // it just starts with Zero empty.
-loadZeroToken()
+void loadZeroToken(undefined, AbortSignal.timeout(TOKEN_DEADLINE_MS))
   .catch((e: unknown) => {
     console.error("zero auth token unavailable — rows will not sync", e);
   })
   .finally(() => {
-    createRoot(root).render(
+    reactRoot.render(
       // The motion wave's root config. `reducedMotion="user"` hands every `motion` transition in the
       // tree to the user's `prefers-reduced-motion` answer: motion replaces transform-driven
       // animations with opacity ones rather than removing them, so a surface still arrives and

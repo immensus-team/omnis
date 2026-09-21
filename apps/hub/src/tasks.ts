@@ -38,3 +38,31 @@ export async function createTask(pool: Pool, title: string): Promise<TaskRow | n
   if (row === undefined) throw new Error("tasks insert returned no row");
   return row;
 }
+
+/** loop-r2-06/L2-04: the Tasks screen's checkbox, which until this existed flipped back and wrote
+ *  nothing — `POST /tasks` was the table's only human write.
+ *
+ *  Two states, not the five `tasks_state_ck` allows: a checkbox has two. `in_progress`, `blocked`
+ *  and `dropped` belong to the agents' own loops (`propose.ts`, the delegation path), and a screen
+ *  that offered them through one square would be a state machine with a single ambiguous control.
+ *
+ *  `done_at` is set and cleared by the same statement, and there is no `updated_at` column to touch
+ *  (0004_tasks_approvals.sql has `done_at` and neither of the other two names) — so nothing here
+ *  needs a migration. Reopening a task clears the stamp rather than leaving it: "when it was
+ *  finished" is not a fact about a task that is not finished.
+ *
+ *  Returns null when no row matches, which is the route's 404. */
+export async function setTaskState(
+  pool: Pool,
+  id: string,
+  state: "done" | "open",
+): Promise<TaskRow | null> {
+  const rows = await query<TaskRow>(
+    pool,
+    `UPDATE tasks SET state = $2, done_at = CASE WHEN $2 = 'done' THEN now() END
+      WHERE id = $1
+      RETURNING *`,
+    [id, state],
+  );
+  return rows[0] ?? null;
+}

@@ -4,7 +4,7 @@
 import "./setup";
 
 import type { ApprovalStackItem } from "@omnis/ui";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   Thread,
@@ -36,10 +36,12 @@ vi.mock("../src/zero-client.js", () => ({
   initZero: () => zero,
   useZeroClient: () => zero,
   loadZeroToken: async () => {},
+  hasZeroToken: () => true,
 }));
 vi.mock("@rocicorp/zero/react", () => ({
   useQuery: (q: { __table: string }) => [store[q.__table] ?? [], { type: "complete" }],
   useZero: () => zero,
+  useConnectionState: () => ({ name: "connected" }),
   ZeroProvider: ({ children }: { children: unknown }) => children,
 }));
 
@@ -304,5 +306,161 @@ describe("Thread — the draft and its approval are one card (loop-r2-02)", () =
     expect(screen.queryByText(DRAFT_BODY)).toBeNull();
     expect(document.querySelector(".draft-card")).toBeNull();
     expect(document.querySelector(".thread-screen__draft")).toBeNull();
+  });
+});
+
+/* loop-r2-03: `r` opens an inline composer that proposes a send. */
+describe("Thread — the reply composer (loop-r2-03)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    // The two below stub `fetch`, and a leaked stub is a later test's silent failure.
+    vi.unstubAllGlobals();
+  });
+
+  const REPLY = "I'll send comments Wednesday.";
+
+  /** The box, by role: the toolbar's Reply button carries the same accessible name, so `getByLabelText`
+   *  would find two elements and say nothing about which one is the textarea. */
+  function box(): HTMLTextAreaElement {
+    return screen.getByRole("textbox", { name: "Reply" }) as HTMLTextAreaElement;
+  }
+
+  function openByClick(): HTMLTextAreaElement {
+    fireEvent.click(screen.getByRole("button", { name: "Reply" }));
+    return box();
+  }
+
+  it("opens the composer from the toolbar's Reply, with the caret in it", () => {
+    seedStore([]);
+    render(<Thread threadId={THREAD_ID} approvals={[]} onDecide={vi.fn()} />);
+
+    // The control the last wave left disabled behind a roadmap phase is live, and it says nothing
+    // about a phase any more — it is the control's own name.
+    const reply = screen.getByRole("button", { name: "Reply" });
+    expect(reply).toBeEnabled();
+    expect(reply).toHaveAttribute("title", "Reply");
+    expect(document.querySelector(".reply-composer")).toBeNull();
+
+    const box = openByClick();
+    expect(document.querySelector(".reply-composer")).not.toBeNull();
+    expect(box).toHaveFocus();
+    // The line names the thread by the same string the header above it does. `store.accounts` is
+    // empty here, so the account's channel is unknown and the line drops that half.
+    expect(screen.getByText("Reply in omnis-launch")).toBeInTheDocument();
+    // Where a reply is written in every mail client: the last thing in the conversation, under the
+    // flow and under any card — never chrome beside the toolbar.
+    const composerBox = document.querySelector(".reply-composer");
+    expect(composerBox?.parentElement?.lastElementChild).toBe(composerBox);
+  });
+
+  // §e guard 10: every gesture has a non-gesture twin, and this is the twin that has to resolve to
+  // the same box rather than to a second copy of "open the composer".
+  it("opens the same box on `r`", () => {
+    seedStore([]);
+    render(<Thread threadId={THREAD_ID} approvals={[]} onDecide={vi.fn()} />);
+
+    fireEvent.keyDown(window, { key: "r" });
+    expect(document.querySelector(".reply-composer")).not.toBeNull();
+    expect(box()).toHaveFocus();
+  });
+
+  // The live stack found this one: `fireEvent.keyDown` stops at the keydown, where a browser runs on
+  // to the insertion, so the box used to open with the "r" that opened it already in it.
+  it("does not put the letter that opened the box into it", () => {
+    seedStore([]);
+    render(<Thread threadId={THREAD_ID} approvals={[]} onDecide={vi.fn()} />);
+
+    const press = new KeyboardEvent("keydown", { key: "r", bubbles: true, cancelable: true });
+    // Dispatched by hand rather than with `fireEvent`, which would return a boolean and hide the
+    // event whose `defaultPrevented` is the claim. `act` because the state update the listener makes
+    // is outside React's own event system here, and nothing else would flush it.
+    act(() => {
+      window.dispatchEvent(press);
+    });
+
+    expect(press.defaultPrevented).toBe(true);
+    expect(box()).toHaveValue("");
+  });
+
+  it("leaves `r` alone on an archived thread", () => {
+    // Replying to something already filed away is a write the person did not ask for. The toolbar's
+    // Reply stays live there — the banner's Restore is one click away — but the bare letter does not.
+    store.threads = [{ ...threadRow, archived_at: 9 }];
+    store.items = [];
+    store.pending_approvals = [];
+    render(<Thread threadId={THREAD_ID} approvals={[]} onDecide={vi.fn()} />);
+
+    fireEvent.keyDown(window, { key: "r" });
+    expect(document.querySelector(".reply-composer")).toBeNull();
+  });
+
+  // The box proposes and gets out of the way: the approval it raised is what the flow then carries,
+  // which is the same gate every other `send` in the product goes through.
+  it("proposes the reply through the hub and closes", async () => {
+    seedStore([]);
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({ approval_id: "approval-2" }),
+    } as unknown as Response);
+    vi.stubGlobal("fetch", fetchMock);
+    render(<Thread threadId={THREAD_ID} approvals={[]} onDecide={vi.fn()} />);
+
+    fireEvent.change(openByClick(), { target: { value: REPLY } });
+    fireEvent.click(screen.getByRole("button", { name: "Send for approval" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledOnce();
+    });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(`/api/threads/${THREAD_ID}/reply`);
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(String(init?.body))).toEqual({ body: REPLY });
+    await waitFor(() => {
+      expect(document.querySelector(".reply-composer")).toBeNull();
+    });
+  });
+
+  // The focus a submit is owed goes to the card the raise produced. The card arrives through Zero,
+  // not as a child of this screen, so there is no ref to hand it — the screen waits for the card
+  // that quotes the body it sent.
+  it("hands the focus to the card that carries the reply", async () => {
+    seedStore([]);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: async () => ({ approval_id: "approval-2" }),
+      } as unknown as Response),
+    );
+    const { rerender } = render(<Thread threadId={THREAD_ID} approvals={[]} onDecide={vi.fn()} />);
+
+    fireEvent.change(openByClick(), { target: { value: REPLY } });
+    fireEvent.click(screen.getByRole("button", { name: "Send for approval" }));
+    await waitFor(() => {
+      expect(document.querySelector(".reply-composer")).toBeNull();
+    });
+
+    // Zero replicates the approval a moment later: the same props, one more card.
+    rerender(
+      <Thread
+        threadId={THREAD_ID}
+        approvals={[
+          {
+            ...draftApproval,
+            id: "approval-2",
+            item_id: null,
+            description: "Reply in omnis-launch",
+            args: { channel: "slack", body: REPLY },
+          },
+        ]}
+        onDecide={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Approve" })).toHaveFocus();
+    });
   });
 });

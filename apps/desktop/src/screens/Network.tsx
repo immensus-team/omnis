@@ -173,7 +173,11 @@ export function Network({ now: nowProp, onOpenPerson, onOpenThread }: NetworkPro
       )}
 
       <header className="network-screen__head">
-        <h1 className="network-screen__title">Network</h1>
+        {/* loop-r2-08: focusable so the shell can land the focus on a screen switch — see
+            App.tsx's heading-focus effect. */}
+        <h1 className="network-screen__title" tabIndex={-1}>
+          Network
+        </h1>
       </header>
 
       {/* A5 §3.6's follow-up queue strip — the screen's top line, because "who has gone quiet" is

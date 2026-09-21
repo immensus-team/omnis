@@ -81,9 +81,13 @@ export function SessionHeader({
     <header className="session-header">
       <div className="session-header__line">
         {/* The same runtime tile an inbox row draws, at 32px instead of 40 — reused rather than
-            re-drawn, so a runtime that gains a brand mark gains it in both places at once. */}
+            re-drawn, so a runtime that gains a brand mark gains it in both places at once. That is
+            exactly what loop-r2-07 relies on: omnis's own runtime draws the app's own mark here, the
+            way its row does, rather than the "O" letter fallback for a runtime with no icon. */}
         <span className="session-header__avatar">
-          <RowAvatarView avatar={{ kind: "runtime", runtime }} />
+          <RowAvatarView
+            avatar={runtime === "omnis" ? { kind: "omnis" } : { kind: "runtime", runtime }}
+          />
         </span>
         <h2 className="session-header__title">{title}</h2>
         <AgentStatusPill state={state === "failed" ? "failed" : agentSessionKinsoState(state)} />

@@ -11,8 +11,13 @@
    would have to be amended to learn — the same reason the S5 copy named its wave. The count moved
    from 6398 to 6404 when loop-r1-08 added §c.5's `.ask-panel__action kbd` rule — and the gallery's
    copy, which the same header rule binds and no test guards, was re-copied with it. loop-r2-02's
-   `.approval-card__provenance` line and its shared `.draft-card__actions button` rule are the
-   latest re-copy, at 6562 lines.
+   `.approval-card__provenance` line and its shared `.draft-card__actions button` rule came next;
+   loop-r2-03's `.reply-composer` block, which takes its box, its field and its action row from the
+   `.approval-card` selectors beside it, came next; loop-r2-04's and loop-r2-05's chrome — the
+   `ask-panel__action kbd` re-copy, the connection banner and the skeleton rows — are in the same
+   body. loop-r2-06's `.approval-stack__row-body`/`__row-where` pair and its `.approval-open-link`
+   are the latest re-copy, at 6863 lines. loop-r2-08's `h1[tabindex="-1"]` focus suppression is the
+   latest, at 6910 lines.
    apps/web/test/vendor-css.test.ts is what holds the line: it compares everything below this
    comment against that file byte for byte — forgetting to re-copy fails a test, not the screen. */
 /* Shell layout only. Colour and type come from @omnis/ui/tokens.css (A5 §1).
@@ -372,10 +377,13 @@ body {
 }
 
 /* §c.2: the announcement the keyboard reorder makes. The rail's tiles are icon-only, so this is the
-   only place the reorder can say what it did — visually hidden, but the same 1px clipped box the
-   rest of the app hides spoken-only text in, and out of flow so it cannot push the rail's column
-   around. */
-.channel-rail__announce {
+   only place the reorder can say what it did — visually hidden, and out of flow so it cannot push
+   the rail's column around.
+   loop-r2-05: `.visually-hidden` is the same recipe under a name anything may use — the boot
+   skeleton's "Loading omnis…" is the second caller, and a second copy of six declarations is a
+   second copy to keep in step. One rule, two names. */
+.channel-rail__announce,
+.visually-hidden {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -397,6 +405,75 @@ body {
      gap cannot be animated. Below 900 the rail leaves the row and this goes back to 0 (that block,
      far below). */
   margin-left: 16px;
+}
+
+/* loop-r2-05: the shell's one line about sync, drawn under the ask bar at >=900 and at the top of
+   this column below it. Chrome, so it is glass (v3 §e.4) — the list under it, and the skeleton rows
+   in that list, stay opaque. The weight is the thread screen's archived banner's: 13px, one line,
+   secondary ink, a 12px radius. It is a statement of fact, not an alert. */
+.connection-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 12px;
+  /* Under the ask bar, with the margin rather than the column's 12px gap: the banner is attached to
+     the bar it reports on. Below 900 there is no bar above it and this is the column's own top
+     gutter. */
+  margin: 8px 0 0;
+  border-radius: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  /* The entrance only. It leaves at once — unmounting is not a transition, and a banner that fades
+     out would leave the user reading a sentence that is no longer true. */
+  transition: opacity var(--dur-fast) var(--ease-spring);
+}
+
+/* `@starting-style` is the whole entrance: the first style change after the element is rendered
+   starts here rather than at the final value, and the transition above carries it in over
+   --dur-fast. No keyframes, no motion component, and nothing to undo — once the animation has run
+   there is no rule left to fight. */
+@starting-style {
+  .connection-banner {
+    opacity: 0;
+  }
+}
+
+/* The dot is 6px of ink before the text, not a status pill: the sentence already says which state
+   this is. Its colour is the one `.status-pill[data-tone="warning"]` writes, read from that rule
+   rather than restated (one state, one colour, and no new colour enters the palette). */
+.connection-banner__dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: oklch(from var(--warn-500) 0.44 c h);
+}
+
+/* Connecting is not a problem yet — it is the quietest of the four, so it gets the tertiary ink
+   rather than the warning colour. */
+.connection-banner[data-kind="connecting"] .connection-banner__dot {
+  background: var(--text-tertiary);
+}
+
+/* The sentence is the part that shrinks: at 320 it wraps to a second line and the button stays
+   where it is, which is what keeps the banner inside the viewport. */
+.connection-banner__text {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.connection-banner__action {
+  flex: 0 0 auto;
+  /* Pushed to the end of the line, so the button is in the same place whether the sentence is one
+     line or two. */
+  margin-left: auto;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
 }
 
 /* U1 ask/search pill — rendered by CommandPalette mode="inline".
@@ -744,8 +821,8 @@ body {
   background: var(--state-hover);
 }
 
-/* An un-wired Phase B action does not pretend to be pressable — not-allowed cursor, disabled, and
-   a tag on the right. 0.55 is the floor for the fade (hallmark slop-test): below it the row stops
+/* An action with nothing behind it does not pretend to be pressable — not-allowed cursor, disabled,
+   and a tag on the right. 0.55 is the floor for the fade (hallmark slop-test): below it the row stops
    reading as a gated feature and starts reading as an erased screen. */
 .ask-panel__action:disabled {
   opacity: 0.55;
@@ -1106,6 +1183,22 @@ body {
   border-radius: var(--row-radius);
 }
 
+/* loop-r2-08: a screen's own `h1` is a programmatic focus target — the shell moves the focus there
+   when the screen changes (App.tsx), and the Archived view moves it there when the last restore
+   empties the list (Inbox.tsx). A heading the shell focused is not a control the user tabbed to, so
+   it takes no ring.
+   `:focus-visible` is deliberately **not** restored here, and that is the measured half: a script
+   `focus()` that lands inside a keyboard interaction's focus-visible window matches
+   `:focus-visible` in Chromium, so a `:focus-visible` rule on this selector can only ever put the
+   ring *on* — for exactly the focus this suppression exists for (verified on the live stack: the
+   heading's computed `outlineStyle` came back `solid` after a `g t` with the rule in place). There
+   is no Tab onto the heading to give the ring back to either: `tabIndex="-1"` is what keeps it out
+   of the tab order, which is the whole reason it can be a focus target without being a new stop.
+   One ring and nothing else, the same recipe every other focus style in this file uses (v3 §e.11). */
+h1[tabindex="-1"]:focus {
+  outline: none;
+}
+
 /* US-D08 §c.4: the row hairline. `--row-rule-inset` on the left, the row's own 16px padding on the
    right, 1px tall at the row's bottom edge.
    The ink is written out rather than read from `--border-row`: that token is a `border` shorthand
@@ -1134,6 +1227,70 @@ body {
   display: none;
 }
 
+/* loop-r2-05: the list's loading shape (Inbox.tsx's InboxSkeleton). A real row — the same box, the
+   same padding, the same grid — with blocks where the text goes, so the list does not change height
+   when the data lands.
+   Static on purpose: no shimmer and no pulse (UX-06, SKILLS.md #9). That is the design decision,
+   and it is also why there is no reduced-motion branch here to forget. */
+.inbox-row--skeleton {
+  /* The list is a column flex container, so the default shrink would squash eight of these into
+     whatever height the card happens to have. The placeholders keep their size and the list clips
+     (see .inbox-card__list--skeleton) instead. */
+  flex: 0 0 auto;
+  cursor: default;
+}
+
+/* The two line boxes the real row's own text makes: the 15px name at line-height 1.5 (22.5px, the
+   line its 12px timestamp does not grow) and the 14px summary at 1.5 (21px). Spelled as the grid's
+   rows so the blocks below can be the ink rather than the whole line — 22.5 + the grid's 4px gap +
+   21 + the row's 12px padding twice is the 71.5px a real row measures. tools/e2e/shots-loop-r2-05.ts
+   asserts the skeleton row and the real row are the same height, which is what keeps this
+   arithmetic honest rather than merely plausible. */
+.inbox-row--skeleton .inbox-row__content {
+  grid-template-rows: 22.5px 21px;
+}
+
+/* Size and place come from .inbox-row__avatar; only the fill is the skeleton's. --bg-elevated is
+   the step above the canvas in both themes, which is the one ink a placeholder may use. */
+.inbox-row__skeleton-circle {
+  background: var(--bg-elevated);
+}
+
+.inbox-row__skeleton-bar {
+  align-self: center;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+}
+
+.inbox-row__skeleton-bar--line1 {
+  grid-row: 1;
+  grid-column: 3;
+  width: 60%;
+}
+
+.inbox-row__skeleton-bar--line2 {
+  grid-row: 2;
+  grid-column: 3;
+  width: 85%;
+}
+
+/* Eight placeholders are taller than the card on any laptop; the list clips them rather than
+   growing the card or showing a scrollbar over rows that do not exist. */
+.inbox-card__list--skeleton {
+  overflow: hidden;
+}
+
+/* loop-r2-05: the card's title bar in the boot skeleton (components/BootSkeleton.tsx), 28px as the
+   brief specifies. Ink is --bg-elevated, the same one the rows use — one placeholder colour. */
+.boot-skeleton__title {
+  display: block;
+  width: 72px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+}
+
 .inbox-row__avatar {
   grid-row: 1 / span 2;
   grid-column: 2;
@@ -1159,6 +1316,25 @@ body {
      the same shape stated as the corner it actually is. (Mail's M100 app tiles are squircles and
      M143's people are circles; that split is the one thing this rule has to keep.) */
   border-radius: 10px;
+}
+
+/* loop-r2-07/L2-32: a row for omnis itself wears the omnis mark. No fill, because the PNG carries
+   its own tile (the same reason ChannelGlyph draws no tile behind it), and the squircle corner the
+   other brand tiles have rather than a person's circle — the mark is in the avatar's own slot, so
+   `overflow: hidden` must clip it to the tile's shape, not to a disc. */
+.inbox-row__avatar--omnis {
+  background: none;
+  border-radius: 10px;
+}
+
+/* The mark fills whatever slot it is dropped into — 40px in an inbox row, 32px in the session
+   header's smaller tile — the same way `.inbox-row__avatar-img` sizes a photo. ChannelGlyph carries
+   its size as an <img> attribute for the row's case, and an attribute cannot follow a slot: without
+   this the header drew a 40px mark inside its 32px box, and `overflow: hidden` cropped all four
+   edges of it. */
+.inbox-row__avatar--omnis img {
+  width: 100%;
+  height: 100%;
 }
 
 .inbox-row__avatar-img {
@@ -1695,6 +1871,7 @@ body {
 .agent-session-screen__system-log,
 .tool-call-badge,
 .approval-card,
+.reply-composer,
 .digest-card,
 .draft-card {
   margin-bottom: 12px;
@@ -1918,6 +2095,18 @@ body {
   font-size: 14px;
 }
 
+/* loop-r2-07/L2-06: why a blocked session is blocked when omnis is holding nothing to decide. One
+   paragraph under the transcript, secondary ink — the same register as the empty line above it and
+   deliberately not a card, an icon or a warning tone: the session is not broken, it is waiting on a
+   terminal this screen cannot see, and a callout would make that read as an error. */
+.agent-session-screen__blocked {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
 .agent-session-screen__empty-dot {
   flex: 0 0 auto;
   width: 6px;
@@ -1992,13 +2181,18 @@ body {
   color: var(--text-secondary);
 }
 
-.approval-card {
+.approval-card,
+.reply-composer {
   border: 1px solid var(--border-hairline-strong);
   border-radius: 12px;
   /* loop-r2-01/L2-37: the card's first paragraph used to carry the browser's 1em above it, so the
      card opened with a band of empty space before its own first line. The header below has no
      margin and the top padding is the trimmed one; the sides keep the 12px, so the header lines up
-     with the description and the body rather than sitting in its own indent. */
+     with the description and the body rather than sitting in its own indent.
+     loop-r2-03: the reply composer is in the same box. It becomes one of these cards the moment the
+     proposal lands — the card is drawn by the flow and this box is gone — so a box with a different
+     radius or padding would be a visible jump at the exact moment the person is watching for their
+     reply to appear. */
   padding: 8px 12px 12px;
 }
 
@@ -2054,9 +2248,12 @@ body {
 }
 
 /* The edit and respond fields. Opaque and one hairline, like every other input (v3 §e.4 — glass is
-   chrome, and a field is not chrome); `--bg-base` is the fill the rest of the app's inputs use. */
+   chrome, and a field is not chrome); `--bg-base` is the fill the rest of the app's inputs use.
+   loop-r2-03: the reply composer's textarea is the same field — one input style in the product, so
+   the selector was extended rather than a second copy written beside it. */
 .approval-card__editor,
-.approval-card__respond {
+.approval-card__respond,
+.reply-composer__editor {
   display: block;
   box-sizing: border-box;
   width: 100%;
@@ -2072,7 +2269,8 @@ body {
 }
 
 .approval-card__editor::placeholder,
-.approval-card__respond::placeholder {
+.approval-card__respond::placeholder,
+.reply-composer__editor::placeholder {
   color: var(--text-tertiary);
 }
 
@@ -2093,7 +2291,8 @@ body {
 }
 
 .approval-card__editor:focus-visible,
-.approval-card__respond:focus-visible {
+.approval-card__respond:focus-visible,
+.reply-composer__editor:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -2145,7 +2344,8 @@ body {
    primary decision — wherever the break happened to fall; the brief asks for one line with Approve
    first and primary. So the row stays on one line and, when it genuinely cannot fit, it scrolls
    inside the card (`overflow-x`) instead of pushing the card, or the pane, wider. */
-.approval-card__actions {
+.approval-card__actions,
+.reply-composer__actions {
   display: flex;
   flex-wrap: nowrap;
   gap: 8px;
@@ -2165,7 +2365,8 @@ body {
    because only this selector was written — so the rule is shared rather than copied, and the two
    cards cannot drift apart later. */
 .approval-card__actions button,
-.draft-card__actions button {
+.draft-card__actions button,
+.reply-composer__actions button {
   white-space: nowrap;
   border: var(--hairline);
   border-radius: 8px;
@@ -2184,7 +2385,8 @@ body {
    (`.confirm-prompt__button--confirm`, §c.8) — with the hairline dropped rather than drawn around
    the edge of a filled button. Read, edit and respond each lead with their primary; the ghosts
    after it keep the hairline. */
-.approval-card__actions button[data-variant="primary"] {
+.approval-card__actions button[data-variant="primary"],
+.reply-composer__actions button[data-variant="primary"] {
   border-color: transparent;
   background: var(--accent);
   color: var(--accent-fg);
@@ -2193,9 +2395,76 @@ body {
 /* A disabled decision has to look disabled. `Button` says so with Tailwind's `disabled:opacity-50`,
    and apps/desktop compiles no Tailwind — the utility is inert here, so the same intent is written
    out. Without it "Save & send" on an empty editor is a live-looking button that does nothing. */
-.approval-card__actions button:disabled {
+.approval-card__actions button:disabled,
+.reply-composer__actions button:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* loop-r2-03 — the reply composer. The box, the field and the buttons are the approval card's
+   (the rules above were extended to reach them); what is written here is only what the composer has
+   and the card does not: the destination line, the error line, the send chord's hint, and the
+   composer's own 3-to-12-row field. */
+.reply-composer__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* A long thread title shortens the text block, not the card — the same guard the card's header
+   carries. */
+.reply-composer__header-text {
+  min-width: 0;
+}
+
+/* A failed proposal is the one thing on this card that is not a decision, so it gets no pill: one
+   12px line under the field in the app's failure colour, the same one the quick-add's notice uses
+   for its failed half. The text above it is untouched — that is the point of showing it here. */
+.reply-composer__error {
+  margin: 6px 0 0;
+  color: var(--danger-500);
+  font-size: 12px;
+}
+
+/* The send chord, at the far end of the action row. `margin-left: auto` is the right alignment; on
+   a row that overflows (320px) an auto margin resolves to zero and this costs nothing. */
+.reply-composer__hint {
+  margin-left: auto;
+  align-self: center;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+/* The keys are not a table lookup — they are part of the sentence beside them, so they take its
+   font rather than the browser's monospace. No key cap: no border, no fill, no second radius (v3 §e
+   guard 11). */
+.reply-composer__hint kbd {
+  font: inherit;
+}
+
+/* Three lines to start, twelve at most. Same arithmetic as the card's editor (15px/1.45 plus the
+   field's 8px vertical padding and 1px border, twice), and the floor is written out rather than left
+   to `rows`: Chromium ignores `rows` the moment `field-sizing: content` applies. Three and not the
+   editor's four because a reply to a message in front of you is shorter than the message itself. */
+.reply-composer__editor {
+  resize: none;
+  field-sizing: content;
+  min-height: calc(3 * 1.45 * 15px + 18px);
+  max-height: calc(12 * 1.45 * 15px + 18px);
+  overflow-y: auto;
+}
+
+/* A phone has no ⌘ key. Telling a thumb about a chord it cannot press is noise, so the hint is not
+   drawn on a coarse pointer — the button beside it is the whole affordance there. The `kbd`s are
+   decoration on top of that and the hint is not a control, so nothing becomes unlabelled. */
+@media (pointer: coarse) {
+  .reply-composer__hint {
+    display: none;
+  }
 }
 
 /* US-D03 — the approval stack. It used to be a wall: every pending approval drew the identical
@@ -2256,12 +2525,54 @@ body {
   letter-spacing: 0.02em;
 }
 
+/* loop-r2-06/L2-24: the description and the thread it belongs to, stacked. The column is a child of
+   the row's baseline-aligned flex, so the body's own baseline is still its first line's — the action
+   label and the risk pill stay on the description's line and do not drop to the second one. */
+.approval-stack__row-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .approval-stack__row-text {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* The thread's name, in the caption scale the header above the rows already uses. It is the answer
+   to "a decision about *what*", so it is quieter than the description it sits under, not louder. */
+.approval-stack__row-where {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+/* loop-r2-06/L2-24: the way back from the queue into the conversation the card is about. A ghost
+   button wearing the decision row's own hairline (`.approval-card__actions button`) — it is a way
+   out of the card, not a fifth decision to make on it, so it does not get a fill. */
+.approval-open-link {
+  align-self: flex-start;
+  margin-top: 8px;
+  border: var(--hairline);
+  border-radius: 8px;
+  padding: 4px 12px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.approval-open-link:hover {
+  background: var(--state-hover);
 }
 
 .approval-stack__risk {
@@ -3507,8 +3818,10 @@ body {
   }
 
   /* §c.9 gives the pill `height: var(--bar-h)` here rather than the 44px it has at the top of the
-     list. Beside a 44px and a 52px circle, a 44px pill would sit 4px above the compose circle's
-     own centre and read as a different control. */
+     list: the band the list reserves for this bar is 56px + `--bar-h` + two gaps, and the pill is
+     the piece that fills the second term. loop-r2-03 took the 52px compose circle out of the row
+     (there is no recipient picker for a new message), so the pill is the only piece left that is
+     not a 44px circle — its height is now the bar's own height. */
   .bottom-bar .ask-bar__pill {
     height: var(--bar-h);
   }
@@ -3530,19 +3843,11 @@ body {
     cursor: pointer;
   }
 
-  /* §c.9's 52px compose circle — the one piece bigger than the pill's own radius would suggest,
-     because it is the bar's primary action.
-     `margin-left: auto` is what makes it the bar's *trailing* piece. While the ask pill is in the
-     row the pill's `flex: 1 1 auto` already takes every spare pixel, so this margin is zero and the
-     two are equivalent; it is kept for the case the slot is rendered without one, where the circle
-     would otherwise slide left to sit 8px after the filters. (The shell used to hand the bar no pill
-     whenever a thread was open — S5 removed that: the pane is a modal drawer now, so the ask bar
-     stays in the BottomBar and is covered by the scrim rather than replaced.) */
-  .bottom-bar__piece--compose {
-    width: 52px;
-    height: 52px;
-    margin-left: auto;
-  }
+  /* loop-r2-03/NC2-03: §c.9's 52px compose circle and its `margin-left: auto` are gone. The circle
+     was never rendered enabled — a new message needs a recipient picker that does not exist, so all
+     it could be was a disabled glyph under a tooltip that explained a phase — and the reviewers read
+     that as an unfinished product rather than as a gate. The ask pill's `flex: 1 1 auto` above is
+     what takes the width it gave back. */
 
   /* The same 0.55 floor the rail's gated tiles and the ask panel's un-wired actions use (the
      hallmark slop-test's floor): below it a control stops reading as gated and starts reading as
@@ -4861,6 +5166,15 @@ button.today-screen__event-title:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* loop-r2-05: the banner arrives by fading, so with the preference set it does not fade at all —
+     it is a status line, and the thing it reports is already true before it is drawn. This rule
+     lives here rather than beside `.connection-banner` because packages/ui/test/motion.test.tsx
+     reads from the *first* reduced-motion block in this file to its end, and a block above the
+     moving-surface rules would shadow every one of them. */
+  .connection-banner {
+    transition: none;
+  }
+
   /* The ask panel: 320ms of lift-and-scale becomes a cross-fade. */
   .ask-panel {
     animation-name: fade-in;
@@ -5342,6 +5656,46 @@ button.today-screen__event-title:focus-visible {
      screen — and it is the one number that would leave a band of bare aurora under the glass. */
   flex: 1 1 auto;
   max-height: none;
+}
+
+/* loop-r2-04: the drawer's own input (ask-panel.tsx). Below 900 the bar's input is under the drawer,
+   so this is where the caret goes and where the query is typed — before it existed the focus landed
+   on the "Suggestions" tab button and every letter ran as an Inbox shortcut (L2-03).
+   The box: 44px is the touch target, radius 12 is the sheet step, and 16px is the floor below which
+   iOS zooms the page on focus. The fill is `--bg-base` and not the glass recipe — §e guard 4 keeps
+   every input opaque, and this one sits *on* the drawer's material rather than above the canvas. */
+.ask-panel__input {
+  /* `none` rather than the glass's `1 1 auto`: the input is a fixed band above the scrolling list,
+     and a shrinking one would collapse at the shortest snap point. */
+  flex: none;
+  /* The glass insets its own content by 10px, so the input's edges line up with the rows under it. */
+  margin: 4px 10px 8px;
+  height: 44px;
+  padding: 0 14px;
+  border: var(--hairline);
+  border-radius: 12px;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 16px;
+}
+
+.ask-panel__input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.ask-panel__input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* §e guard 10 / SKILLS #10: a `<kbd>` is a shortcut hint, and a touch device has no keyboard to
+   press it with — at 390 the panel is only ever drawn on a coarse pointer, so its hints are copy
+   that cannot be acted on. One rule for every hint in the panel. */
+@media (pointer: coarse) {
+  .ask-panel kbd {
+    display: none;
+  }
 }
 
 /* The pin from note 2. `!important` because `vaul` writes the overlay's opacity inline as well as

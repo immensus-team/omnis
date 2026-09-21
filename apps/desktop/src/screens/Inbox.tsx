@@ -121,6 +121,29 @@ export function inboxRowTitle(row: {
   return row.personName || row.threadTitle || row.channelHandle || "(no title)";
 }
 
+/** The width of the title a toast quotes. A thread title is unbounded — the hub takes whatever the
+ *  channel sent, and an email subject can run to a paragraph — while the toast is one line in the
+ *  corner of the window. 40 characters is what fits beside the Undo button at 390px without the
+ *  sentence wrapping, and the ellipsis is a real character so "…" is what is truncated, not "..." . */
+export const TOAST_TITLE_MAX = 40;
+
+export function truncateTitle(title: string): string {
+  return title.length <= TOAST_TITLE_MAX ? title : `${title.slice(0, TOAST_TITLE_MAX).trimEnd()}…`;
+}
+
+/** loop-r2-08: how many archives/restores the undo stack holds. Twenty is a working session's worth
+ *  of triage and nothing like a journal; see `undoStack` in `Inbox` for why it is capped at all. */
+export const UNDO_STACK_MAX = 20;
+
+/** One archive or restore, as the undo of it needs to know it: whose row, what state it was moved
+ *  *to* (the undo is the opposite), and the title its toast quoted — read at the write, because the
+ *  row is out of the list a frame later. */
+export interface UndoEntry {
+  id: string;
+  archived: boolean;
+  title: string;
+}
+
 function firstLine(body: string): string {
   const idx = body.indexOf("\n");
   return (idx === -1 ? body : body.slice(0, idx)).trim();
@@ -280,8 +303,38 @@ type FlatItem =
   | { kind: "header"; key: string; count: number; pill: ReactNode }
   | { kind: "row"; row: ThreadRow };
 
+/** The placeholder rows' keys, written out rather than taken from the loop index: nothing here ever
+ *  reorders, but an index key is exactly what `noArrayIndexKey` exists to catch, and eight literals
+ *  say "this list is fixed" more plainly than an ignore comment would. */
+const SKELETON_KEYS = ["s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7"];
+
+/** loop-r2-05: the list's loading shape. It wears the real row's grid — the same padding, the same
+ *  40px avatar column, the same two line boxes — with the text replaced by blocks, so the list does
+ *  not jump when the data lands. Static on purpose: UX-06 and SKILLS.md #9 ban the shimmer, which is
+ *  also why a skeleton has no reduced-motion branch to write.
+ *
+ *  Drawn here and by the boot skeleton (components/BootSkeleton.tsx), so the shape the shell paints
+ *  before Zero exists and the shape the list paints while its first query resolves are one shape. */
+export function InboxSkeleton() {
+  return (
+    <>
+      {SKELETON_KEYS.map((key) => (
+        <div key={key} className="inbox-row inbox-row--skeleton" aria-hidden="true">
+          <div className="inbox-row__content">
+            <span className="inbox-row__avatar inbox-row__skeleton-circle" />
+            <span className="inbox-row__skeleton-bar inbox-row__skeleton-bar--line1" />
+            <span className="inbox-row__skeleton-bar inbox-row__skeleton-bar--line2" />
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 export function Inbox({
   onOpen,
+  initialSelectedId = null,
+  onSelectedIdChange,
   channelFilter = null,
   onChannelFilterChange,
   filtersOpen = false,
@@ -289,8 +342,15 @@ export function Inbox({
   pendingApprovals = 0,
   onOpenApprovals,
   notify,
+  connectionOk = true,
 }: {
   onOpen?: (target: OpenTarget) => void;
+  /** loop-r2-08/L2-09: the selection the shell remembered from the last time this screen was up.
+   *  It is the *initial* value only — from the first render on, this screen owns the selection and
+   *  reports every move back through `onSelectedIdChange`, so there is never a second owner. */
+  initialSelectedId?: string | null;
+  /** Where the selection goes when it moves, for the shell to remember across a screen switch. */
+  onSelectedIdChange?: (id: string | null) => void;
   /** U1 channel rail selection. null = everything (the Inbox tile). ANDed with the pill filters
    *  (work/personal/...). */
   channelFilter?: UiChannel | null;
@@ -314,10 +374,14 @@ export function Inbox({
    *  disarming of the undo it is offering. A request and not a spec: the id that tells one toast
    *  from the next belongs to the slot, and this screen has no way to know it. */
   notify?: (spec: ToastRequest, deferred?: { run: () => void }) => void;
+  /** loop-r2-05: whether the shell can see the hub. False, the subline drops its "Updated {x}"
+   *  segment — the connection banner directly above the list is already saying how stale this data
+   *  is, and a header that went on claiming freshness would be arguing with it. */
+  connectionOk?: boolean;
 }) {
   const zero = useZeroClient();
   const [filter, setFilter] = useState<InboxFilter>("all");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [view, setView] = useState<"inbox" | "archived">("inbox");
   // Optimistic override: keeps the row from sitting there unchanged until the hub round trip and
   // Zero replication arrive.
@@ -350,7 +414,7 @@ export function Inbox({
   // proven to work, so it is reused as-is. ponytail: a thread with several messages inside the
   // top-N can push another thread out (the limit is 200 to leave slack) — if a true "newest per
   // thread" is ever needed, verify the threads.related("items", limit 1) path and switch.
-  const [items] = useQuery(
+  const [items, itemsR] = useQuery(
     zero.query.items
       .where("status", "!=", "archived")
       .orderBy("sent_at", "desc")
@@ -439,6 +503,10 @@ export function Inbox({
           : item.author_person_id
             ? "person"
             : "system";
+      // loop-r2-07: hoisted out of the row literal, which used to spell the fallback inline. The
+      // channel now decides the avatar as well as the right-hand mark, and both ends have to agree
+      // about what the row is — a thread whose account has not synced reads as "system" at both.
+      const channel = channelByAccount.get(item.account_id) ?? "system";
       const title = inboxRowTitle({
         personName: item.author?.display_name ?? null,
         threadTitle: item.thread?.title ?? null,
@@ -459,14 +527,22 @@ export function Inbox({
           title,
         }),
         isDraft: (item.status as UiItemStatus) === "draft",
-        channel: channelByAccount.get(item.account_id) ?? "system",
+        channel,
         timestamp: formatRelativeTime(item.sent_at),
         sentAt: item.sent_at,
         unread: (item.thread?.unread_count ?? 0) > 0,
         unreadCount: item.thread?.unread_count ?? 0,
         labels: chipsByThread.get(item.thread_id) ?? [],
+        // loop-r2-07/L2-32: omnis's own row and a session omnis itself runs wear the omnis mark.
+        // Both used to draw an invented one — a pastel "OM" monogram and a black "O" tile — while
+        // the rail and Settings next to them showed the real mark. Every other row keeps the
+        // runtime logo or the initials it had.
         avatar:
-          runtime !== undefined ? { kind: "runtime", runtime } : { kind: "initials", name: title },
+          channel === "system" || runtime === "omnis"
+            ? { kind: "omnis" }
+            : runtime !== undefined
+              ? { kind: "runtime", runtime }
+              : { kind: "initials", name: title },
         // The persons row travels with items.author, so the hover card's relationship state and
         // VIP chip are read, not guessed. Authorless rows (agent sessions, system) have none.
         person: item.author
@@ -505,14 +581,38 @@ export function Inbox({
     });
   }, []);
 
-  /** loop-r1-06: the archive whose Undo is still on screen — `z` and ⌘Z are the toast's keyboard
-   *  twin, and they have to name the same row the button would. It is armed by the toggle below and
-   *  disarmed by that toggle's toast leaving (the deferred passed to `notify`), so the keys are live
-   *  exactly as long as the button is rather than forever. */
-  const lastToggle = useRef<{ id: string; archived: boolean } | null>(null);
+  /** loop-r2-08/L2-10, NC2-09: the archives and restores this screen can still take back, oldest
+   *  first. It replaced a single `lastToggle` ref that `undoArchive` *re-armed with the inverse* of
+   *  the write it had just undone — so `e`, ⌘Z, `z` archived the thread again (the second undo undid
+   *  the undo), and the whole thing was disarmed when its toast expired, which is why both testers
+   *  who pressed ⌘Z twice got one thread back instead of two. A stack is what the keys mean: the
+   *  last few writes in the order they happened, each undo taking the one on top.
+   *
+   *  Capped at 20: this is a convenience for the last few actions, not a journal, and an uncapped
+   *  stack would hold a title and an id for every archive of a long session. The oldest entry is
+   *  dropped, so it is the twentieth-oldest undo that quietly stops being available, never the
+   *  newest.
+   *
+   *  Nothing disarms it but an undo: `z` and ⌘Z are live until they are spent, not until the toast
+   *  goes. That is the point of the rewrite — the toast's own lifetime is a UI fact and the undo
+   *  stack is a data fact, and tying the second to the first was the bug. */
+  const undoStack = useRef<UndoEntry[]>([]);
 
   const toggleArchive = useCallback(
-    function toggle(threadId: string, archived: boolean) {
+    /** `undoEntry` is present iff this call *is* the undo of a write: the entry it takes back. Its
+     *  absence is what makes this a new write, so the two cases cannot be confused — and passing it
+     *  rather than reading the top of the stack is what keeps the toast's button and the keyboard
+     *  from undoing two different things (see below). */
+    function toggle(threadId: string, archived: boolean, undoEntry?: UndoEntry) {
+      /** What this write would be undone *to*, and the title its toast quotes. Built here rather
+       *  than where it is pushed because the failure path below needs it too: a write the hub
+       *  refused must not leave an entry behind. */
+      const entry: UndoEntry = {
+        id: threadId,
+        archived,
+        title: truncateTitle(threadRows.find((r) => r.id === threadId)?.title ?? "(no title)"),
+      };
+
       // US-D04: the row is held in the list for one leave animation. The server call goes out
       // immediately rather than after the animation — the round trip overlaps the 240ms instead of
       // queueing behind it, and the optimistic state below still lands on the same frame as the
@@ -545,44 +645,75 @@ export function Inbox({
           next.delete(threadId);
           return next;
         });
+        // The write did not happen, so there is nothing to take back: the entry goes with it. The
+        // old toggle disarmed itself here through the toast's deferred work; with no deferred there
+        // is nothing to run, and this is the same disarm said in the stack's own terms.
+        undoStack.current = undoStack.current.filter((e) => e !== entry);
         // loop-r1-06: a failed write used to be a `console.error` and nothing else — the row
         // reappeared with no explanation, which reads as a glitch rather than as a failure. Retry
         // re-attempts the same write, not the rollback.
         notify?.({
           message: archived ? "Couldn't archive. It's back in your inbox." : "Couldn't restore it.",
-          action: { label: "Retry", onAction: () => toggle(threadId, archived) },
+          action: { label: "Retry", onAction: () => toggle(threadId, archived, undoEntry) },
         });
       });
 
+      if (undoEntry === undefined) {
+        // A write: it becomes the newest thing that can be taken back. The stack is replaced rather
+        // than mutated so that the cap and the identity test below both read one array.
+        undoStack.current = [...undoStack.current, entry].slice(-UNDO_STACK_MAX);
+      } else {
+        // An undo: it *consumes* the entry it was asked to take back, by identity — so the toast's
+        // button (which passes its own entry) and the key (which passes the top of the stack) can
+        // never both take the same one, and neither re-arms what it just undid.
+        undoStack.current = undoStack.current.filter((e) => e !== undoEntry);
+        // The restored row is where the user is looking, so the selection follows it. In the
+        // Archived view the row is leaving that list, but the selection it leaves behind is still
+        // this thread: the next `u` needs a row, and `tabStopId` falls back to the first row when
+        // this one is not on screen.
+        setSelectedId(undoEntry.id);
+        // Deferred a frame for the same reason `moveTo` is: the row only returns to the list on
+        // this commit, and the virtualiser mounts it a layout effect later.
+        requestAnimationFrame(() => {
+          // loop-r2-08/L2-28, one key over from the `u` path above: an undo made *while the Archived
+          // view is up* takes its thread out of the list that is on screen. The row is still mounted
+          // for its leave animation, so focusing it works — and then the leave timer unmounts it and
+          // the focus falls to `<body>`, which is the symptom requirement 7 exists for. A restored
+          // row is never a target worth keeping here, so the screen's own `h1` takes the focus
+          // instead: same element, and the same reading, as the empty Archived list's fallback.
+          const target =
+            view === "archived"
+              ? document.querySelector(".inbox-card__title")
+              : document.querySelector(`[data-thread-id="${undoEntry.id}"]`);
+          if (target instanceof HTMLElement) target.focus({ preventScroll: true });
+        });
+      }
+
       // The toast goes up with the optimistic state rather than with the reply: the row has already
       // left, and the point of the Undo is to catch the second thought that arrives while the write
-      // is still in flight. "Archived" and "Moved to Inbox" say where the row went, which is the
-      // one thing the row itself can no longer say.
-      const armed = { id: threadId, archived };
-      lastToggle.current = armed;
-      notify?.(
-        {
-          message: archived ? "Archived" : "Moved to Inbox",
-          action: { label: "Undo", onAction: () => toggle(threadId, !archived) },
+      // is still in flight. It names the thread, because "Archived" alone said nothing a person with
+      // two archives in a row could act on (L2-10, NC2-09) — the undo 04 handed over from the
+      // palette's focus return is the other half of the same finding.
+      notify?.({
+        message: archived ? `Archived "${entry.title}"` : `Moved "${entry.title}" to Inbox`,
+        action: {
+          label: "Undo",
+          // Its *own* entry, whether this call was a write or an undo. Undoing "whatever is on top"
+          // is what made a button press and a key press two different actions.
+          onAction: () => toggle(entry.id, !entry.archived, entry),
         },
-        {
-          run: () => {
-            // Identity, not truthiness: a newer toggle has armed the ref for its own toast by now,
-            // and this one going away must not disarm that.
-            if (lastToggle.current === armed) lastToggle.current = null;
-          },
-        },
-      );
+      });
     },
-    [notify],
+    [notify, threadRows, view],
   );
 
-  /** The undo the toast is offering, whichever key or button asked for it. Nothing armed means
-   *  nothing to take back — the toast has gone, and with it the right to undo. */
+  /** The keyboard's undo — `z` and ⌘Z, the toast's twin. It takes the newest entry off the stack and
+   *  hands it to `toggleArchive` to consume. An empty stack means nothing to take back, and then the
+   *  keys do nothing at all: a third ⌘Z after two restores posts no request. */
   const undoArchive = useCallback(() => {
-    const last = lastToggle.current;
-    if (last === null) return;
-    toggleArchive(last.id, !last.archived);
+    const entry = undoStack.current[undoStack.current.length - 1];
+    if (entry === undefined) return;
+    toggleArchive(entry.id, !entry.archived, entry);
   }, [toggleArchive]);
 
   // The leave timers outlive a row that unmounts first (archiving the last row and switching views,
@@ -659,8 +790,9 @@ export function Inbox({
   // US-D02: grouping happens in the agents view only. needs-approval queries pending alone
   // (pending_approvals' `.where(state, pending)` above), so there is always exactly one group and
   // a header band would repeat the name of the tab just chosen without carrying any information —
-  // only the number folds into the tab pill (pendingCount below). Archived stays flat too: laying
-  // state groups over its own sort axis (archive time, newest first) makes the two fight.
+  // the number goes on the tab pill, and it is the shell's number (see below). Archived stays flat
+  // too: laying state groups over its own sort axis (archive time, newest first) makes the two
+  // fight.
   const grouped = view === "inbox" && filter === "agents";
   const listItems = useMemo<FlatItem[]>(() => {
     if (!grouped) return filtered.map((row) => ({ kind: "row", row }));
@@ -726,6 +858,15 @@ export function Inbox({
     [listItems],
   );
 
+  /** loop-r2-08/L2-09: every move of the selection is reported to the shell, which is what lets
+   *  `g t` then `g i` come back to the row the user left. It fires on mount too, with the value the
+   *  shell itself handed in — a write of the same value back, which is a no-op on the shell's ref.
+   *  (Making that harmless is cheaper than making it conditional, and the conditional version is
+   *  the one that silently skips the first real move.) */
+  useEffect(() => {
+    onSelectedIdChange?.(selectedId);
+  }, [selectedId, onSelectedIdChange]);
+
   /** loop-r1-03/L-02, NC-02: archive (or restore) and move on. Both `e`/`u` and the row's own
    *  Archive button come through here, so the keyboard and the mouse cannot disagree about where
    *  the selection lands; the bug was that it stayed on the row that had just left, so the next `e`
@@ -738,9 +879,23 @@ export function Inbox({
     (threadId: string, archived: boolean) => {
       const next = neighbourAfter(rowIds, threadId);
       toggleArchive(threadId, archived);
-      if (threadId === selectedId) moveTo(next);
+      if (threadId !== selectedId) return;
+      moveTo(next);
+      // loop-r2-08/L2-28: the last restore leaves nothing to advance to, and a list with no rows
+      // has no row to hold the focus — it landed on `<body>`, so the next Tab restarted at the top
+      // of the document. The screen's own `h1` is where a screen with no content puts it, which is
+      // the same target a screen switch uses (App.tsx). Deferred a frame because the heading is
+      // skipped when the view swaps; `preventScroll` keeps the jump out of it.
+      // Only the Archived view: it is the one the finding names, and its empty state is the one the
+      // user just created themselves.
+      if (next === null && view === "archived") {
+        requestAnimationFrame(() => {
+          const heading = document.querySelector(".inbox-card__title");
+          if (heading instanceof HTMLElement) heading.focus({ preventScroll: true });
+        });
+      }
     },
-    [rowIds, selectedId, toggleArchive, moveTo],
+    [rowIds, selectedId, view, toggleArchive, moveTo],
   );
 
   useKeymap(
@@ -823,20 +978,6 @@ export function Inbox({
   const tabStopId =
     selectedId !== null && rowIds.includes(selectedId) ? selectedId : (rowIds[0] ?? null);
 
-  // The needs-approval tab's count. It only means anything if it is the same number whether or
-  // not the tab is selected, so it is counted **before** the pill filter — from `channelFiltered`,
-  // the last stage upstream of it. (It read `labelFiltered`, which looks pre-pill and is not: that
-  // stage returns `pillFiltered` untouched when no label is chosen, so the count was taken after
-  // the pill after all. The badge then vanished on every tab whose own rows carry no approval —
-  // the agents view advertised no queue while both waiting threads sat one tab away.) At zero it
-  // is not drawn: an empty queue is said by an empty list, not by a badge.
-  const pendingCount = useMemo(
-    () =>
-      applyArchiveView(channelFiltered, view, pendingArchive).filter((r) => r.hasPendingApproval)
-        .length,
-    [channelFiltered, view, pendingArchive],
-  );
-
   // US-D08 §c.3: the subline under the title. Same three segments Mail shows, in that order, with
   // any segment that has nothing to say removed — and, because it is a join over a filtered array,
   // a separator can never be left dangling without a segment after it.
@@ -852,7 +993,9 @@ export function Inbox({
   const accountChannel = soleAccount ? CHANNEL_LABEL[soleAccount.channel as UiChannel] : null;
   const subline = [
     channelFilter ? CHANNEL_LABEL[channelFilter] : accountChannel,
-    latestSentAt === null ? null : `Updated ${formatRelativeTime(latestSentAt)}`,
+    // loop-r2-05: dropped when the shell cannot see the hub. "Updated now" over a socket that has
+    // been down for a minute is the one lie this header used to tell.
+    !connectionOk || latestSentAt === null ? null : `Updated ${formatRelativeTime(latestSentAt)}`,
     // Dropped at zero: an empty queue is said by an empty list, the rule the needs-approval count
     // badge already follows.
     unreadOnScreen > 0 ? `${unreadOnScreen} unread` : null,
@@ -860,10 +1003,24 @@ export function Inbox({
     .filter((segment): segment is string => segment !== null)
     .join(" · ");
 
+  /** loop-r2-05: the list has nothing to draw *and* its query has not answered yet. The `items`
+   *  presence check is the half that matters: an empty replica that has not synced looks exactly
+   *  like an empty mailbox, and only this says which one it is. Once rows exist they are drawn as
+   *  they always were, offline included — blanking synced rows would be a regression dressed as a
+   *  loading state, which is the rule Today's `screenState` already follows. */
+  const showSkeleton = itemsR.type !== "complete" && items.length === 0;
+
   return (
     <OpaqueSurface className="inbox-card">
       <div className="inbox-card__header">
-        <h2 className="inbox-card__title">{view === "archived" ? "Archived" : "Inbox"}</h2>
+        {/* loop-r2-08/L2-09: this is the screen's own title, so it is the screen's `h1` — it was
+            the only screen whose title was an `h2`, which is why `g i` had no heading to land on.
+            The styles hang off the class, so the rendered size is unchanged. `tabIndex={-1}` makes
+            it a programmatic focus target (the shell focuses it on a screen switch, and the
+            Archived view focuses it when the last restore empties the list). */}
+        <h1 className="inbox-card__title" tabIndex={-1}>
+          {view === "archived" ? "Archived" : "Inbox"}
+        </h1>
         {/* loop-r1-02/L-04: the queue's entry point. It is a fourth segment of the subline rather
             than a control of its own, because that is where Mail puts "N unread" and a person
             looking for what is waiting looks there. It is inline, so the line keeps the height of
@@ -921,8 +1078,15 @@ export function Inbox({
               >
                 <Icon size={16} aria-hidden="true" />
                 <span className="inbox-card__chip-label">{FILTER_LABEL[f]}</span>
-                {f === "needs-approval" && pendingCount > 0 && (
-                  <span className="inbox-card__pill-count">{pendingCount}</span>
+                {/* loop-r2-06/L2-07, NC2-08: the badge is the **shell's** number, not a count of
+                    the rows below. It used to count threads carrying an approval, which is a
+                    different question: archiving a thread took its still-pending approval off the
+                    badge while the subline and the queue went on counting it, so one screen showed
+                    three answers that drifted further apart with every archive. The pill's *filter*
+                    still lists threads — that is what a filter is — but what it advertises is the
+                    queue, which is one number and lives in the shell. */}
+                {f === "needs-approval" && pendingApprovals > 0 && (
+                  <span className="inbox-card__pill-count">{pendingApprovals}</span>
                 )}
               </button>
             );
@@ -950,81 +1114,90 @@ export function Inbox({
       {/* loop-r1-03: the wrapper exists to scope four keys — see onListKeyDown. It carries no
           tabindex of its own: the list's tab stop is the selected row, and the wrapper is not a
           stop at all (NC-18 counted the "list wrapper (no visible focus)" as one). */}
-      <div className="inbox-card__list" onKeyDown={onListKeyDown}>
-        <Virtuoso
-          ref={virtuosoRef}
-          role="listbox"
-          // loop-r1-03/NC-18: react-virtuoso puts tabIndex={0} on its scroller by default, which is
-          // the focusable-but-invisible stop the keyboard-only session counted. Taking it out
-          // leaves the list exactly one tab stop, on the selected row.
-          tabIndex={-1}
-          // loop-r1-03/NC-18: the skip link's target (App.tsx). It is the listbox itself rather
-          // than the wrapper above, so the focus the link moves already lands on the element that
-          // owns the arrows and Home/End — and no new tabindex had to be invented for it, since
-          // this one is here for the opposite reason. `-1` is not a tab stop, so the count below is
-          // unchanged: the list is still one stop, and it is still the selected row.
-          id="inbox-list"
-          style={{ flex: "1 1 0", minHeight: 0 }}
-          data={listItems}
-          // loop-r1-03: the row's identity, so React moves a row's DOM node with the row instead of
-          // reusing whatever node sat at that position. Without it, archiving a row shifts every row
-          // below it up one *position*, React reconciles the virtualiser's children by position,
-          // and the node that held the focus is handed to a different thread: the focus ring lands
-          // on a row nobody selected and a screen reader reads the wrong one. Measured, not
-          // theorised — shots-loop-r1-03 read the focus on b3a8cee8 while the selection was on
-          // 46ed6e45. The header half of the union already carries its own stable key (FlatItem).
-          computeItemKey={(_, item) => (item.kind === "header" ? item.key : item.row.id)}
-          itemContent={(index, item) =>
-            item.kind === "header" ? (
-              <GroupHeader pill={item.pill} count={item.count} />
-            ) : (
-              <InboxRow
-                // US-D08 §c.4: only the row at the end of the list drops its hairline. The index
-                // is the flat list index, and the last item is always a row — a group header is
-                // only ever emitted above the rows it counts.
-                last={index === listItems.length - 1}
-                id={item.row.id}
-                name={item.row.title}
-                summary={item.row.summary}
-                isDraft={item.row.isDraft}
-                avatar={item.row.avatar}
-                channel={item.row.channel}
-                // When the group header directly above states the status, the row does not say it
-                // again (ref-issue-tracker-density.webp also keeps state words in the header
-                // only). What it does not do is erase the fact that this is a session —
-                // overwriting agentState with null drops a runtime session row to a channel glyph
-                // and it starts calling itself a "Slack message" (round three's rejection).
-                agentState={item.row.agentState}
-                groupedByState={grouped}
-                timestamp={item.row.timestamp}
-                unread={item.row.unread}
-                unreadCount={item.row.unreadCount}
-                selected={item.row.id === selectedId}
-                // On the needs-approval tab every row is pending — repeating with a dot per row
-                // what the tab already said makes the dot distinguish nothing (the same rule as
-                // dropping the status badge under a group header: what is stated above is not
-                // repeated below).
-                hasPendingApproval={filter !== "needs-approval" && item.row.hasPendingApproval}
-                labels={item.row.labels}
-                person={item.row.person}
-                archived={view === "archived"}
-                leaving={leavingIds.has(item.row.id)}
-                // loop-r1-03: one Tab reaches the list and it lands on the selected row; every
-                // other row is one `j` away instead. See tabStopId.
-                tabStop={item.row.id === tabStopId}
-                // Focus *is* selection — a Tab into the list, Escape's focus restore and a row
-                // focused in another window all arrive here, and none of them opens the pane.
-                onFocusRow={setSelectedId}
-                // The mouse path takes the same advance as `e`: one archive rule, two triggers.
-                onArchive={(id) => archiveAndAdvance(id, view !== "archived")}
-                onSelect={(id) => {
-                  setSelectedId(id);
-                  onOpen?.({ threadId: item.row.threadId, agentSession: item.row.agentSession });
-                }}
-              />
-            )
-          }
-        />
+      <div
+        className={`inbox-card__list${showSkeleton ? " inbox-card__list--skeleton" : ""}`}
+        onKeyDown={onListKeyDown}
+        // loop-r2-05: the list says it is busy rather than sitting empty with nothing to announce.
+        aria-busy={showSkeleton ? "true" : undefined}
+      >
+        {showSkeleton ? (
+          <InboxSkeleton />
+        ) : (
+          <Virtuoso
+            ref={virtuosoRef}
+            role="listbox"
+            // loop-r1-03/NC-18: react-virtuoso puts tabIndex={0} on its scroller by default, which is
+            // the focusable-but-invisible stop the keyboard-only session counted. Taking it out
+            // leaves the list exactly one tab stop, on the selected row.
+            tabIndex={-1}
+            // loop-r1-03/NC-18: the skip link's target (App.tsx). It is the listbox itself rather
+            // than the wrapper above, so the focus the link moves already lands on the element that
+            // owns the arrows and Home/End — and no new tabindex had to be invented for it, since
+            // this one is here for the opposite reason. `-1` is not a tab stop, so the count below is
+            // unchanged: the list is still one stop, and it is still the selected row.
+            id="inbox-list"
+            style={{ flex: "1 1 0", minHeight: 0 }}
+            data={listItems}
+            // loop-r1-03: the row's identity, so React moves a row's DOM node with the row instead of
+            // reusing whatever node sat at that position. Without it, archiving a row shifts every row
+            // below it up one *position*, React reconciles the virtualiser's children by position,
+            // and the node that held the focus is handed to a different thread: the focus ring lands
+            // on a row nobody selected and a screen reader reads the wrong one. Measured, not
+            // theorised — shots-loop-r1-03 read the focus on b3a8cee8 while the selection was on
+            // 46ed6e45. The header half of the union already carries its own stable key (FlatItem).
+            computeItemKey={(_, item) => (item.kind === "header" ? item.key : item.row.id)}
+            itemContent={(index, item) =>
+              item.kind === "header" ? (
+                <GroupHeader pill={item.pill} count={item.count} />
+              ) : (
+                <InboxRow
+                  // US-D08 §c.4: only the row at the end of the list drops its hairline. The index
+                  // is the flat list index, and the last item is always a row — a group header is
+                  // only ever emitted above the rows it counts.
+                  last={index === listItems.length - 1}
+                  id={item.row.id}
+                  name={item.row.title}
+                  summary={item.row.summary}
+                  isDraft={item.row.isDraft}
+                  avatar={item.row.avatar}
+                  channel={item.row.channel}
+                  // When the group header directly above states the status, the row does not say it
+                  // again (ref-issue-tracker-density.webp also keeps state words in the header
+                  // only). What it does not do is erase the fact that this is a session —
+                  // overwriting agentState with null drops a runtime session row to a channel glyph
+                  // and it starts calling itself a "Slack message" (round three's rejection).
+                  agentState={item.row.agentState}
+                  groupedByState={grouped}
+                  timestamp={item.row.timestamp}
+                  unread={item.row.unread}
+                  unreadCount={item.row.unreadCount}
+                  selected={item.row.id === selectedId}
+                  // On the needs-approval tab every row is pending — repeating with a dot per row
+                  // what the tab already said makes the dot distinguish nothing (the same rule as
+                  // dropping the status badge under a group header: what is stated above is not
+                  // repeated below).
+                  hasPendingApproval={filter !== "needs-approval" && item.row.hasPendingApproval}
+                  labels={item.row.labels}
+                  person={item.row.person}
+                  archived={view === "archived"}
+                  leaving={leavingIds.has(item.row.id)}
+                  // loop-r1-03: one Tab reaches the list and it lands on the selected row; every
+                  // other row is one `j` away instead. See tabStopId.
+                  tabStop={item.row.id === tabStopId}
+                  // Focus *is* selection — a Tab into the list, Escape's focus restore and a row
+                  // focused in another window all arrive here, and none of them opens the pane.
+                  onFocusRow={setSelectedId}
+                  // The mouse path takes the same advance as `e`: one archive rule, two triggers.
+                  onArchive={(id) => archiveAndAdvance(id, view !== "archived")}
+                  onSelect={(id) => {
+                    setSelectedId(id);
+                    onOpen?.({ threadId: item.row.threadId, agentSession: item.row.agentSession });
+                  }}
+                />
+              )
+            }
+          />
+        )}
       </div>
       {/* US-D09 §c.6: M125's Filters sheet. It is a sibling of the prompt below rather than its
           ancestor, and that is load-bearing — both portal to <body>, and React bubbles a synthetic
