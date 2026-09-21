@@ -6,6 +6,7 @@ import {
   ChannelRail,
   CommandPalette,
   type CommandPaletteSearch,
+  ConnectionBanner,
   DETAIL_COLLAPSED_KEY,
   DETAIL_DEFAULT_WIDTH,
   DETAIL_WIDTH_KEY,
@@ -32,7 +33,8 @@ import {
   useFloatingPane,
   useNarrowShell,
 } from "@omnis/ui";
-import { ZeroProvider, useQuery } from "@rocicorp/zero/react";
+import { formatRelativeTime } from "@omnis/ui/lib/relative-time";
+import { ZeroProvider, useConnectionState, useQuery } from "@rocicorp/zero/react";
 import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
@@ -46,6 +48,7 @@ import { approvalDecideUrl, decideApproval } from "./api/approvals.js";
 import { type SearchHit, search, toUiSearchGroups } from "./api/search.js";
 import { fetchSettings, putSetting } from "./api/settings.js";
 import { isEditableTarget, isInsideOverlay, useKeymap } from "./hooks/use-keymap.js";
+import { useConnection } from "./lib/connection.js";
 import { AgentSession } from "./screens/AgentSession.js";
 import { Digest } from "./screens/Digest.js";
 import { Inbox, type OpenTarget } from "./screens/Inbox.js";
@@ -67,6 +70,21 @@ let zeroClient: ReturnType<typeof initZero> | undefined;
 function getZero() {
   zeroClient ??= initZero();
   return zeroClient;
+}
+
+/** loop-r2-05: the banner's freshness word. The formatter is the same one the Inbox subline reads
+ *  ("3m", "2h", "just now"), and the sentence around it is the banner's, so what the shell adds
+ *  here is only the " ago" — with no second suffix on a time that is already "now". */
+function syncedAgo(timestampMs: number): string {
+  const relative = formatRelativeTime(timestampMs);
+  return relative === "now" ? "just now" : `${relative} ago`;
+}
+
+/** The banner's two buttons both end here in the cases Zero cannot fix (see `onRetry`): a token is
+ *  issued by `loadZeroToken` at boot and nowhere else, so the only way to get a fresh one is to run
+ *  the boot again. Module scope for a stable identity — the banner takes it as a prop. */
+function reloadPage(): void {
+  window.location.reload();
 }
 
 /** The other half of A5 §2.4's go-to pair. The letters live in hooks/use-keymap.ts (GOTO_KEYS:
@@ -154,6 +172,16 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
   // two owners for one value. The prop the shell is handed is where it *starts*.
   const [screen, setScreen] = useState<ShellScreen>(initialScreen);
   const zero = useZeroClient();
+  /** loop-r2-05: one source for "can this window see omnis" (lib/connection.ts), drawn once by the
+   *  banner below and read once more by the Inbox's subline — before this, the Inbox said "Updated
+   *  now" and Today said "You're offline" about the same socket at the same moment.
+   *
+   *  Zero's own state is read a second time here rather than folded into `connection`, because the
+   *  banner's Retry button needs the raw name: `connection.kind` has already collapsed `error` and
+   *  `needs-auth` into `unreachable` and `session`, and those two are exactly the cases Zero's
+   *  `connect()` answers (it "does not reconnect from `disconnected` or `closed`"). */
+  const connection = useConnection();
+  const zeroConnection = useConnectionState();
   const [open, setOpen] = useState<OpenTarget | null>(null);
   // US-B30: a person is not a thread, so the detail pane's target is its own state rather than a
   // second variant on OpenTarget — the pane draws PersonDetail or Thread, never a mix, and one
@@ -860,6 +888,33 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
     />
   );
 
+  /** loop-r2-05: the shell's one line about sync. Zero's own `connect()` is the right call exactly
+   *  when Zero is paused waiting for the app to hand it something — `error` and `needs-auth` — and
+   *  useless in every other case: it does not reconnect a `disconnected` socket (1.9.0
+   *  `connection.d.ts`; Zero already retries those on its own), and with no token at all there is
+   *  nothing to reconnect *with*, because the token rides the client's constructor and only a boot
+   *  can supply one. So the fallback is a reload, which re-runs that boot. */
+  const onRetry = useCallback(() => {
+    if (zeroConnection.name === "error" || zeroConnection.name === "needs-auth") {
+      void zero.connection.connect();
+      return;
+    }
+    reloadPage();
+  }, [zero, zeroConnection.name]);
+
+  /** Rendered in exactly one of the two places below, like `askBar` — directly under the ask bar at
+   *  >=900, and the first thing in the list column at <900 (where the ask bar is the BottomBar's
+   *  pill instead, and a banner inside a fixed bar would be the wrong surface). One element, one
+   *  mount: there is never a second banner to keep in step. */
+  const connectionBanner = (
+    <ConnectionBanner
+      kind={connection.kind}
+      lastSyncedAt={connection.lastSyncedAt === null ? null : syncedAgo(connection.lastSyncedAt)}
+      onRetry={onRetry}
+      onReload={reloadPage}
+    />
+  );
+
   /** The list column's body: one screen at a time, and the Inbox is the default. The rail switches
    *  between them by screen — there is no URL router in the desktop app. */
   const screenBody =
@@ -898,6 +953,10 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
         // what is waiting to be decided, and a list filtered to one channel still has all of them.
         pendingApprovals={visibleApprovals.length}
         onOpenApprovals={() => setQueueOpen(true)}
+        // loop-r2-05: the subline's "Updated 3m ago" is a freshness claim, and it is only true
+        // while the connection is. When it is not, the banner above says what actually happened
+        // and the subline drops that segment rather than contradicting it.
+        connectionOk={connection.kind === "ok"}
         // loop-r1-06: the toast slot lives here, not in the screen, so that "Archived · Undo" from
         // the Inbox and "Approved: …" from a card are the same object in the same corner of the
         // window. The Inbox raises its own toasts through this.
@@ -993,6 +1052,9 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
       <div className="app-shell__main">
         {/* The wide tier keeps the ask bar at the top of the list, where it has been since US-D01. */}
         {narrow ? null : askBar}
+        {/* loop-r2-05: under the ask bar, above the rows — the one place in the shell that says
+            whether what is below it is live. */}
+        {connectionBanner}
         {screenBody}
       </div>
       {/* §c.9: the narrow tier's bar, above the rail bar rather than stacked into it. It is

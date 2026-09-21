@@ -36,10 +36,12 @@ vi.mock("../src/zero-client.js", () => ({
   initZero: () => zero,
   useZeroClient: () => zero,
   loadZeroToken: async () => {},
+  hasZeroToken: () => true,
 }));
 vi.mock("@rocicorp/zero/react", () => ({
   useQuery: (q: { __table: string }) => [store[q.__table] ?? [], { type: "complete" }],
   useZero: () => zero,
+  useConnectionState: () => ({ name: "connected" }),
   ZeroProvider: ({ children }: { children: unknown }) => children,
 }));
 

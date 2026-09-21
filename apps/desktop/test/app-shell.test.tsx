@@ -71,6 +71,9 @@ vi.mock("../src/zero-client.js", () => ({
   initZero: () => chain,
   useZeroClient: () => chain,
   loadZeroToken: async () => {},
+  // loop-r2-05: the shell now asks whether a token was ever issued, so the mock has to answer —
+  // without this every App test would draw the "Can't reach omnis" banner.
+  hasZeroToken: () => true,
 }));
 vi.mock("@rocicorp/zero/react", () => ({
   useQuery: (q: unknown) => [
@@ -78,6 +81,7 @@ vi.mock("@rocicorp/zero/react", () => ({
     { type: "complete" },
   ],
   useZero: () => chain,
+  useConnectionState: () => ({ name: "connected" }),
   ZeroProvider: ({ children }: { children: unknown }) => children,
 }));
 
@@ -1286,15 +1290,22 @@ describe("App shell approval queue (loop-r1-02: the list comes first)", () => {
     it("flushes the held-back ignore as a beacon if the window goes first", async () => {
       stubDecide();
       const sent: { url: string; body: BodyInit | null }[] = [];
-      vi.stubGlobal(
-        "navigator",
-        Object.assign(Object.create(navigator), {
-          sendBeacon: (url: string, body?: BodyInit | null): boolean => {
+      // loop-r2-05: `Object.assign` is not enough to build this stand-in any more. The shell reads
+      // `navigator.onLine` for the connection banner, and jsdom's is an own accessor with no setter,
+      // so assignment down the prototype chain throws. Own properties shadow it and leave the rest
+      // of `navigator` — the parts the shell also touches — inherited and real.
+      const fakeNavigator = Object.create(navigator) as Navigator;
+      Object.defineProperties(fakeNavigator, {
+        onLine: { value: navigator.onLine, configurable: true },
+        sendBeacon: {
+          configurable: true,
+          value: (url: string, body?: BodyInit | null): boolean => {
             sent.push({ url, body: body ?? null });
             return true;
           },
-        }),
-      );
+        },
+      });
+      vi.stubGlobal("navigator", fakeNavigator);
       approvals.rows = [approval("a1")];
       render(<App />);
       openQueue();
