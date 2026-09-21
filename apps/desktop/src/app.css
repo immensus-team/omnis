@@ -2677,6 +2677,35 @@ body {
   font-size: 12px;
 }
 
+/* The screen's two actions — "Draft a follow-up" on every queued card and "This is the same person"
+   in the footer. They are plain `<button>`s styled here, not `@omnis/ui`'s `Button`, because that
+   component styles itself only with Tailwind utilities and apps/desktop compiles no Tailwind: the
+   `variant="ghost"` it was given was inert, and both actions drew as the UA's grey system-font box
+   next to fully styled cards. Same reset and the same shape as `.network-screen__queue-chip`, so the
+   strip's chips and the actions read as one family of quiet controls; the background stays
+   transparent because this one class sits both inside a card and on the paper canvas. */
+.network-screen__action {
+  border: var(--hairline);
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.network-screen__action:hover {
+  border-color: var(--border-hairline-strong);
+  background: var(--state-hover);
+}
+
+.network-screen__action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* A5 §3.6's follow-up suggestion on the card. Inside the card it is a distinct block — a rule above
    it is the one hairline allowed here, and it separates "this is who they are" from "this is what
    to do about it". */

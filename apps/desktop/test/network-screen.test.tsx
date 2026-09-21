@@ -242,7 +242,12 @@ describe("Network screen (A5 §3.6)", () => {
   it("offers the follow-up on the card of a queued person", () => {
     render(<Network now={new Date(now)} />);
     expect(grid().getByText("No contact in 3 days.")).toBeInTheDocument();
-    expect(grid().getByRole("button", { name: "Draft a follow-up" })).toBeInTheDocument();
+    // The class is the assertion, not decoration: apps/desktop compiles no Tailwind, so a button
+    // that carries only `@omnis/ui`'s `Button` utilities draws as the UA's grey system-font box.
+    // `.network-screen__action` is what actually reset it.
+    expect(grid().getByRole("button", { name: "Draft a follow-up" })).toHaveClass(
+      "network-screen__action",
+    );
   });
 
   it("leaves a person who is not due out of the queue", () => {
@@ -279,6 +284,9 @@ describe("Network screen (A5 §3.6)", () => {
     // The plan puts the merge/split entry point here and leaves the dialog to follow-up scope, so
     // the button has to report that rather than pretend to work.
     render(<Network now={new Date(now)} />);
+    expect(screen.getByRole("button", { name: "This is the same person" })).toHaveClass(
+      "network-screen__action",
+    );
     fireEvent.click(screen.getByRole("button", { name: "This is the same person" }));
     expect(screen.getByRole("status")).toHaveTextContent("Merging two people isn't wired up yet.");
   });
@@ -301,6 +309,35 @@ describe("PersonDetail (A5 §3.6 — timeline, conversations across channels, no
     expect(screen.getByText("omnis launch sync")).toBeInTheDocument();
     expect(screen.getByText("Met at the November offsite.")).toBeInTheDocument();
     expect(screen.getByText("dana@example.com")).toBeInTheDocument();
+  });
+
+  it("says there are no notes when the column is NULL, not only when it was never set", () => {
+    // `persons.notes` is `string().optional()` on the Zero schema, so a NULL column reaches the pane
+    // as `null` rather than `undefined`. The first cut tested only for `undefined`, so a person with
+    // no notes — the Network shots' fixture has one — drew an empty <ul> under the heading, which
+    // reads as a section that failed to load rather than one with nothing in it.
+    ROWS.persons = [{ ...PERSON, notes: null }];
+    render(<PersonDetail personId="p1" />);
+    expect(screen.getByText("No notes yet.")).toBeInTheDocument();
+    expect(document.querySelector(".person-detail__notes")).toBeNull();
+  });
+
+  it("still lists routed notes while the person's own notes column is NULL", () => {
+    // The empty state must not swallow the notes the notes loop routed here: the heading has two
+    // sources, and "No notes yet." is only true when both are empty.
+    ROWS.persons = [{ ...PERSON, notes: null }];
+    ROWS.notes = [
+      {
+        id: "n1",
+        person_id: "p1",
+        body: "Introduced to Priya at the offsite.",
+        routed_to_person_id: "p1",
+        created_at: now,
+      },
+    ];
+    render(<PersonDetail personId="p1" />);
+    expect(screen.getByText("Introduced to Priya at the offsite.")).toBeInTheDocument();
+    expect(screen.queryByText("No notes yet.")).not.toBeInTheDocument();
   });
 
   it("opens the conversation behind a channel link", () => {

@@ -1,5 +1,4 @@
 import {
-  Button,
   type KeyValueRow,
   KeyValueTable,
   OpaqueSurface,
@@ -243,9 +242,18 @@ export function Network({ now: nowProp, onOpenPerson, onOpenThread }: NetworkPro
                       <p className="person-card__followup-body">
                         {contactGapLabel(person.last_contact_at ?? null, now)}
                       </p>
-                      <Button variant="ghost" onClick={() => onOpenPerson?.(person.id)}>
+                      {/* A plain `<button>` styled by `app.css`, not `@omnis/ui`'s `Button`: that
+                          component's Tailwind utilities are inert here (apps/desktop compiles no
+                          Tailwind), so it rendered as the UA's grey system-font box — visible in the
+                          first cut of these frames. This is the same reset `.today-screen__brief-button`
+                          and `.approval-card__actions button` make. */}
+                      <button
+                        type="button"
+                        className="network-screen__action"
+                        onClick={() => onOpenPerson?.(person.id)}
+                      >
                         Draft a follow-up
-                      </Button>
+                      </button>
                     </div>
                   )}
                 </PersonCard>
@@ -261,9 +269,9 @@ export function Network({ now: nowProp, onOpenPerson, onOpenThread }: NetworkPro
           (`mergePersons`/`splitIdentity` are the memory-ingestion plan's), so the button says so
           instead of opening an empty sheet. */}
       <footer className="network-screen__footer">
-        <Button variant="ghost" onClick={() => setMergeNote(true)}>
+        <button type="button" className="network-screen__action" onClick={() => setMergeNote(true)}>
           This is the same person
-        </Button>
+        </button>
         {mergeNote && (
           // `<output>` rather than `<p role="status">`: the element carries the role already.
           <output className="network-screen__merge-note">
@@ -414,13 +422,14 @@ export function PersonDetail({ personId, onOpenThread }: PersonDetailProps) {
           (notes.routed_to_person_id). */}
       <section className="person-detail__section" aria-label="Notes">
         <h3 className="person-detail__section-title">Notes</h3>
-        {person.notes === undefined && notes.length === 0 ? (
+        {/* `!person.notes`, not `=== undefined`: `persons.notes` is `string().optional()` on the Zero
+            schema, so a NULL column arrives as `null` — and the narrower check let that case through
+            to draw an empty `<ul>` under the heading instead of saying there is nothing to show. */}
+        {!person.notes && notes.length === 0 ? (
           <p className="person-detail__empty">No notes yet.</p>
         ) : (
           <ul className="person-detail__notes">
-            {person.notes !== undefined && person.notes !== null && person.notes !== "" && (
-              <li className="person-detail__note">{person.notes}</li>
-            )}
+            {person.notes ? <li className="person-detail__note">{person.notes}</li> : null}
             {notes.map((note) => (
               <li key={note.id} className="person-detail__note">
                 {note.body}
