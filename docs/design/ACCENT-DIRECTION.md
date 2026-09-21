@@ -107,12 +107,36 @@ The canvas grain is a **static painted pseudo-element on the non-scrolling shell
 
 No `mix-blend-mode`, in either theme. Film grain is bidirectional; plain alpha reads correctly on both paper and ink and costs the compositor nothing. `--grain` is defined in §2.2 and shared with the aurora.
 
-### 1.4 Accent goes to ink
+### 1.4 Accent goes to ink — **superseded: the accent is blue again (v3)**
 
-`--accent-500/600` are blue (hue 230). In a monotone app a blue accent competes with the aurora and reads as stock-SaaS. Rename and re-value; these two tokens are referenced only by `--accent` in the two theme blocks (`tokens.css:30` and `:69`), so the token edit itself is two lines plus the rename.
+> **v3 amendment, 2026-09-21 (`DESIGN-DIRECTION-v3.md` §a.2, §b.1).** This section used to read "Accent
+> goes to ink": D6 made `--accent` graphite, renaming `--accent-500/600` to `--ink-500/600`. v3 reverses
+> both the rename and the value. Logan's 2026-09-21 brief §8 is newer and explicit — "one accent (blue,
+> only for active/selected/links/primary button)" — and the reference is Apple Mail, whose entire
+> selection grammar is one blue. The tokens keep their names and become:
+>
+> ```css
+> --accent-600: oklch(0.48 0.18 255);   /* light theme. 4.8:1 on --bg-canvas; white on it is 4.8:1 */
+> --accent-500: oklch(0.72 0.14 255);   /* dark theme */
+> ```
+>
+> `:root { --accent: var(--accent-600); }` · `:root[data-theme="dark"] { --accent: var(--accent-500); }`
+> · `--accent-fg` stays paper / near-black. L 0.48 is the **ceiling**: above it, white text on an
+> accent-filled chip drops below 4.5:1. Do not raise it to match `#007AFF` — Apple's blue is ~3.6:1 and
+> we carry label text on ours. If a browser clamps the gamut, lower chroma to 0.16; never raise L.
+> D8 applies this to `packages/ui/src/tokens.css`.
+>
+> What survives unchanged: the **structural** rule behind guard 6 (exactly one accent hue), and every
+> layering and glass rule in §2 and §4.
+
+The rest of this section is the D6 audit that put the accent at graphite. Its per-consumer findings still
+hold — the accent token is a single value and every site below reads it — with the two amendments noted
+after the table.
+
+`--accent-500/600` were blue (hue 230). In a monotone app a blue accent competes with the aurora and reads as stock-SaaS. Rename and re-value; these two tokens are referenced only by `--accent` in the two theme blocks (`tokens.css:30` and `:69`), so the token edit itself is two lines plus the rename.
 
 ```css
-/* replaces --accent-500 / --accent-600 */
+/* D6 values — superseded by the v3 block above. */
 --ink-500: oklch(0.93 0.004 80);   /* dark-theme accent */
 --ink-600: oklch(0.26 0.008 80);   /* light-theme accent */
 ```
@@ -136,6 +160,8 @@ No `mix-blend-mode`, in either theme. Film grain is bidirectional; plain alpha r
 | 11 | `app.css:1013` `.filter-chip` fill | `oklch(from var(--accent) 0.97 …)` becomes L0.97 near-white on an L0.98 canvas — an invisible tint pretending to be one | **fix**: `background: var(--bg-elevated);` and delete the `oklch(from …)` (and the comment above it that explains a hue rotation that no longer happens) |
 | 12 | `packages/ui/src/components/button.tsx:11` primary CTA | near-black fill + paper text (light), paper fill + near-black text (dark) | fine — this is a correct primary button in both themes. No change. |
 | 13 | `packages/ui/src/lib/row-meta.ts:60-61` `CHANNEL_COLOR.agent` / `.system` | agent and system row glyphs lose their colour identifier | **keep as-is, deliberately**: every other channel glyph is a *brand* colour; agent/system are not brands, and graphite is the honest reading. Agent rows still carry the status badge (`idle`/`working`/`blocked`/`done`), which is the real identifier per DESIGN-DIRECTION. |
+
+**v3 drops exactly one of these fixes: row 8.** The underline on `.thread-screen__archived-banner button` was the answer to "a text-only affordance whose only signal was accent colour". With the accent blue again, blue text on paper is a sufficient link affordance — it is exactly Mail's "Unsubscribe" (M120, M112). Delete the `text-decoration: underline` requirement; the button stays at `color: var(--accent)`. Rows 7, 9, 11 and 13's outcomes stand unchanged: a draft is not "selected", an `info` pill filled in the selection blue would be indistinguishable from a selected one, and the agent/system glyph question is answered by the status badge either way.
 
 Two tests assert the token *name*, not its value — `packages/ui/test/row-meta.test.ts:69` and `packages/ui/test/channel-rail.test.tsx:55` both expect `var(--accent)`. They keep passing. Do not touch them.
 
@@ -645,7 +671,7 @@ If the answer to "why is there colour here" is "it looked flat", the answer is n
 - **`mist` has no mass at all** (§3.1), so nothing dark can land behind the rail's glyphs.
 - On `void` the mass crosses the content band by design — that surface answers with the card (§4.1.3), not with positioning.
 - Never set text colour to an aurora colour. Ink on aurora, never aurora on ink.
-- Existing focus rings stay `--accent` (graphite) — a focus ring drawn in aurora colours is invisible on an aurora surface.
+- Existing focus rings stay `--accent` (blue, §1.4) — a focus ring drawn in aurora colours is invisible on an aurora surface.
 
 ### 4.4 Glass stays — the chrome recipe over aurora
 
@@ -672,7 +698,7 @@ If the answer to "why is there colour here" is "it looked flat", the answer is n
 
 **Inside the glass: opaque cards, not more glass.** Content groups (the reference's Services block, the Settings strip) are `OpaqueSurface` — `background: var(--bg-base)`, `border-radius: 12px`, `border: 0`, `box-shadow: none`. No hairline, no shadow, no second `backdrop-filter`. Glass inside glass doubles the backdrop cost and reads as haze.
 
-- **Selected item = one filled pill.** `background: var(--accent); color: var(--accent-fg); border-radius: 10px;` — this is §1.4 row 4's "correct selected". Saturated in *value*, not in hue: the reference's blue pill becomes near-black on paper (paper on ink in dark). A hued selected pill is a §5.3 guard 6 reject.
+- **Selected item = one filled pill.** `background: var(--accent); color: var(--accent-fg); border-radius: 10px;` — this is §1.4 row 4's "correct selected". D6 read "saturated in *value*, not in hue" and turned the reference's blue pill near-black on paper; **v3 reverses that** (§1.4): the pill is blue, because the accent is blue. Guard 6 still holds — it forbids a *second* accent hue, not this one.
 - **Section labels with counts** ("Menu: 6", "Service: 3"): 12px, label in `--text-secondary`, count in `--text-primary` with `font-variant-numeric: tabular-nums`. No pill, no badge, no colour.
 - **Count badges are for alerts only.** A badge pill — `--danger-500` fill, `var(--gray-000)` text, `border-radius: 999px`, `min-width: 18px` — is allowed only where the count is an unread/needs-action alert (the reference's red "4"). Decorative counts stay plain text. Avatar stacks are images, not tinted chips.
 
@@ -728,7 +754,7 @@ Also capture 1 and 2 at 1440 with `prefers-reduced-transparency: reduce` emulate
 3. **No glow on buttons.** No `box-shadow` with a chromatic colour, no coloured focus ring, no hover that adds colour. Buttons get `--state-hover` and nothing else.
 4. **Aurora never sits under dense text.** Any surface with more than ~40 words on it puts those words on a scrim (`mist` counts as its own scrim, since it has no mass), or carries no aurora at all. Onboarding is the worked example: `void` behind, words on a card (§4.1.3). *One word changed from the previous draft — "uses `mist` and a scrim" would have made §4.1.3 a violation of a gate it actually satisfies.*
 5. **One recipe.** Exactly one `.aurora` stack exists in the codebase (field + mass + grain + vignette). If a second bespoke gradient appears "just for this one panel", it is a reject. (`--aurora-orb` and `--aurora-stroke` are the two named exceptions in §4.1.2 and there are no others.)
-6. **No rainbow accent.** `--accent` is graphite. Semantic colour is limited to `--danger-500`, `--warn-500`, `--success-500` and the brand channel glyphs. A fourth coloured UI token is a reject.
+6. **No rainbow accent.** `--accent` is **one hue** — blue, `oklch(0.48 0.18 255)` in light and `oklch(0.72 0.14 255)` in dark (§1.4, v3 §b.1; D6's graphite is superseded). Semantic colour is limited to `--danger-500`, `--warn-500`, `--success-500` and the brand channel glyphs. A fourth coloured UI token is a reject, and a third accent-ish hue used for emphasis is one too.
 7. **Reads as glass, not a tinted panel.** A chrome surface (rail plate, ask panel, sheet, popover) whose fill is opaque, whose `backdrop-filter` is gone outside the reduced-transparency block, or whose tint carries chroma, is a reject — §4.4. The aurora is visible *through* the plate, never painted onto it.
 
 Plus the standing 12-line list in `docs/design/SKILLS.md` — this section adds to it, it does not replace it.

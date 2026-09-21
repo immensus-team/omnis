@@ -3,11 +3,11 @@
 **The baseline is kinso.** References: `reference/kinso-inbox.webp`, detailed teardown `../research/23-gap-kinso-visual-teardown.md`, OSS borrowing plan `../research/30-herdr-and-oss-ui-borrow.md`.
 
 ## What we follow as-is
-- **Light theme by default** (warm off-white canvas + faint grid + film grain; the peach/mint gradient wash is retired by the 2026-09-21 monotone directive — colour lives only on the three aurora surfaces in `ACCENT-DIRECTION.md`). Dark is an option, and A5's "dark-first" is dropped.
+- **Light theme by default** (plain paper canvas + 3.5% film grain; the grid and the peach/mint gradient wash are both retired by the 2026-09-21 monotone directive — colour lives only on the three aurora surfaces in `ACCENT-DIRECTION.md` and on the single blue accent). Dark is an option, and A5's "dark-first" is dropped.
 - **Left channel rail**: vertical squircle tiles. Inbox tile at the top (black), channel brand icons below it (Gmail, Slack, LinkedIn, WhatsApp, Telegram, KakaoTalk, Outlook, Calendar), agent tile, collapse arrow. My avatar and settings at the bottom.
 - **Top "Start typing to ask or search" bar**: an input that keeps the ⌘K palette always visible. omnis orb (gradient bead) on the left, gradient stroke on focus.
-- **Inbox row = conversation (person) unit**: circular avatar + bold name + gray relative time (3m, 2w, 4 Aug) + **one-line AI summary** ("Wants you to share a sales contract from Brightstone Realty …") + fixed channel brand icon on the right. No hairlines, generous row height, only the selected row elevates into a white card + soft shadow.
-- **List header** carrying just the one-line Inbox title. The filter pills (All/Work/Personal/Agents/Needs approval) sit small on the right side of the header.
+- **Inbox row = conversation (person) unit**: circular avatar + bold name + gray relative time (3m, 2w, 4 Aug) + **one-line AI summary** ("Wants you to share a sales contract from Brightstone Realty …") + fixed channel brand icon on the right. Generous row height. **Hairlines are allowed in lists**, at ≤ 8% ink and inset from the row's left edge to where the text column starts — a full-bleed divider, or ink above 8%, turns the list into a table. On desktop only the selected row elevates into a white card + soft shadow; in the `<900` tier the selected row is a **flat tint with no shadow** (a lifted card under a floating bar reads as two stacked sheets).
+- **List header** carrying a large Inbox title and a gray one-line subline, with a **full-width horizontally scrolling category-chip row** (All/Work/Personal/Agents/Needs approval) directly beneath it. The Archived toggle and "+ Label" are circular icon buttons at the row's end.
 
 ## What we change to fit omnis's purpose
 - Agent sessions use the same row grammar. Runtime logo in the avatar slot (Claude/Codex/DeepSeek/Hermes), last-turn summary in the summary slot, status badge in the right icon slot (idle/working/**blocked**/done — the herdr state model). blocked (needs my response) floats to the top of the list.
@@ -22,7 +22,7 @@
 
 - **DeepSeek V4.1 Flash is the workhorse for iterative UI/UX polish.** Assign UI stories to the DeepSeek tier and have a Sonnet driver execute and verify them. Reviewers compare screenshots against the references below and reject anything that "looks like AI slop" (uniform card grids, purple gradients everywhere, excessive shadows, meaningless icons, bland default fonts, and static transitions are all slop signals).
 - **Keep researching, installing, and using open-source design skills.** Keep the install list and usage notes in `docs/design/SKILLS.md` (created after research).
-- **Apple-like and glassy, with natural motion.** Liquid Glass only on sidebar/toolbar/sheet/palette/floating panels; lists and body content stay opaque (existing rule). Motion is spring-based (160ms entry, 240ms transition, 320ms layer appearance; no exaggeration) and respects reduced-motion.
+- **Apple-like and glassy, with natural motion.** Liquid Glass only on sidebar/toolbar/sheet/palette/floating panels — and two more members of that set, both of them toolbars: the `<900` bottom bar and the detail action bar. Lists and body content stay opaque (existing rule). Motion is spring-based (160ms entry, 240ms transition, 320ms layer appearance; no exaggeration) and respects reduced-motion.
 
 ### 3 reference images (`reference/`)
 | File | Details to borrow |
@@ -43,7 +43,8 @@ table with it.
 |---|---|
 | `999px` | Pills — tab pills, row label chips, status badges |
 | `22px` | The channel rail plate (`.channel-rail__plate`) |
-| `20px` | Large screen-filling surfaces — `.inbox-card`, `.ask-panel` |
+| `20px` | Large screen-filling surfaces — `.inbox-card`, `.ask-panel`, sheet cards |
+| `16px` | A grouped card inside a sheet — the white group on the sheet's grey field |
 | `12px` | Floating surfaces — status pills, hover card, filter popover |
 | `10px` | A step down inside a large surface — ask panel actions, the archive banner |
 | `8px` | List surfaces — selected/hovered rows, filter chips, the add-chip button |
