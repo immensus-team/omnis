@@ -2735,3 +2735,318 @@ body {
     --dur-reorder: 0ms;
   }
 }
+
+/* ==========================================================================================
+   US-D09 §c.6/§c.8 — the Sheet, its groups and rows, and the ConfirmPrompt.
+
+   Both are portalled to <body> (see the components), which is why nothing below uses
+   `@container shell`: a container query only matches a descendant of the container, and a portal
+   puts these outside `#root`. `#root` is the viewport-wide shell container, so the media queries
+   here and the container queries everywhere else in this file resolve to the same widths.
+   ========================================================================================== */
+
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  /* Above the detail pane's 20 and the BottomBar's band — a sheet is the topmost thing on screen
+     while it is up, including when it is opened from a thread. */
+  z-index: 40;
+  display: flex;
+  /* <900: flush to the bottom edge, the way M125's Filters sheet is. */
+  align-items: flex-end;
+  justify-content: center;
+  /* The backdrop is the overlay's own fill, and it cross-fades (--dur-base) rather than arriving
+     with the panel's slide. */
+  background: oklch(0 0 0 / 0.18);
+  animation: fade-in var(--dur-base) var(--ease-spring);
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  /* A sheet taller than the viewport is a second scroller with no way back to the header. */
+  max-height: min(85vh, 640px);
+  /* Top corners only: the bottom edge is the viewport's. */
+  border-radius: 20px 20px 0 0;
+  animation: sheet-in var(--dur-panel) var(--ease-spring);
+}
+
+/* §c.6: above the narrow tier the same component is a centred card with all four corners. */
+@media (min-width: 900px) {
+  .sheet-overlay {
+    align-items: center;
+  }
+
+  .sheet {
+    width: min(480px, calc(100% - 48px));
+    border-radius: 20px;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* 44px, the title centred, the way out on one side. `touch-action: none` because this is the one
+   part of the sheet that is a drag handle — without it the browser reads a downward drag on the
+   header as a scroll and sends `pointercancel` instead of the end of the gesture. */
+.sheet__header {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0 8px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.sheet__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* The two header controls. A pill rather than M125's 32px circle: the confirm's label is a word
+   ("Done"), and a word does not fit a 32px circle at 13px. It is still 32px tall, still filled
+   `--accent`, still right-aligned; only the horizontal padding is added. */
+.sheet__close,
+.sheet__confirm {
+  position: absolute;
+  top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sheet__close {
+  left: 8px;
+  background: var(--chip-bg);
+  color: var(--text-primary);
+}
+
+.sheet__confirm {
+  right: 8px;
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.sheet__body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 16px 20px;
+}
+
+.sheet-group {
+  margin-bottom: 20px;
+}
+
+.sheet-group:last-child {
+  margin-bottom: 4px;
+}
+
+.sheet-group__label {
+  margin: 0 0 6px;
+  padding: 0 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* The white card on the sheet's grey field. `OpaqueSurface` supplies the fill; this rule supplies
+   only the shape, and adds no border or shadow — a card inside a sheet that draws its own edge is
+   a second floating surface in a box that is already one. */
+.sheet-group__card {
+  border-radius: var(--radius-group);
+  border: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.sheet-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sheet-row--static {
+  cursor: default;
+}
+
+.sheet-row:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.sheet-row:not(.sheet-row--static):hover {
+  background: var(--state-hover);
+}
+
+.sheet-row__label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sheet-row__trailing {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* §c.6: rows inside one group are separated by the list hairline, inset to the label column — the
+   same ink as `.inbox-row::after` and for the same reason (the `--border-row` token is a border
+   shorthand and `background` cannot take it). Inset on both sides: a full-bleed rule inside a
+   rounded card turns the group into a table (guard 3). */
+.sheet-row + .sheet-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 16px;
+  height: 1px;
+  background: oklch(0.2 0.004 80 / 0.07);
+  pointer-events: none;
+}
+
+.sheet-row__check {
+  color: var(--accent);
+  font-size: 15px;
+}
+
+/* ---- ConfirmPrompt (§c.8) ---- */
+
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  /* Above the sheet: a prompt raised from inside one has to cover it. */
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+  background: oklch(0 0 0 / 0.18);
+  animation: fade-in var(--dur-base) var(--ease-spring);
+}
+
+.confirm-prompt {
+  width: min(320px, calc(100% - 48px));
+  padding: 20px 16px 16px;
+  border-radius: 20px;
+  text-align: center;
+  animation: confirm-in var(--dur-panel) var(--ease-spring);
+}
+
+@keyframes confirm-in {
+  from {
+    transform: scale(0.96);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.confirm-prompt__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.confirm-prompt__body {
+  margin: 6px auto 0;
+  max-width: 40ch;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* See the TSX: `wrap-reverse` is what puts a wrapped confirm on top, and it only does that while
+   the cancel button is the first child. `min-width: max-content` is the whole stacking rule — a
+   pill cannot shrink below its own label, so a label needing more than half the row breaks the
+   line by itself. */
+.confirm-prompt__actions {
+  display: flex;
+  flex-wrap: wrap-reverse;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.confirm-prompt__button {
+  flex: 1 1 0;
+  min-width: max-content;
+  height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.confirm-prompt__button--confirm {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.confirm-prompt__button--confirm[data-destructive="true"] {
+  background: var(--danger-500);
+  color: var(--gray-000);
+}
+
+.confirm-prompt__button--cancel {
+  background: var(--chip-bg);
+  color: var(--text-primary);
+}
+
+/* §c.6/§c.8 under reduced motion: the sheet arrives without sliding and the prompt without
+   scaling. `animation-name` rather than `animation: none` for the same reason the ask panel uses
+   it — the element is conditionally rendered, so a fade keeps the entrance and the end event. */
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    animation-name: fade-in;
+  }
+
+  .confirm-prompt {
+    animation-name: fade-in;
+  }
+}
+
+/* §c.6: with transparency reduced, the sheet and the popover fall back to their flat fills. Two
+   classes on each selector so this beats `.glass-surface` on specificity rather than on the order
+   the two stylesheets happen to be bundled in — `@omnis/ui/tokens.css` owns that rule. */
+/* biome-ignore lint/correctness/noUnknownMediaFeatureName: prefers-reduced-transparency is a real Media Queries L5 feature (WebKit implements it); Biome's list simply has not caught up. */
+@media (prefers-reduced-transparency: reduce) {
+  .glass-surface.sheet {
+    background: var(--bg-sheet);
+  }
+
+  .glass-surface.confirm-prompt {
+    background: var(--bg-sheet);
+  }
+}
