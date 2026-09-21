@@ -33,6 +33,14 @@ describe("SETTING_DEFAULTS (US-B33)", () => {
     expect(SETTING_DEFAULTS["cost.cap_usd"]).toBe(60);
     expect(SETTING_DEFAULTS["cost.last_state"]).toBeNull();
   });
+
+  // US-D10: the detail pane's layout. The width's unset state is null and not a number, because
+  // the width the shell ships with is a grid track at >=1280 and a sheet below it — a number here
+  // would be a second answer to a question the CSS already answers.
+  it("leaves the detail pane's width unset and its collapsed flag off", () => {
+    expect(SETTING_DEFAULTS["ui.detail_width"]).toBeNull();
+    expect(SETTING_DEFAULTS["ui.detail_collapsed"]).toBe(false);
+  });
 });
 
 describe("getSetting", () => {

@@ -8,6 +8,8 @@ import "./setup";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { VirtuosoMockContext } from "react-virtuoso";
 import { describe, expect, it, vi } from "vitest";
+// Type-only, so it is erased and cannot race the mocked dynamic import below.
+import type { InboxFilter } from "../src/screens/Inbox";
 
 const THREADS = {
   pending: "11111111-1111-1111-1111-111111111111",
@@ -161,7 +163,7 @@ globalThis.ResizeObserver ??= class {
   disconnect() {}
 } as unknown as typeof ResizeObserver;
 
-const { Inbox } = await import("../src/screens/Inbox");
+const { Inbox, FILTER_LABEL } = await import("../src/screens/Inbox");
 
 vi.stubGlobal(
   "fetch",
@@ -191,11 +193,12 @@ const headerCounts = (container: HTMLElement): string[] =>
 const rowNames = (): string[] =>
   screen.getAllByRole("option").map((r) => r.querySelector(".inbox-row__name")?.textContent ?? "");
 
-// The needs-approval pill's accessible name carries the count ("needs-approval 2"), so it is
-// matched by prefix.
-const filterTab = (name: string) =>
-  screen.getByRole("radio", { name: (n: string) => n.startsWith(name) });
-const filterBy = (name: string) => fireEvent.click(filterTab(name));
+// US-D08 §c.3: a chip's accessible name is exactly its label — the pending count is a child of the
+// needs-approval chip and is deliberately *not* in the name, so this is an exact match, and the
+// labels come from FILTER_LABEL rather than from a second copy of the words in this file.
+const filterTab = (filter: InboxFilter) =>
+  screen.getByRole("radio", { name: FILTER_LABEL[filter] });
+const filterBy = (filter: InboxFilter) => fireEvent.click(filterTab(filter));
 
 describe("Inbox group headers (US-D02)", () => {
   it("puts blocked above working in the agents view", () => {
@@ -277,7 +280,7 @@ describe("Inbox group headers (US-D02)", () => {
     const { container } = renderInbox();
     expect(container.querySelectorAll(".group-header")).toHaveLength(0);
 
-    for (const name of ["work", "personal"]) {
+    for (const name of ["work", "personal"] as const) {
       filterBy(name);
       expect(container.querySelectorAll(".group-header")).toHaveLength(0);
     }

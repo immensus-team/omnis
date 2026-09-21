@@ -50,6 +50,34 @@ describe("InboxRow (U2 kinso conversation row, one per thread)", () => {
     expect(screen.queryByLabelText("Unread")).not.toBeInTheDocument();
   });
 
+  // US-D08 §c.4: the dot moved out of the meta line into the row's own leading column, so it is the
+  // avatar's sibling and not the name's. The difference is not cosmetic — inside the meta line it
+  // pushed the name and the time along by its own width, and every unread row in the list was
+  // indented against every read one.
+  it("puts the unread dot in the row's gutter, beside the avatar rather than the name", () => {
+    const { container } = render(<InboxRow {...baseProps} unread={true} />);
+    // US-D08 §c.4: the grid is on the content wrapper since the swipe — the row's own box carries
+    // the padding and the hairline, and this half is what translates.
+    const content = container.querySelector(".inbox-row__content");
+    const dot = container.querySelector(".inbox-row__unread-dot");
+
+    expect(dot?.parentElement).toBe(content);
+    expect(container.querySelector(".inbox-row__meta")?.contains(dot)).toBe(false);
+    // Order says which grid column it takes: the dot is placed before the avatar, and app.css gives
+    // the two of them columns 1 and 2 respectively.
+    expect(content?.firstElementChild).toBe(dot);
+  });
+
+  // US-D08 §c.4: the list says which row is last, because Virtuoso gives every row its own wrapper
+  // and a `:last-child` selector in CSS would therefore be true of all of them.
+  it("marks the last row of the list so the hairline under it can be dropped", () => {
+    const { container: withLast } = render(<InboxRow {...baseProps} last={true} />);
+    expect(withLast.querySelector(".inbox-row")).toHaveClass("inbox-row--last");
+
+    const { container: without } = render(<InboxRow {...baseProps} />);
+    expect(without.querySelector(".inbox-row")).not.toHaveClass("inbox-row--last");
+  });
+
   it("prefixes draft summaries with 'Draft: ' (A5 §3.1)", () => {
     render(<InboxRow {...baseProps} isDraft={true} summary="Yes, got it" />);
     expect(screen.getByText("Draft: Yes, got it")).toBeInTheDocument();
@@ -327,5 +355,70 @@ describe("InboxRow hover card (US-D02)", () => {
     });
     act(() => vi.advanceTimersByTime(400));
     expect(within(card() as HTMLElement).queryByText("Channels")).not.toBeInTheDocument();
+  });
+});
+
+// US-D09 §c.7: the row's `…`. The swipe is the row's gesture, so guard 11 wants a way to reach the
+// same action without it — and the contextual menu is where the row's actions are enumerated. What
+// these assert is that the enumeration is the row's own: the menu says what the pill says, from the
+// same `archived` flag, and pressing it calls the same handler.
+describe("InboxRow contextual menu (US-D09 §c.7)", () => {
+  /** A press, not a bare click: jsdom's `click` never focuses the element it fires on, and Radix
+   *  hands focus back to whatever was focused when the panel opened. */
+  function openMenu(): HTMLElement {
+    const trigger = screen.getByRole("button", { name: "More actions" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    return screen.getByRole("dialog");
+  }
+
+  it("shows Open and the archive action, and does not open the thread on the way", () => {
+    const onSelect = vi.fn();
+    const onArchive = vi.fn();
+    render(<InboxRow {...baseProps} onSelect={onSelect} onArchive={onArchive} />);
+
+    const menu = openMenu();
+    expect(within(menu).getByText("Open")).toBeInTheDocument();
+    expect(within(menu).getByText("Archive")).toBeInTheDocument();
+    // The row is one big click target, so without the trigger stopping propagation, opening the
+    // menu would also open the thread behind it.
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("runs the row's own open and archive, with the row's id", () => {
+    const onSelect = vi.fn();
+    const onArchive = vi.fn();
+    render(<InboxRow {...baseProps} onSelect={onSelect} onArchive={onArchive} />);
+
+    fireEvent.click(within(openMenu()).getByText("Archive"));
+    expect(onArchive).toHaveBeenCalledWith("thread-1");
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.click(within(openMenu()).getByText("Open"));
+    expect(onSelect).toHaveBeenCalledWith("thread-1");
+  });
+
+  // The reviewer's check, asserted where it can actually fail: the menu's second row is read
+  // against the pill in the same render, so a row that says "Restore" on one and "Archive" on the
+  // other is caught by its own inconsistency rather than by a hardcoded string that agrees with one
+  // of them.
+  it.each([false, true])("lists the swipe action the row is showing (archived=%s)", (archived) => {
+    const { container } = render(
+      <InboxRow {...baseProps} archived={archived} onArchive={vi.fn()} />,
+    );
+    const pillLabel = container.querySelector(".inbox-row__action")?.textContent;
+
+    const menu = openMenu();
+    expect(pillLabel).toBe(archived ? "Restore" : "Archive");
+    expect(within(menu).getByText(pillLabel as string)).toBeInTheDocument();
+  });
+
+  it("keeps Open when the row has nothing to archive", () => {
+    // A row with no archive action has no swipe either, so the check above is vacuous for it —
+    // but the `…` still has to be there and still has to do something.
+    render(<InboxRow {...baseProps} />);
+    const menu = openMenu();
+    expect(within(menu).getByText("Open")).toBeInTheDocument();
+    expect(within(menu).queryByText("Archive")).not.toBeInTheDocument();
   });
 });

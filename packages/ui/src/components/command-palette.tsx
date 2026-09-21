@@ -8,7 +8,7 @@ import {
   readAskModel,
   writeAskModel,
 } from "../lib/ask-model.js";
-import { PANEL_MS, motionMs } from "../lib/motion.js";
+import { useClosingSpring } from "../lib/motion.js";
 import { AskPanel } from "./ask-panel.js";
 import { GlassSurface } from "./glass-surface.js";
 
@@ -364,30 +364,9 @@ function InlinePalette({
 
 /** Closing has to run the same spring the opening does (brief: spring open/close), which means the
  *  panel has to stay in the DOM while it runs — CSS alone cannot animate an element that has already
- *  unmounted. US-D04: the length and the reduced-motion answer both live in lib/motion.ts, next to
- *  the row-leave hold that needs the same arithmetic. */
-function panelExitMs(): number {
-  return motionMs(PANEL_MS);
-}
-
-function useClosingSpring(open: boolean): boolean {
-  const [closing, setClosing] = useState(false);
-  // A first render that is already closed must not run the close animation (it never opened, so
-  // there is nothing to leave).
-  const everOpened = useRef(open);
-  useEffect(() => {
-    if (open) {
-      everOpened.current = true;
-      setClosing(false);
-      return;
-    }
-    if (!everOpened.current) return;
-    setClosing(true);
-    const timer = setTimeout(() => setClosing(false), panelExitMs());
-    return () => clearTimeout(timer);
-  }, [open]);
-  return closing;
-}
+ *  unmounted. US-D04 moved the hook itself to lib/motion.ts when US-D10's detail pane needed the
+ *  same hold at a different length; the default there is this panel's PANEL_MS, so this call site
+ *  reads as it always did. */
 
 /** US-D01 model picker. There is no settings HTTP route, so it lives in localStorage only
  *  (lib/ask-model.ts). The menu is deliberately opaque — glass over glass kills the text

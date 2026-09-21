@@ -18,6 +18,10 @@ export type SettingKey =
   | "ingest.github_repos"
   | "autonomy.rules"
   | "kakao.send_enabled_at"
+  // US-D10: the detail pane's layout. `ui.detail_width` is null while the pane has never been
+  // dragged — null means "the shell's own default", not a number the client has to invent.
+  | "ui.detail_width"
+  | "ui.detail_collapsed"
   // The decision tier's provider switch — "llm" (default) or "jev".
   // See docs/decisions/2026-09-21-jev-decision-tier.md.
   | "agents.decision_provider";
@@ -36,6 +40,10 @@ export const SETTING_DEFAULTS: Readonly<Record<SettingKey, unknown>> = {
   "ingest.github_repos": [],
   "autonomy.rules": [],
   "kakao.send_enabled_at": null,
+  // US-D10. Null, not 420: the width the layout ships with is a grid track at >=1280 and a sheet
+  // below it, and baking a pixel value in here would make the two disagree on a fresh install.
+  "ui.detail_width": null,
+  "ui.detail_collapsed": false,
   "agents.decision_provider": "llm",
 };
 

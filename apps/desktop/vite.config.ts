@@ -3,14 +3,17 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
-  // import.meta.env.OMNIS_ZERO_URL (read by zero-client.ts) is not injected into the bundle under
-  // the default envPrefix ("VITE_"), which is how the override contract §7 pins down dies without
-  // a word.
+  // `import.meta.env.OMNIS_ZERO_URL`, which zero-client.ts reads, is not injected into the bundle
+  // under the default envPrefix ("VITE_") — an override the contract §7 pins down would die quietly.
   envPrefix: ["VITE_", "OMNIS_"],
   clearScreen: false,
-  // The hub (127.0.0.1:8787) is a different origin from the dev server and hands out no CORS
-  // headers (contract §5's 127.0.0.1 boundary). In dev it is proxied onto the same origin, and the
-  // clients use relative paths (OMNIS_HUB_HTTP_URL="").
+  // The hub (127.0.0.1:8787) is a different origin from the dev server and sends no CORS headers
+  // (the 127.0.0.1 boundary of contract §5). In dev everything is proxied to the same origin and the
+  // client sets OMNIS_HUB_HTTP_URL="" to use relative paths — so this table is the whole list of
+  // routes the app may call. A path missing from it fails *quietly*: Vite's SPA fallback answers the
+  // GET with index.html and a 200, `fetchSettings` dies in `res.json()` and returns `{}`, and every
+  // preference falls back to its default with nothing in the console. US-D10's two `ui.detail_*`
+  // writes are how `/settings` was found missing here.
   server: {
     port: 5173,
     strictPort: true,
@@ -28,6 +31,7 @@ export default defineConfig({
       // Same failure mode as /search above, and the reason it has to be spelled out twice: prefix is
       // the whole match rule, so "/settings" covers "/settings/cost.cap_usd" but nothing else here,
       // and /cost is a separate route. The screen's `data-state` lands on "error" without these.
+      // US-D10 writes the same two keys the detail pane's layout lives in, through the same prefix.
       "/settings": "http://127.0.0.1:8787",
       "/cost": "http://127.0.0.1:8787",
     },

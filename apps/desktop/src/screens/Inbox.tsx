@@ -1,10 +1,21 @@
 import {
   ArchiveIcon,
+  BotIcon,
+  BriefcaseIcon,
+  CONFIRM_COPY,
+  ClockIcon,
+  ConfirmPrompt,
   type FilterChip,
   FilterChipBar,
+  InboxIcon,
   OpaqueSurface,
+  Sheet,
+  SheetCheck,
+  SheetGroup,
+  SheetRow,
   type UiChannel,
   type UiItemStatus,
+  UserIcon,
 } from "@omnis/ui";
 import { groupBy } from "@omnis/ui/components/command-palette";
 import { GroupHeader } from "@omnis/ui/components/group-header";
@@ -28,6 +39,29 @@ import { useZeroClient } from "../zero-client.js";
 
 export const FILTERS = ["all", "work", "personal", "agents", "needs-approval"] as const;
 export type InboxFilter = (typeof FILTERS)[number];
+
+/** US-D08 §c.3: the chip's visible word. It is Title Case where the filter id is a slug —
+ *  "needs-approval" is an id, never a label — and it is also the chip's accessible name, so the
+ *  name is identical whether or not the container query has folded the word away. Exported because
+ *  a test that spells "Agents" itself is a second copy of this map that fails for the wrong reason
+ *  the day a label is reworded. */
+export const FILTER_LABEL: Record<InboxFilter, string> = {
+  all: "All",
+  work: "Work",
+  personal: "Personal",
+  agents: "Agents",
+  "needs-approval": "Needs approval",
+};
+
+/** US-D08 §c.3: one 16px glyph per chip, drawn at every width. Below 560px of list pane the label
+ *  folds and the glyph is all that is left, which is why the row cannot be text-only. */
+const FILTER_ICON: Record<InboxFilter, typeof InboxIcon> = {
+  all: InboxIcon,
+  work: BriefcaseIcon,
+  personal: UserIcon,
+  agents: BotIcon,
+  "needs-approval": ClockIcon,
+};
 
 /** The minimum the shell (App.tsx) needs to pick a screen. Thread and AgentSession look at the
  *  same threads row, but only kind='agent_session' opens the session screen (A5 §3.3). */
@@ -194,6 +228,9 @@ interface ThreadRow extends InboxQueryItem, ArchivableRow, SortableInboxRow {
   isDraft: boolean;
   channel: UiChannel;
   timestamp: string;
+  /** US-D08 §c.3: the header subline's clock. `timestamp` is already a finished relative phrase and
+   *  cannot be compared, so the raw value travels alongside it. */
+  sentAt: number;
   unread: boolean;
   unreadCount: number;
   labels: LabelChip[];
@@ -211,6 +248,8 @@ export function Inbox({
   onOpen,
   channelFilter = null,
   onChannelFilterChange,
+  filtersOpen = false,
+  onFiltersOpenChange,
 }: {
   onOpen?: (target: OpenTarget) => void;
   /** U1 channel rail selection. null = everything (the Inbox tile). ANDed with the pill filters
@@ -219,6 +258,11 @@ export function Inbox({
   /** US-D02: how the channel chip's x undoes the rail selection. Without it the channel chip is
    *  not drawn at all — an x that does nothing is worse than no x. */
   onChannelFilterChange?: (c: UiChannel | null) => void;
+  /** US-D09 §c.6: M125's sheet, opened by the BottomBar's filters circle. It is controlled from the
+   *  shell because the trigger is the shell's bar, while the state it edits (the filter pill, the
+   *  Archived view, the label chips) is this screen's. */
+  filtersOpen?: boolean;
+  onFiltersOpenChange?: (open: boolean) => void;
 }) {
   const zero = useZeroClient();
   const [filter, setFilter] = useState<InboxFilter>("all");
@@ -234,6 +278,10 @@ export function Inbox({
   // US-D02: the label chip filter. An empty Set means no label condition (it is ANDed with the
   // others).
   const [selectedLabelIds, setSelectedLabelIds] = useState<Set<string>>(new Set());
+  /** US-D09 §c.8: the bulk action's confirmation. It holds the **ids** the question named rather
+   *  than a count or a boolean: the question says "Archive 3 threads?" and confirming has to archive
+   *  those three, not whatever is on screen a replication later. */
+  const [archiveAll, setArchiveAll] = useState<string[] | null>(null);
 
   // Deviation from plan A26 step 7, measured against interface contract §7's zeroSchema: the
   // zeroSchema (A21, packages/kernel/src/zero-schema.ts) defines only the three relations
@@ -358,6 +406,7 @@ export function Inbox({
         isDraft: (item.status as UiItemStatus) === "draft",
         channel: channelByAccount.get(item.account_id) ?? "system",
         timestamp: formatRelativeTime(item.sent_at),
+        sentAt: item.sent_at,
         unread: (item.thread?.unread_count ?? 0) > 0,
         unreadCount: item.thread?.unread_count ?? 0,
         labels: chipsByThread.get(item.thread_id) ?? [],
@@ -389,6 +438,17 @@ export function Inbox({
       return next;
     });
   }, [threadRows]);
+
+  // One toggle, two call sites: the "+ Label" popover and §c.6's sheet edit the same Set, and a
+  // second copy of this is where the two would start disagreeing.
+  const toggleLabel = useCallback((id: string) => {
+    setSelectedLabelIds((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   const toggleArchive = useCallback((threadId: string, archived: boolean) => {
     // US-D04: the row is held in the list for one leave animation. The server call goes out
@@ -506,13 +566,7 @@ export function Inbox({
     fieldLabel: "Label",
     options: labels.map((l) => ({ id: l.id, label: l.name })),
     selectedIds: [...selectedLabelIds],
-    onToggle: (id: string) =>
-      setSelectedLabelIds((s) => {
-        const next = new Set(s);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        return next;
-      }),
+    onToggle: toggleLabel,
   };
 
   // US-D02: grouping happens in the agents view only. needs-approval queries pending alone
@@ -554,16 +608,40 @@ export function Inbox({
     [channelFiltered, view, pendingArchive],
   );
 
+  // US-D08 §c.3: the subline under the title. Same three segments Mail shows, in that order, with
+  // any segment that has nothing to say removed — and, because it is a join over a filtered array,
+  // a separator can never be left dangling without a segment after it.
+  // The clock is the newest item **on screen**, not the newest in the mailbox: filtered down to a
+  // quiet channel, "Updated 2h" over a list of two-day-old rows would be advertising freshness the
+  // list below does not have.
+  // ponytail: the channel segment only appears when exactly one account is connected. With several
+  // there is no single account to name, and Mail's answer (the unified "All Inboxes" title) is a
+  // separate feature.
+  const latestSentAt = filtered.length === 0 ? null : Math.max(...filtered.map((r) => r.sentAt));
+  const unreadOnScreen = filtered.reduce((n, r) => n + (r.unread ? 1 : 0), 0);
+  const soleAccount = accounts.length === 1 ? accounts[0] : undefined;
+  const accountChannel = soleAccount ? CHANNEL_LABEL[soleAccount.channel as UiChannel] : null;
+  const subline = [
+    channelFilter ? CHANNEL_LABEL[channelFilter] : accountChannel,
+    latestSentAt === null ? null : `Updated ${formatRelativeTime(latestSentAt)}`,
+    // Dropped at zero: an empty queue is said by an empty list, the rule the needs-approval count
+    // badge already follows.
+    unreadOnScreen > 0 ? `${unreadOnScreen} unread` : null,
+  ]
+    .filter((segment): segment is string => segment !== null)
+    .join(" · ");
+
   return (
     <OpaqueSurface className="inbox-card">
       <div className="inbox-card__header">
         <h2 className="inbox-card__title">{view === "archived" ? "Archived" : "Inbox"}</h2>
+        {subline && <p className="inbox-card__subline">{subline}</p>}
       </div>
       {/* US-D02b: this one line under the title is the whole filter UI — the view pills, the
           Archived toggle and the label chips used to scatter over three lines (that is the
           screenshot where the chips folded into a pile) and are now a single horizontally
-          scrolling strip. Narrow does not wrap it, it slides; app.css's container queries are what
-          strip the two widest buttons down to icons. */}
+          scrolling strip. Narrow does not wrap it, it slides; app.css's container query is what
+          folds every inactive chip down to its icon (US-D08 §c.3). */}
       <div className="inbox-card__filter-row">
         {/* Active label chips lead the strip. They used to sit after five always-present view
             pills, so at 390px the chip currently filtering the list — and its x — scrolled off the
@@ -575,24 +653,36 @@ export function Inbox({
             appears tears that popover down mid-selection, which kills multi-select. */}
         {chips.length > 0 && <FilterChipBar chips={chips} />}
         <div role="radiogroup" aria-label="Inbox filters" className="inbox-card__pills">
-          {FILTERS.map((f) => (
-            <button
-              key={f}
-              type="button"
-              // biome-ignore lint/a11y/useSemanticElements: A5 §2.1 filter pill — <input type="radio"> can't render a pill label+count.
-              role="radio"
-              aria-checked={filter === f}
-              onClick={() => setFilter(f)}
-            >
-              {f}
-              {f === "needs-approval" && pendingCount > 0 && (
-                <span className="inbox-card__pill-count">{pendingCount}</span>
-              )}
-            </button>
-          ))}
+          {FILTERS.map((f) => {
+            const Icon = FILTER_ICON[f];
+            return (
+              <button
+                key={f}
+                type="button"
+                // biome-ignore lint/a11y/useSemanticElements: A5 §2.1 filter pill — <input type="radio"> can't render a pill label+count.
+                role="radio"
+                aria-checked={filter === f}
+                // US-D08 §c.3: the accessible name is the label, stated here rather than inherited
+                // from the chip's contents — below 560px of list pane the container query folds the
+                // word away, leaving an icon-only chip whose name would otherwise collapse with it.
+                // It also keeps the pending count out of the name ("Needs approval 2" announces the
+                // queue twice, once as a number nobody asked for).
+                aria-label={FILTER_LABEL[f]}
+                onClick={() => setFilter(f)}
+              >
+                <Icon size={16} aria-hidden="true" />
+                <span className="inbox-card__chip-label">{FILTER_LABEL[f]}</span>
+                {f === "needs-approval" && pendingCount > 0 && (
+                  <span className="inbox-card__pill-count">{pendingCount}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
         {/* US-A36: the Archived pill. Unlike the filter pills (radio) it is a toggle, so it sits
-            outside the radiogroup. */}
+            outside the radiogroup. US-D08 §c.3: a 32px circle at the row's end, icon-only at every
+            width — the word went with the label element, and the name now lives in aria-label and
+            the title. */}
         <button
           type="button"
           className="inbox-card__archived-pill"
@@ -601,8 +691,7 @@ export function Inbox({
           title="Archived"
           onClick={() => setView((v) => (v === "archived" ? "inbox" : "archived"))}
         >
-          <ArchiveIcon className="inbox-card__archived-icon" size={14} aria-hidden="true" />
-          <span className="inbox-card__archived-label">Archived</span>
+          <ArchiveIcon size={16} aria-hidden="true" />
         </button>
         {/* The "+ Label" trigger keeps the end of the strip whatever is filtering. A workspace
             with no labels at all gets no bar — an empty strip is a control with nothing to
@@ -613,11 +702,15 @@ export function Inbox({
         role="listbox"
         style={{ flex: "1 1 0", minHeight: 0 }}
         data={listItems}
-        itemContent={(_, item) =>
+        itemContent={(index, item) =>
           item.kind === "header" ? (
             <GroupHeader pill={item.pill} count={item.count} />
           ) : (
             <InboxRow
+              // US-D08 §c.4: only the row at the end of the list drops its hairline. The index is
+              // the flat list index, and the last item is always a row — a group header is only
+              // ever emitted above the rows it counts.
+              last={index === listItems.length - 1}
               id={item.row.id}
               name={item.row.title}
               summary={item.row.summary}
@@ -652,6 +745,89 @@ export function Inbox({
             />
           )
         }
+      />
+      {/* US-D09 §c.6: M125's Filters sheet. It is a sibling of the prompt below rather than its
+          ancestor, and that is load-bearing — both portal to <body>, and React bubbles a synthetic
+          event through the **React** tree, so a prompt rendered inside the sheet would deliver its
+          own Escape and Tab to the sheet's trap as well. They are two surfaces, so they are two
+          branches.
+          The rows apply as they are pressed (that is what M125's checkmarks mean), which makes
+          Done a dismissal and not a commit — hence a no-op confirm rather than a copy of the
+          filter state to write back. */}
+      {onFiltersOpenChange && (
+        <Sheet
+          open={filtersOpen}
+          onOpenChange={onFiltersOpenChange}
+          title="Filters"
+          confirm={{ label: "Done", onConfirm: () => {} }}
+        >
+          <SheetGroup label="Show">
+            {FILTERS.map((f) => (
+              <SheetRow
+                key={f}
+                // biome-ignore lint/a11y/useSemanticElements: M125's rows are 48px card rows closed by a check — an <input type="radio"> cannot render one, and the role is what carries the semantics into the sheet's own grammar.
+                role="radio"
+                checked={filter === f}
+                trailing={<SheetCheck checked={filter === f} />}
+                onClick={() => setFilter(f)}
+              >
+                {FILTER_LABEL[f]}
+              </SheetRow>
+            ))}
+          </SheetGroup>
+          {/* The Archived toggle is a view, not a sixth filter pill: the pills are radio (mutually
+              exclusive by construction) and it is a checkbox — the same distinction the strip's own
+              circle makes by sitting outside the radiogroup. */}
+          <SheetGroup label="View">
+            <SheetRow
+              // biome-ignore lint/a11y/useSemanticElements: the same call as the rows above — the toggle is a sheet row, not a bare <input type="checkbox">.
+              role="checkbox"
+              checked={view === "archived"}
+              trailing={<SheetCheck checked={view === "archived"} />}
+              onClick={() => setView((v) => (v === "archived" ? "inbox" : "archived"))}
+            >
+              Archived threads
+            </SheetRow>
+          </SheetGroup>
+          {labels.length > 0 && (
+            <SheetGroup label="Labels">
+              {labels.map((l) => (
+                <SheetRow
+                  key={l.id}
+                  // biome-ignore lint/a11y/useSemanticElements: a sheet row again — the label names a Set membership, and the row is what M125 draws it in.
+                  role="checkbox"
+                  checked={selectedLabelIds.has(l.id)}
+                  trailing={<SheetCheck checked={selectedLabelIds.has(l.id)} />}
+                  onClick={() => toggleLabel(l.id)}
+                >
+                  {l.name}
+                </SheetRow>
+              ))}
+            </SheetGroup>
+          )}
+          {/* The bulk action, and the only thing in this sheet that is not reversible by pressing
+              the row again — so it is the one that asks (§c.8). With nothing on screen there is
+              nothing to archive and the group is not drawn: an "Archive 0 threads?" question is a
+              control with nothing to act on. */}
+          {view === "inbox" && filtered.length > 0 && (
+            <SheetGroup label="Actions">
+              <SheetRow onClick={() => setArchiveAll(filtered.map((r) => r.threadId))}>
+                {`Archive all ${filtered.length} shown`}
+              </SheetRow>
+            </SheetGroup>
+          )}
+        </Sheet>
+      )}
+      {/* §c.8: the title is the whole question and it names the count, while the list it will act
+          on was frozen when the question was asked. */}
+      <ConfirmPrompt
+        open={archiveAll !== null}
+        onOpenChange={(open) => !open && setArchiveAll(null)}
+        {...CONFIRM_COPY.archiveThreads(archiveAll?.length ?? 0)}
+        confirmLabel="Archive"
+        onConfirm={() => {
+          for (const threadId of archiveAll ?? []) toggleArchive(threadId, true);
+        }}
       />
     </OpaqueSurface>
   );

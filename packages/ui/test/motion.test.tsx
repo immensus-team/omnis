@@ -14,6 +14,7 @@ import {
   REDUCED_FADE_MS,
   motionMs,
   prefersReducedMotion,
+  useClosingSpring,
 } from "../src/lib/motion";
 
 /** This test file's own directory — the same cwd-independent read app-shell.test.tsx uses, because
@@ -202,5 +203,57 @@ describe("US-D04 reduced motion in the rendered tree (RTL + matchMedia mock)", (
 
     act(() => vi.advanceTimersByTime(PANEL_MS));
     expect(screen.queryByRole("dialog", { name: "AI panel" })).not.toBeInTheDocument();
+  });
+});
+
+/** US-D10 moved the hold itself out of command-palette.tsx, because the detail pane needed the same
+ *  arithmetic at its own length (LEAVE_MS). The panel's two tests above are the default's proof —
+ *  they call the hook with no `full` and see PANEL_MS — so what is left to hold here is the
+ *  argument and the "never opened" rule. */
+describe("US-D10 useClosingSpring (one hold, several lengths)", () => {
+  /** A probe rather than a component: the hook's return value is the whole subject, and there is no
+   *  surface in this package that would show a 240ms hold at a place a test could read it. */
+  function Probe({ open, full }: { open: boolean; full: number }) {
+    return <span data-testid="closing">{useClosingSpring(open, full) ? "yes" : "no"}</span>;
+  }
+  const closing = () => screen.getByTestId("closing").textContent;
+
+  it("holds a surface that was open for the length it was given", () => {
+    vi.useFakeTimers();
+    const { rerender } = render(<Probe open full={LEAVE_MS} />);
+    expect(closing()).toBe("no");
+
+    rerender(<Probe open={false} full={LEAVE_MS} />);
+    expect(closing()).toBe("yes");
+
+    // Not one millisecond early, and not one late: the hold is the animation's length.
+    act(() => vi.advanceTimersByTime(LEAVE_MS - 1));
+    expect(closing()).toBe("yes");
+    act(() => vi.advanceTimersByTime(1));
+    expect(closing()).toBe("no");
+  });
+
+  it("never closes a surface that was not open to begin with", () => {
+    vi.useFakeTimers();
+    // The first render is what "never opened" means: a cell that mounts closed must not play an exit
+    // (there is nothing leaving), and the timer this would otherwise start is the bug it prevents.
+    const { rerender } = render(<Probe open={false} full={LEAVE_MS} />);
+    expect(closing()).toBe("no");
+
+    act(() => vi.advanceTimersByTime(LEAVE_MS));
+    rerender(<Probe open={false} full={LEAVE_MS} />);
+    expect(closing()).toBe("no");
+  });
+
+  it("holds for the reduced fade instead of the given length under reduced motion", () => {
+    stubMatchMedia(true);
+    vi.useFakeTimers();
+    const { rerender } = render(<Probe open full={LEAVE_MS} />);
+    rerender(<Probe open={false} full={LEAVE_MS} />);
+
+    // The reduced fade is shorter than the pane's own length, so this is the one assertion that
+    // tells the two apart: at the fade the hold is already over, and at LEAVE_MS it was over sooner.
+    act(() => vi.advanceTimersByTime(REDUCED_FADE_MS));
+    expect(closing()).toBe("no");
   });
 });

@@ -3,7 +3,12 @@
    enough that white reads as paper and not enough to read as "beige". Two things this replaces: the
    old cool base (hue 260) and the peach/mint canvas wash. Colour now appears in exactly three places
    (ACCENT-DIRECTION.md §1.1): the brand channel glyphs, the three semantic tones (--danger/--warn/
-   --success), and the aurora surfaces further down this file. */
+   --success), and the aurora surfaces further down this file.
+   US-D08 (2026-09-21, DESIGN-DIRECTION-v3.md §b): two changes on top of that. The canvas loses its
+   grid — it is plain paper and the film grain is the only thing on it — and the accent is blue again
+   (§b.1: one hue, for active/selected/links/primary only). The rest of §b is the shape vocabulary the
+   Mail-informed surfaces needed: the row hairline and its inset, the chip and sheet tokens, the
+   floating bar's height and gap, and the settle curve and swipe duration. */
 :root {
   --gray-950: oklch(0.145 0.004 80);
   --gray-900: oklch(0.175 0.004 80);
@@ -13,11 +18,18 @@
   --gray-300: oklch(0.785 0.003 80);
   --gray-100: oklch(0.945 0.003 80);
   --gray-000: oklch(0.992 0.002 80);
-  /* US-D06 §1.4: the accent used to be blue (hue 230). In a monotone app a blue accent competes with
-     the aurora and reads as stock-SaaS, so the accent goes to graphite — a value, not a hue. These
-     two are referenced only by --accent in the two theme blocks below. */
-  --ink-500: oklch(0.93 0.004 80);
-  --ink-600: oklch(0.26 0.008 80);
+  /* US-D06 §1.4 sent the accent to graphite (hue-free `--ink-500/600`) on the grounds that a blue
+     accent competes with the aurora and reads as stock-SaaS. US-D08 §b.1 reverses that: the
+     2026-09-21 brief §8 is newer and explicit — "one accent (blue, only for active/selected/links/
+     primary button)" — and the reference is Apple Mail, whose entire selection grammar is one blue.
+     ACCENT-DIRECTION.md §1.4 carries the same amendment. Referenced only by --accent in the two
+     theme blocks below.
+
+     L 0.48 is a CEILING, not a target: above it, white label text on an accent-filled chip drops
+     under 4.5:1. Do not raise it toward Apple's #007AFF (~3.6:1 — they carry no label text on
+     theirs). If the browser clamps the gamut, lower chroma to 0.16; never raise L. */
+  --accent-600: oklch(0.48 0.18 255);
+  --accent-500: oklch(0.72 0.14 255);
   --danger-500: oklch(0.62 0.19 25);
   /* US-D06: nudged warmer (hue 80 → 72) so `blocked` sits in the same family as the aurora bloom.
      Semantic tones keep their hue — they are signals, not decoration. */
@@ -41,7 +53,7 @@
   --text-primary: oklch(0.205 0.004 80);
   --text-secondary: oklch(0.435 0.004 80);
   --text-tertiary: oklch(0.56 0.004 80 / 0.75);
-  --accent: var(--ink-600);
+  --accent: var(--accent-600);
   --accent-fg: oklch(0.992 0.002 80);
   --shadow-row-selected: 0 4px 16px oklch(0 0 0 / 0.1), 0 1px 2px oklch(0 0 0 / 0.08);
   /* US-D06 §4.1.2: `--ask-gradient` (teal→orange, the kinso teardown's approximation) is retired.
@@ -66,20 +78,46 @@
     var(--aurora-butter) 62%,
     var(--aurora-indigo) 100%
   );
-  /* Canvas background: a faint grid over a warm off-white. US-D06 §1.3 removes the two radials
-     (peach at 15%/0%, mint at 100%/20%) that used to wash the canvas — the 2026-09-21 monotone
-     directive supersedes them; colour lives on the aurora surfaces only. The film grain that used to
-     be part of that wash is painted by `.app-shell::before` in apps/desktop/src/app.css. */
+  /* Canvas background: plain paper. US-D06 §1.3 removed the two radials (peach at 15%/0%, mint at
+     100%/20%) that used to wash the canvas; US-D08 §b.2 removes the faint grid that was left. The
+     canvas is now a flat near-white and the 3.5% film grain painted by `.app-shell::before` in
+     apps/desktop/src/app.css is the only thing on it (ACCENT-DIRECTION §5.3 guard 2's ceiling, and
+     v3 §e guard 1: "if you can point at the background and describe a shape, it fails").
+
+     The two grid tokens stay declared — `body` still reads them, so they are the switch rather than
+     dead weight, and the rule is that both theme blocks say `none`.
+     (background-image takes a list of layers and nothing else: mixing in a position/size clause such
+     as `0 0 / 32px 32px` discards the whole declaration — measured, computed backgroundImage
+     === "none". That is why the size is a token of its own.) */
   --bg-canvas: oklch(0.98 0.004 80);
-  /* background-image takes a list of layers and nothing else — mixing in a position/size clause
-     such as `0 0 / 32px 32px` discards the whole declaration (measured: computed
-     backgroundImage === "none"). The size is split out into the token below. */
-  --canvas-grid: linear-gradient(90deg, oklch(0.2 0.004 80 / 0.03) 1px, transparent 1px),
-    linear-gradient(0deg, oklch(0.2 0.004 80 / 0.03) 1px, transparent 1px);
-  --canvas-grid-size: 32px 32px, 32px 32px;
+  --canvas-grid: none;
+  --canvas-grid-size: auto;
   --font-sans: "Pretendard Variable", "Inter Variable", -apple-system, BlinkMacSystemFont,
     "SF Pro Text", system-ui, sans-serif;
   --hairline: 1px solid var(--border-hairline);
+  /* ==== US-D08 §b.3 — the Mail-informed list, chip, sheet and bar shapes ===================== */
+  /* The row hairline. 7% ink — DESIGN-DIRECTION allows hairlines in lists at ≤ 8% and v3 §e guard 3
+     rejects anything above it or a full-bleed divider: above 8% the list stops being a list and
+     becomes a table. Drawn by `.inbox-row::after` in apps/desktop/src/app.css. */
+  --border-row: 1px solid oklch(0.2 0.004 80 / 0.07);
+  /* Where a row hairline starts: the text column's origin, i.e. how far in the row's content is.
+     The arithmetic is the row's own box and nothing else — 16px padding + a 10px unread gutter +
+     12px gap + a 40px avatar + 12px gap. (v3 §b.3 wrote 68px, which is the same sum without the
+     unread gutter c.4 adds; a hairline that starts 22px left of the text column is the full-bleed
+     look guard 3 rejects, so the token carries the measured value.) */
+  --row-rule-inset: 90px;
+  /* Chips (Mail's category pills). The active chip is a filled pill and nothing else — no border, no
+     shadow, no underline (v3 §e guard 7: pills, not tabs). */
+  --chip-bg: oklch(0.93 0.003 80);
+  --chip-h: 32px;
+  /* Sheets: a grey field carrying white grouped cards. `--bg-sheet` is the reduced-transparency
+     fallback only — the sheet's own field stays glass, which is what M125 shows. */
+  --bg-sheet: oklch(0.955 0.003 80);
+  --radius-group: 16px;
+  /* The floating bars and toolbars (the `<900` bottom bar, the detail action bar) and their inset
+     from the viewport edge. */
+  --bar-h: 52px;
+  --bar-gap: 12px;
   --dur-fast: 100ms;
   /* US-D04: DESIGN-DIRECTION's motion ladder is "160ms entry, 240ms transition, 320ms layer
      appearance". Each rung now has a token: --dur-base is the entry rung (a row lifting into
@@ -94,6 +132,15 @@
   /* US-D01: the floating panel's (ask panel) spring entry — US-D04 moved it onto its own rung. */
   --dur-panel: 320ms;
   --ease-spring: cubic-bezier(0.2, 0, 0, 1);
+  /* US-D08 §b.3: the settle curve — a drag's drop, a swipe's spring back. A plain value token with
+     no reduced-motion rung of its own, so it belongs here rather than beside --dur-reorder in
+     app.css, which is scoped to the rail only because that token does have a 0ms rung. */
+  --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+  /* The row swipe's open and close. 200ms, and 0ms under reduced motion — but that override lives in
+     app.css's reduced-motion block (scoped to `.inbox-row`), NOT in this file's: a `0ms` rung in
+     that block would be wrong for all five durations it collapses, and motion.test.tsx asserts the
+     block never carries one. --dur-reorder is split the same way for the same reason. */
+  --dur-swipe: 200ms;
   /* US-D01, the two liquid-glass pieces: a 1px inner highlight (the feel of light touching the
      glass's top face) and the soft shadow that lifts the surface. .glass-surface uses both together
      — no per-surface declarations. */
@@ -160,7 +207,7 @@
   /* US-D06: easy to miss — this is the second declaration of --text-tertiary, and only the :root one
      is in the §1.2 table's first column. Both move to hue 80. */
   --text-tertiary: oklch(0.56 0.004 80 / 0.7);
-  --accent: var(--ink-500);
+  --accent: var(--accent-500);
   --accent-fg: oklch(0.145 0.004 80);
   --shadow-row-selected: 0 4px 16px oklch(0 0 0 / 0.35), 0 1px 2px oklch(0 0 0 / 0.4);
   --bg-canvas: var(--gray-950);

@@ -50,4 +50,4 @@ table with it.
 | `8px` | List surfaces — selected/hovered rows, filter chips, the add-chip button |
 | `6px` | Small things inside a pill — group header counts, chip × buttons |
 | `50%` | Circles — avatars, unread/approval dots, status pill dots |
-| `30%` | The runtime avatar squircle |
+| `10px` | The runtime avatar squircle — a tile, not a circle (US-D08 §c.4; it was `30%`, which is the same shape only at exactly 40px) |

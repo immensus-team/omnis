@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+
 /** US-D04: the durations CSS cannot tell JS about.
  *
  *  CSS handles almost all of the motion pass on its own (tokens.css + app.css). Three places need
@@ -36,4 +38,30 @@ export function prefersReducedMotion(): boolean {
  *  started leaving, which is the one outcome this whole helper exists to avoid. */
 export function motionMs(full: number): number {
   return prefersReducedMotion() ? REDUCED_FADE_MS : full;
+}
+
+/** True for the length of an exit animation, so a conditionally-rendered surface can stay mounted
+ *  while it leaves. The same arithmetic both call sites need — the ask panel (PANEL_MS) and the
+ *  detail pane (LEAVE_MS) — and the reason it is a hook rather than two copies: the first render to
+ *  see `open === false` after a first render that was *already* false must not animate, and that
+ *  along-with-the-timer rule is the whole of the logic.
+ *
+ *  `full` defaults to PANEL_MS because a floating panel is the common case. */
+export function useClosingSpring(open: boolean, full: number = PANEL_MS): boolean {
+  const [closing, setClosing] = useState(false);
+  // A first render that is already closed must not run the close animation (it never opened, so
+  // there is nothing to leave).
+  const everOpened = useRef(open);
+  useEffect(() => {
+    if (open) {
+      everOpened.current = true;
+      setClosing(false);
+      return;
+    }
+    if (!everOpened.current) return;
+    setClosing(true);
+    const timer = setTimeout(() => setClosing(false), motionMs(full));
+    return () => clearTimeout(timer);
+  }, [open, full]);
+  return closing;
 }

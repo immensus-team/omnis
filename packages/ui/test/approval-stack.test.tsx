@@ -3,7 +3,7 @@
 // so the file declares its own environment and setup (jest-dom matchers + afterEach(cleanup)).
 import "./setup";
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   ApprovalStack,
@@ -32,6 +32,14 @@ const C = approval({ id: "c", thread_id: "t2", risk: "normal", created_at: 200 }
 // assertion rather than a coincidence of ordering.
 const D = approval({ id: "d", thread_id: "t2", risk: "high", created_at: 300 });
 const ALL = [A, B, C, D];
+
+/** US-D09 §c.8: the card's Accept asks first, so a test that wants the decision clicks through the
+ *  prompt. One helper rather than the two clicks inlined twice — the second copy is where a test
+ *  would start asserting the id against a decision it never reached. */
+function approve(): void {
+  fireEvent.click(screen.getByText("Approve"));
+  fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Approve" }));
+}
 
 describe("scopeApprovalStack (US-D03: hierarchy instead of an identical card wall)", () => {
   it("expands the open thread's riskiest approval and collapses the rest", () => {
@@ -141,7 +149,7 @@ describe("ApprovalStack (US-D03)", () => {
     rerender(<ApprovalStack approvals={ALL} openThreadId="t1" onDecide={onDecide} />);
     expect(screen.getByText("1 more waiting")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /approval c/ })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("Approve"));
+    approve();
     expect(onDecide).toHaveBeenCalledWith("b", "accept", undefined);
   });
 
@@ -155,7 +163,7 @@ describe("ApprovalStack (US-D03)", () => {
   it("decides by the approval's id, not by the card's", () => {
     const onDecide = vi.fn();
     render(<ApprovalStack approvals={ALL} openThreadId="t1" onDecide={onDecide} />);
-    fireEvent.click(screen.getByText("Approve"));
+    approve();
     expect(onDecide).toHaveBeenCalledWith("b", "accept", undefined);
   });
 });

@@ -168,17 +168,19 @@ test("Phase A seeded smoke", async ({ page }) => {
     const names = async (): Promise<string[]> =>
       (await rows.locator(".inbox-row__name").allTextContents()).map((n) => n.trim()).sort();
     const all = await names();
-    await page.getByRole("radio", { name: "work", exact: true }).click();
+    // US-D08 §c.3: a category chip's accessible name is exactly its label (FILTER_LABEL in
+    // apps/desktop/src/screens/Inbox.tsx). Title Case is the label; the id is still "work".
+    await page.getByRole("radio", { name: "Work", exact: true }).click();
     await expect.poll(() => rows.count()).toBeLessThan(all.length);
     const work = await names();
-    await page.getByRole("radio", { name: "personal", exact: true }).click();
+    await page.getByRole("radio", { name: "Personal", exact: true }).click();
     await expect.poll(async () => (await names()).join("|")).not.toBe(work.join("|"));
     const personal = await names();
     expect(work.length).toBeGreaterThan(0);
     expect(personal.length).toBeGreaterThan(0);
     expect(work.filter((n) => personal.includes(n))).toEqual([]);
     for (const name of [...work, ...personal]) expect(all).toContain(name);
-    await page.getByRole("radio", { name: "all", exact: true }).click();
+    await page.getByRole("radio", { name: "All", exact: true }).click();
     return `all=${all.length} work=[${work.join(", ")}] personal=[${personal.join(", ")}]`;
   });
 
@@ -199,9 +201,9 @@ test("Phase A seeded smoke", async ({ page }) => {
     await expect.poll(() => rows.count()).toBe(all);
     return `all=${all} gmail=${gmail}`;
   });
-  await page.getByRole("radio", { name: "work", exact: true }).click();
+  await page.getByRole("radio", { name: "Work", exact: true }).click();
   await shot(page, "02-inbox-filter-work.png");
-  await page.getByRole("radio", { name: "all", exact: true }).click();
+  await page.getByRole("radio", { name: "All", exact: true }).click();
 
   await check("A5 Thread screen renders seeded items with status badges", async () => {
     // The draft row has sent_at=now(), so it is at the top of the list — clickable without making
@@ -248,10 +250,18 @@ test("Phase A seeded smoke", async ({ page }) => {
 
   await check("A8 Approve → hub moves the approval to decided", async () => {
     await page.getByRole("button", { name: "Approve", exact: true }).first().click();
+    // US-D09 §c.8: the card's Accept is the one control here that goes straight out to the tool, so
+    // it asks once before it does. The prompt's pill carries the same word as the button that opened
+    // it, so the second click is scoped to the prompt rather than left to `.first()` — which would
+    // click the button behind the overlay and then poll a hub that was never told anything.
+    const prompt = page.getByRole("alertdialog");
+    await expect(prompt).toBeVisible();
+    await prompt.getByRole("button", { name: "Approve", exact: true }).click();
+    await expect(prompt).toBeHidden();
     await expect
       .poll(async () => (await hubApprovals("decided")).map((a) => a.id), { timeout: 20_000 })
       .toContain(SEED.approvalId);
-    return "pending → decided";
+    return "pending → decided, through §c.8's prompt";
   });
 
   // US-D01: ⌘K opens the ask bar's floating AI panel rather than a separate modal palette (see
@@ -276,7 +286,7 @@ test("Phase A seeded smoke", async ({ page }) => {
   await check(
     "A-archive archiving a row removes it from the list and restoring brings it back",
     async () => {
-      await page.getByRole("radio", { name: "all", exact: true }).click();
+      await page.getByRole("radio", { name: "All", exact: true }).click();
       const before = await rows.count();
       const target = rows.first();
       const name = ((await target.locator(".inbox-row__name").textContent()) ?? "").trim();
@@ -314,7 +324,7 @@ test("Phase A seeded smoke", async ({ page }) => {
   );
 
   await check("G5 a new item reaches the UI in ≤2s", async () => {
-    await page.getByRole("radio", { name: "all", exact: true }).click();
+    await page.getByRole("radio", { name: "All", exact: true }).click();
     const marker = `G5 latency probe ${Date.now()}`;
     const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
     try {

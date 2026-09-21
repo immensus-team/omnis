@@ -40,7 +40,9 @@ function item(threadId: string, title: string) {
       title,
       external_id: title,
       meta: {},
-      unread_count: 0,
+      // US-D08 §c.3: the header subline counts unread rows, so the fixture is unread by default —
+      // a zero-count fixture would make the count segment's absence the only thing testable.
+      unread_count: 1,
       archived_at: null,
     },
     author: null,
@@ -104,7 +106,7 @@ if (typeof Element.prototype.scrollIntoView === "undefined") {
   Element.prototype.scrollIntoView = () => {};
 }
 
-const { Inbox } = await import("../src/screens/Inbox");
+const { Inbox, FILTER_LABEL } = await import("../src/screens/Inbox");
 
 vi.stubGlobal(
   "fetch",
@@ -311,28 +313,47 @@ describe("Inbox filter row responsive contract (US-D02b)", () => {
 
   // Three rules for the touch layout, on two different containers, and none of them can be observed
   // in jsdom — so this case locks the declarations down and shots-responsive.ts measures them.
-  // (1) The five view pills are ~19px tall, under half the touch floor, while being this tier's
-  // primary control; that is the list pane's own width, so it lives in the `list` query with the
-  // icon collapse. (2) The hover-only Archive/Restore button is `opacity: 0`, so it keeps its box
-  // — ~65px of every row's right column for a control a finger cannot reveal at all. That one is
-  // the *shell* tier: at 768px the list pane is still ~736px wide, so the `list` query never fires
-  // there even though the rail has already collapsed to a bottom bar. (3) The ask pill's grid
-  // column needs its min-content released, and its orb dropped at phone widths, or the placeholder
-  // ellipsizes and the strip can push the page wider.
-  it("keeps the container queries that raise the pill targets and drop the row action", () => {
+  // (1) US-D08 §c.3: below 560px of list pane every inactive chip folds to its icon and keeps a
+  // 32px target; that is the list pane's own width, so it lives in the `list` query. (2) The row's
+  // swipe lives in the *shell* tier: at 768px the list pane is still ~736px wide, so the `list`
+  // query never fires there even though the rail has already collapsed to a bottom bar. (3) The ask
+  // pill's grid column needs its min-content released, and its orb dropped at phone widths, or the
+  // placeholder ellipsizes and the strip can push the page wider.
+  it("keeps the container queries that fold the chip labels and give the row its swipe", () => {
     const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
     const ruleBlock = (query: string): string | undefined =>
       css.match(new RegExp(`@container ${query} \\{([\\s\\S]*?)\\n\\}`))?.[1];
 
     const narrowList = ruleBlock("list \\(max-width: 559\\.98px\\)");
     expect(narrowList).toBeDefined();
-    expect(narrowList).toMatch(/\.inbox-card__pills button,[\s\S]*?min-height: 32px;/);
+    // Only the *unchecked* chip folds — the active chip is the strip's "you are here" and keeps its
+    // word, so a rule without that qualifier would be the bug, not the fix.
+    expect(narrowList).toMatch(
+      /\.inbox-card__pills button\[aria-checked="false"\] \.inbox-card__chip-label \{\s*display: none;/,
+    );
+    // The declaration is read within the unchecked-chip rule rather than against the selector, so
+    // the prose inside it stays free to explain the number without breaking the assertion.
+    const iconOnly = narrowList?.match(
+      /\.inbox-card__pills button\[aria-checked="false"\] \{([\s\S]*?)\n {2}\}/,
+    )?.[1];
+    expect(iconOnly).toContain("padding: 0 10px;");
+    // The strip's height is fixed by `--chip-h` at the base rule now, so this block must not be
+    // re-trimming the padding to make room for a target that is already the right size.
+    expect(narrowList).not.toContain("min-height");
 
     const narrowShell = ruleBlock("shell \\(max-width: 899\\.98px\\)");
     expect(narrowShell).toBeDefined();
-    expect(narrowShell).toMatch(/\.inbox-row__action \{\s*display: none;/);
-    // Not global: the wide tier still reveals the action on `:focus-within` for the keyboard.
-    expect(css).toContain(".inbox-row:focus-within .inbox-row__action");
+    // §c.4: this tier used to switch the hover-only Archive/Restore button off entirely, and this
+    // assertion used to be what kept that rule honest. The swipe replaced it as the tier's way to
+    // archive, so the pill is back — it is the non-gesture twin guard 11 asks for. Its geometry and
+    // its invisible-at-rest state are in inbox-row-rules.test.tsx, next to the rest of the row.
+    expect(narrowShell).toMatch(/\.inbox-row__swipe \{\s*\n\s*position: absolute;/);
+    expect(narrowShell).not.toMatch(/^ {2}\.inbox-row__action \{/m);
+    // Not global either way: the wide tier still reveals the control on `:focus-within` for the
+    // keyboard, and now so does this one. US-D09 §c.7: the reveal moved from the pill to the
+    // cluster when the row's `…` joined it there, so the selector this asserts changed with it —
+    // the pill is still inside the cluster, and the pill is still what the keyboard reaches.
+    expect(css).toContain(".inbox-row:focus-within .inbox-row__hover-actions");
 
     const phoneShell = ruleBlock("shell \\(max-width: 419\\.98px\\)");
     expect(phoneShell).toBeDefined();
@@ -342,24 +363,103 @@ describe("Inbox filter row responsive contract (US-D02b)", () => {
     expect(css).toMatch(/\.ask-bar,\s*\n\.ask-bar__pill \{\s*\n\s*min-width: 0;/);
   });
 
-  // Below a 560px list pane the container query hides `.inbox-card__archived-label` and shows the
-  // archive glyph in its place. JSDOM cannot apply `@container`, so both halves are asserted to be
-  // in the DOM at all times — and the toggle's name to come from aria-label, never from the text
-  // that a real browser hides.
-  it("keeps the archived toggle's glyph and label in the DOM under one stable accessible name", () => {
+  // US-D08 §c.3: the Archived toggle is a 32px circle with no text at any width, so its name can
+  // only come from aria-label. Asserted with the text content empty, which is what makes that a
+  // fact rather than a convention.
+  it("keeps the archived toggle's name on an icon-only 32px button", () => {
     renderInbox();
 
     const toggle = screen.getByRole("button", { name: "Archived" });
     expect(toggle).toHaveAttribute("aria-label", "Archived");
     expect(toggle).toHaveAttribute("title", "Archived");
-    expect(toggle.querySelector(".inbox-card__archived-label")).toHaveTextContent("Archived");
-    // The glyph is what survives the collapse, so it must not join the accessible name.
-    expect(toggle.querySelector(".inbox-card__archived-icon")).toHaveAttribute(
-      "aria-hidden",
-      "true",
-    );
+    expect(toggle.textContent).toBe("");
+    // The glyph is all there is, so it must not join the accessible name.
+    expect(toggle.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
 
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
+describe("Inbox header and category chips (US-D08 §c.3)", () => {
+  // The chip is icon + label, and the label is the accessible name stated on the button rather
+  // than inherited from its contents. That is the whole reason the `<560` collapse is safe: below
+  // 560px of list pane app.css hides `.inbox-card__chip-label` on every inactive chip, and a name
+  // derived from the DOM would go with it. JSDOM applies no `@container`, so what is locked here is
+  // that the name does not depend on any node being visible — the real fold is measured in
+  // tools/e2e/shots-responsive.ts.
+  it("names every chip from its label, with nothing visible required", () => {
+    renderInbox();
+
+    for (const [id, label] of Object.entries(FILTER_LABEL)) {
+      const chip = screen.getByRole("radio", { name: label });
+      expect(chip).toHaveAttribute("aria-label", label);
+      // The icon is decoration; a screen reader that announced it would say "graphic, All".
+      expect(chip.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+      // Icon *and* label are both in the DOM at every width — the collapse is a CSS display, and a
+      // chip that never rendered its word could not be un-collapsed by a wider pane.
+      expect(chip.querySelector(".inbox-card__chip-label")).toHaveTextContent(label);
+      expect(chip).toHaveAttribute("aria-checked", String(id === "all"));
+    }
+  });
+
+  // The count badge is inside the needs-approval chip. It must not be in the accessible name: the
+  // name is the chip's label, and "Needs approval 2" announces the queue twice.
+  it("keeps the pending count out of the chip's accessible name", () => {
+    store.pending_approvals = [
+      { id: "ap-1", thread_id: THREADS.none, state: "pending", created_at: Date.now() },
+      { id: "ap-2", thread_id: THREADS.both, state: "pending", created_at: Date.now() },
+    ];
+    try {
+      renderInbox();
+      const chip = screen.getByRole("radio", { name: "Needs approval" });
+      expect(chip.querySelector(".inbox-card__pill-count")).toHaveTextContent("2");
+    } finally {
+      store.pending_approvals = [];
+    }
+  });
+
+  // §c.3: `channel · Updated 3m · N unread`, dropping any segment with nothing to say. The join is
+  // what guarantees a separator is never left without a segment after it.
+  it("composes the subline from the segments that have something to say", () => {
+    const { container } = renderInbox();
+    // One account, so it is named; every row is unread, so the count is there; the rows are fresh,
+    // so the clock reads "now". Matched loosely because the clock is read when the assertion runs,
+    // not when the fixture was built.
+    expect(container.querySelector(".inbox-card__subline")?.textContent).toMatch(
+      /^Gmail · Updated \S+ · 4 unread$/,
+    );
+
+    // The count drops at zero rather than reading "0 unread" — and the join does not leave the
+    // separator behind it.
+    const saved = store.items;
+    store.items = saved.map((row) => {
+      const r = row as { thread: Record<string, unknown> };
+      return { ...r, thread: { ...r.thread, unread_count: 0 } };
+    });
+    try {
+      const { container: quiet } = renderInbox();
+      expect(quiet.querySelector(".inbox-card__subline")?.textContent).toMatch(
+        /^Gmail · Updated \S+$/,
+      );
+    } finally {
+      store.items = saved;
+    }
+  });
+
+  // With no account connected there is no channel to name, so the segment goes and the subline
+  // starts at the clock — never at a leading separator.
+  it("drops the channel segment rather than leading with a separator", () => {
+    const saved = store.accounts;
+    store.accounts = [];
+    try {
+      const { container } = renderInbox();
+      const text = container.querySelector(".inbox-card__subline")?.textContent ?? "";
+      expect(text.startsWith("Updated ")).toBe(true);
+      expect(text).not.toContain("· ·");
+      expect(text).not.toMatch(/^·/);
+    } finally {
+      store.accounts = saved;
+    }
   });
 });
