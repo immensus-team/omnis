@@ -35,6 +35,10 @@ export default defineConfig({
       "/api": "http://127.0.0.1:8787",
       "/approvals": "http://127.0.0.1:8787",
       "/health": "http://127.0.0.1:8787",
+      // US-B36: the push subscribe call is a cross-origin POST with a JSON content-type, which
+      // means a preflight the hub does not answer (it sends no CORS headers) — so it has to travel
+      // through this proxy like every other hub write. The hub accepts /push/… and /api/push/… alike.
+      "/push": "http://127.0.0.1:8787",
     },
   },
 });
