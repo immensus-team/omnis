@@ -9,6 +9,7 @@ import { Pool } from "pg";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DECISION_PROVIDER_KEY,
+  DEFAULT_DECISION_PROVIDER,
   DELEGATION_JEV_MIN,
   DRAFT_WORTHINESS_VETO_BELOW,
   FOLLOWUP_VETO_BELOW,
@@ -67,7 +68,14 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  await pool.query("DELETE FROM settings WHERE key = $1", [DECISION_PROVIDER_KEY]);
+  // 0014_agents_decision_provider.sql seeds this row and kernel's settings suite asserts every
+  // SettingKey has one. Restore the seeded value rather than deleting it, so this file leaves the
+  // shared DB in the state the migrations put it in.
+  await pool.query(
+    `INSERT INTO settings (key, value) VALUES ($1, $2::jsonb)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [DECISION_PROVIDER_KEY, JSON.stringify(DEFAULT_DECISION_PROVIDER)],
+  );
   await pool.query("DELETE FROM persons WHERE id = $1", [personId]);
   await pool.query("DELETE FROM items WHERE thread_id = $1", [threadId]);
   await pool.end();
