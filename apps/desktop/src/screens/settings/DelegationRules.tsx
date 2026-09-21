@@ -238,7 +238,7 @@ export function DelegationRules({ rules, hermesEnabled, onSave }: DelegationRule
               id="delegation-repo"
               type="text"
               className="settings-screen__input"
-              placeholder="/Users/logankim/AI-Workspaces/omnis"
+              placeholder="/Users/you/AI-Workspaces/omnis"
               value={repo}
               aria-invalid={pathError ? true : undefined}
               onChange={(e) => {
