@@ -17,6 +17,7 @@ function setupHandle(width = 420) {
     shellWidth: SHELL,
     onWidthChange: vi.fn(),
     onWidthCommit: vi.fn(),
+    onCancel: vi.fn(),
     onReset: vi.fn(),
   };
   const { unmount } = render(<DetailPaneHandle {...props} />);
@@ -135,7 +136,7 @@ describe("DetailPaneHandle drag (US-D10: rubber band, then a settle)", () => {
     expect(h.onWidthCommit).not.toHaveBeenCalled();
   });
 
-  it("puts the pane back at the width it had when the gesture is cancelled", () => {
+  it("drops the gesture when it is cancelled instead of walking the pane back", () => {
     const h = setupHandle(420);
     fireEvent.pointerDown(h.grip, {
       button: 0,
@@ -148,13 +149,18 @@ describe("DetailPaneHandle drag (US-D10: rubber band, then a settle)", () => {
     expect(h.onWidthChange).toHaveBeenLastCalledWith(520);
 
     fireEvent.keyDown(window, { key: "Escape" });
-    // Back to the origin, and no commit — a gesture that never happened is not a setting.
-    expect(h.onWidthChange).toHaveBeenLastCalledWith(420);
+    // `onCancel`, not a banded or re-set width: the width the pane returns to is the one the shell
+    // passed in, and the shell still holds it. Handing 420 back would be a *new* width the shell
+    // would have to write a frame from — which is what made the cancel animate home through the
+    // band on the way out.
+    expect(h.onCancel).toHaveBeenCalledTimes(1);
     expect(h.onWidthCommit).not.toHaveBeenCalled();
+    expect(h.onWidthChange).toHaveBeenLastCalledWith(520);
 
     // And the gesture is over: a late release cannot commit it.
     fireEvent.pointerUp(window, { pointerId: 1, clientX: -100, clientY: 0 });
     expect(h.onWidthCommit).not.toHaveBeenCalled();
+    expect(h.onCancel).toHaveBeenCalledTimes(1);
   });
 });
 

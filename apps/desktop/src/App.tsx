@@ -115,6 +115,13 @@ function Shell() {
   // collapsed it, in which case it has no column either.
   const floating = useFloatingPane();
   const [storedWidth, setStoredWidth] = useState<number | null>(null);
+  /** The width a *gesture* is drawing, and null whenever no gesture is running. Kept apart from
+   *  `storedWidth` because the two are clamped differently: a width the user has settled on is
+   *  always inside the range, while the band the drag reports past the limits is deliberately
+   *  outside it. Clamping this one on the way to the DOM — which is what the shell used to do —
+   *  computes a rubber band and then throws it away, so the pane followed the pointer one-for-one
+   *  to the limit and stopped dead there. */
+  const [liveWidth, setLiveWidth] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [dragging, setDragging] = useState(false);
   const shellWidth = useShellWidth();
@@ -224,8 +231,10 @@ function Shell() {
   const sheetShape = paneVisible && (floating || paneCollapsed);
   const columnShape = paneRendered && !sheetShape;
   // A stored width is kept as the user chose it and clamped against the window it is drawn in: 320px
-  // to half the shell. A number picked on a wider screen is not rewritten by a narrower one.
-  const detailWidth = clampDetailWidth(storedWidth ?? DETAIL_DEFAULT_WIDTH, shellWidth);
+  // to half the shell. A number picked on a wider screen is not rewritten by a narrower one — which
+  // is also why `liveWidth` short-circuits the clamp rather than going through it (see above).
+  const detailWidth =
+    liveWidth ?? clampDetailWidth(storedWidth ?? DETAIL_DEFAULT_WIDTH, shellWidth);
 
   /** Writes one setting — and does not care whether the hub took it. A layout preference that fails
    *  to save leaves the session exactly as the user arranged it, which is the only thing the write
@@ -248,11 +257,22 @@ function Shell() {
   const onWidthCommit = useCallback(
     (width: number) => {
       arranged.current = true;
+      // The gesture is over, so the live width goes with it: from here the pane is drawn from the
+      // value that was just committed, which is the clamped one.
+      setDragging(false);
+      setLiveWidth(null);
       setStoredWidth(width);
       remember(DETAIL_WIDTH_KEY, width);
     },
     [remember],
   );
+
+  /** A cancelled gesture draws nothing — the shell puts the pane back by dropping the live width,
+   *  which lands on the stored one, which is where the press started. */
+  const onWidthCancel = useCallback(() => {
+    setDragging(false);
+    setLiveWidth(null);
+  }, []);
 
   useDetailPaneKey(onPaneToggle, !narrow);
   // §c.5: a thread — not the approval queue, and not an agent session, which draws no toolbar —
@@ -391,12 +411,13 @@ function Shell() {
           shellWidth={shellWidth}
           onWidthChange={(width) => {
             setDragging(true);
-            setStoredWidth(width);
+            // Deliberately not `setStoredWidth`: a frame of a gesture is not a decision, and the
+            // stored value is what a reload restores — writing it 60 times a second would both
+            // persist the band and rewrite how wide the pane opens next time.
+            setLiveWidth(width);
           }}
-          onWidthCommit={(width) => {
-            setDragging(false);
-            onWidthCommit(width);
-          }}
+          onWidthCommit={onWidthCommit}
+          onCancel={onWidthCancel}
           onReset={() => {
             // A double-click goes back to the width the shell ships with — which is not a number of
             // pixels but the fraction of the window the pane has when nothing is stored. Clearing the

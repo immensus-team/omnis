@@ -407,13 +407,17 @@ describe("App shell thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
 });
 
 describe("App shell detail card (US-D10 §c.5: the pane is the list's own card)", () => {
-  /** `.inbox-card`'s own rule, which is the base file rather than a tier — this one is top-level, so
-   *  it is not `ruleBody`'s (that reads the indented form inside an at-rule). */
-  function listCard(): string {
+  /** A rule at the top level of app.css — the base file rather than a tier. Not `ruleBody`, which
+   *  reads the indented form of a rule declared inside an at-rule. */
+  function baseRule(selector: string): string {
     const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
-    const start = css.indexOf("\n.inbox-card {");
-    expect(start, ".inbox-card is not in app.css").toBeGreaterThan(-1);
+    const start = css.indexOf(`\n${selector} {`);
+    expect(start, `${selector} is not in app.css`).toBeGreaterThan(-1);
     return css.slice(start, css.indexOf("}", start));
+  }
+
+  function listCard(): string {
+    return baseRule(".inbox-card");
   }
 
   function widePane(): string {
@@ -457,6 +461,27 @@ describe("App shell detail card (US-D10 §c.5: the pane is the list's own card)"
     // restate a blur here, and this test is what stops the sheet's recipe being copied up.
     expect(overlay).not.toContain("backdrop-filter");
     expect(widePane()).toContain("backdrop-filter: none;");
+  });
+
+  // Once the pane is gone the list card runs the whole way across, so the corner the chevron wants is
+  // the ask pill's own right end. The pill is `position: relative; z-index: 6` (it has to stand above
+  // its own model menu), and a chevron under it is not merely hidden by the glass — the press lands on
+  // the input, which is how a collapsed pane was unopenable by pointer at 1440. Comparing the two
+  // numbers rather than pinning one keeps this a statement about the relationship: either can move,
+  // as long as the chevron stays on top.
+  it("keeps the collapsed pane's chevron above the ask pill sharing its corner", () => {
+    const zIndex = (body: string) => Number(/z-index:\s*(-?\d+)/.exec(body)?.[1]);
+    expect(zIndex(baseRule(".detail-pane__toggle--floating"))).toBeGreaterThan(
+      zIndex(baseRule(".ask-bar__pill")),
+    );
+  });
+
+  // `app-shell--detail-dragging` is on the shell for exactly one declaration: the grip's own
+  // `user-select: none` does not stop a selection the pointer starts inside it and then extends out
+  // across the pane, which is every drag to the left. Nothing else reads the class, so this is what
+  // keeps the rule from being dead weight in the class list.
+  it("turns off text selection for the length of a drag", () => {
+    expect(baseRule(".app-shell--detail-dragging")).toContain("user-select: none;");
   });
 });
 

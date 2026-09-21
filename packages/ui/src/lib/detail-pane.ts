@@ -17,10 +17,11 @@ export const DETAIL_MIN_WIDTH = 320;
 
 /** What the pane measures when `ui.detail_width` has never been written.
  *
- *  It is only the fallback for the *stored* value; the widest the shell draws it with nothing
- *  stored is app.css's own `34%` track. That distinction is deliberate — the shipped look is a
- *  fraction of the window and stays one on a fresh install, while a width the user dragged is a
- *  number of pixels they chose and is restored as one. */
+ *  It is the same 420px the narrow tier's sheet has always been, which is the point: the column and
+ *  the sheet open at one size, so collapsing and re-expanding the pane (or dragging it and
+ *  double-clicking to reset) never changes how wide the conversation is. The settings value stays
+ *  `null` until the user drags — a stored number means "the user chose this", and a fresh install
+ *  should keep following the shell's own default. */
 export const DETAIL_DEFAULT_WIDTH = 420;
 
 /** One arrow-key press on the grip. 16px is the pointer's own granularity — a step small enough

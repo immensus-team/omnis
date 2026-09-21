@@ -1406,12 +1406,18 @@ body {
 
 /* The way back once the pane is gone: the same chevron, dropped on the list card's top-right corner
    — where a sidebar's toggle lives. It carries a fill of its own because the card behind it is the
-   same colour as an unpainted button. */
+   same colour as an unpainted button.
+   z-index 7: the pane's space is the list's now, so the ask pill runs the whole way across the top
+   and the corner the chevron wants is the pill's own right end. The pill is `position: relative;
+   z-index: 6` (it has to stand above its own model menu), so anything lower than 7 is not merely
+   behind it — the glass hides the chevron *and* the press lands on the input, which is how a
+   collapsed pane became unopenable by pointer. Same stacking context (both are positioned children
+   of the shell), so the numbers are directly comparable. */
 .detail-pane__toggle--floating {
   position: absolute;
   top: 28px;
   right: 28px;
-  z-index: 5;
+  z-index: 7;
   background: var(--bg-elevated);
   box-shadow: var(--shadow-row-selected);
 }
@@ -1462,6 +1468,14 @@ body {
   background: var(--text-tertiary);
   opacity: 0;
   transition: opacity var(--dur-fast) var(--ease-settle);
+}
+
+/* A drag is not a selection. The grip's own `user-select: none` does not stop the selection the
+   pointer starts *inside* it and then extends across the pane as it moves — which is every drag to
+   the left, and it leaves the conversation highlighted afterwards. The shell carries the flag for
+   the length of the gesture, so one rule covers whatever the pointer crosses. */
+.app-shell--detail-dragging {
+  user-select: none;
 }
 
 .detail-pane__grip:hover .detail-pane__grip-pill,

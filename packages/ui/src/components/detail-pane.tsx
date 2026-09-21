@@ -56,10 +56,16 @@ export interface DetailPaneHandleProps {
    *  window, because the rail and the list share the window with the pane. */
   shellWidth: number;
   /** Every frame of a gesture: where the pane should draw, rubber band included. Not persisted —
-   *  a drag is not a decision until it is released. */
+   *  a drag is not a decision until it is released. This is the only path that reports a width
+   *  outside 320…half the shell, which is why the shell draws it without clamping it. */
   onWidthChange(width: number): void;
   /** The gesture ended: the width to settle at, and the one to remember. */
   onWidthCommit(width: number): void;
+  /** The gesture ended with nothing decided (Escape, a pointer the browser took away). The pane
+   *  goes back to the width it had when the grip was pressed — and the shell already has that
+   *  number: it is the width it passed in, so this callback is "drop whatever the gesture was
+   *  drawing" rather than a value to re-set. Nothing is written. */
+  onCancel(): void;
   /** Double-click. Named `reset` rather than "commit the default" because there is a difference:
    *  the pane goes back to the width the shell ships with, which is a fraction of the window and
    *  not a number of pixels at all. The shell clears the setting rather than writing one. */
@@ -80,6 +86,7 @@ export function DetailPaneHandle({
   shellWidth,
   onWidthChange,
   onWidthCommit,
+  onCancel,
   onReset,
   className,
 }: DetailPaneHandleProps) {
@@ -106,7 +113,7 @@ export function DetailPaneHandle({
       // it had at the press and no write is made — a gesture that never happened is not a setting.
       onCancel: () => {
         setDragging(false);
-        onWidthChange(clampDetailWidth(from.current, shellWidth));
+        onCancel();
       },
     },
     { axis: "x" },
