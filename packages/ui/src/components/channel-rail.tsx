@@ -42,8 +42,11 @@ const LIFT_SCALE = 1.08;
 /** Phase B gate. Account and Settings have no screen behind them yet, so they are rendered
  *  disabled with a title that says why rather than as labelled buttons that announce as actionable
  *  and then do nothing — the same treatment `.ask-panel__action:disabled` already gives un-wired
- *  actions in app.css. */
-const PHASE_B_TITLE = "Not wired up yet — Phase B";
+ *  actions in app.css.
+ *  US-D08 §c.9: exported, because the BottomBar's filters and compose circles are gated for the
+ *  same reason (the filters Sheet and the composer are D9's). One string, so the two bars of the
+ *  same tier cannot come to mean different things by "not yet". */
+export const PHASE_B_TITLE = "Not wired up yet — Phase B";
 
 /** One running drag. The lifted tile owns a working copy of the order for the length of the
  *  gesture and the store is written once, on drop — a reorder that lands two slots away in a single

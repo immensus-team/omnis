@@ -2,11 +2,13 @@ import {
   type ApprovalCardDecision,
   ApprovalStack,
   type ApprovalStackItem,
+  BottomBar,
   ChannelRail,
   CommandPalette,
   type PaletteAction,
   type RailSelection,
   type UiChannel,
+  useNarrowShell,
 } from "@omnis/ui";
 import { ZeroProvider, useQuery } from "@rocicorp/zero/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -52,6 +54,11 @@ function Shell() {
   const [open, setOpen] = useState<OpenTarget | null>(null);
   const [askOpen, setAskOpen] = useState(false);
   const [railChannel, setRailChannel] = useState<RailSelection>(null);
+  // US-D08 §c.9: below 900 the ask bar leaves the top of the list and becomes the BottomBar's
+  // middle piece. One element in one of two places, never both — a second render of the palette
+  // would be a second cmdk list, a second action list to keep in sync, and two things answering
+  // Cmd+K.
+  const narrow = useNarrowShell();
   // US-D01 decision: Cmd+K opens the ask bar's floating AI panel rather than a separate modal
   // palette. Putting the same action list on two surfaces (modal + panel) leaves no way to tell
   // which is the real one, so they are merged into one.
@@ -120,6 +127,18 @@ function Shell() {
   // into a sidebar taking a third of the window.)
   const detail = open !== null || approvals.length > 0;
 
+  const askBar = (
+    <CommandPalette
+      mode="inline"
+      open={askOpen}
+      onOpenChange={setAskOpen}
+      actions={actions}
+      threadSelected={open !== null}
+      threadSummary={selectedThreadSummary}
+      threadTitle={selectedThreadTitle}
+    />
+  );
+
   return (
     <main
       data-testid="app-shell"
@@ -127,21 +146,19 @@ function Shell() {
     >
       <ChannelRail channels={connectedChannels} selected={railChannel} onSelect={setRailChannel} />
       <div className="app-shell__main">
-        <CommandPalette
-          mode="inline"
-          open={askOpen}
-          onOpenChange={setAskOpen}
-          actions={actions}
-          threadSelected={open !== null}
-          threadSummary={selectedThreadSummary}
-          threadTitle={selectedThreadTitle}
-        />
+        {/* The wide tier keeps the ask bar at the top of the list, where it has been since US-D01. */}
+        {narrow ? null : askBar}
         <Inbox
           onOpen={setOpen}
           channelFilter={railChannel}
           onChannelFilterChange={setRailChannel}
         />
       </div>
+      {/* §c.9: the narrow tier's bar, above the rail bar rather than stacked into it. It is
+          `position: fixed` in app.css, so being the last child of the shell costs nothing in the
+          grid; it lives inside <main> because that is what makes it a descendant of the container
+          the shell's container queries are measured on. */}
+      {narrow ? <BottomBar>{askBar}</BottomBar> : null}
       {/* US-D02b: the detail pane always renders with the sheet's glass, whatever the width. In
           the narrow shells (<=1279.98px) that is what it actually is — a glass sheet floating over
           the list — and in the wide shell app.css's `@container shell (min-width: 1280px)` takes

@@ -2192,8 +2192,9 @@ body {
 
 /* <900: one column for the list. The rail folds into a bottom bar (only in this tier does
    ChannelRail draw four tiles plus More and move the avatar and settings into the More popover —
-   its JS breakpoint is channel-rail.tsx's NARROW_RAIL_QUERY and must match this number), and the
-   detail pane becomes a full-width sheet with 16px of margin each side. */
+   its JS breakpoint is lib/media-query.ts's NARROW_SHELL_QUERY and must match this number, as does
+   every other JS-side reader of the tier), and the detail pane becomes a full-width sheet with
+   16px of margin each side. */
 @container shell (max-width: 899.98px) {
   .app-shell,
   .app-shell--with-detail {
@@ -2313,23 +2314,27 @@ body {
     color: var(--text-secondary);
   }
 
-  /* Keeps the fixed bar off the last row and the ask bar — the bar's 56px plus room to
-     breathe. */
+  /* Keeps both fixed bars off the last row: the rail bar's 56px, the BottomBar's --bar-h, and a
+     --bar-gap on each side of the BottomBar. US-D08 §c.9's number (56 + 52 + 24 = 132 at the
+     tokens' current values), and the same expression `.app-shell__detail` stops at and the ask
+     panel opens to. The ask bar is *inside* the BottomBar in this tier, so the room it used to
+     need of its own at the top of the list is part of this sum now. */
   .app-shell__main {
-    padding-bottom: 72px;
+    padding-bottom: calc(56px + var(--bar-h) + var(--bar-gap) * 2);
   }
 
   /* There is no room to keep 420px — full width, with 16px of margin each side. */
   .app-shell__detail {
     width: calc(100% - 32px);
-    /* The sheet's 16px bottom margin is right for the list, and wrong for the bar: the bar is the
-       only navigation this tier has, it is `position: fixed` along the bottom 56px, and it has no
-       `z-index` — while this sheet is positioned *and* carries `z-index: 20`, so it paints over the
-       bar and takes its hit area. Measured at 390: `elementFromPoint` at a tile's own centre
+    /* The sheet's 16px bottom margin is right for the list, and wrong for the bars: the rail bar is
+       the only navigation this tier has, it is `position: fixed` along the bottom 56px, and it has
+       no `z-index` — while this sheet is positioned *and* carries `z-index: 20`, so it paints over
+       the bar and takes its hit area. Measured at 390: `elementFromPoint` at a tile's own centre
        returned the sheet, so the tiles were visible and untouchable — and with them the rail's
-       touch reorder, which is D7's whole narrow-tier path. The sheet stops above the bar instead,
-       on the same 72px `.app-shell__main` reserves. */
-    bottom: 72px;
+       touch reorder, which is D7's whole narrow-tier path. The sheet stops above both bars instead,
+       on the same sum `.app-shell__main` reserves — US-D08 §c.9 raised it from the rail's 72px to
+       include the BottomBar, so the sheet does not swallow the composition bar either. */
+    bottom: calc(56px + var(--bar-h) + var(--bar-gap) * 2);
   }
 
   /* The rail has gone from a column to a toolbar, and a toolbar is a place glass belongs
@@ -2401,6 +2406,90 @@ body {
      tile 2px upward. */
   .channel-rail__tile--inbox {
     margin-bottom: 0;
+  }
+
+  /* US-D08 §c.9: the BottomBar, floating above the rail bar rather than stacked into it — one
+     rail-height bar with a top hairline at `bottom: 0` (above), and this line of controls one gap
+     above *that*. The bar itself is transparent; the three pieces carry their own glass. A
+     full-bleed glass band here would read as a second rail, which is the thing §c.9 rules out.
+     `z-index: 30` is above the rail's and the detail sheet's 20 on purpose: the bar does not
+     overlap either of them (the sheet stops below), but the ask panel opens *upward* into the
+     space the sheet is standing in, and it is the panel that has to be on top there. */
+  .bottom-bar {
+    position: fixed;
+    left: var(--bar-gap);
+    right: var(--bar-gap);
+    /* One --bar-gap above the rail's 56px. At `bottom: 0` the two bars would share a row of pixels
+       and the rail's top hairline would run through the circles. */
+    bottom: calc(56px + var(--bar-gap));
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 30;
+  }
+
+  /* The pill is the bar's middle piece and the only one that grows: with every piece `flex: none`
+     the bar would be its min-content width, floating in the middle of a 390px screen with the
+     list's full width under it. */
+  .bottom-bar > .ask-bar {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* §c.9 gives the pill `height: var(--bar-h)` here rather than the 44px it has at the top of the
+     list. Beside a 44px and a 52px circle, a 44px pill would sit 4px above the compose circle's
+     own centre and read as a different control. */
+  .bottom-bar .ask-bar__pill {
+    height: var(--bar-h);
+  }
+
+  .bottom-bar__piece {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    /* No border: .glass-surface's hairline is already the circle's edge, and this rule's own
+       border would draw a second line just inside it. The fill, the blur and the lift are the
+       glass recipe's, untouched. */
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  /* §c.9's 52px compose circle — the one piece bigger than the pill's own radius would suggest,
+     because it is the bar's primary action. */
+  .bottom-bar__piece--compose {
+    width: 52px;
+    height: 52px;
+  }
+
+  /* The same 0.55 floor the rail's gated tiles and the ask panel's un-wired actions use (the
+     hallmark slop-test's floor): below it a control stops reading as gated and starts reading as
+     erased. The accessible name and the title survive the fade — the button never becomes a
+     mystery circle. */
+  .bottom-bar__piece:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  /* The panel can only open upward in this tier: under the bar there is a 12px gap and then the
+     rail. `fixed` rather than `absolute` because the pill it belongs to is ~246px wide at 390 —
+     two circles and their gaps have taken the rest — and a 420px panel clipped to 246px is a
+     column of ellipses. Pinned to the shell's own gutters it is the width of the bar instead; and
+     being pinned on both sides it cannot widen the page, whatever its content. */
+  .bottom-bar .ask-panel {
+    top: auto;
+    left: var(--bar-gap);
+    right: var(--bar-gap);
+    /* The same sum .app-shell__main reserves: rail + bar + a gap either side. */
+    bottom: calc(56px + var(--bar-h) + var(--bar-gap) * 2);
+    width: auto;
+    max-width: none;
+    transform-origin: bottom center;
   }
 }
 
