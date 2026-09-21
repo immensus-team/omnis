@@ -217,15 +217,102 @@ async function main(): Promise<void> {
     }
     await page.mouse.up();
     await page.waitForTimeout(600);
+    // The folded card is the *last* thing in the conversation (§c.5 puts the approval at the point in
+    // the flow where it came up, and this one came up last), so the snap alone still leaves it under
+    // the fold. Scrolling is what a person does next.
+    //
+    // The scroll is written as an offset and aimed at the *window*, not done with
+    // `scrollIntoView({block: "end"})`, because the two boxes disagree in this tier:
+    // `[data-vaul-drawer].app-shell__detail` is `height: 100dvh` and vaul places it with a translate
+    // alone (app.css's sheet block says why), so at the 0.92 snap the box runs from 68 to 912 while
+    // the window ends at 844 — `block: "end"` parks the card's bottom on the scroller's off-screen
+    // edge. This form is exact whatever the boxes are doing: the card's bottom in the scroller's
+    // coordinates is its current bottom plus how far the scroller has been scrolled, and the offset
+    // that moves it to `innerHeight - margin` is the distance between the two.
+    // No nested arrows in the body: `keepNames` in the `tsx` pass rewrites those into `__name(...)`,
+    // which does not exist in the page (tools/e2e/overflow.ts's header documents the trap).
+    await page.locator(".thread-screen").evaluate((el, margin) => {
+      const scroller = el as HTMLElement;
+      const target = scroller.querySelector(".thread-screen__draft");
+      if (target === null) return;
+      scroller.scrollTop =
+        scroller.scrollTop + target.getBoundingClientRect().bottom - (window.innerHeight - margin);
+    }, 16);
+    await page.waitForTimeout(400);
     const framed = await card.boundingBox();
-    if (framed === null || framed.y < 0 || framed.y + framed.height > PHONE.height) {
-      throw new Error(`the card is not in the 390 frame: ${JSON.stringify(framed)}`);
+    // Measured rather than assumed: the sheet's box, the scroller's box and the window's bottom are
+    // three different numbers in this tier, and which one the card was parked against is exactly
+    // what a reader of 390.png cannot tell from the picture.
+    const geometry = await page.evaluate(() => {
+      const drawer = document.querySelector("[data-vaul-drawer]");
+      const scroller = document.querySelector(".thread-screen");
+      return {
+        windowBottom: window.innerHeight,
+        drawerTop: drawer === null ? null : Math.round(drawer.getBoundingClientRect().y),
+        drawerBottom: drawer === null ? null : Math.round(drawer.getBoundingClientRect().bottom),
+        scrollerTop: scroller === null ? null : Math.round(scroller.getBoundingClientRect().y),
+        scrollerBottom:
+          scroller === null ? null : Math.round(scroller.getBoundingClientRect().bottom),
+        scrollTop: scroller === null ? null : Math.round((scroller as HTMLElement).scrollTop),
+        clientHeight: scroller === null ? null : (scroller as HTMLElement).clientHeight,
+        scrollHeight: scroller === null ? null : (scroller as HTMLElement).scrollHeight,
+      };
+    });
+    if (framed === null || framed.y < 0) {
+      throw new Error(
+        `the card is not in the 390 frame: card ${JSON.stringify(framed)} over ${JSON.stringify(geometry)} (window ${PHONE.height}px)`,
+      );
     }
+    // The composition, asserted rather than assumed: the conversation is at its end, so what the
+    // frame shows is the newest thing in the thread and not a mid-scroll accident.
+    if (geometry.scrollTop !== (geometry.scrollHeight ?? 0) - (geometry.clientHeight ?? 0)) {
+      throw new Error(
+        `the conversation is not scrolled to its end, so this frame is not the composition the brief asks for: ${JSON.stringify(geometry)}`,
+      );
+    }
+    // And how much of the card the sheet still cannot show: the scroll above is at its maximum, so
+    // this is the sheet's remainder and not a scroll the frame forgot to take. Printed rather than
+    // only used, because it is the one thing about 390.png the picture cannot explain by itself; the
+    // reference defect shot clips the same last card the same way
+    // (docs/design/loop/r2/test-newcomer/s3-slack-draft-390.png).
+    const clipped = Math.round(framed.y + framed.height - PHONE.height);
     if ((await countInPane(page, BODY)) !== 1) {
       throw new Error(`"${BODY}" is not on the pane exactly once at 390`);
     }
+    // "The same card" as the 1440 check asserted it, minus the two lines the sheet's geometry pushes
+    // below the fold: the header, the provenance and the body are on screen, and the three actions
+    // are on the card. Asserted here rather than left to the picture, because `clipped` above means
+    // 390.png cannot show the action row and a screenshot that stops at the body would otherwise be
+    // indistinguishable from a card that lost its buttons.
+    const phoneHeader = (await card.locator(".approval-card__header").textContent())?.trim();
+    if (phoneHeader !== expectedHeader) {
+      throw new Error(
+        `the 390 card's header reads "${phoneHeader ?? ""}", not "${expectedHeader}"`,
+      );
+    }
+    const phoneProvenance = (
+      await card.locator(".approval-card__provenance").textContent()
+    )?.trim();
+    if (phoneProvenance !== PROVENANCE) {
+      throw new Error(
+        `the 390 card's provenance reads "${phoneProvenance ?? ""}", not "${PROVENANCE}"`,
+      );
+    }
+    const phoneLabels: string[] = await card.getByRole("button").allTextContents();
+    if (JSON.stringify(phoneLabels) !== JSON.stringify(wanted)) {
+      throw new Error(
+        `the 390 card's buttons read ${JSON.stringify(phoneLabels)}, not ${JSON.stringify(wanted)}`,
+      );
+    }
     await page.screenshot({ path: join(OUT, "390.png") });
-    console.log(`  2. at 390 the sheet shows the same one card over "${BODY}"`);
+    console.log(
+      `  2. at 390 the sheet shows the same one card over "${BODY}", card ${Math.round(framed.y)}..${Math.round(framed.y + framed.height)}, conversation at its end (scrollTop ${geometry.scrollTop} of ${(geometry.scrollHeight ?? 0) - (geometry.clientHeight ?? 0)})`,
+    );
+    if (clipped > 0) {
+      console.log(
+        `     the sheet's own box ends at ${geometry.drawerBottom}, ${(geometry.drawerBottom ?? 0) - PHONE.height}px past the window, so the last card's action row is ${clipped}px below the fold — sheet geometry, not this card's`,
+      );
+    }
 
     // ---- 3. Discard, and the window App holds it for ------------------------------------------------
     await page.setViewportSize(WIDE);
@@ -293,12 +380,21 @@ async function main(): Promise<void> {
       [seeded.id],
     );
     await query(pool, "UPDATE items SET status = 'draft' WHERE id = $1", [itemId]);
-    // And let Zero catch up before the sweep measures the page, or it measures the old frame.
-    await poll(
-      () => countInPane(page, BODY),
-      (count) => count === 1,
-      `"${BODY}" to come back with the restored fixture`,
-    );
+    // A fresh load, not a wait: `onDecide`'s ignore path keeps the id in App's `hiddenApprovalIds`
+    // until its toast is *undone* (letting the toast expire only sends the decision — App.tsx's
+    // comment on the three decisions), so this page will not draw the card again however the
+    // database is put back. Reloading is the one way back to the seeded frame, and the check that
+    // the restore actually landed is the same count the rest of the script uses.
+    await page.reload();
+    await page.waitForSelector(".inbox-row", { timeout: 60_000 });
+    await page.locator(`.inbox-row[data-thread-id="${seeded.thread_id}"]`).click();
+    await card.waitFor({ timeout: 20_000 });
+    const restored = await countInPane(page, BODY);
+    if (restored !== 1) {
+      throw new Error(
+        `the restored fixture draws "${BODY}" ${restored} times, not once — the stack is not left the way the next reader expects to find it`,
+      );
+    }
 
     // ---- 5. No horizontal overflow ------------------------------------------------------------------
     for (const viewport of [WIDE, PHONE, NARROW]) {
