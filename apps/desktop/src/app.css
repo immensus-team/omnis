@@ -2566,6 +2566,54 @@ body {
   color: var(--warn-500);
 }
 
+/* One column and the bottom bar. The flex row above asks for the title and the meta side by side,
+   which is right wherever there is room — but at 390 the meta's fixed width leaves the title about
+   half the card and a five-word todo breaks into three lines beside it. Below the rail's breakpoint
+   the row becomes a grid instead: checkbox and kind hold the first row's leading columns, the title
+   takes the rest of that row, and whatever meta the row has wraps underneath it.
+
+   A grid rather than `flex-basis: 100%` on the title, because the checkbox and the kind icon sit
+   *before* the title in the DOM — pushing the title to a full line with flex would leave those two
+   alone on a line of their own above it. */
+@container shell (max-width: 899.98px) {
+  .task-row {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 2px 8px;
+  }
+
+  .task-row__checkbox,
+  .task-row__kind {
+    grid-row: 1;
+    align-self: center;
+  }
+
+  .task-row__checkbox {
+    grid-column: 1;
+  }
+
+  .task-row__kind {
+    grid-column: 2;
+  }
+
+  .task-row__title {
+    grid-column: 3 / -1;
+    grid-row: 1;
+  }
+
+  /* Auto-placed, so a row with no due date and no source occupies no second row at all. */
+  .task-row__due {
+    grid-column: 3;
+  }
+
+  .task-row__source,
+  .task-row__session,
+  .task-row__delegation-state {
+    grid-column: 4;
+  }
+}
+
 /* ==========================================================================================
    US-B28 §3.4 Today — the morning briefing, today's schedule and the pending-approval strip on one
    screen. It is the Inbox card's twin: same 20px radius, same surface, same place in the shell's
