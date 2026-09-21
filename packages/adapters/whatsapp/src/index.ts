@@ -221,12 +221,12 @@ const EPOCH_MS_FLOOR = 1e12;
  *  message in 1970 (the same drop-rather-than-guess call the Gmail/Outlook/telegram adapters make). */
 function parseSentAt(value: unknown): string | null {
   // A number is epoch milliseconds by definition, so it is measured against the floor rather than
-  // trusted: a seconds value is the one way a numeric `ts` can be silently mis-dated instead of dropped.
-  if (typeof value === "number") {
-    if (!Number.isFinite(value) || value < EPOCH_MS_FLOOR) return null;
-    return new Date(value).toISOString();
-  }
-  if (typeof value !== "string") return null;
+  // trusted: an epoch-*seconds* value is the one way a numeric `ts` can be silently mis-dated instead
+  // of dropped. The floor is a plain range check and deliberately not an early return — `toISOString()`
+  // throws RangeError outside the Date range, so the shared `Number.isFinite(getTime())` guard below
+  // has to stay the thing that decides renderability for numbers and strings alike.
+  if (typeof value === "number" && (!Number.isFinite(value) || value < EPOCH_MS_FLOOR)) return null;
+  if (typeof value !== "string" && typeof value !== "number") return null;
   const ms = new Date(value).getTime();
   return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
 }
@@ -246,6 +246,11 @@ const EVENT_TYPES = new Set<string>([
  *  chat cache and the poll attaches from the chat it just listed); that chat is where threadMeta's
  *  title, participants and dm-vs-group come from. */
 export function normalize(raw: unknown): NormalizedItem[] {
+  // The real `message.upserted` frame carries `entries` — an array — so a whole list is read as one item
+  // per entry. Handling it here rather than on the WS path alone keeps one shape rule and lets the
+  // contract fixtures pin it, which they cannot do for a branch inside the adapter's event handler.
+  if (Array.isArray(raw)) return raw.flatMap((entry) => normalize(entry));
+
   const payload = recordOf(raw);
   if (payload === null) return [];
   const type = textOf(payload.type);
@@ -255,7 +260,10 @@ export function normalize(raw: unknown): NormalizedItem[] {
   // there is nothing further to read.
   if (type === "message.deleted" || type === "chat.deleted") return [];
 
-  const data = type !== null && EVENT_TYPES.has(type) ? recordOf(payload.data) : payload;
+  const rawData = type !== null && EVENT_TYPES.has(type) ? payload.data : payload;
+  // The envelope's `data` is the entries array in a forwarded frame, so it is split the same way.
+  if (Array.isArray(rawData)) return rawData.flatMap((entry) => normalize(entry));
+  const data = recordOf(rawData);
   if (data === null) return [];
 
   const chat = recordOf(data.chat);
@@ -354,6 +362,8 @@ export function createWhatsAppAdapter(deps: WhatsAppAdapterDeps = {}): Adapter {
   let failure: { status: "down" | "degraded"; error: NonNullable<Health["lastError"]> } | undefined;
   let pollAfter: string | undefined;
   let pollTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Invalidates any poll chain from a previous session or subscription — see schedulePoll(). */
+  let pollGeneration = 0;
   let unsubscribe: (() => void) | undefined;
   let up = false;
 
@@ -409,7 +419,12 @@ export function createWhatsAppAdapter(deps: WhatsAppAdapterDeps = {}): Adapter {
 
   /** The two capture paths fail independently and the reported status is the worse of them. A failed
    *  poll means no capture at all (`down`); a chat warm-up or an unstable WS means capture is running
-   *  but diminished (`degraded`), which is exactly A1 §2.6's REST-poll fallback. */
+   *  but diminished (`degraded`), which is exactly A1 §2.6's REST-poll fallback.
+   *  A recorded failure therefore outranks the WS-close count, so when both are true the A1-D3 condition
+   *  still holds but its literal "ws_unstable" text is not the one reported. That is deliberate — `down`
+   *  is the louder fault and a consumer reading the status still sees one — so nothing should grep for
+   *  that string to detect the switch condition. The US-C23 spike should settle which signal is
+   *  authoritative rather than leave it to whichever branch runs first. */
   function statusAndError(): StatusReport {
     if (!up) return { status: "down" };
     if (failure !== undefined) return { status: failure.status, lastError: failure.error };
@@ -467,13 +482,8 @@ export function createWhatsAppAdapter(deps: WhatsAppAdapterDeps = {}): Adapter {
   }
 
   function handleEvent(event: BeeperEvent): void {
-    // The real `message.upserted` frame carries `entries` — an array — so a client that forwards the
-    // frame's list rather than one extracted payload is understood here rather than dropped. A drop
-    // would be invisible: the WS is the only realtime path, and the poll arriving late looks the same.
-    if (Array.isArray(event.data)) {
-      for (const entry of event.data) emit(entry);
-      return;
-    }
+    // The `entries` array is a message-frame shape, and normalize() reads it back per entry — so the
+    // array needs no fan-out here. Chat frames are single-payload, and their handling is unchanged.
     const payload = recordOf(event.data) ?? recordOf(event);
     if (event.type === "chat.upserted" && payload !== null) rememberChat(payload);
     if (event.type === "chat.deleted") {
@@ -517,10 +527,14 @@ export function createWhatsAppAdapter(deps: WhatsAppAdapterDeps = {}): Adapter {
 
   // No retry burst: a failure never shortens the interval, it just leaves the flag up until the next
   // scheduled poll finds Beeper answering again.
-  function schedulePoll(): void {
-    if (!up) return;
+  // `generation` is what makes a re-subscribe total. Clearing pollTimer stops a pass that is merely
+  // waiting, but a pass already in flight re-schedules itself when it finishes — and it would overwrite
+  // pollTimer doing so, leaving a chain that disconnect() can no longer reach. A pass from a superseded
+  // generation therefore never re-schedules.
+  function schedulePoll(generation = pollGeneration): void {
+    if (!up || generation !== pollGeneration) return;
     pollTimer = setTimeout(() => {
-      void pollOnce().finally(schedulePoll);
+      void pollOnce().finally(() => schedulePoll(generation));
     }, pollMs);
   }
 
@@ -556,6 +570,8 @@ export function createWhatsAppAdapter(deps: WhatsAppAdapterDeps = {}): Adapter {
       // The previous session's failure is not this one's: the warm-up below either succeeds (healthy)
       // or records its own error, so a reconnect cannot report a fault that has already been cleared.
       failure = undefined;
+      // A new session also supersedes any poll chain the last one left behind.
+      pollGeneration += 1;
       lastEventAt = now().toISOString();
       // Warm the chat cache before any WS event can arrive: it is what lets a group's first WS message
       // carry threadMeta.kind = "group". threads.kind is written on insert only
@@ -623,6 +639,7 @@ export function createWhatsAppAdapter(deps: WhatsAppAdapterDeps = {}): Adapter {
       // callback live.
       unsubscribe?.();
       if (pollTimer !== undefined) clearTimeout(pollTimer);
+      pollGeneration += 1;
       unsubscribe = active.onEvent(handleEvent, handleClose);
       schedulePoll();
       return queue;

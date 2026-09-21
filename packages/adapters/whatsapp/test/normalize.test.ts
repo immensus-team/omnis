@@ -107,6 +107,18 @@ describe("normalize() drops what it cannot represent", () => {
     expect(normalize(message({ timestamp: 1758531243 }))).toEqual([]);
   });
 
+  it("drops an out-of-range numeric timestamp instead of throwing", () => {
+    // `new Date(x).toISOString()` throws RangeError once x leaves the Date range (|x| > 8.64e15), and
+    // normalize() throwing is not survivable: on the WS path it escapes the event callback, and on the
+    // poll path it turns every pass into "down" with a cursor that can never advance. A bad `ts` is a
+    // dropped row, not an exception (the same `Number.isFinite(getTime())` guard the string path uses).
+    expect(normalize(message({ timestamp: 8.64e15 + 1 }))).toEqual([]);
+    expect(normalize(message({ timestamp: 1e18 }))).toEqual([]);
+    expect(normalize(message({ timestamp: Number.POSITIVE_INFINITY }))).toEqual([]);
+    // The top of the representable range is still readable.
+    expect(firstItem(message({ timestamp: 8.64e15 })).sentAt).toBe("+275760-09-13T00:00:00.000Z");
+  });
+
   it("yields nothing for a chat payload, which carries no message content", () => {
     expect(
       normalize({ type: "chat.upserted", data: { id: CHAT_ID, network: "whatsapp" } }),
@@ -151,6 +163,19 @@ describe("normalize() shape", () => {
     // The length is asserted first: comparing the two calls alone also passes when both are [].
     expect(normalize(message())).toHaveLength(1);
     expect(normalize(message())).toEqual(normalize({ type: "message.upserted", data: message() }));
+  });
+
+  it("reads a whole entries array as one item per entry", () => {
+    // The real `message.upserted` frame carries `entries` — plural — so the shape is understood here,
+    // where the contract fixtures can pin it, rather than only on the WS path.
+    const items = normalize({
+      type: "message.upserted",
+      data: [message(), message({ id: "1343994", text: "and one more" })],
+    });
+    expect(items.map((item) => item.externalId)).toEqual(["1343993", "1343994"]);
+    expect(
+      normalize([message(), message({ id: "1343995" })]).map((item) => item.externalId),
+    ).toEqual(["1343993", "1343995"]);
   });
 
   it("reads a numeric WS `ts` as epoch milliseconds", () => {

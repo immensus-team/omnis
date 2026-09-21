@@ -1,0 +1,80 @@
+{
+  "scenario": "message.upserted whose payload is the frame's `entries` list rather than a single extracted message — the real Desktop API frame is `entries: [...]` (plural), so a client that forwards the list instead of picking one entry out of it still yields one item per entry. A drop here would be invisible: the WS is the only realtime path, and a message that never arrives looks exactly like one the poll has not reached yet",
+  "raw": {
+    "type": "message.upserted",
+    "data": [
+      {
+        "id": "1343993",
+        "accountID": "local-whatsapp_ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc",
+        "chatID": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+        "senderID": "@15550101002:local-whatsapp.localhost",
+        "senderName": "Dana Lee",
+        "sortKey": "455171049984",
+        "timestamp": "2026-09-22T09:14:03.621Z",
+        "type": "TEXT",
+        "text": "Are we still on for tomorrow at 10?",
+        "isDeleted": false,
+        "attachments": []
+      },
+      {
+        "id": "1343994",
+        "accountID": "local-whatsapp_ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc",
+        "chatID": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+        "senderID": "@15550101002:local-whatsapp.localhost",
+        "senderName": "Dana Lee",
+        "sortKey": "455171049984",
+        "timestamp": "2026-09-22T09:14:03.621Z",
+        "type": "TEXT",
+        "text": "Yes — 10:00 in the small room.",
+        "isDeleted": false,
+        "attachments": []
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "threadExternalId": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+        "externalId": "1343993",
+        "kind": "message",
+        "author": { "kind": "person", "id": "@15550101002:local-whatsapp.localhost" },
+        "body": "Are we still on for tomorrow at 10?",
+        "attachments": [],
+        "sentAt": "2026-09-22T09:14:03.621Z",
+        "status": "received",
+        "sourceHash": "1343993",
+        "threadMeta": {
+          "externalId": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+          "kind": "dm",
+          "title": null,
+          "participants": [
+            { "externalId": "@15550101002:local-whatsapp.localhost", "displayName": "Dana Lee" }
+          ],
+          "lastItemAt": "2026-09-22T09:14:03.621Z",
+          "archivedAt": null
+        }
+      },
+      {
+        "threadExternalId": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+        "externalId": "1343994",
+        "kind": "message",
+        "author": { "kind": "person", "id": "@15550101002:local-whatsapp.localhost" },
+        "body": "Yes — 10:00 in the small room.",
+        "attachments": [],
+        "sentAt": "2026-09-22T09:14:03.621Z",
+        "status": "received",
+        "sourceHash": "1343994",
+        "threadMeta": {
+          "externalId": "!whatsapp_15550101002:ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc.local-whatsapp.localhost",
+          "kind": "dm",
+          "title": null,
+          "participants": [
+            { "externalId": "@15550101002:local-whatsapp.localhost", "displayName": "Dana Lee" }
+          ],
+          "lastItemAt": "2026-09-22T09:14:03.621Z",
+          "archivedAt": null
+        }
+      }
+    ]
+  }
+}

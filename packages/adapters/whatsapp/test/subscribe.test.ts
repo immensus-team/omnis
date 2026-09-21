@@ -398,6 +398,41 @@ describe("WhatsApp subscribe()", () => {
     await adapter.disconnect();
   });
 
+  // The harder half of the same problem: clearing the timer only stops a _scheduled_ pass. If the
+  // re-subscribe lands while a pass is in flight, that pass's own re-schedule would still start a second
+  // chain — and would overwrite the timer handle, so disconnect() could no longer stop it.
+  it("does not leave a duplicate chain when a re-subscribe lands mid-poll", async () => {
+    vi.useFakeTimers();
+    // Every listMessages call waits on one gate the test opens, so a pass can be held mid-flight.
+    let open: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    const fake = fakeClient({
+      listMessages: vi.fn(async () => {
+        await gate;
+        return [];
+      }),
+    });
+    const time = clock();
+    const adapter = createWhatsAppAdapter({ client: fake.client, now: time.now });
+    await adapter.connect(auth);
+    adapter.subscribe();
+
+    await vi.advanceTimersByTimeAsync(POLL_MS); // the first pass starts and blocks on the gate
+    // One call so far: the pass is genuinely in flight, past the point where clearing a timer helps.
+    expect(vi.mocked(fake.client.listMessages).mock.calls).toHaveLength(1);
+    adapter.subscribe(); // the hub's retry, arriving while that pass is still open
+    open(); // the held pass finishes now — and must not schedule a chain of its own
+
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    // Two WhatsApp chats per pass: the held pass (2) plus the replacement chain's single pass (2).
+    // A second chain surviving would make it six.
+    expect(vi.mocked(fake.client.listMessages).mock.calls).toHaveLength(4);
+
+    await adapter.disconnect();
+  });
+
   // "chat.upserted → threadMeta" (backlog US-C11): a chat the adapter has not listed is learned from the
   // event itself, which is what gives the very next message of that chat its real title and thread kind.
   it("learns a chat from chat.upserted, so the next WS message carries its threadMeta", async () => {
