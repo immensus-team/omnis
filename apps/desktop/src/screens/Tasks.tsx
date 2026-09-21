@@ -3,8 +3,9 @@ import { type ApprovalCardInterrupt, ApprovalCardView } from "@omnis/ui/componen
 import { CHANNEL_LABEL } from "@omnis/ui/lib/row-meta";
 import type { UiChannel } from "@omnis/ui/types";
 import { useQuery } from "@rocicorp/zero/react";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { decideApproval } from "../api/approvals.js";
+import { createTask } from "../api/tasks.js";
 import { type ZeroClient, useZeroClient } from "../zero-client.js";
 
 /** A5 §3.5's four tabs, in the order the mock draws them. */
@@ -122,6 +123,14 @@ export const TASKS_BANNER: Record<TasksState, string> = {
   ready: "",
 };
 
+/** A5 §3.5's quick-add, after the hub has answered. The failure carries the Notes composer's promise
+ *  — the words are still in the box — because that is the same thing this screen is telling you. */
+export const QUICK_ADD_ADDED = "Added to Tasks";
+export const QUICK_ADD_FAILED = "Couldn't add the task. It is still in the box.";
+/** How long "Added to Tasks" stays up: long enough to read once, gone before the next add's first
+ *  keystroke. The failure line has no timer — it waits for that keystroke. */
+export const QUICK_ADD_NOTICE_MS = 3000;
+
 /** Sent as the `IN` list when no task has a source item. A real uuid that matches nothing: Zero's
  *  query builder takes an array, and the number of hooks cannot be conditional, so the empty case
  *  still has to be a valid query. */
@@ -134,9 +143,9 @@ export interface TasksProps {
   onOpenSource?: (itemId: string) => void;
   /** A delegated task's Agent Session (tasks.delegated_session_id). */
   onOpenDelegation?: (sessionId: string) => void;
-  /** A5 §3.5: the checkbox is an optimistic `state: 'done'`. The hub has no tasks write route yet
-   *  (the plan's open question, shared with the agents plan), so today the shell passes nothing and
-   *  the checkbox reflects the row it was given. */
+  /** A5 §3.5: the checkbox is an optimistic `state: 'done'`. `POST /tasks` creates a task but
+   *  nothing changes one's state yet, so today the shell passes nothing and the checkbox reflects
+   *  the row it was given. */
   onToggleDone?: (taskId: string, done: boolean) => void;
 }
 
@@ -144,6 +153,12 @@ export function Tasks({ now: nowProp, onOpenSource, onOpenDelegation, onToggleDo
   const zero: ZeroClient = useZeroClient();
   const [view, setView] = useState<TasksView>("today");
   const [quickAdd, setQuickAdd] = useState("");
+  /** True while `POST /tasks` is in flight. The field stays editable throughout — this is a label
+   *  for assistive tech and the second-submit guard, not a lock on the input. */
+  const [adding, setAdding] = useState(false);
+  /** The quick-add's one line of feedback. A fresh object on every answer, so an "added" that is
+   *  still up when the next one lands re-arms its timer instead of keeping the first one's. */
+  const [notice, setNotice] = useState<{ kind: "added" | "failed" } | null>(null);
   /** Which delegation's approval card is open in place. One at a time — an approval card is a large
    *  object, and two of them stacked is not a list any more. */
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
@@ -228,12 +243,32 @@ export function Tasks({ now: nowProp, onOpenSource, onOpenDelegation, onToggleDo
     return typeof meta?.task_due_basis === "string" ? meta.task_due_basis : null;
   };
 
-  function onSubmitQuickAdd(e: FormEvent) {
+  // "Added to Tasks" clears itself; the failure line does not, because it is the one that has to
+  // still be there while the person decides whether to press Enter again.
+  useEffect(() => {
+    if (notice?.kind !== "added") return;
+    const timer = setTimeout(() => setNotice(null), QUICK_ADD_NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  async function onSubmitQuickAdd(e: FormEvent): Promise<void> {
     e.preventDefault();
-    // The field is the deliverable the plan asks for ("title only, the rest later"); the write route
-    // behind it is the plan's open question, shared with the agents plan. Clearing without storing
-    // is the honest state of that: nothing has been created, so nothing is claimed to have been.
-    setQuickAdd("");
+    const title = quickAdd.trim();
+    // A blank submit does nothing — and says nothing, because there is no failure to report.
+    if (title === "" || adding) return;
+    setAdding(true);
+    try {
+      await createTask(title);
+      // Only on success: the field clears, so the words leaving the box are words the hub has. A
+      // failed add leaves them exactly where they were — retyping them is the one thing this screen
+      // must never ask for.
+      setQuickAdd("");
+      setNotice({ kind: "added" });
+    } catch {
+      setNotice({ kind: "failed" });
+    } finally {
+      setAdding(false);
+    }
   }
 
   return (
@@ -259,15 +294,33 @@ export function Tasks({ now: nowProp, onOpenSource, onOpenDelegation, onToggleDo
         />
       </header>
 
-      <form className="tasks-screen__quick-add" onSubmit={onSubmitQuickAdd}>
+      <form className="tasks-screen__quick-add" onSubmit={(e) => void onSubmitQuickAdd(e)}>
         <input
           className="tasks-screen__quick-input"
           aria-label="Quick add task"
           placeholder="New task…"
           value={quickAdd}
-          onChange={(e) => setQuickAdd(e.target.value)}
+          // The field keeps taking keystrokes while the hub is answering; the state is announced,
+          // not enforced by a disabled input.
+          aria-busy={adding}
+          onChange={(e) => {
+            setQuickAdd(e.target.value);
+            // The failure line's dismissal is the next keystroke (the notice is otherwise a
+            // one-shot the person cannot get rid of without adding another task).
+            if (notice?.kind === "failed") setNotice(null);
+          }}
         />
       </form>
+
+      {notice !== null && (
+        <p
+          className="tasks-screen__notice"
+          data-kind={notice.kind}
+          role={notice.kind === "added" ? "status" : "alert"}
+        >
+          {notice.kind === "added" ? QUICK_ADD_ADDED : QUICK_ADD_FAILED}
+        </p>
+      )}
 
       {visible.length === 0 ? (
         <p className="tasks-screen__empty">{VIEW_EMPTY[view]}</p>

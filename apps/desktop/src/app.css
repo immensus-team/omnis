@@ -3416,6 +3416,22 @@ body {
   outline-offset: 1px;
 }
 
+/* The quick-add's one line of feedback, drawn as the Notes composer's notice is (same padding,
+   radius and 12px size — the two screens answer the same question the same way). No motion: it
+   appears and disappears, and the "added" half is the only one on a timer. */
+.tasks-screen__notice {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.tasks-screen__notice[data-kind="failed"] {
+  color: var(--danger-500);
+}
+
 .tasks-screen__list {
   list-style: none;
   margin: 0;
