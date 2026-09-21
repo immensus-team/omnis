@@ -1,7 +1,7 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
-import { query } from "@omnis/db";
+import { one, query } from "@omnis/db";
 import type { Kernel, Logger } from "@omnis/kernel";
 import {
   BRIDGE_ERRORS,
@@ -125,21 +125,25 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
 
   // ---- bridge → hub notifications ----
 
-  async function onRegister(host: HostId, params: Record<string, unknown>): Promise<void> {
+  async function onRegister(host: HostId, params: Record<string, unknown>): Promise<string> {
     const runtime = RuntimeKind.parse(params.runtime);
     const version = typeof params.version === "string" ? params.version : null;
     const display = typeof params.display === "string" ? params.display : `${runtime}@${host}`;
     const capabilities = (params.capabilities ?? {}) as Record<string, unknown>;
-    await query(
+    // US-C00: runtime.registered is a request now, so the bridge learns the row's id here instead of
+    // looking it up afterwards (local-agent fills runtimeIds with it — US-C01).
+    const { id } = await one<{ id: string }>(
       pool,
       `INSERT INTO agent_runtimes (runtime, host, display, capabilities, version, state, last_seen_at)
        VALUES ($1, $2, $3, $4::jsonb, $5, 'online', now())
        ON CONFLICT (runtime, host) DO UPDATE
          SET display = EXCLUDED.display, capabilities = EXCLUDED.capabilities,
-             version = EXCLUDED.version, state = 'online', last_seen_at = now()`,
+             version = EXCLUDED.version, state = 'online', last_seen_at = now()
+       RETURNING id`,
       [runtime, host, display, JSON.stringify(capabilities), version],
     );
-    logger.info("runtime registered", { runtime, host, version });
+    logger.info("runtime registered", { runtime, host, version, runtimeId: id });
+    return id;
   }
 
   async function onHealth(host: HostId, params: Record<string, unknown>): Promise<void> {
@@ -383,8 +387,9 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
     params: Record<string, unknown>,
   ): Promise<unknown> {
     if (method === "runtime.registered") {
-      await onRegister(conn.host, params);
-      return null;
+      // US-C00: the upsert's id goes back to the bridge. A notification without an id still runs;
+      // onMessage drops the result for anything that is not a request.
+      return { runtime_id: await onRegister(conn.host, params) };
     }
     if (method === "session.registered") {
       await onSessionRegistered(conn.host, params);

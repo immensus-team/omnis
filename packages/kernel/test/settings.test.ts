@@ -43,6 +43,23 @@ describe("SETTING_DEFAULTS (US-B33)", () => {
   });
 });
 
+// US-C00: Phase C's four keys. Guarding them matters more than most defaults — a true here is what
+// lets a delegation run or a terminal scan start without Logan touching it, so each ships off.
+describe("Phase C defaults (US-C00)", () => {
+  it("ships delegation off — an empty rule list and no Hermes target", () => {
+    expect(SETTING_DEFAULTS["delegation.allow_rules"]).toEqual([]);
+    expect(SETTING_DEFAULTS["delegation.hermes_enabled"]).toBe(false);
+  });
+
+  it("ships terminal import off", () => {
+    expect(SETTING_DEFAULTS["import.terminal_sessions"]).toBe(false);
+  });
+
+  it("leaves kakao.read_stable_since unset — no reader has observed a stable room list yet", () => {
+    expect(SETTING_DEFAULTS["kakao.read_stable_since"]).toBeNull();
+  });
+});
+
 describe("getSetting", () => {
   it("returns the stored value when a row exists", async () => {
     const { pool, query } = fakePool([{ value: 80 }]);

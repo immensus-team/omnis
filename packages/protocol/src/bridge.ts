@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { Attachment, HostId, RuntimeKind, SessionId, SessionKey } from "./adapter.js";
+import {
+  AdapterEvent,
+  Attachment,
+  HostId,
+  NormalizedItem,
+  RuntimeKind,
+  SessionId,
+  SessionKey,
+} from "./adapter.js";
 import { HumanInterrupt } from "./approval.js";
 
 /** A2-D3: no initialize handshake. Every request carries this version in params._meta. */
@@ -232,8 +240,10 @@ export const HUB_METHODS = [
   "session.close",
   "ingest.scan",
   "ingest.read",
+  "capture.send",
+  "sessions.import_scan",
 ] as const;
-/** bridge → hub (A2 §3.3). Only approval.requested is a request; the rest are notifications. */
+/** bridge → hub (A2 §3.3). approval.requested and runtime.registered are requests; the rest are notifications. */
 export const BRIDGE_METHODS = [
   "runtime.registered",
   "session.registered",
@@ -244,6 +254,7 @@ export const BRIDGE_METHODS = [
   "turn.completed",
   "approval.requested",
   "health",
+  "capture.items",
 ] as const;
 export type HubMethod = (typeof HUB_METHODS)[number];
 export type BridgeMethod = (typeof BRIDGE_METHODS)[number];
@@ -320,6 +331,47 @@ export function withMeta<P extends Record<string, unknown>>(
 }
 
 /** A2-D3: a mismatch rejects just this request with -32010 instead of dropping the connection. */
+// --- Phase C (backlog §3) ---
+export const RuntimeRegisteredResult = z.object({ runtime_id: z.string().uuid() });
+export const DelegateRunParams = z.object({ brief: DelegationBrief, sig: z.string() });
+export const CaptureItemsParams = z.object({
+  channel: z.enum(["kakaotalk", "linkedin"]),
+  account_external_id: z.string().min(1),
+  events: z
+    .array(z.union([NormalizedItem, AdapterEvent]))
+    .min(1)
+    .max(200),
+});
+export const CaptureSendParams = z.object({
+  channel: z.enum(["kakaotalk", "linkedin"]),
+  approval_id: z.string().uuid(),
+  sig: z.string(),
+  thread_external_id: z.string().min(1),
+  text: z.string().min(1).max(4000),
+  dry_run: z.boolean(),
+});
+export const ImportScanParams = z.object({
+  since: z.string().datetime().nullable(),
+  max_sessions: z.number().int().positive().max(200).default(50),
+});
+export const ImportedTurn = z.object({
+  source_id: z.string().min(1),
+  role: z.enum(["user", "agent"]),
+  at: z.string().datetime(),
+  text: z.string().max(1000),
+  tool_calls: z.array(z.string()),
+});
+export const ImportedSession = z.object({
+  runtime: z.enum(["claude_code", "codex"]),
+  source_id: z.string().min(1),
+  cwd: z.string().min(1),
+  started_at: z.string().datetime(),
+  turns: z.array(ImportedTurn),
+});
+export const ImportScanResult = z.object({ sessions: z.array(ImportedSession) });
+export type ImportedSession = z.infer<typeof ImportedSession>;
+export type ImportedTurn = z.infer<typeof ImportedTurn>;
+
 export function assertProtocolVersion(params: unknown): void {
   const meta = (params as { _meta?: unknown } | null | undefined)?._meta;
   const parsed = RpcMeta.safeParse(meta);
