@@ -373,10 +373,13 @@ body {
 }
 
 /* §c.2: the announcement the keyboard reorder makes. The rail's tiles are icon-only, so this is the
-   only place the reorder can say what it did — visually hidden, but the same 1px clipped box the
-   rest of the app hides spoken-only text in, and out of flow so it cannot push the rail's column
-   around. */
-.channel-rail__announce {
+   only place the reorder can say what it did — visually hidden, and out of flow so it cannot push
+   the rail's column around.
+   loop-r2-05: `.visually-hidden` is the same recipe under a name anything may use — the boot
+   skeleton's "Loading omnis…" is the second caller, and a second copy of six declarations is a
+   second copy to keep in step. One rule, two names. */
+.channel-rail__announce,
+.visually-hidden {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1262,6 +1265,16 @@ body {
    growing the card or showing a scrollbar over rows that do not exist. */
 .inbox-card__list--skeleton {
   overflow: hidden;
+}
+
+/* loop-r2-05: the card's title bar in the boot skeleton (components/BootSkeleton.tsx), 28px as the
+   brief specifies. Ink is --bg-elevated, the same one the rows use — one placeholder colour. */
+.boot-skeleton__title {
+  display: block;
+  width: 72px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
 }
 
 .inbox-row__avatar {
