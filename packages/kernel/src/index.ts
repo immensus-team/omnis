@@ -95,6 +95,8 @@ export { createKernel } from "./kernel.js";
 export type { Kernel, KernelDeps } from "./kernel.js";
 export { SETTING_DEFAULTS, getAllSettings, getSetting, setSetting } from "./settings.js";
 export type { SettingKey } from "./settings.js";
+export { KAKAO_STABLE_DAYS, kakaoSendState, kakaoSendStep } from "./kakao-send.js";
+export type { KakaoSendReason, KakaoSendState, KakaoSendStep } from "./kakao-send.js";
 
 export {
   POLICY,
