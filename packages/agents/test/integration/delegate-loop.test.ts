@@ -78,6 +78,11 @@ describe("delegateLoop (A4 §5)", () => {
   });
 
   it("creates a pending approval row, never an execution", async () => {
+    // Scoped to this loop's own window: the integration files share one DB and run serially, and unrelated
+    // files (schema-0004/0007, transcript-route) leave their own agent_sessions rows behind, so a global
+    // count(*) only held when this file happened to run first. Scoped, it still fails if the loop ever opens
+    // a session before the approval is granted — which is the invariant this test is named for.
+    const since = new Date();
     const taskId = returningId(
       await pool.query<{ id: string }>(
         "INSERT INTO tasks (title, owner_kind, created_by) VALUES ('delegation candidate','agent','agent') RETURNING id",
@@ -118,7 +123,8 @@ describe("delegateLoop (A4 §5)", () => {
     expect(rows[0]).toMatchObject({ state: "pending", action: "delegate", risk: "normal" });
     expect(rows[0]?.args.brief).toContain("## Acceptance Criteria");
     const sessions = await pool.query<{ n: string }>(
-      "SELECT count(*)::text AS n FROM agent_sessions",
+      "SELECT count(*)::text AS n FROM agent_sessions WHERE started_at >= $1",
+      [since],
     );
     expect(sessions.rows[0]?.n).toBe("0");
   });
