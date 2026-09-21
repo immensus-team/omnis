@@ -20,7 +20,9 @@ export async function fetchZeroToken(
   hubUrl: string = HUB_HTTP_URL,
   signal?: AbortSignal,
 ): Promise<string> {
-  const res = await fetch(`${hubUrl}/api/zero-token`, { signal });
+  // `signal ?? null`: `RequestInit.signal` is `AbortSignal | null` and this repo compiles with
+  // exactOptionalPropertyTypes, so an explicit undefined is not the same thing as an absent key.
+  const res = await fetch(`${hubUrl}/api/zero-token`, { signal: signal ?? null });
   if (!res.ok) throw new Error(`zero token fetch failed: HTTP ${res.status}`);
   return ((await res.json()) as { token: string }).token;
 }

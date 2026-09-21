@@ -389,6 +389,81 @@ body {
   margin-left: 16px;
 }
 
+/* loop-r2-05: the shell's one line about sync, drawn under the ask bar at >=900 and at the top of
+   this column below it. Chrome, so it is glass (v3 §e.4) — the list under it, and the skeleton rows
+   in that list, stay opaque. The weight is the thread screen's archived banner's: 13px, one line,
+   secondary ink, a 12px radius. It is a statement of fact, not an alert. */
+.connection-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 12px;
+  /* Under the ask bar, with the margin rather than the column's 12px gap: the banner is attached to
+     the bar it reports on. Below 900 there is no bar above it and this is the column's own top
+     gutter. */
+  margin: 8px 0 0;
+  border-radius: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  /* The entrance only. It leaves at once — unmounting is not a transition, and a banner that fades
+     out would leave the user reading a sentence that is no longer true. */
+  transition: opacity var(--dur-fast) var(--ease-spring);
+}
+
+/* `@starting-style` is the whole entrance: the first style change after the element is rendered
+   starts here rather than at the final value, and the transition above carries it in over
+   --dur-fast. No keyframes, no motion component, and nothing to undo — once the animation has run
+   there is no rule left to fight. */
+@starting-style {
+  .connection-banner {
+    opacity: 0;
+  }
+}
+
+/* The dot is 6px of ink before the text, not a status pill: the sentence already says which state
+   this is. Its colour is the one `.status-pill[data-tone="warning"]` writes, read from that rule
+   rather than restated (one state, one colour, and no new colour enters the palette). */
+.connection-banner__dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: oklch(from var(--warn-500) 0.44 c h);
+}
+
+/* Connecting is not a problem yet — it is the quietest of the four, so it gets the tertiary ink
+   rather than the warning colour. */
+.connection-banner[data-kind="connecting"] .connection-banner__dot {
+  background: var(--text-tertiary);
+}
+
+/* The sentence is the part that shrinks: at 320 it wraps to a second line and the button stays
+   where it is, which is what keeps the banner inside the viewport. */
+.connection-banner__text {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.connection-banner__action {
+  flex: 0 0 auto;
+  /* Pushed to the end of the line, so the button is in the same place whether the sentence is one
+     line or two. */
+  margin-left: auto;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .connection-banner {
+    transition: none;
+  }
+}
+
 /* U1 ask/search pill — rendered by CommandPalette mode="inline".
    A gradient stroke instead of .glass-surface's default hairline border (--aurora-stroke on
    focus, US-D06 §4.1.2 — the retired --ask-gradient's teal→orange was the last hue on the
