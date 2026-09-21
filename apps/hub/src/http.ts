@@ -17,6 +17,7 @@ import type { Adapter } from "@omnis/protocol";
 import type { Pool } from "pg";
 import { setThreadArchived } from "./archive.js";
 import type { HubConfig } from "./config.js";
+import { NOTE_MAX_CHARS, createNote, decideNoteRouting } from "./notes.js";
 import { createSearchDeps, runSearch } from "./search.js";
 import { isValidSettingKey } from "./settings.js";
 import { clampLastN, loadTranscript } from "./transcript.js";
@@ -240,6 +241,72 @@ export function createHubServer(deps: HubServerDeps): Server {
       );
       if (summary === null) return send(res, 404, { error: "session not found" });
       return send(res, 200, summary);
+    }
+
+    // Delta §7 (US-B31): the Notes screen's two writes. POST /notes itself is not in the delta's
+    // route table — it was listed as a follow-up task, but the L7 routing loop is triggered by
+    // `note.created` and this is the only place that event can come from, so without it a note is
+    // written by nobody and routed by nothing.
+    if (path === "/notes") {
+      if (method !== "POST") return send(res, 405, { error: "method not allowed" });
+      let body: unknown;
+      try {
+        body = await readJson(req);
+      } catch {
+        return send(res, 400, { error: "invalid json body" });
+      }
+      if (
+        typeof body !== "object" ||
+        body === null ||
+        typeof (body as { body?: unknown }).body !== "string"
+      ) {
+        return send(res, 400, { error: "expected { body: string }" });
+      }
+      const note = await createNote(pool, kernel.events, (body as { body: string }).body);
+      if (note === null) {
+        return send(res, 400, {
+          error: `note body must be 1..${String(NOTE_MAX_CHARS)} characters`,
+        });
+      }
+      return send(res, 201, note);
+    }
+
+    const noteRoute = /^\/notes\/([0-9a-fA-F-]{36})\/route$/.exec(path);
+    if (noteRoute !== null) {
+      if (method !== "POST") return send(res, 405, { error: "method not allowed" });
+      const id = noteRoute[1];
+      if (id === undefined) return send(res, 400, { error: "bad id" });
+      let body: unknown;
+      try {
+        body = await readJson(req);
+      } catch {
+        return send(res, 400, { error: "invalid json body" });
+      }
+      const b = body as { accept?: unknown; thread_id?: unknown; person_id?: unknown };
+      if (typeof b.accept !== "boolean") {
+        return send(res, 400, { error: "expected { accept: boolean, thread_id?, person_id? }" });
+      }
+      for (const [key, value] of [
+        ["thread_id", b.thread_id],
+        ["person_id", b.person_id],
+      ] as const) {
+        if (value !== undefined && (typeof value !== "string" || !/^[0-9a-f-]{36}$/i.test(value))) {
+          return send(res, 400, { error: `bad ${key}` });
+        }
+      }
+      const outcome = await decideNoteRouting(pool, id, {
+        accept: b.accept,
+        ...(typeof b.thread_id === "string" ? { thread_id: b.thread_id } : {}),
+        ...(typeof b.person_id === "string" ? { person_id: b.person_id } : {}),
+      });
+      if (!outcome.ok) {
+        if (outcome.reason === "not_found") return send(res, 404, { error: "note not found" });
+        if (outcome.reason === "not_proposed") {
+          return send(res, 409, { error: "note is not awaiting a routing decision" });
+        }
+        return send(res, 400, { error: "accept needs exactly one of thread_id, person_id" });
+      }
+      return send(res, 200, { id, route_state: outcome.route_state });
     }
 
     // Delta §7 (US-B33): Settings screen reads, settings write, and the cost banner.

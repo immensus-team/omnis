@@ -18,6 +18,7 @@ import { type SearchHit, search, toUiSearchGroups } from "./api/search.js";
 import { AgentSession } from "./screens/AgentSession.js";
 import { Inbox, type OpenTarget } from "./screens/Inbox.js";
 import { Network, PersonDetail } from "./screens/Network.js";
+import { Notes } from "./screens/Notes.js";
 import { Tasks } from "./screens/Tasks.js";
 import { Thread } from "./screens/Thread.js";
 import { Today } from "./screens/Today.js";
@@ -47,7 +48,7 @@ function useCommandPaletteKey(toggle: () => void) {
 
 /** The screens the shell can show. The rail switches between them by screen, not by route —
  *  there is no URL router in the desktop app (src-tauri loads one documents). */
-export type ShellScreen = "inbox" | "today" | "tasks" | "network";
+export type ShellScreen = "inbox" | "today" | "tasks" | "network" | "notes";
 
 export function App({ screen = "inbox" }: { screen?: ShellScreen }) {
   // Without ZeroProvider, useQuery dies with "useZero must be used within a ZeroProvider".
@@ -246,6 +247,10 @@ function Shell({ screen }: { screen: ShellScreen }) {
           <Today onOpenThread={openThread} />
         ) : screen === "network" ? (
           <Network onOpenPerson={setOpenPersonId} onOpenThread={openThreadFromPerson} />
+        ) : screen === "notes" ? (
+          // US-B31: no navigation leaves this screen — a note's target is a label, not a link (A5
+          // §3.7), and the routing decision is taken in place.
+          <Notes />
         ) : screen === "tasks" ? (
           <Tasks
             onOpenSource={setSourceItemId}
