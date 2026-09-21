@@ -36,6 +36,19 @@ describe("saveSubscription", () => {
     expect(params).toEqual(["https://push.example/abc", "p2", "a2", "iPhone Safari"]);
   });
 
+  // delta §2.3 caps ua at 200 chars, and a browser with a 400-char user agent is not a reason to
+  // refuse the subscription — so the cap is a truncation, applied here for every caller at once.
+  it("truncates an over-long ua to the schema's 200 chars", async () => {
+    const pool = fakePool([{ id: "sub-1" }]);
+    await saveSubscription(pool as never, {
+      endpoint: "https://push.example/abc",
+      keys: { p256dh: "p", auth: "a" },
+      ua: "u".repeat(500),
+    });
+    const [, params] = pool.query.mock.calls[0] as [string, unknown[]];
+    expect(params[3]).toHaveLength(200);
+  });
+
   it("throws rather than returning undefined when the insert yields no row", async () => {
     const pool = fakePool([]);
     await expect(

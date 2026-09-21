@@ -34,6 +34,8 @@ const APPROVAL_STATES = [
   "expired",
 ] as const;
 const MAX_BODY_BYTES = 64 * 1024;
+/** Browsers cap a URL at 2048; anything longer is not one the push service would accept anyway. */
+const ENDPOINT_MAX_CHARS = 2048;
 const ZERO_TOKEN_TTL_SEC = 7 * 24 * 60 * 60;
 
 // US-A21b: HS256 is a one-liner, so jose is not pulled in for it. The only thing signed is the
@@ -417,6 +419,12 @@ export function createHubServer(deps: HubServerDeps): Server {
           typeof b.keys?.auth !== "string"
         ) {
           return send(res, 400, { error: "expected PushSubscription shape" });
+        }
+        // endpoint is UNIQUE, so its value goes into a btree index with a ~2704-byte ceiling: a
+        // longer one is a Postgres error (and so a 500) rather than a stored row. 2048 is the URL
+        // length browsers themselves stop at, so this refuses only what no browser sends.
+        if (b.endpoint.length > ENDPOINT_MAX_CHARS) {
+          return send(res, 400, { error: `endpoint must be at most ${ENDPOINT_MAX_CHARS} chars` });
         }
         const id = await saveSubscription(pool, {
           endpoint: b.endpoint,

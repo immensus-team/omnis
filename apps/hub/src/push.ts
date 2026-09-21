@@ -13,6 +13,11 @@ export interface PushSubscriptionInput {
   ua?: string;
 }
 
+/** delta §2.3 caps `ua` at 200 chars. Truncated rather than rejected: a browser with a long user
+ *  agent string must not be the one device that cannot subscribe. The cap lives here, where every
+ *  caller routes through, instead of in each caller. */
+const UA_MAX = 200;
+
 export async function saveSubscription(pool: Pool, sub: PushSubscriptionInput): Promise<string> {
   const rows = await query<{ id: string }>(
     pool,
@@ -20,7 +25,7 @@ export async function saveSubscription(pool: Pool, sub: PushSubscriptionInput): 
        VALUES ($1, $2, $3, $4)
      ON CONFLICT (endpoint) DO UPDATE SET p256dh = $2, auth = $3, ua = $4, fail_count = 0
      RETURNING id`,
-    [sub.endpoint, sub.keys.p256dh, sub.keys.auth, sub.ua ?? null],
+    [sub.endpoint, sub.keys.p256dh, sub.keys.auth, sub.ua?.slice(0, UA_MAX) ?? null],
   );
   const row = rows[0];
   if (row === undefined) throw new Error("insert push_subscriptions returned no row");

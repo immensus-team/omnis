@@ -397,6 +397,8 @@ describe("PWA Web Push subscription (US-B36, delta §7)", () => {
       { endpoint: "https://push.example/x" }, // no keys at all
       { keys: { p256dh: "p", auth: "a" } }, // no endpoint
       { endpoint: 7, keys: { p256dh: "p", auth: "a" } }, // endpoint is not a string
+      // Longer than a browser ever sends, and long enough to fall over the UNIQUE index's ceiling.
+      { endpoint: `https://push.example/${"x".repeat(2040)}`, keys: { p256dh: "p", auth: "a" } },
     ]) {
       expect((await create(body)).status).toBe(400);
     }
