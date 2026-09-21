@@ -3,9 +3,9 @@ import { type ApprovalCardInterrupt, ApprovalCardView } from "@omnis/ui/componen
 import { DigestCard } from "@omnis/ui/components/digest-card";
 import { formatRelativeTime } from "@omnis/ui/lib/relative-time";
 import { useQuery } from "@rocicorp/zero/react";
-import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState } from "react";
 import { decideApproval } from "../api/approvals.js";
-import { type ZeroClient, useZeroClient } from "../zero-client.js";
+import { useZeroClient } from "../zero-client.js";
 
 /** A5 §3.4: greeting text, rendered as an <h1> so a screen reader announces the page's gist
  *  immediately.
@@ -32,21 +32,23 @@ export function isSameLocalDay(a: Date, b: Date): boolean {
   );
 }
 
-export type ScreenState = "error" | "offline" | "loading" | "empty" | "ready";
+export type ScreenState = "error" | "loading" | "empty" | "ready";
 
-/** US-B28's four states. Zero's query result type is 'unknown' | 'complete' | 'error'
- *  (@rocicorp/zero 1.9.0 `ResultType`), and while offline a query never reaches 'complete' — that
- *  is why offline comes before loading. error carries the most specific information, so it comes
- *  first. The return value is a *word*, never a reason to blank the body: offline and error keep
+/** US-B28's states, less the one that moved. Zero's query result type is 'unknown' | 'complete' |
+ *  'error' (@rocicorp/zero 1.9.0 `ResultType`). error carries the most specific information, so it
+ *  comes first. The return value is a *word*, never a reason to blank the body: an error keeps
  *  rendering the rows Zero has already synced (blanking them would be a regression, not a state).
+ *
+ *  loop-r2-05 removed `offline` from this list along with the `online` input that fed it. Whether
+ *  this window can see the hub is one fact about the whole shell, not a per-screen one, and Today
+ *  saying "You're offline" while the Inbox's header said "Updated now" was the two screens telling
+ *  different stories about the same socket. The shell's connection banner says it once, above both.
  */
 export function screenState(input: {
-  online: boolean;
   resultTypes: readonly ("unknown" | "complete" | "error")[];
   hasContent: boolean;
 }): ScreenState {
   if (input.resultTypes.includes("error")) return "error";
-  if (!input.online) return "offline";
   if (input.resultTypes.includes("unknown")) return "loading";
   return input.hasContent ? "ready" : "empty";
 }
@@ -56,7 +58,6 @@ export function screenState(input: {
  *  top rather than a screen of its own. */
 export const STATE_COPY: Record<ScreenState, string> = {
   error: "Couldn't load the Today screen. Check the hub logs.",
-  offline: "You're offline. Showing the last content we received.",
   loading: "Loading…",
   // A5 §3.4 words the empty state as "Quiet day today"; "Today is empty" says the same thing in a
   // way that sounds like a fault.
@@ -136,18 +137,6 @@ function clockTime(ms: number): string {
  *  would change on every digest write; this bound costs nothing and degrades to text. */
 const ITEM_WINDOW = 200;
 
-/** Reads Zero's online flag as React state. `zero.onOnline` returns the unsubscribe function
- *  `useSyncExternalStore` wants; the server-render/test snapshot assumes online, which is the
- *  quieter assumption (offline would paint an offline banner into every test render). */
-function useZeroOnline(zero: ZeroClient): boolean {
-  const subscribe = useCallback((cb: () => void) => zero.onOnline(() => cb()), [zero]);
-  return useSyncExternalStore(
-    subscribe,
-    () => zero.online,
-    () => true,
-  );
-}
-
 export interface TodayProps {
   /** The display name in the greeting. Nothing in the schema holds it yet (delta §9's
    *  OMNIS_USER_ID is a machine identity, not a display name), so it defaults to the hub's
@@ -167,7 +156,6 @@ export function Today({ userName = "Logan", onOpenThread, onOpenDigest }: TodayP
   // the state decision depend on when React happened to re-render.
   const now = useMemo(() => new Date(), []);
 
-  const online = useZeroOnline(zero);
   // One row, not the whole history of briefings: digests accumulate one per day, and every look at
   // this screen would otherwise materialize all of them. The same shape serves the nightly card.
   const [morningRows, morningR] = useQuery(
@@ -216,7 +204,6 @@ export function Today({ userName = "Logan", onOpenThread, onOpenDigest }: TodayP
   );
 
   const state = screenState({
-    online,
     resultTypes: [morningR.type, nightlyR.type, itemsR.type, approvalsR.type],
     hasContent:
       morning !== null || nightly !== null || todaysEvents.length > 0 || approvals.length > 0,

@@ -1199,6 +1199,60 @@ body {
   display: none;
 }
 
+/* loop-r2-05: the list's loading shape (Inbox.tsx's InboxSkeleton). A real row — the same box, the
+   same padding, the same grid — with blocks where the text goes, so the list does not change height
+   when the data lands.
+   Static on purpose: no shimmer and no pulse (UX-06, SKILLS.md #9). That is the design decision,
+   and it is also why there is no reduced-motion branch here to forget. */
+.inbox-row--skeleton {
+  /* The list is a column flex container, so the default shrink would squash eight of these into
+     whatever height the card happens to have. The placeholders keep their size and the list clips
+     (see .inbox-card__list--skeleton) instead. */
+  flex: 0 0 auto;
+  cursor: default;
+}
+
+/* The two line boxes the real row's own text makes: the 15px name at line-height 1.5 (22.5px, the
+   line its 12px timestamp does not grow) and the 14px summary at 1.5 (21px). Spelled as the grid's
+   rows so the blocks below can be the ink rather than the whole line — 22.5 + the grid's 4px gap +
+   21 + the row's 12px padding twice is the 71.5px a real row measures. tools/e2e/shots-loop-r2-05.ts
+   asserts the skeleton row and the real row are the same height, which is what keeps this
+   arithmetic honest rather than merely plausible. */
+.inbox-row--skeleton .inbox-row__content {
+  grid-template-rows: 22.5px 21px;
+}
+
+/* Size and place come from .inbox-row__avatar; only the fill is the skeleton's. --bg-elevated is
+   the step above the canvas in both themes, which is the one ink a placeholder may use. */
+.inbox-row__skeleton-circle {
+  background: var(--bg-elevated);
+}
+
+.inbox-row__skeleton-bar {
+  align-self: center;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+}
+
+.inbox-row__skeleton-bar--line1 {
+  grid-row: 1;
+  grid-column: 3;
+  width: 60%;
+}
+
+.inbox-row__skeleton-bar--line2 {
+  grid-row: 2;
+  grid-column: 3;
+  width: 85%;
+}
+
+/* Eight placeholders are taller than the card on any laptop; the list clips them rather than
+   growing the card or showing a scrollbar over rows that do not exist. */
+.inbox-card__list--skeleton {
+  overflow: hidden;
+}
+
 .inbox-row__avatar {
   grid-row: 1 / span 2;
   grid-column: 2;

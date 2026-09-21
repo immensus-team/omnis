@@ -46,22 +46,26 @@ describe("isSameLocalDay (today-calendar filter decision)", () => {
   });
 });
 
-describe("screenState (US-B28 4 states — loading/empty/error/offline)", () => {
-  const ok = { online: true, resultTypes: ["complete", "complete"] as const };
+describe("screenState (US-B28's states, less the one loop-r2-05 moved to the shell)", () => {
+  const ok = { resultTypes: ["complete", "complete"] as const };
   it("error wins over everything — a failed query is the most specific thing we know", () => {
-    expect(
-      screenState({ online: false, resultTypes: ["error", "unknown"], hasContent: true }),
-    ).toBe("error");
+    expect(screenState({ resultTypes: ["error", "unknown"], hasContent: true })).toBe("error");
   });
-  it("offline beats loading — offline queries never reach 'complete', so 'loading' would hang forever", () => {
-    expect(
-      screenState({ online: false, resultTypes: ["unknown", "complete"], hasContent: false }),
-    ).toBe("offline");
+  // loop-r2-05: there is no `offline` state here any more. Whether this window can see the hub is
+  // one fact about the whole shell, and Today saying "You're offline" while the Inbox's subline
+  // said "Updated now" was two screens telling different stories about the same socket. The
+  // screen's own answer while a query has not answered is `loading`, and the shell's banner above
+  // it says what the connection is doing.
+  it("never reports offline — the shell's connection banner is the one place that is said", () => {
+    expect(screenState({ resultTypes: ["unknown", "complete"], hasContent: false })).toBe(
+      "loading",
+    );
+    expect(Object.keys(STATE_COPY)).not.toContain("offline");
   });
   it("loading while any query is still 'unknown'", () => {
-    expect(
-      screenState({ online: true, resultTypes: ["unknown", "complete"], hasContent: false }),
-    ).toBe("loading");
+    expect(screenState({ resultTypes: ["unknown", "complete"], hasContent: false })).toBe(
+      "loading",
+    );
   });
   it("empty when every query completed and there is nothing to show", () => {
     expect(screenState({ ...ok, hasContent: false })).toBe("empty");
@@ -69,12 +73,12 @@ describe("screenState (US-B28 4 states — loading/empty/error/offline)", () => 
   it("ready when every query completed and there is something to show", () => {
     expect(screenState({ ...ok, hasContent: true })).toBe("ready");
   });
-  // Even offline, already-synced local data stays on screen — only the banner appears, the lists
-  // stay alive: the return value is a state word, never a reason to blank the body. `ready` is the
-  // one state with nothing to say, and it says it with an empty string rather than a third state
-  // of the banner.
-  it("offline still reports content so the caller keeps rendering the cached lists", () => {
-    expect(STATE_COPY.offline).not.toBe("");
+  // Already-synced local data stays on screen through a failed query — only the banner appears,
+  // the lists stay alive: the return value is a state word, never a reason to blank the body.
+  // `ready` is the one state with nothing to say, and it says it with an empty string rather than
+  // a fourth state of the banner.
+  it("keeps a state word for the caller, and says nothing when there is nothing to say", () => {
+    expect(STATE_COPY.error).not.toBe("");
     expect(STATE_COPY.ready).toBe("");
   });
 });

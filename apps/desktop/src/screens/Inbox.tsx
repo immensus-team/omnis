@@ -280,6 +280,34 @@ type FlatItem =
   | { kind: "header"; key: string; count: number; pill: ReactNode }
   | { kind: "row"; row: ThreadRow };
 
+/** The placeholder rows' keys, written out rather than taken from the loop index: nothing here ever
+ *  reorders, but an index key is exactly what `noArrayIndexKey` exists to catch, and eight literals
+ *  say "this list is fixed" more plainly than an ignore comment would. */
+const SKELETON_KEYS = ["s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7"];
+
+/** loop-r2-05: the list's loading shape. It wears the real row's grid — the same padding, the same
+ *  40px avatar column, the same two line boxes — with the text replaced by blocks, so the list does
+ *  not jump when the data lands. Static on purpose: UX-06 and SKILLS.md #9 ban the shimmer, which is
+ *  also why a skeleton has no reduced-motion branch to write.
+ *
+ *  Drawn here and by the boot skeleton (components/BootSkeleton.tsx), so the shape the shell paints
+ *  before Zero exists and the shape the list paints while its first query resolves are one shape. */
+export function InboxSkeleton() {
+  return (
+    <>
+      {SKELETON_KEYS.map((key) => (
+        <div key={key} className="inbox-row inbox-row--skeleton" aria-hidden="true">
+          <div className="inbox-row__content">
+            <span className="inbox-row__avatar inbox-row__skeleton-circle" />
+            <span className="inbox-row__skeleton-bar inbox-row__skeleton-bar--line1" />
+            <span className="inbox-row__skeleton-bar inbox-row__skeleton-bar--line2" />
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 export function Inbox({
   onOpen,
   channelFilter = null,
@@ -289,6 +317,7 @@ export function Inbox({
   pendingApprovals = 0,
   onOpenApprovals,
   notify,
+  connectionOk = true,
 }: {
   onOpen?: (target: OpenTarget) => void;
   /** U1 channel rail selection. null = everything (the Inbox tile). ANDed with the pill filters
@@ -314,6 +343,10 @@ export function Inbox({
    *  disarming of the undo it is offering. A request and not a spec: the id that tells one toast
    *  from the next belongs to the slot, and this screen has no way to know it. */
   notify?: (spec: ToastRequest, deferred?: { run: () => void }) => void;
+  /** loop-r2-05: whether the shell can see the hub. False, the subline drops its "Updated {x}"
+   *  segment — the connection banner directly above the list is already saying how stale this data
+   *  is, and a header that went on claiming freshness would be arguing with it. */
+  connectionOk?: boolean;
 }) {
   const zero = useZeroClient();
   const [filter, setFilter] = useState<InboxFilter>("all");
@@ -350,7 +383,7 @@ export function Inbox({
   // proven to work, so it is reused as-is. ponytail: a thread with several messages inside the
   // top-N can push another thread out (the limit is 200 to leave slack) — if a true "newest per
   // thread" is ever needed, verify the threads.related("items", limit 1) path and switch.
-  const [items] = useQuery(
+  const [items, itemsR] = useQuery(
     zero.query.items
       .where("status", "!=", "archived")
       .orderBy("sent_at", "desc")
@@ -852,13 +885,22 @@ export function Inbox({
   const accountChannel = soleAccount ? CHANNEL_LABEL[soleAccount.channel as UiChannel] : null;
   const subline = [
     channelFilter ? CHANNEL_LABEL[channelFilter] : accountChannel,
-    latestSentAt === null ? null : `Updated ${formatRelativeTime(latestSentAt)}`,
+    // loop-r2-05: dropped when the shell cannot see the hub. "Updated now" over a socket that has
+    // been down for a minute is the one lie this header used to tell.
+    !connectionOk || latestSentAt === null ? null : `Updated ${formatRelativeTime(latestSentAt)}`,
     // Dropped at zero: an empty queue is said by an empty list, the rule the needs-approval count
     // badge already follows.
     unreadOnScreen > 0 ? `${unreadOnScreen} unread` : null,
   ]
     .filter((segment): segment is string => segment !== null)
     .join(" · ");
+
+  /** loop-r2-05: the list has nothing to draw *and* its query has not answered yet. The `items`
+   *  presence check is the half that matters: an empty replica that has not synced looks exactly
+   *  like an empty mailbox, and only this says which one it is. Once rows exist they are drawn as
+   *  they always were, offline included — blanking synced rows would be a regression dressed as a
+   *  loading state, which is the rule Today's `screenState` already follows. */
+  const showSkeleton = itemsR.type !== "complete" && items.length === 0;
 
   return (
     <OpaqueSurface className="inbox-card">
@@ -950,81 +992,90 @@ export function Inbox({
       {/* loop-r1-03: the wrapper exists to scope four keys — see onListKeyDown. It carries no
           tabindex of its own: the list's tab stop is the selected row, and the wrapper is not a
           stop at all (NC-18 counted the "list wrapper (no visible focus)" as one). */}
-      <div className="inbox-card__list" onKeyDown={onListKeyDown}>
-        <Virtuoso
-          ref={virtuosoRef}
-          role="listbox"
-          // loop-r1-03/NC-18: react-virtuoso puts tabIndex={0} on its scroller by default, which is
-          // the focusable-but-invisible stop the keyboard-only session counted. Taking it out
-          // leaves the list exactly one tab stop, on the selected row.
-          tabIndex={-1}
-          // loop-r1-03/NC-18: the skip link's target (App.tsx). It is the listbox itself rather
-          // than the wrapper above, so the focus the link moves already lands on the element that
-          // owns the arrows and Home/End — and no new tabindex had to be invented for it, since
-          // this one is here for the opposite reason. `-1` is not a tab stop, so the count below is
-          // unchanged: the list is still one stop, and it is still the selected row.
-          id="inbox-list"
-          style={{ flex: "1 1 0", minHeight: 0 }}
-          data={listItems}
-          // loop-r1-03: the row's identity, so React moves a row's DOM node with the row instead of
-          // reusing whatever node sat at that position. Without it, archiving a row shifts every row
-          // below it up one *position*, React reconciles the virtualiser's children by position,
-          // and the node that held the focus is handed to a different thread: the focus ring lands
-          // on a row nobody selected and a screen reader reads the wrong one. Measured, not
-          // theorised — shots-loop-r1-03 read the focus on b3a8cee8 while the selection was on
-          // 46ed6e45. The header half of the union already carries its own stable key (FlatItem).
-          computeItemKey={(_, item) => (item.kind === "header" ? item.key : item.row.id)}
-          itemContent={(index, item) =>
-            item.kind === "header" ? (
-              <GroupHeader pill={item.pill} count={item.count} />
-            ) : (
-              <InboxRow
-                // US-D08 §c.4: only the row at the end of the list drops its hairline. The index
-                // is the flat list index, and the last item is always a row — a group header is
-                // only ever emitted above the rows it counts.
-                last={index === listItems.length - 1}
-                id={item.row.id}
-                name={item.row.title}
-                summary={item.row.summary}
-                isDraft={item.row.isDraft}
-                avatar={item.row.avatar}
-                channel={item.row.channel}
-                // When the group header directly above states the status, the row does not say it
-                // again (ref-issue-tracker-density.webp also keeps state words in the header
-                // only). What it does not do is erase the fact that this is a session —
-                // overwriting agentState with null drops a runtime session row to a channel glyph
-                // and it starts calling itself a "Slack message" (round three's rejection).
-                agentState={item.row.agentState}
-                groupedByState={grouped}
-                timestamp={item.row.timestamp}
-                unread={item.row.unread}
-                unreadCount={item.row.unreadCount}
-                selected={item.row.id === selectedId}
-                // On the needs-approval tab every row is pending — repeating with a dot per row
-                // what the tab already said makes the dot distinguish nothing (the same rule as
-                // dropping the status badge under a group header: what is stated above is not
-                // repeated below).
-                hasPendingApproval={filter !== "needs-approval" && item.row.hasPendingApproval}
-                labels={item.row.labels}
-                person={item.row.person}
-                archived={view === "archived"}
-                leaving={leavingIds.has(item.row.id)}
-                // loop-r1-03: one Tab reaches the list and it lands on the selected row; every
-                // other row is one `j` away instead. See tabStopId.
-                tabStop={item.row.id === tabStopId}
-                // Focus *is* selection — a Tab into the list, Escape's focus restore and a row
-                // focused in another window all arrive here, and none of them opens the pane.
-                onFocusRow={setSelectedId}
-                // The mouse path takes the same advance as `e`: one archive rule, two triggers.
-                onArchive={(id) => archiveAndAdvance(id, view !== "archived")}
-                onSelect={(id) => {
-                  setSelectedId(id);
-                  onOpen?.({ threadId: item.row.threadId, agentSession: item.row.agentSession });
-                }}
-              />
-            )
-          }
-        />
+      <div
+        className={`inbox-card__list${showSkeleton ? " inbox-card__list--skeleton" : ""}`}
+        onKeyDown={onListKeyDown}
+        // loop-r2-05: the list says it is busy rather than sitting empty with nothing to announce.
+        aria-busy={showSkeleton ? "true" : undefined}
+      >
+        {showSkeleton ? (
+          <InboxSkeleton />
+        ) : (
+          <Virtuoso
+            ref={virtuosoRef}
+            role="listbox"
+            // loop-r1-03/NC-18: react-virtuoso puts tabIndex={0} on its scroller by default, which is
+            // the focusable-but-invisible stop the keyboard-only session counted. Taking it out
+            // leaves the list exactly one tab stop, on the selected row.
+            tabIndex={-1}
+            // loop-r1-03/NC-18: the skip link's target (App.tsx). It is the listbox itself rather
+            // than the wrapper above, so the focus the link moves already lands on the element that
+            // owns the arrows and Home/End — and no new tabindex had to be invented for it, since
+            // this one is here for the opposite reason. `-1` is not a tab stop, so the count below is
+            // unchanged: the list is still one stop, and it is still the selected row.
+            id="inbox-list"
+            style={{ flex: "1 1 0", minHeight: 0 }}
+            data={listItems}
+            // loop-r1-03: the row's identity, so React moves a row's DOM node with the row instead of
+            // reusing whatever node sat at that position. Without it, archiving a row shifts every row
+            // below it up one *position*, React reconciles the virtualiser's children by position,
+            // and the node that held the focus is handed to a different thread: the focus ring lands
+            // on a row nobody selected and a screen reader reads the wrong one. Measured, not
+            // theorised — shots-loop-r1-03 read the focus on b3a8cee8 while the selection was on
+            // 46ed6e45. The header half of the union already carries its own stable key (FlatItem).
+            computeItemKey={(_, item) => (item.kind === "header" ? item.key : item.row.id)}
+            itemContent={(index, item) =>
+              item.kind === "header" ? (
+                <GroupHeader pill={item.pill} count={item.count} />
+              ) : (
+                <InboxRow
+                  // US-D08 §c.4: only the row at the end of the list drops its hairline. The index
+                  // is the flat list index, and the last item is always a row — a group header is
+                  // only ever emitted above the rows it counts.
+                  last={index === listItems.length - 1}
+                  id={item.row.id}
+                  name={item.row.title}
+                  summary={item.row.summary}
+                  isDraft={item.row.isDraft}
+                  avatar={item.row.avatar}
+                  channel={item.row.channel}
+                  // When the group header directly above states the status, the row does not say it
+                  // again (ref-issue-tracker-density.webp also keeps state words in the header
+                  // only). What it does not do is erase the fact that this is a session —
+                  // overwriting agentState with null drops a runtime session row to a channel glyph
+                  // and it starts calling itself a "Slack message" (round three's rejection).
+                  agentState={item.row.agentState}
+                  groupedByState={grouped}
+                  timestamp={item.row.timestamp}
+                  unread={item.row.unread}
+                  unreadCount={item.row.unreadCount}
+                  selected={item.row.id === selectedId}
+                  // On the needs-approval tab every row is pending — repeating with a dot per row
+                  // what the tab already said makes the dot distinguish nothing (the same rule as
+                  // dropping the status badge under a group header: what is stated above is not
+                  // repeated below).
+                  hasPendingApproval={filter !== "needs-approval" && item.row.hasPendingApproval}
+                  labels={item.row.labels}
+                  person={item.row.person}
+                  archived={view === "archived"}
+                  leaving={leavingIds.has(item.row.id)}
+                  // loop-r1-03: one Tab reaches the list and it lands on the selected row; every
+                  // other row is one `j` away instead. See tabStopId.
+                  tabStop={item.row.id === tabStopId}
+                  // Focus *is* selection — a Tab into the list, Escape's focus restore and a row
+                  // focused in another window all arrive here, and none of them opens the pane.
+                  onFocusRow={setSelectedId}
+                  // The mouse path takes the same advance as `e`: one archive rule, two triggers.
+                  onArchive={(id) => archiveAndAdvance(id, view !== "archived")}
+                  onSelect={(id) => {
+                    setSelectedId(id);
+                    onOpen?.({ threadId: item.row.threadId, agentSession: item.row.agentSession });
+                  }}
+                />
+              )
+            }
+          />
+        )}
       </div>
       {/* US-D09 §c.6: M125's Filters sheet. It is a sibling of the prompt below rather than its
           ancestor, and that is load-bearing — both portal to <body>, and React bubbles a synthetic
