@@ -125,8 +125,7 @@ async function main(): Promise<void> {
     if (seeded.thread_id === null) throw new Error(`"${REPLY}" is not on a thread`);
     if (seeded.item_id === null) {
       throw new Error(
-        `"${REPLY}" carries no item_id — the seed is not linking the approval to its draft, and ` +
-          "nothing below can fold",
+        `"${REPLY}" carries no item_id — the seed is not linking the approval to its draft, and nothing below can fold`,
       );
     }
     const itemId = seeded.item_id;
