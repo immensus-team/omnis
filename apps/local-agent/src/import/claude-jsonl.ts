@@ -40,7 +40,12 @@ export function maskSecrets(s: string, secrets: string[]): string {
 
 type JsonObject = Record<string, unknown>;
 
-function parseLine(line: string): JsonObject | null {
+/**
+ * The small helpers below are shared with `codex-rollout.ts` (US-C15) — both scanners read a vendor's
+ * jsonl into the same `ImportedSession` shape, and the masking order in `turnForImport` is the part
+ * that must never drift between them. Editing one of these edits the Codex scanner too.
+ */
+export function parseLine(line: string): JsonObject | null {
   const trimmed = line.trim();
   if (trimmed.length === 0) return null;
   try {
@@ -53,10 +58,11 @@ function parseLine(line: string): JsonObject | null {
   }
 }
 
-const asString = (v: unknown): string | null => (typeof v === "string" && v.length > 0 ? v : null);
+export const asString = (v: unknown): string | null =>
+  typeof v === "string" && v.length > 0 ? v : null;
 
 /** A turn with an unparseable timestamp cannot satisfy `ImportedTurn.at: z.string().datetime()`. */
-function asIso(v: unknown): string | null {
+export function asIso(v: unknown): string | null {
   if (typeof v !== "string") return null;
   const ms = Date.parse(v);
   return Number.isNaN(ms) ? null : new Date(ms).toISOString();
@@ -125,7 +131,7 @@ export function parseClaudeJsonl(text: string): {
   return { cwd, sessionId, startedAt: turns[0]?.at ?? null, turns };
 }
 
-function insideAnyRoot(cwd: string, roots: string[]): boolean {
+export function insideAnyRoot(cwd: string, roots: string[]): boolean {
   const resolved = resolve(cwd);
   return roots.some((root) => {
     const r = resolve(root);
@@ -134,7 +140,7 @@ function insideAnyRoot(cwd: string, roots: string[]): boolean {
 }
 
 /** The mask/truncate pair, in that order: cutting first would leave the head of a secret in the item. */
-function turnForImport(turn: ImportedTurn, secrets: string[]): ImportedTurn {
+export function turnForImport(turn: ImportedTurn, secrets: string[]): ImportedTurn {
   return {
     ...turn,
     // Every string here is transcript-supplied and reaches the hub, so all of them are masked. Doing

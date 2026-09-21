@@ -277,6 +277,10 @@ describe("sessions.import_scan over the dispatcher", () => {
       logger: createLogger("@omnis/local-agent", { sink: () => {} }),
       host: "mini",
       claudeHome: FIXTURE_HOME,
+      // US-C15 added the Codex scanner to this same method. Without a `codexHome` here the scan would
+      // reach the developer's real `~/.codex/sessions`, so this test pins an absent one (the path the
+      // `deps()` helper above already treats as "no Codex on this host").
+      codexHome: join(FIXTURE_HOME, "codex"),
       importSecrets: [KNOWN_SECRET],
     });
 

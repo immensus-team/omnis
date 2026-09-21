@@ -28,6 +28,7 @@ import {
 import { handleCaptureSend } from "./capture.js";
 import { runDelegation } from "./delegate.js";
 import { scanClaudeProjects } from "./import/claude-jsonl.js";
+import { scanCodexSessions } from "./import/codex-rollout.js";
 import { handleIngestRead, handleIngestScan } from "./ingest.js";
 import type { Logger } from "./logger.js";
 import { assertPathAllowed } from "./paths.js";
@@ -211,23 +212,29 @@ export function createDispatcher(
         });
       }
 
-      // US-C14 (C-D7): read-only and pull-based. The scanner opens nothing but
-      // `claudeHome/projects/<dir>/<file>.jsonl`, and keeps only sessions whose cwd is inside the
-      // union of this host's allowed_roots — the same boundary `session.create` enforces for turns.
+      // US-C14/US-C15 (C-D7): read-only and pull-based. Each scanner opens nothing but its own
+      // vendor's transcript path, and keeps only sessions whose cwd is inside the union of this
+      // host's allowed_roots — the same boundary `session.create` enforces for turns.
       case "sessions.import_scan": {
         const p = ImportScanParams.parse(params);
-        return {
-          sessions: await scanClaudeProjects(
-            p.since === null ? null : new Date(p.since),
-            p.max_sessions,
-            {
-              claudeHome: deps.claudeHome ?? join(homedir(), ".claude"),
-              codexHome: deps.codexHome ?? join(homedir(), ".codex"),
-              allowedRoots: [...new Set([...deps.allowedRoots.values()].flat())],
-              secrets: deps.importSecrets ?? [],
-            },
-          ),
+        const since = p.since === null ? null : new Date(p.since);
+        const scanDeps = {
+          claudeHome: deps.claudeHome ?? join(homedir(), ".claude"),
+          codexHome: deps.codexHome ?? join(homedir(), ".codex"),
+          allowedRoots: [...new Set([...deps.allowedRoots.values()].flat())],
+          secrets: deps.importSecrets ?? [],
         };
+        // Each scanner already capped itself at `max_sessions`, so merging the two bounded lists and
+        // slicing again keeps the whole request at that cap. Newest first by start time: file mtime is
+        // each scanner's recency signal but is not part of `ImportedSession`, and the cap only ever
+        // drops sessions older than the ones kept.
+        const sessions = [
+          ...(await scanClaudeProjects(since, p.max_sessions, scanDeps)),
+          ...(await scanCodexSessions(since, p.max_sessions, scanDeps)),
+        ]
+          .sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at))
+          .slice(0, p.max_sessions);
+        return { sessions };
       }
 
       case "capture.send":

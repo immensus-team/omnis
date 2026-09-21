@@ -1,0 +1,11 @@
+{"type":"_fixture","provenance":"synthetic-from-docs"}
+{"timestamp":"2026-09-21T10:00:00.000Z","type":"session_meta","payload":{"id":"0b6c1d2e-0000-4000-8000-0000000000c1","timestamp":"2026-09-21T10:00:00.000Z","cwd":"/repo/omnis"}}
+{"timestamp":"2026-09-21T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Import the Codex rollout."}]}}
+this line is not JSON at all
+{"timestamp":"2026-09-21T10:00:02.000Z","type":"event_msg","payload":{"type":"token_count","info":null}}
+{"timestamp":"2026-09-21T10:00:04.000Z","type":"response_item","payload":{"type":"reasoning","summary":[{"type":"summary_text","text":"Reasoning that must be skipped."}]}}
+{"timestamp":"2026-09-21T10:00:05.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Reading the rollout format first."}]}}
+{"timestamp":"2026-09-21T10:00:06.000Z","type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"{\"command\":[\"ls\"]}","call_id":"call_1"}}
+{"timestamp":"2026-09-21T10:00:07.000Z","type":"response_item","payload":{"type":"function_call","name":"read_file","arguments":"{\"path\":\"/repo/omnis/plan.md\"}","call_id":"call_2"}}
+{"timestamp":"2026-09-21T10:00:08.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_2","output":"ok"}}
+{"timestamp":"2026-09-21T10:00:09.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Plain string content with sk-abcdefghij0123456789ABCDEF and ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 and OMNIS_TEST_TOKEN_KNOWN_VALUE."}]}}
