@@ -1,6 +1,8 @@
 // US-B33 (Settings screen) screenshots: docs/design/screens/w4b/settings-{1440,390}.png.
 //
-// Same stack and the same two sizes as the other w4b shot tools (1440x900 and 390x844).
+// Same stack and the same two sizes as the other w4b shot tools (1440x900 and 390x844), plus a
+// horizontal-overflow sweep over docs/design/SKILLS.md's four slop-test widths (320/375/414/768) — the
+// gate that fails the whole task if a scrollbar appears at any one of them.
 //
 // The frame is the **Autonomy** section, and that is a deliberate choice rather than a shrug:
 //
@@ -361,6 +363,31 @@ async function shoot(page: Page, label: string): Promise<void> {
   await page.screenshot({ path: join(OUT, `settings-${label}.png`) });
 }
 
+/** `docs/design/SKILLS.md`'s slop-test gate 11: a horizontal scrollbar at even one of 320/375/414/768
+ *  fails the task. The two frames are 1440 and 390, so these four are measured without a frame — and
+ *  every section, because the long allowlist chips and the sensitivity table are the two things most
+ *  likely to push the page wider than the phone. The page is resized rather than reloaded: the shell's
+ *  layout is container-query based, so a resize is what actually exercises it. */
+const SWEEP_WIDTHS = [320, 375, 414, 768];
+
+async function sweep(browser: Browser, pool: Pool): Promise<void> {
+  const page = await browser.newPage({ viewport: { width: SWEEP_WIDTHS[0], height: 800 } });
+  try {
+    await openSettings(page, await readBack(pool), false);
+    for (const width of SWEEP_WIDTHS) {
+      await page.setViewportSize({ width, height: 800 });
+      for (const label of ["Accounts", "Autonomy", "Model tiers", "General"]) {
+        await openTab(page, label);
+        const overflow = await page.evaluate(measureOverflow);
+        assertNoOverflow(`settings / ${label} at ${String(width)}px`, overflow);
+        console.log(`  ${String(width)}px ${label} — ${describeOverflow(overflow)}`);
+      }
+    }
+  } finally {
+    await page.close();
+  }
+}
+
 async function pass(
   browser: Browser,
   label: string,
@@ -407,8 +434,11 @@ async function main(): Promise<void> {
     try {
       // 1440 makes the writes; 390 is a fresh load that re-reads them from the hub. Both assert every
       // section, so neither frame can be of a screen whose other tabs are unfinished.
+      // 1440 makes the writes; 390 and the sweep are fresh loads that re-read them from the hub. Both
+      // frames assert every section, so neither can be of a screen whose other tabs are unfinished.
       await pass(browser, "1440", { width: 1440, height: 900 }, pool, true);
       await pass(browser, "390", { width: 390, height: 844 }, pool, false);
+      await sweep(browser, pool);
     } finally {
       await browser.close();
     }

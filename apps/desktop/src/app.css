@@ -4328,6 +4328,21 @@ button.today-screen__event-title:focus-visible {
   gap: 8px;
 }
 
+/* The narrow end of the shell. `docs/design/SKILLS.md`'s slop-test gate 11 fails the task if any of
+   320/375/414/768 scrolls sideways, and four sub-nav labels do not fit one row at 320: the track is
+   inline-flex and its segments cannot shrink. So the segments give up padding — 4px 8px still reads as
+   a pill — and the track is allowed to wrap if even that is not enough. Scoped to this nav, because
+   the same control is the thread header's tab switch, where two or three segments always fit. */
+@container shell (max-width: 359.98px) {
+  .settings-screen__nav .segmented-control {
+    flex-wrap: wrap;
+  }
+
+  .settings-screen__nav .segmented-control__segment {
+    padding: 4px 8px;
+  }
+}
+
 /* The wide shell: the reference's left sub-nav, with the sections beside it. Scoped to the settings
    screen so the thread header's SegmentedControl keeps the horizontal track it was built as. */
 @container shell (min-width: 1280px) {

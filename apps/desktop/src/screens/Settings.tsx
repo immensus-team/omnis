@@ -242,7 +242,7 @@ export function settingsState(
 }
 
 export const SETTINGS_BANNER: Record<SettingsState, string> = {
-  error: "Couldn't load your settings — check the hub logs.",
+  error: "Couldn't load your settings. Check the hub logs.",
   loading: "Loading your settings…",
   ready: "",
 };
@@ -611,14 +611,14 @@ export function Settings() {
                 <h2 className="settings-screen__label">Sensitivity rules</h2>
                 <dl className="settings-screen__rules">
                   <div>
-                    <dt>T1 — local</dt>
+                    <dt>T1: local</dt>
                     <dd>
                       Classification, labeling, todo extraction, auto-archive. No draft text leaves
                       a local model.
                     </dd>
                   </div>
                   <div>
-                    <dt>T2 — escalation</dt>
+                    <dt>T2: escalation</dt>
                     <dd>
                       Draft generation only, and never for a sensitive thread. Paused first when the
                       cap is reached.
