@@ -23,6 +23,7 @@ export * from "./components/tool-call-badge.js";
 export * from "./components/channel-rail.js";
 export * from "./components/bottom-bar.js";
 export * from "./components/status-pill.js";
+export * from "./components/session-header.js";
 export * from "./components/group-header.js";
 export * from "./components/filter-chip-bar.js";
 export * from "./components/context-menu.js";

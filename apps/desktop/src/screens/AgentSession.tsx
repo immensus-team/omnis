@@ -1,12 +1,21 @@
-import { ToolCallBadge, type ToolCallState } from "@omnis/ui";
+import {
+  type ApprovalCardDecision,
+  ApprovalStack,
+  type ApprovalStackItem,
+  SessionHeader,
+  ToolCallBadge,
+  type ToolCallState,
+} from "@omnis/ui";
+import type { AgentRuntimeKind } from "@omnis/ui/lib/row-meta";
 import { useQuery } from "@rocicorp/zero/react";
-import { useMemo } from "react";
+import type { ReactNode } from "react";
 import { useZeroClient } from "../zero-client.js";
 
-/** items.tool(jsonb, kind='tool_call'일 때만 값)의 실제 shape(0002_core_inbox.sql:151,
- * packages/kernel/src/zero-schema.ts `tool: json().optional()`) — 계획의 `tool: string | null`은
- * DB 컬럼이 이름 문자열이 아니라 객체({name,args,state,label,icon})라는 사실과 맞지 않아 이 shape로
- * 교정한다(Thread.tsx의 sent_at 편차와 같은 종류: 계획 예시 코드가 실제 zero-schema.ts와 다름). */
+/** The real shape of items.tool (jsonb, only set when kind='tool_call') — 0002_core_inbox.sql:151 and
+ * packages/kernel/src/zero-schema.ts's `tool: json().optional()`. The plan's `tool: string | null`
+ * does not match the DB, which stores an object ({name,args,state,label,icon}) rather than a name
+ * string; this interface is the corrected shape (the same kind of deviation as Thread.tsx's
+ * sent_at: the plan's example code and the real zero-schema.ts disagree). */
 export interface SessionToolMeta {
   name: string;
   state?: ToolCallState;
@@ -22,54 +31,177 @@ export interface SessionQueryItem {
   body: string;
 }
 
-/** master §11: send/delete/delegate/calendar_write는 에이전트가 직접 호출 못 한다 —
- *  승인 후 실행 결과는 kind='system' 로그 한 줄로만 나타난다(§9 체크리스트). */
+/** agent_sessions, the columns this screen reads. */
+interface SessionRow {
+  runtime_id: string;
+  state: string;
+  cwd?: string | null;
+  summary?: string | null;
+  started_at?: number | null;
+  last_turn_at?: number | null;
+  ended_at?: number | null;
+}
+
+/** agent_runtimes, the columns this screen reads. */
+interface RuntimeRow {
+  runtime: string;
+  host: string;
+  display: string;
+}
+
+/** master §11: send/delete/delegate/calendar_write are not callable by an agent directly — a
+ *  calendar_write runs only after approval, and the result appears as a single kind='system' log
+ *  line (§9 checklist). */
 export function isSystemExecutionLog(item: SessionQueryItem): boolean {
   return item.kind === "system";
 }
 
-export function AgentSession({ sessionThreadId }: { sessionThreadId: string }) {
+/** loop-r1-07: whether a tool call has anything to expand. The hub writes `meta.input ?? {}`, so an
+ *  empty object is what a call that reported no arguments carries — a `<details>` over `{}` would be
+ *  a control that opens onto nothing, and the badge alone is the honest rendering. */
+export function hasToolArgs(args: unknown): boolean {
+  return typeof args === "object" && args !== null && Object.keys(args).length > 0;
+}
+
+/** loop-r1-07/L-10: what a session with no transcript says instead of nothing at all. A working
+ *  session used to open a completely blank pane — the one state where "nothing has happened yet" is
+ *  the expected answer and the pane still has to say so.
+ *
+ *  `blocked` is read off the DB state and not off the kinso mapper: this line is about *what the
+ *  session is waiting for*, and `failed` (which the pill folds into blocked, and which the brief
+ *  puts with idle/done here) is a different sentence. */
+function emptyLine(state: string | undefined, hasApproval: boolean): ReactNode {
+  if (state === "starting" || state === "running") {
+    return (
+      <p className="agent-session-screen__empty">
+        <span className="agent-session-screen__empty-dot" aria-hidden="true" />
+        Working · no output yet
+      </p>
+    );
+  }
+  if (state === "waiting_approval") {
+    // With a card above it this line would contradict what is already on screen — the approval *is*
+    // what it is waiting for.
+    if (hasApproval) return null;
+    return <p className="agent-session-screen__empty">Blocked · nothing to decide here yet</p>;
+  }
+  return <p className="agent-session-screen__empty">No activity recorded for this session.</p>;
+}
+
+export function AgentSession({
+  sessionThreadId,
+  approvals,
+  onDecide,
+}: {
+  sessionThreadId: string;
+  /** Every pending approval the shell holds. This screen narrows to its own thread — §c.5's rule
+   *  for the conversation applies here too: another thread's approval under this session's title is
+   *  a card about work that is not the thing on screen. */
+  approvals?: ApprovalStackItem[];
+  onDecide?: (
+    id: string,
+    decision: ApprovalCardDecision,
+    decidedArgs?: Record<string, unknown>,
+  ) => void;
+}) {
   const zero = useZeroClient();
-  // 편차(계획 step 7 대비, packages/kernel/src/zero-schema.ts 기준): items 컬럼은 camelCase
-  // `sentAt`이 아니라 snake_case `sent_at`이다 — Thread.tsx(Task 5)가 같은 이유로 이미 고쳤다.
+  // Deviation from the plan's step 7 (packages/kernel/src/zero-schema.ts is the source of truth):
+  // items' timestamp column is snake_case `sent_at`, not camelCase `sentAt` — Thread.tsx (Task 5)
+  // already fixed this for the same reason.
   const [items] = useQuery(
     zero.query.items
       .where("thread_id", "=", sessionThreadId)
       .where("kind", "IN", ["agent_turn", "tool_call", "system"])
       .orderBy("sent_at", "asc"),
   );
+  // The four reads below are unconditional, and the two that need an id the first read supplies
+  // query the empty string instead of being skipped — the number of hooks cannot depend on what
+  // came back, which is the same rule App.tsx follows for `open?.threadId`.
+  const [sessionRows] = useQuery(
+    zero.query.agent_sessions.where("thread_id", "=", sessionThreadId),
+  );
+  const session = (sessionRows as unknown as SessionRow[])[0];
+  const [runtimeRows] = useQuery(
+    zero.query.agent_runtimes.where("id", "=", session?.runtime_id ?? ""),
+  );
+  const runtime = (runtimeRows as unknown as RuntimeRow[])[0];
+  const [threadRows] = useQuery(zero.query.threads.where("id", "=", sessionThreadId));
+  const title = (threadRows as unknown as { title?: string | null }[])[0]?.title ?? null;
+
   const typedItems = items as unknown as SessionQueryItem[];
+  const waiting = (approvals ?? []).filter((a) => a.thread_id === sessionThreadId);
+  // The header is the session's own facts, so it needs the session row and the runtime that ran it.
+  // A thread whose session has not synced yet draws its timeline without a header rather than a
+  // header full of placeholders.
+  const header =
+    session !== undefined && runtime !== undefined ? (
+      <SessionHeader
+        title={title ?? "Agent session"}
+        state={session.state}
+        runtime={runtime.runtime as AgentRuntimeKind}
+        host={runtime.host}
+        cwd={session.cwd ?? null}
+        startedAt={session.started_at ?? null}
+        lastTurnAt={session.last_turn_at ?? null}
+        endedAt={session.ended_at ?? null}
+      />
+    ) : null;
 
   return (
     <div className="agent-session-screen">
-      {typedItems.map((item) => {
-        if (isSystemExecutionLog(item)) {
-          return (
-            <p key={item.id} className="agent-session-screen__system-log">
-              {item.body}
-            </p>
-          );
-        }
-        if (item.kind === "tool_call" && item.tool) {
-          const state: ToolCallState = item.tool.state ?? "loading";
-          // exactOptionalPropertyTypes(Global Constraints): `resultSummary?: string`는
-          // "생략 가능"이지 "undefined 허용"이 아니라서 `resultSummary={item.body || undefined}`는
-          // 타입 에러다(useKeymap US-A29 편차와 같은 계열) — 값이 있을 때만 프롭을 스프레드한다.
-          return (
-            <ToolCallBadge
-              key={item.id}
-              tool={item.tool.name}
-              state={state}
-              {...(item.body ? { resultSummary: item.body } : {})}
-            />
-          );
-        }
-        return (
-          <p key={item.id} className="agent-session-screen__turn">
-            {item.body}
-          </p>
-        );
-      })}
+      {header}
+      {/* loop-r1-07: the queue used to sit *above* this screen (App.tsx), which is what an agent
+          session with a pending approval looked like: a card, and then a "Blocked" session that
+          never said what it was blocked on. It is the same stack, in the place the thread screen
+          puts its own — under the title of the thing it is about. */}
+      {waiting.length > 0 && onDecide !== undefined && (
+        <section className="agent-session-screen__waiting">
+          <p className="agent-session-screen__waiting-label">Waiting on you</p>
+          <ApprovalStack approvals={waiting} openThreadId={sessionThreadId} onDecide={onDecide} />
+        </section>
+      )}
+      {typedItems.length === 0
+        ? emptyLine(session?.state, waiting.length > 0)
+        : typedItems.map((item) => {
+            if (isSystemExecutionLog(item)) {
+              return (
+                <p key={item.id} className="agent-session-screen__system-log">
+                  {item.body}
+                </p>
+              );
+            }
+            if (item.kind === "tool_call" && item.tool) {
+              const state: ToolCallState = item.tool.state ?? "loading";
+              // exactOptionalPropertyTypes (Global Constraints): `resultSummary?: string` means
+              // "may be omitted", not "may be undefined", so `resultSummary={item.body || undefined}`
+              // is a type error (the same family as the useKeymap/US-A29 deviation) — the prop is
+              // spread only when there is a value for it.
+              const badge = {
+                tool: item.tool.name,
+                state,
+                ...(item.body ? { resultSummary: item.body } : {}),
+              };
+              if (!hasToolArgs(item.tool.args)) {
+                return <ToolCallBadge key={item.id} {...badge} />;
+              }
+              // A native <details>: the disclosure, the keyboard (Enter/Space on the summary) and
+              // the accessibility tree all come from the element, and its height opens instantly —
+              // the only animation on this screen is the working dot above.
+              return (
+                <details key={item.id} className="agent-session-screen__tool">
+                  <summary>
+                    <ToolCallBadge {...badge} />
+                  </summary>
+                  <pre>{JSON.stringify(item.tool.args, null, 2)}</pre>
+                </details>
+              );
+            }
+            return (
+              <p key={item.id} className="agent-session-screen__turn">
+                {item.body}
+              </p>
+            );
+          })}
     </div>
   );
 }

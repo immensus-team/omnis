@@ -1790,6 +1790,188 @@ body {
   color: var(--text-secondary);
 }
 
+/* ==========================================================================================
+   loop-r1-07 — the session header, the states a session with nothing to say can be in, and one
+   expandable tool call. The header is opaque: a session is the pane's *content*, and glass is
+   chrome (v3 §e guard 4), so this sits on the same paper as the transcript under it.
+   ========================================================================================== */
+
+.agent-session-screen {
+  /* The pane's one monospace. A filesystem path and a JSON blob are the only two things in the
+     product read as literal text rather than as copy, and both are in this screen — declared here
+     rather than in tokens.css because inventing a global token for two callers is a third thing to
+     keep in step. */
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+}
+
+.session-header {
+  /* Where the hairline below starts: the header's own text column, i.e. the 32px runtime tile and
+     the 12px gap beside it. The same rule as `--row-rule-inset` (v3 §b.3), and deliberately not
+     that token's value — its 90px is the *inbox row's* arithmetic (16 padding + 10 unread gutter +
+     12 + 40 avatar + 12) and describes a box this is not. */
+  --session-header-inset: 44px;
+  position: relative;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+}
+
+/* One hairline between the header and the timeline, at 7% ink and inset (v3 §e guard 3: a
+   full-bleed divider turns the pane into a table). A background rather than a border, with the ink
+   spelled out, for the reason `.inbox-row::after` spells it out: `--border-row` is a border
+   shorthand, and the value has to be readable off the pseudo-element by the reviewer check. */
+.session-header::after {
+  content: "";
+  position: absolute;
+  left: var(--session-header-inset);
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: oklch(0.2 0.004 80 / 0.07);
+}
+
+.session-header__line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* The runtime tile an inbox row draws, at the header's 32px instead of the row's 40. The component
+   itself is reused as-is and scaled here — a second copy of its four branches (brand mark, letter,
+   photo, initials) is exactly what reusing it avoids. */
+.session-header__avatar .inbox-row__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.session-header__title {
+  flex: 1 1 auto;
+  /* A flex item's default min-width is its content's, so without this the title refuses to shrink
+     and pushes the pill past the pane's right edge instead of ellipsising. */
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Right-aligned in the line. `margin-left: auto` and not `text-align` — the pill is a flex item. */
+.session-header__line > .status-pill {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+/* The facts table. Its top margin is the only spacing it owns: the header's own padding-bottom is
+   what separates the block from the hairline, so the two numbers cannot disagree. */
+.session-header__meta {
+  margin-top: 8px;
+}
+
+/* A directory path with its *start* ellipsised, which is the opposite of every other ellipsis in
+   the product and the right way round here: `/Users/…/omnis.plan-loop-r1` says where a session is
+   running, and `/Users/logankim/AI-Workspa…` does not. `direction: rtl` is what moves the ellipsis
+   to the left; `text-align: left` puts the shortened text back against the left edge of the value
+   column rather than the right one the RTL direction would choose. */
+.session-header__cwd {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  direction: rtl;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* loop-r1-07: the section the session's pending approvals moved into (they used to be drawn above
+   this whole screen by App.tsx). */
+.agent-session-screen__waiting {
+  margin-bottom: 16px;
+}
+
+.agent-session-screen__waiting-label {
+  margin: 0 0 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* The states a session with no items can be in — working, blocked with nothing to decide, or done.
+   One line, secondary, and nothing else: a spinner here would show motion the app cannot vouch for,
+   which is the same lie as the "$0.00" the header leaves out (UX-13). */
+.agent-session-screen__empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.agent-session-screen__empty-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: agent-session-working 1.2s ease-in-out infinite;
+}
+
+@keyframes agent-session-working {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* v3 §e guard 10 / SKILLS.md #10: the pulse is the only animation this story adds, and it is
+   decoration — the sentence beside it already says the session is working. Its reduce override
+   lives in the shared reduced-motion block at the end of the toast section, where every story's
+   moving surface is collected (a block of its own here would sit in front of that one, and
+   motion.test.tsx reads the stylesheet from the first such block to the end). */
+
+/* One tool call: its badge on the summary line, its raw arguments under it. The `<details>` is
+   native, so the disclosure, the keyboard (Enter/Space on the summary) and the height are the
+   element's own — nothing here animates it (v3 §e guard 5: nothing moves for decoration). */
+.agent-session-screen__tool {
+  margin-bottom: 12px;
+}
+
+.agent-session-screen__tool > summary {
+  cursor: pointer;
+}
+
+/* The badge's own 12px bottom margin is the timeline's rhythm; inside a summary it would be spacing
+   under the disclosure marker. */
+.agent-session-screen__tool > summary .tool-call-badge {
+  margin-bottom: 0;
+}
+
+/* The raw arguments. Opaque `--bg-elevated` and 8px, the same fill and step as the attachment card
+   — this is content inside a message, not a surface a message sits in (ACCENT §4.4). Its own
+   scroller: the 240px ceiling keeps one long call from taking the pane, and `overflow: auto` keeps
+   a wide line inside the block instead of widening the page. */
+.agent-session-screen__tool pre {
+  margin: 8px 0 0;
+  max-height: 240px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 /* US-D09 §c.5: a tool call in the body flow. It carries `.opaque-surface` (the component renders
    through `OpaqueSurface`), so the fill comes from that recipe; what is here is the pill's shape
    and `--radius-group`, which is what makes the badge and the approval card beside it read as the
@@ -4719,6 +4901,14 @@ button.today-screen__event-title:focus-visible {
 
   .toast__pill--closing {
     animation-name: fade-out;
+  }
+
+  /* loop-r1-07: the working dot under a session with no output yet. `none` here rather than a
+     second, slower opacity: the sentence beside it already says the session is working, and a
+     static dot is the mark the other two empty states draw. This is the one surface in the block
+     that is not a fade — nothing is entering or leaving, so there is no unmount waiting on it. */
+  .agent-session-screen__empty-dot {
+    animation: none;
   }
 }
 
