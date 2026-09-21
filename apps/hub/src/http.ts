@@ -23,6 +23,7 @@ import { NOTE_MAX_CHARS, createNote, decideNoteRouting } from "./notes.js";
 import { removeSubscription, saveSubscription } from "./push.js";
 import { createSearchDeps, runSearch } from "./search.js";
 import { isValidSettingKey } from "./settings.js";
+import { TASK_TITLE_MAX_CHARS, createTask } from "./tasks.js";
 import { clampLastN, loadTranscript } from "./transcript.js";
 
 const APPROVAL_STATES = [
@@ -349,6 +350,33 @@ export function createHubServer(deps: HubServerDeps): Server {
         return send(res, 400, { error: "accept needs exactly one of thread_id, person_id" });
       }
       return send(res, 200, { id, route_state: outcome.route_state });
+    }
+
+    // A5 §3.5's quick-add. The Tasks screen had a field with nothing behind it: it cleared on Enter
+    // and lost the words, which reads as "saved" (L-07, NC-05). The row it writes is the same shape
+    // the agents' propose.ts writes, so it lands in the list the screen already draws.
+    if (path === "/tasks") {
+      if (method !== "POST") return send(res, 405, { error: "method not allowed" });
+      let body: unknown;
+      try {
+        body = await readJson(req);
+      } catch {
+        return send(res, 400, { error: "invalid json body" });
+      }
+      if (
+        typeof body !== "object" ||
+        body === null ||
+        typeof (body as { title?: unknown }).title !== "string"
+      ) {
+        return send(res, 400, { error: "expected { title: string }" });
+      }
+      const task = await createTask(pool, (body as { title: string }).title);
+      if (task === null) {
+        return send(res, 400, {
+          error: `task title must be 1..${String(TASK_TITLE_MAX_CHARS)} characters`,
+        });
+      }
+      return send(res, 201, task);
     }
 
     // Delta §7 (US-B33): Settings screen reads, settings write, and the cost banner.
