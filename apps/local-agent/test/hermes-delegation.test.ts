@@ -1,10 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { BRIDGE_ERRORS, BridgeError, type HumanResponse } from "@omnis/protocol";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { HermesAdapter, parseHermesCapabilities } from "../src/bridges/hermes.js";
 import { loadConfig } from "../src/config.js";
 import type { EventSink } from "../src/rpc-dispatch.js";
+import { buildRuntimes } from "../src/runtimes.js";
 import type { SessionRecord } from "../src/session-registry.js";
 
 const here = new URL(".", import.meta.url).pathname;
@@ -164,6 +165,46 @@ describe("HttpRuntimeConfig.delegation parsing (US-C06, C-D6)", () => {
     expect(() => loadConfig({ argv: [], env: {}, tomlText: toml('delegation = "yes"\n') })).toThrow(
       /delegation/,
     );
+  });
+});
+
+/** `defaultMake` is the only place the TOML flag is copied onto the adapter, and every runtimes.test.ts case
+ *  injects its own `make`, so without this the wiring could be deleted with the suite still green — a host
+ *  would read `delegation = true` and stay read-only anyway. This walks the real factory: TOML → loadConfig →
+ *  buildRuntimes → HermesAdapter → probe()'s capability surface. */
+describe("the delegation flag reaches the adapter through the real factory (US-C06)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function approvalsFor(extra: string): Promise<string | undefined> {
+    // The adapter is built without an injected fetchFn, so stub the global the real path would use — and pin
+    // base_url away from the 8642 default, because no test may touch the mini's Hermes.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ session_key_header: "X-Hermes-Session-Key", models: [] }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+      ),
+    );
+    const { config } = loadConfig({
+      argv: [],
+      env: {},
+      tomlText: `host = "mini"\n[[runtime]]\nkind = "hermes"\nbase_url = "http://127.0.0.1:9"\ntoken_keychain_item = "omnis.hermes.api_key.mini"\n${extra}`,
+    });
+    const built = await buildRuntimes(config.runtimes, {
+      readSecret: async () => "tok-1",
+      logger: { log: () => {}, debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
+    });
+    return built[0]?.capabilities.approvals;
+  }
+
+  it("reports `native` for a TOML host that opted in, and `none` for one that did not", async () => {
+    expect(await approvalsFor("delegation = true\n")).toBe("native");
+    expect(await approvalsFor("")).toBe("none");
   });
 });
 
