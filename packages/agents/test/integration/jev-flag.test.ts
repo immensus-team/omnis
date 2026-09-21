@@ -19,7 +19,17 @@ beforeEach(async () => {
   configureAgents({ pool });
   await pool.query("DELETE FROM settings WHERE key = $1", [DECISION_PROVIDER_KEY]);
 });
-afterAll(() => pool.end());
+// 0014_agents_decision_provider.sql seeds this row and kernel's settings suite asserts every
+// SettingKey has one. Integration files share a DB and run in a single fork, so the deletions
+// above would reach the next file unless the seeded value goes back first.
+afterAll(async () => {
+  await pool.query(
+    `INSERT INTO settings (key, value) VALUES ($1, $2::jsonb)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [DECISION_PROVIDER_KEY, JSON.stringify(DEFAULT_DECISION_PROVIDER)],
+  );
+  await pool.end();
+});
 
 const REQ: DecisionRequest = {
   kind: "sensitivity",
