@@ -1207,6 +1207,13 @@ body {
   color: var(--text-primary);
 }
 
+/* US-D09 §c.7: the pill carries no visibility of its own. `opacity: 0; pointer-events: none` used
+   to sit here because the pill was the only thing the row revealed — but a child's `opacity` does
+   not follow its parent's, so once 7a02ecd moved the reveal onto the cluster the pill stayed at
+   0/none while the cluster around it turned to 1/auto: visible box, invisible and unclickable
+   control. The browser can tell (elementFromPoint at the pill's centre answered the cluster, and
+   phase A's A-archive waited 88s for a click it would never get); d9-surfaces.spec.ts now asks it
+   on every run. The pill appears exactly when the cluster does. */
 .inbox-row__action {
   border: var(--hairline);
   border-radius: 999px;
@@ -1216,8 +1223,6 @@ body {
   font: inherit;
   font-size: 11px;
   cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
 }
 
 /* US-D02: the row's own hover fill. What shows that the 400ms hover card came out of *this* row
@@ -3331,7 +3336,20 @@ body {
 /* >=900: the pane's bar, right-aligned over the scrolling body. `sticky` rather than `fixed` — it is
    a row of the conversation's own flow that happens to stay put, so it scrolls with the thread
    instead of hovering over the whole window. `margin-left: auto` with `width: max-content` pins a
-   block child to the end without a wrapper element. */
+   block child to the end without a wrapper element.
+
+   `margin-bottom` is the band the bar's own paint needs: the capsule is opaque and `--shadow-glass`
+   (`0 8px 24px`) reaches ~20px past its box, and the header's first line — the sender's date,
+   right-aligned to the same edge the capsule is — is the first thing under it. Without a band the
+   capsule's bottom edge and its shadow land across the top of the date, which is what the 1440
+   acceptance frame showed.
+
+   The extra 8px is the bar's own offset, and it is measured, not guessed: `top: 8px` holds the bar
+   8px below the scroller's content edge, and a sticky element's *paint* may sit lower than its flow
+   box — at 1440 the bar's row is 32–78 while the capsule paints 40–86. So the row has to reserve its
+   shadow's 20px plus the 8px the paint drops by, or the gap the header sees is 8px short of the
+   shadow. Scrolled, only the box is pinned and the message passes under the glass, which is what
+   §c.5's "sitting over the scrolling body" means — the band is a rest position, not an inset. */
 @container shell (min-width: 900px) {
   .thread-toolbar--pane {
     position: sticky;
@@ -3339,6 +3357,7 @@ body {
     z-index: 2;
     width: max-content;
     margin-left: auto;
+    margin-bottom: 28px;
   }
 }
 
@@ -3377,6 +3396,9 @@ body {
     flex: 0 0 auto;
     align-self: flex-end;
     width: max-content;
+    /* The chrome row carries no material, so it casts nothing onto the message below it — the band
+       the sticky tier reserves is for that shadow, and here it would only be a hole. */
+    margin-bottom: 0;
   }
 }
 

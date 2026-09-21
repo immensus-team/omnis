@@ -116,6 +116,32 @@ describe("Inbox row gutter and avatar shapes (US-D08 §c.4)", () => {
   });
 });
 
+describe("Inbox row hover cluster (US-D09 §c.7)", () => {
+  // One reveal, on the cluster. `opacity` is not an inherited property, so the copy US-D02b left on
+  // the pill did not go away when 7a02ecd moved the reveal up to the cluster: the cluster turned to
+  // 1/auto and the pill stayed at 0/none inside it — a visible box that no click could land on.
+  // Nothing in the unit suite could see that, but the browser could: phase A's A-archive waited its
+  // whole 90s test budget for that click, and d9-surfaces.spec.ts now hit-tests the pill.
+  it("leaves the reveal to the cluster, not to the pill inside it", () => {
+    const cluster = ruleBody(appCss, ".inbox-row__hover-actions");
+    // Out of flow (US-D02b: the row's `auto` column is sized by the brand mark alone) and off until
+    // the row is pointed at or focused.
+    expect(cluster).toContain("position: absolute");
+    expect(cluster).toContain("opacity: 0");
+    expect(cluster).toContain("pointer-events: none");
+
+    const pill = ruleBody(appCss, ".inbox-row__action");
+    expect(pill).not.toContain("opacity");
+    expect(pill).not.toContain("pointer-events");
+
+    // …and the reveal itself, on both halves of the pair.
+    expect(appCss).toContain(".inbox-row:hover .inbox-row__hover-actions,");
+    const revealed = ruleBody(appCss, ".inbox-row:focus-within .inbox-row__hover-actions");
+    expect(revealed).toContain("opacity: 1");
+    expect(revealed).toContain("pointer-events: auto");
+  });
+});
+
 describe("Inbox row swipe (US-D08 §c.4)", () => {
   const tsx = readFileSync(
     join(TEST_DIR, "../../../packages/ui/src/components/inbox-row.tsx"),

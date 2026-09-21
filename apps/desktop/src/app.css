@@ -1199,6 +1199,13 @@ body {
   color: var(--text-primary);
 }
 
+/* US-D09 §c.7: the pill carries no visibility of its own. `opacity: 0; pointer-events: none` used
+   to sit here because the pill was the only thing the row revealed — but a child's `opacity` does
+   not follow its parent's, so once 7a02ecd moved the reveal onto the cluster the pill stayed at
+   0/none while the cluster around it turned to 1/auto: visible box, invisible and unclickable
+   control. The browser can tell (elementFromPoint at the pill's centre answered the cluster, and
+   phase A's A-archive waited 88s for a click it would never get); d9-surfaces.spec.ts now asks it
+   on every run. The pill appears exactly when the cluster does. */
 .inbox-row__action {
   border: var(--hairline);
   border-radius: 999px;
@@ -1208,8 +1215,6 @@ body {
   font: inherit;
   font-size: 11px;
   cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
 }
 
 /* US-D02: the row's own hover fill. What shows that the 400ms hover card came out of *this* row
