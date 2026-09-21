@@ -3,7 +3,7 @@
 // file declares its own environment and setup (jest-dom matchers + afterEach(cleanup)).
 import "./setup";
 
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { InboxRow } from "../src/components/inbox-row";
 
@@ -420,5 +420,34 @@ describe("InboxRow contextual menu (US-D09 §c.7)", () => {
     const menu = openMenu();
     expect(within(menu).getByText("Open")).toBeInTheDocument();
     expect(within(menu).queryByText("Archive")).not.toBeInTheDocument();
+  });
+});
+
+describe("InboxRow leave (motion-OSS S4 — the collapse is motion's)", () => {
+  // Both tests assert the *target* rather than the journey. motion writes the target it is given as
+  // inline style, and jsdom runs none of the frames in between: `Element.animate` is a stub in
+  // test/setup.ts, the accelerated opacity path goes through it, and a target reached by a
+  // *transition* (a rerender) therefore stalls at its start value here. Rendering the row already
+  // leaving reaches the same target without an animation, which is what makes it assertable — and
+  // the three frames of the collapse itself are the browser sequence in
+  // docs/design/screens/motion-oss/, which is the evidence a jsdom suite cannot produce.
+  it("aims a leaving row at zero height and zero opacity", async () => {
+    render(<InboxRow {...baseProps} leaving />);
+    const row = screen.getByRole("option");
+    expect(row).toHaveClass("inbox-row--leaving");
+    await waitFor(() => {
+      expect(row.style.height).toBe("0px");
+      expect(row.style.opacity).toBe("0");
+    });
+  });
+
+  it("leaves a row that is not leaving at the auto height motion measures itself", async () => {
+    render(<InboxRow {...baseProps} />);
+    const row = screen.getByRole("option");
+    // `height: auto` is the resting target, and it is the whole reason this file no longer measures
+    // anything: the deleted useCollapseHeight wrote a getBoundingClientRect() pixel value into
+    // --row-collapse-h because `auto` could not be interpolated by CSS. motion measures it itself.
+    await waitFor(() => expect(row.style.height).toBe("auto"));
+    expect(row.style.opacity).toBe("1");
   });
 });

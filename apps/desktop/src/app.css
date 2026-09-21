@@ -1253,34 +1253,24 @@ body {
    left to animate, so the rows below jump up by one row's height with no explanation of where the
    row went. Inbox.tsx holds the row in the list for --dur-move (motion.ts's LEAVE_MS) while this
    runs, then lets it go.
-   Height is a measured pixel value, not `auto`: `height: auto` cannot interpolate without
-   `interpolate-size: allow-keywords`, which macOS's WKWebView does not ship — inbox-row.tsx writes
-   --row-collapse-h from getBoundingClientRect() the moment `leaving` turns on. Padding collapses
-   with it (see the note on --row-pad-y above) and overflow clips the grid rows as they fold. */
+   The height and the opacity are `motion`'s since the motion-OSS S4 port (inbox-row.tsx's
+   LEAVE_EXIT) — it owns the `height: auto` measurement the old keyframe needed, which is why
+   --row-collapse-h and the @keyframes rule that consumed it are gone.
+   Padding is the half that stays here, and deliberately: it is a layout property this file already
+   owns as --row-pad-y, and animating it from JavaScript would mean either hardcoding 12px in the
+   component or measuring the computed style. So CSS collapses its own padding over the same
+   --dur-move rung while motion collapses the box — two engines, two properties, one token, and no
+   property is animated by both. overflow clips the grid rows as they fold. */
 .inbox-row--leaving {
-  height: var(--row-collapse-h, auto);
   overflow: hidden;
   /* The row is still in the list but is no longer a thing to press — pointer-events is switched off
      on the same frame the archive click lands, so a second click during the 240ms cannot re-archive
      or re-open what is already on its way out. */
   pointer-events: none;
-  will-change: height, opacity;
-  animation: inbox-row-leave var(--dur-move) var(--ease-spring) forwards;
-}
-
-@keyframes inbox-row-leave {
-  from {
-    opacity: 1;
-    height: var(--row-collapse-h);
-    padding-top: var(--row-pad-y);
-    padding-bottom: var(--row-pad-y);
-  }
-  to {
-    opacity: 0;
-    height: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-  }
+  padding-top: 0;
+  padding-bottom: 0;
+  transition: padding-top var(--dur-move) var(--ease-spring), padding-bottom var(--dur-move)
+    var(--ease-spring);
 }
 
 /* §c.7: the reveal belongs to the cluster now that it has two controls in it. `:focus-within`
@@ -4358,10 +4348,17 @@ button.today-screen__event-title:focus-visible {
     animation-name: fade-out;
   }
 
-  /* The archived row. It keeps its height and fades: the collapse is the part with the movement in
-     it, and the list closing the gap is a one-frame change of position, not an animation. */
+  /* The archived row. It keeps its height *and its padding* and only fades: the collapse is the part
+     with the movement in it, and the list closing the gap is a one-frame change of position, not an
+     animation. The height half of that is motion's (inbox-row.tsx's LEAVE_EXIT_REDUCED, which drops
+     the height from the exit target); the padding half is here, and it has to be restated rather
+     than merely left alone, because the rule above zeroes it on `.inbox-row--leaving` — without this
+     the row would jump 24px shorter on the frame the archive landed, which is the one thing
+     reduced motion is asking not to happen. */
   .inbox-row--leaving {
-    animation-name: fade-out;
+    padding-top: var(--row-pad-y);
+    padding-bottom: var(--row-pad-y);
+    transition: none;
   }
 
   /* §c.4: the row's swipe settles where it was released instead of travelling — the same override

@@ -1,15 +1,10 @@
 import * as HoverCard from "@radix-ui/react-hover-card";
 import { Archive, Mail, MoreHorizontal, RotateCcw } from "lucide-react";
-import {
-  type CSSProperties,
-  type PointerEvent as ReactPointerEvent,
-  type RefObject,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { motion } from "motion/react";
+import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
 import { cn } from "../lib/cn.js";
 import { useNarrowShell } from "../lib/media-query.js";
+import { LEAVE_MS, SPRING, motionMs, useMotionPrefs } from "../lib/motion.js";
 import { closeRow, openRow, useRowOpen } from "../lib/open-row.js";
 import { pointerDrag } from "../lib/pointer-drag.js";
 import {
@@ -95,34 +90,37 @@ export interface InboxRowProps {
   last?: boolean;
 }
 
-/** US-D04: the archive collapse animates `height`, and `height: auto` only interpolates where
- *  `interpolate-size: allow-keywords` exists — Chromium 129+, which macOS's WKWebView (what Tauri
- *  renders in) does not ship. So the row measures itself once, on the frame `leaving` turns on while
- *  it is still at full height, and hands the pixel value to app.css's @keyframes inbox-row-leave
- *  through --row-collapse-h.
- *  Once, not per frame: reading the rect of every animating row on every frame is exactly the layout
- *  thrash the rest of this pass avoids. The class is applied only after the measurement lands, so a
- *  row never starts an animation whose `from` height is unset — that would make the height discrete
- *  (auto -> 0 snaps instead of collapsing) while the opacity still faded, which reads as a glitch
- *  rather than as motion. */
-function useCollapseHeight(leaving: boolean): {
-  ref: RefObject<HTMLDivElement>;
-  style: CSSProperties | undefined;
-} {
-  const ref = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState<number | null>(null);
-  useEffect(() => {
-    if (!leaving) {
-      setHeight(null);
-      return;
-    }
-    setHeight(ref.current?.getBoundingClientRect().height ?? null);
-  }, [leaving]);
-  return {
-    ref,
-    style: height === null ? undefined : ({ "--row-collapse-h": `${height}px` } as CSSProperties),
-  };
-}
+/** US-D04, motion-OSS S4: the leaving row collapses through `motion`'s `animate` prop rather than
+ *  through a CSS keyframe plus a measurement.
+ *
+ *  **Why `animate` and not `AnimatePresence`.** `AnimatePresence` works by holding a child's DOM
+ *  after React has stopped rendering it — and here React is not the one that unmounts the row:
+ *  react-virtuoso removes it when the list data changes. That hold is what `leavingIds` already does
+ *  one level up (Inbox.tsx keeps the archived row in the data for LEAVE_MS so there is something
+ *  left to animate). Adding `AnimatePresence` on top would be a second, weaker copy of a mechanism
+ *  this screen already has, aimed at an unmount it cannot intercept. What the row needs is the
+ *  animation itself, and that is `animate`.
+ *
+ *  **Height without a measurement.** The keyframe this replaces needed `--row-collapse-h` written
+ *  from `getBoundingClientRect()` (see the deleted `useCollapseHeight`) because `height: auto`
+ *  cannot interpolate without `interpolate-size: allow-keywords`, which macOS's WKWebView does not
+ *  ship. `motion` owns that measurement: `height: auto` in the resting target and `height: 0` in the
+ *  exit is the whole of it, and the element's own rect never enters this file.
+ *
+ *  Padding is deliberately *not* in the target. It is a layout property CSS already owns as
+ *  `--row-pad-y`, and animating it from JavaScript would mean either hardcoding 12px here or
+ *  measuring the computed style — so `app.css` collapses it on `.inbox-row--leaving` instead, over
+ *  the same `--dur-move` rung. Two engines, two properties, one duration; the acceptance rule that
+ *  matters ("no CSS transition and motion animation on the same property") is not in play. */
+const LEAVE_REST = { height: "auto", opacity: 1 } as const;
+const LEAVE_EXIT = { height: 0, opacity: 0 } as const;
+/** Reduced motion: the fade stays, the travel does not — the same split `app.css`'s reduce block
+ *  has always made for this row (there the keyframe became `fade-out` and the height was kept).
+ *  The transition beside it is the other half: `SPRING.move` is the motion-native spelling of the
+ *  `--dur-move` + `--ease-spring` pair the keyframe used, and it is the preset `lib/motion.ts`
+ *  declares for exactly this ("a row collapsing out"); under reduced motion it is the shared fade
+ *  length, which is the same number `motionMs` hands the timer that holds the row in the data. */
+const LEAVE_EXIT_REDUCED = { opacity: 0 } as const;
 
 /** US-D08 §c.4: how far the row's content travels to reveal its action — and, the same distance,
  *  how far a release has to have travelled to commit. One number, because the row comes to rest
@@ -182,10 +180,12 @@ export function InboxRow(props: InboxRowProps) {
     props.unreadCount !== undefined && props.unreadCount > 0
       ? [{ label: "Unread", value: props.unreadCount, numeric: true }]
       : [];
-  // US-D04: `style` is undefined until the row has been measured, so the leaving class and the
-  // height it needs land in the same commit (see useCollapseHeight).
-  const collapse = useCollapseHeight(props.leaving === true);
-  const leaving = props.leaving === true && collapse.style !== undefined;
+  // US-D04 / motion-OSS S4: the collapse is motion's now — one exit target and the spring for the
+  // `--dur-move` rung, with the fade-only target under reduced motion (see the constants above).
+  const leaving = props.leaving === true;
+  const { reducedMotion } = useMotionPrefs();
+  const leaveTarget = leaving ? (reducedMotion ? LEAVE_EXIT_REDUCED : LEAVE_EXIT) : LEAVE_REST;
+  const leaveTransition = reducedMotion ? { duration: motionMs(LEAVE_MS) / 1000 } : SPRING.move;
 
   // US-D08 §c.4: the swipe. Narrow-only — the tier where the rail is already a bottom bar, i.e. the
   // coarse-pointer layout — and only on a row that has something to reveal, so a row with no
@@ -326,9 +326,18 @@ export function InboxRow(props: InboxRowProps) {
     // short (100ms) so the card follows while moving between rows.
     <HoverCard.Root openDelay={400} closeDelay={100}>
       <HoverCard.Trigger asChild>
-        <div
-          ref={collapse.ref}
-          style={collapse.style}
+        <motion.div
+          // `initial={false}`: a row that is not leaving renders at the resting target instead of
+          // animating into it. Without it motion starts every row from its own guess at the current
+          // value — and the guess is 0 for `opacity`, which is animated through the Web Animations
+          // API (probe: a bare `motion.div` with `animate={{opacity:1}}` settles at `opacity: 0` in
+          // jsdom, where `test/setup.ts`'s `Element.animate` stub never reports progress). In a
+          // browser the animation would run and hide the difference; here it would mean every row in
+          // the suite rendered invisible, and a mount animation on every row of a virtualised list is
+          // not wanted anyway — the entrance is the list's, not the row's.
+          initial={false}
+          animate={leaveTarget}
+          transition={leaveTransition}
           // biome-ignore lint/a11y/useSemanticElements: A5 §3.1 listbox/option pattern — <option> is only valid inside <select> and can't hold this row's markup.
           role="option"
           tabIndex={0}
@@ -481,7 +490,7 @@ export function InboxRow(props: InboxRowProps) {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       </HoverCard.Trigger>
       <HoverCard.Portal>
         {/* A floating panel, so it is glass (DESIGN-DIRECTION.md: Liquid Glass on floating panels
