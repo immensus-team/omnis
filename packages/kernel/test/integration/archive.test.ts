@@ -50,6 +50,14 @@ const meta = {
 };
 
 describe("archiveItem / undoArchive (A4 §9.3·§9.4)", () => {
+  async function statusOf(id: string): Promise<string | undefined> {
+    const { rows } = await pool.query<{ status: string }>(
+      "SELECT status FROM items WHERE id = $1",
+      [id],
+    );
+    return rows[0]?.status;
+  }
+
   it("sets status=archived and records meta.archived_by", async () => {
     await archiveItem(pool, itemId, meta);
     const { rows } = await pool.query<{ status: string; ab: typeof meta }>(
@@ -84,6 +92,33 @@ describe("archiveItem / undoArchive (A4 §9.3·§9.4)", () => {
     await undoArchive(pool, { itemId }, "me", createAudit(pool));
     const { rows } = await pool.query("SELECT id FROM items WHERE id = $1", [itemId]);
     expect(rows).toHaveLength(1);
+  });
+
+  // US-B32's whole mechanism: one category's token, stamped on the items by the archiver
+  // (packages/agents auto-archive, `undoTokenFor`), reaches exactly those items and nothing else.
+  // The rest of this file tests the { itemId } path; this is the one the Digest screen's
+  // "Restore all" travels.
+  it("undoes one digest category by its token, and leaves the other category alone", async () => {
+    const token = "5a1c0f7d2e6b4a90";
+    const account = await pool.query<{ account_id: string }>(
+      "SELECT account_id FROM items WHERE id = $1",
+      [itemId],
+    );
+    const sibling = await pool.query<{ id: string }>(
+      `INSERT INTO items (thread_id, account_id, external_id, kind, status, body, sent_at, meta)
+       VALUES ($1,$2,'it_arch_other','email','received','receipt', now(), '{}'::jsonb)
+       ON CONFLICT (account_id, external_id) WHERE external_id IS NOT NULL
+         DO UPDATE SET status='received', meta='{}'::jsonb RETURNING id`,
+      [threadId, account.rows[0]?.account_id ?? ""],
+    );
+    const otherId = sibling.rows[0]?.id ?? "";
+
+    await archiveItem(pool, itemId, { ...meta, undo_token: token });
+    await archiveItem(pool, otherId, { ...meta, reason: "receipt", undo_token: "another-token" });
+
+    expect(await undoArchive(pool, { undoToken: token }, "me", createAudit(pool))).toBe(1);
+    expect(await statusOf(itemId)).toBe("received");
+    expect(await statusOf(otherId)).toBe("archived");
   });
 
   it("archivedSince lists the day's archived items by reason", async () => {

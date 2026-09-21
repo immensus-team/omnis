@@ -11,10 +11,12 @@ import {
   getSetting,
   killSwitchStatus,
   setSetting,
+  undoArchive,
 } from "@omnis/kernel";
 import { searchMemories } from "@omnis/memory";
 import type { Adapter } from "@omnis/protocol";
 import type { Pool } from "pg";
+import { type ArchiveRouteDeps, handleDigestUndo, handleUnarchiveItem } from "./archive-routes.js";
 import { setThreadArchived } from "./archive.js";
 import type { HubConfig } from "./config.js";
 import { NOTE_MAX_CHARS, createNote, decideNoteRouting } from "./notes.js";
@@ -79,6 +81,10 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
 export function createHubServer(deps: HubServerDeps): Server {
   const { kernel, pool, config, logger, startedAt } = deps;
   const searchDeps = createSearchDeps(pool);
+  // US-B32: partly applied here so archive-routes.ts never has to know about pg or the audit sink.
+  const archiveRouteDeps: ArchiveRouteDeps = {
+    undoArchive: (ref, actor) => undoArchive(pool, ref, actor, kernel.audit),
+  };
 
   const server = createServer((req, res) => {
     void handle(req, res).catch((e: unknown) => {
@@ -171,6 +177,35 @@ export function createHubServer(deps: HubServerDeps): Server {
       );
       if (result === null) return send(res, 404, { error: "thread not found" });
       return send(res, 200, result);
+    }
+
+    // US-B32 (delta §7). The per-item restore: the same kernel `undoArchive` the thread route's
+    // sibling reaches, one item at a time, which is the unit A4 §9 archives in. The optional /api
+    // prefix matches the thread route above (Tailscale Serve strips it).
+    const unarchiveItem = /^(?:\/api)?\/items\/([0-9a-fA-F-]{36})\/unarchive$/.exec(path);
+    if (unarchiveItem !== null) {
+      if (method !== "POST") return send(res, 405, { error: "method not allowed" });
+      const id = unarchiveItem[1];
+      if (id === undefined) return send(res, 400, { error: "bad id" });
+      return send(res, 200, await handleUnarchiveItem(archiveRouteDeps, id));
+    }
+
+    // US-B32's "Restore all" for one digest category. The body carries the token because that is
+    // what the archived items were stamped with; the path's id is the row the screen was showing.
+    const digestUndo = /^(?:\/api)?\/digests\/([0-9a-fA-F-]{36})\/undo$/.exec(path);
+    if (digestUndo !== null) {
+      if (method !== "POST") return send(res, 405, { error: "method not allowed" });
+      let body: unknown;
+      try {
+        body = await readJson(req);
+      } catch {
+        return send(res, 400, { error: "invalid json body" });
+      }
+      const token = (body as { undo_token?: unknown }).undo_token;
+      if (typeof token !== "string" || token === "") {
+        return send(res, 400, { error: "expected { undo_token: string }" });
+      }
+      return send(res, 200, await handleDigestUndo(archiveRouteDeps, token));
     }
 
     // The token the desktop uses to attach to zero-cache. Same boundary as the other hub routes

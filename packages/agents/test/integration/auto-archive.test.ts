@@ -4,9 +4,11 @@ import {
   T1_ARCHIVE_CONFIDENCE_MIN,
   autoArchiveLoop,
   configureAgents,
+  digestIdFor,
   hardGate,
   nonHumanSender,
   sweepAutoArchive,
+  undoTokenFor,
 } from "../../src/index.js";
 
 const pool = new Pool({
@@ -200,12 +202,17 @@ describe("autoArchiveLoop hard gates (A4 §9.2)", () => {
       },
       ctx,
     );
-    const done = await pool.query<{ status: string; reason: string }>(
-      "SELECT status, meta->'archived_by'->>'reason' AS reason FROM items WHERE id = $1",
+    const done = await pool.query<{ status: string; reason: string; token: string }>(
+      `SELECT status, meta->'archived_by'->>'reason' AS reason,
+              meta->'archived_by'->>'undo_token' AS token
+         FROM items WHERE id = $1`,
       [low],
     );
     expect(done.rows[0]?.status).toBe("archived");
     expect(done.rows[0]?.reason).toBe("newsletter");
+    // US-B32: the item carries the token the nightly digest recomputes for that reason, which is
+    // what makes the Digest screen's "Restore all" able to reach it through kernel undoArchive.
+    expect(done.rows[0]?.token).toBe(undoTokenFor(digestIdFor(ctx.now), "newsletter"));
   });
 
   it("sweepAutoArchive hands today's untouched items to the runner", async () => {

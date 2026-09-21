@@ -36,6 +36,9 @@ function previewElement() {
   // `notes` (US-B31): same reason as `today`/`tasks`/`network` — the rail that switches screens is
   // not built yet, and the story has to be able to photograph the screen in the real shell.
   if (screen === "notes") return <App screen="notes" />;
+  // `digest` (US-B32): same reason — the screen has to be photographable in the real shell, and the
+  // rail that switches screens is still not built.
+  if (screen === "digest") return <App screen="digest" />;
   return <App />;
 }
 
