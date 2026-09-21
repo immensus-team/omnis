@@ -75,7 +75,17 @@ export function useKeymap(onResolve: (action: string) => void) {
       if (isEditableTarget(e.target)) return;
       const next = reduceKeySequence(state, e.key, Date.now());
       setState(next.resolved ? null : next);
-      if (next.resolved) onResolve(next.resolved);
+      if (next.resolved) {
+        // The letter must not land in whatever the action just focused. `r` opens the reply composer
+        // and focuses its box inside this same keydown, so without this a real keyboard sends the
+        // browser on to insert the "r" into the sentence the key was meant to start — one stray
+        // letter per shortcut. jsdom cannot see it: `fireEvent.keyDown` dispatches the keydown and
+        // stops there, where a browser runs the whole sequence (keydown, beforeinput, insertion).
+        // Nothing else is lost by refusing the default: the target is never an editable one — that is
+        // the guard above — so the press had no other default to perform.
+        e.preventDefault();
+        onResolve(next.resolved);
+      }
     }
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);

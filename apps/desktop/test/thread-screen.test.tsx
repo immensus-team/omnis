@@ -4,7 +4,7 @@
 import "./setup";
 
 import type { ApprovalStackItem } from "@omnis/ui";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   Thread,
@@ -360,6 +360,24 @@ describe("Thread — the reply composer (loop-r2-03)", () => {
     fireEvent.keyDown(window, { key: "r" });
     expect(document.querySelector(".reply-composer")).not.toBeNull();
     expect(box()).toHaveFocus();
+  });
+
+  // The live stack found this one: `fireEvent.keyDown` stops at the keydown, where a browser runs on
+  // to the insertion, so the box used to open with the "r" that opened it already in it.
+  it("does not put the letter that opened the box into it", () => {
+    seedStore([]);
+    render(<Thread threadId={THREAD_ID} approvals={[]} onDecide={vi.fn()} />);
+
+    const press = new KeyboardEvent("keydown", { key: "r", bubbles: true, cancelable: true });
+    // Dispatched by hand rather than with `fireEvent`, which would return a boolean and hide the
+    // event whose `defaultPrevented` is the claim. `act` because the state update the listener makes
+    // is outside React's own event system here, and nothing else would flush it.
+    act(() => {
+      window.dispatchEvent(press);
+    });
+
+    expect(press.defaultPrevented).toBe(true);
+    expect(box()).toHaveValue("");
   });
 
   it("leaves `r` alone on an archived thread", () => {
