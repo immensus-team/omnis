@@ -48,6 +48,13 @@ describe("App shell (US-A25 'empty shell' + A26-A31 screen routing)", () => {
     expect(screen.getByRole("radiogroup", { name: "Inbox filters" })).toBeInTheDocument();
   });
 
+  // US-B29: `?screen=tasks` routes to the Tasks screen, and the shell mounts it inside the same
+  // rail/main shell as the Inbox — the same one-line proof the Inbox case above makes.
+  it("mounts the Tasks screen when the shell is asked for it", () => {
+    render(<App screen="tasks" />);
+    expect(screen.getByRole("radiogroup", { name: "Task views" })).toBeInTheDocument();
+  });
+
   it("opens the ask panel on Cmd+K (US-D01: the inline ask bar's AI panel, not a modal palette)", () => {
     render(<App />);
     // Matched by role alone — the panel's accessible name is product copy that still goes through

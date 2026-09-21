@@ -53,9 +53,13 @@ export interface TaskRowProps {
   /** Clicking the source opens the message it came from. Without it the source is a label, not a
    *  control — the same rule the briefing items on Today follow. */
   onOpenSource?: () => void;
-  /** Only meaningful for a delegation row that has an Agent Session behind it. Without it the row
+  /** Only meaningful for a delegation row that has something to open behind it. Without it the row
    *  draws the state word instead of a button that would go nowhere. */
   onOpenDelegation?: () => void;
+  /** What the delegation button says. §3.5 opens the Agent Session ("Open session"); the Tasks
+   *  screen also uses this slot for a delegation still waiting on approval, and a button that says
+   *  "Open session" over a task that has not started running yet would be a plain lie. */
+  delegationActionLabel?: string;
 }
 
 /** A5 §3.5 `TaskRow`.
@@ -81,6 +85,7 @@ export function TaskRow({
   onToggleDone,
   onOpenSource,
   onOpenDelegation,
+  delegationActionLabel = "Open session",
 }: TaskRowProps) {
   const Icon = KIND_ICON[kind];
   const done = state === "done";
@@ -113,7 +118,7 @@ export function TaskRow({
       {kind === "delegation" &&
         (onOpenDelegation ? (
           <button type="button" className="task-row__session" onClick={onOpenDelegation}>
-            Open session
+            {delegationActionLabel}
           </button>
         ) : (
           <span className="task-row__delegation-state">{DELEGATION_STATE[state]}</span>

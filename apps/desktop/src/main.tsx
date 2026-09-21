@@ -25,11 +25,13 @@ loadZeroToken()
  *  is not built yet, so this is how a screen that is not the Inbox is reached.
  *  - `onboarding` (US-D06 §4.1.3): no first-run flow is wired yet, and wiring one is not D6's job.
  *  - `today` (US-B28): the shell's Screen switching belongs to whoever builds the rail; this story
- *    adds the screen and has to be able to photograph it in the real shell. */
+ *    adds the screen and has to be able to photograph it in the real shell.
+ *  - `tasks` (US-B29): same reason, same owner. */
 function previewElement() {
   const screen = new URLSearchParams(window.location.search).get("screen");
   if (screen === "onboarding") return <OnboardingPreview />;
   if (screen === "today") return <App screen="today" />;
+  if (screen === "tasks") return <App screen="tasks" />;
   return <App />;
 }
 

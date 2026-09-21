@@ -2329,6 +2329,135 @@ body {
 }
 
 /* ==========================================================================================
+   US-B29 §3.5 Tasks — the todo list as a screen.
+
+   It is the Inbox card's twin in the same way Today is: same 20px radius, same opaque surface, same
+   place in the shell's main column, so switching screens does not move the ground under the reader.
+   The view tabs reuse SegmentedControl (the inbox view pills / thread detail header grammar) rather
+   than a bespoke tab strip — "two or three fixed views of one object" is exactly what this is.
+   ========================================================================================== */
+.tasks-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  /* Vertical only, for the same reason as Today: `hidden` on the cross axis turns a wrapping miss
+     into a visible defect instead of a page-level scrollbar at 390. */
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 16px 20px;
+  border-radius: 20px;
+  box-shadow: var(--shadow-row-selected);
+}
+
+.tasks-screen__banner {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.tasks-screen__banner[data-state="error"] {
+  color: var(--danger-500);
+}
+
+/* The title and the tabs share a line at a wide width and stack at a narrow one. The screen has no
+   rail-independent identity otherwise — "Tasks" is the one word that says which screen this is, and
+   at 390 the rail is a bottom bar that no longer names it. */
+.tasks-screen__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.tasks-screen__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.tasks-screen__views {
+  /* Pushed to the right edge of the header at a wide width; it wraps under the title at a narrow
+     one, where `auto` collapses to zero and it simply sits on the next line. */
+  margin-left: auto;
+}
+
+/* The quick-add field is the `t` shortcut's target (A5 §3.5), drawn as the ask bar's smaller
+   sibling: one line, hairline, no fill — an input that looks like a card would be a second
+   surface in a list that is meant to be the only one. */
+.tasks-screen__quick-add {
+  display: flex;
+}
+
+.tasks-screen__quick-input {
+  width: 100%;
+  min-width: 0;
+  border: var(--hairline);
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.tasks-screen__quick-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.tasks-screen__quick-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.tasks-screen__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tasks-screen__item {
+  min-width: 0;
+}
+
+.tasks-screen__empty {
+  margin: 0;
+  padding: 8px 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* The expanded delegation card is a large object inside a flat list, so it is indented to the row's
+   text column and given a top margin — the card belongs to the row above it, and at the list's own
+   2px rhythm it would read as a separate row that had lost its checkbox. */
+.tasks-screen__approval {
+  margin: 4px 0 8px 29px;
+  max-width: 100%;
+}
+
+@container shell (max-width: 899.98px) {
+  /* One column and the bottom bar. The tabs take the full width and the header stacks, which is the
+     same fold the rail makes at this width. */
+  .tasks-screen__views {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  /* No room for the indent at 390 — the card keeps the full column and only drops its left inset. */
+  .tasks-screen__approval {
+    margin-left: 0;
+  }
+}
+
+/* ==========================================================================================
    US-B29 §3.5 TaskRow — one todo, with where it came from.
 
    The row is flat at rest: no hairline, no shadow, no card. A list of eight todos is read by

@@ -17,6 +17,7 @@ import { decideApproval } from "./api/approvals.js";
 import { type SearchHit, search, toUiSearchGroups } from "./api/search.js";
 import { AgentSession } from "./screens/AgentSession.js";
 import { Inbox, type OpenTarget } from "./screens/Inbox.js";
+import { Tasks } from "./screens/Tasks.js";
 import { Thread } from "./screens/Thread.js";
 import { Today } from "./screens/Today.js";
 import { initZero, useZeroClient } from "./zero-client.js";
@@ -45,7 +46,7 @@ function useCommandPaletteKey(toggle: () => void) {
 
 /** The screens the shell can show. The rail switches between them by screen, not by route —
  *  there is no URL router in the desktop app (src-tauri loads one documents). */
-export type ShellScreen = "inbox" | "today";
+export type ShellScreen = "inbox" | "today" | "tasks";
 
 export function App({ screen = "inbox" }: { screen?: ShellScreen }) {
   // Without ZeroProvider, useQuery dies with "useZero must be used within a ZeroProvider".
@@ -86,6 +87,20 @@ function Shell({ screen }: { screen: ShellScreen }) {
   )[0];
   const selectedThreadSummary = selectedThread?.meta?.summary ?? null;
   const selectedThreadTitle = selectedThread?.title ?? null;
+
+  // A5 §3.5: a task's source message deep-links to its Thread. The task row carries the *item*, not
+  // the thread, and Zero has no relationship to walk between the two — so the item is fetched by id
+  // when a source is clicked, and the thread it names is what opens. The id is cleared once it has
+  // been resolved so a later click on the same source re-triggers it.
+  const [sourceItemId, setSourceItemId] = useState<string | null>(null);
+  const [sourceItemRows] = useQuery(zero.query.items.where("id", "=", sourceItemId ?? ""));
+  const sourceThreadId = (sourceItemRows as unknown as { thread_id?: string }[])[0]?.thread_id;
+  useEffect(() => {
+    if (sourceItemId !== null && sourceThreadId !== undefined) {
+      setOpen({ threadId: sourceThreadId, agentSession: false });
+      setSourceItemId(null);
+    }
+  }, [sourceItemId, sourceThreadId]);
 
   // U1 channel rail: the connected accounts' channels, de-duplicated, in order of first
   // appearance.
@@ -215,6 +230,13 @@ function Shell({ screen }: { screen: ShellScreen }) {
         />
         {screen === "today" ? (
           <Today onOpenThread={openThread} />
+        ) : screen === "tasks" ? (
+          <Tasks
+            onOpenSource={setSourceItemId}
+            // tasks.delegated_session_id is the agent_session thread itself, which is what
+            // AgentSession renders — the same route the Inbox uses for an agent session row.
+            onOpenDelegation={(sessionId) => setOpen({ threadId: sessionId, agentSession: true })}
+          />
         ) : (
           <Inbox
             onOpen={setOpen}
