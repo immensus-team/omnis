@@ -18,6 +18,16 @@ export type SettingKey =
   | "ingest.github_repos"
   | "autonomy.rules"
   | "kakao.send_enabled_at"
+  // Phase C (US-C00). `delegation.allow_rules` stays empty until Logan adds a rule in Settings →
+  // Autonomy, so delegation keeps waiting for a human decision. `delegation.hermes_enabled` gates
+  // the Hermes runtime (US-C07 rejects a hermes target while it is false) and `import.terminal_sessions`
+  // gates the read-only terminal import job.
+  | "delegation.allow_rules"
+  | "delegation.hermes_enabled"
+  | "import.terminal_sessions"
+  // The instant the KakaoTalk reader last saw the room list stable — the 14-day send gate compares
+  // against it, and null means "never observed yet".
+  | "kakao.read_stable_since"
   // US-D10: the detail pane's layout. `ui.detail_width` is null while the pane has never been
   // dragged — null means "the shell's own default", not a number the client has to invent.
   | "ui.detail_width"
@@ -40,6 +50,10 @@ export const SETTING_DEFAULTS: Readonly<Record<SettingKey, unknown>> = {
   "ingest.github_repos": [],
   "autonomy.rules": [],
   "kakao.send_enabled_at": null,
+  "delegation.allow_rules": [],
+  "delegation.hermes_enabled": false,
+  "import.terminal_sessions": false,
+  "kakao.read_stable_since": null,
   // US-D10. Null, not 420: the width the layout ships with is a grid track at >=1280 and a sheet
   // below it, and baking a pixel value in here would make the two disagree on a fresh install.
   "ui.detail_width": null,

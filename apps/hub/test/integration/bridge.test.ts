@@ -1,7 +1,8 @@
+import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
-import { createPool, query } from "@omnis/db";
+import { createPool, one, query } from "@omnis/db";
 import { type Kernel, createKernel, createLogger } from "@omnis/kernel";
-import { PROTOCOL_VERSION } from "@omnis/protocol";
+import { PROTOCOL_VERSION, RuntimeRegisteredResult } from "@omnis/protocol";
 import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import WebSocket from "ws";
@@ -101,6 +102,34 @@ function connect(handlers: Record<string, (params: Record<string, unknown>) => u
   });
 }
 
+/** A bridge → hub *request*: the id is what makes the hub answer instead of treating the message
+ *  as a notification (US-C00 turns runtime.registered into one of these). */
+function request(ws: WebSocket, method: string, params: Record<string, unknown>): Promise<unknown> {
+  const id = `t-${randomUUID()}`;
+  return new Promise((resolve, reject) => {
+    const onMessage = (raw: unknown): void => {
+      const msg = JSON.parse(String(raw)) as {
+        id?: string;
+        result?: unknown;
+        error?: { message: string };
+      };
+      if (msg.id !== id) return;
+      ws.off("message", onMessage);
+      if (msg.error !== undefined) reject(new Error(msg.error.message));
+      else resolve(msg.result);
+    };
+    ws.on("message", onMessage);
+    ws.send(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id,
+        method,
+        params: { ...params, _meta: { "ai.omnis/protocolVersion": PROTOCOL_VERSION } },
+      }),
+    );
+  });
+}
+
 async function until<T>(fn: () => Promise<T | null>, ms = 5000): Promise<T> {
   const started = Date.now();
   for (;;) {
@@ -167,6 +196,28 @@ describe("register + discover round trip", () => {
       {},
     );
     expect(discovered.runtimes.map((r) => r.runtime)).toEqual(["claude_code"]);
+
+    client.ws.close();
+    await client.closed;
+  });
+
+  it("answers runtime.registered with the upserted row's runtime_id (US-C00)", async () => {
+    const client = await connect({});
+
+    const result = RuntimeRegisteredResult.parse(
+      await request(client.ws, "runtime.registered", {
+        runtime: "claude_code",
+        host: "macbook",
+        version: "2.1.274",
+        capabilities: { resume: true, tool_calls: true, approvals: "hook", cancel: true },
+      }),
+    );
+
+    const row = await one<{ id: string }>(
+      pool,
+      "SELECT id FROM agent_runtimes WHERE runtime = 'claude_code' AND host = 'macbook'",
+    );
+    expect(result.runtime_id).toBe(row.id);
 
     client.ws.close();
     await client.closed;
