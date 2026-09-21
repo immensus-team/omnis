@@ -3,10 +3,10 @@ import { cn } from "../lib/cn.js";
 import { ContextMenu, type ContextMenuGroup } from "./context-menu.js";
 import { GlassSurface } from "./glass-surface.js";
 
-// US-D09 §c.5 / §c.9 — M103 (toolbars). One bar of icon buttons with three shapes: the detail pane's
-// sticky glass capsule in the wide tier, the same controls as the sheet's own chrome row in the
-// 900–1279.98 tier (where the pane is itself glass — `variant="chrome"`), and the <900 floating
-// action bar that sits in the BottomBar's line between the filters circle and the compose circle.
+// US-D09 §c.5 / §c.9 — M103 (toolbars). One bar of icon buttons with two shapes: the detail pane's
+// sticky glass capsule in the wide tier, and the same controls as the sheet's own chrome row
+// wherever the pane is itself a sheet — 900–1279.98 and (S5) below 900, where the pane is a `vaul`
+// drawer. Both of those pass `variant="chrome"`.
 //
 // It is one component rather than two because §c.5's bars differ in exactly two numbers — their
 // height and where they are positioned — and everything else about them is the same claim: a row of
@@ -107,8 +107,3 @@ export function ThreadToolbar({ actions, menu, className, variant = "glass" }: T
     </GlassSurface>
   );
 }
-
-/** The class the <900 bar carries so app.css can position it and size its buttons. Exported as a
- *  literal rather than left to the call site because app-shell.test.tsx reads the same string out
- *  of the stylesheet, and a typo between the two would silently drop the tier's bar. */
-export const THREAD_TOOLBAR_FLOATING_CLASS = "thread-toolbar--floating";

@@ -6,14 +6,8 @@ import "./setup";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  SHEET_DISMISS_PX,
-  SHEET_SNAP_POINTS,
-  Sheet,
-  SheetCheck,
-  SheetGroup,
-  SheetRow,
-} from "../src/components/sheet";
+import { NARROW_DRAWER_SNAP_POINTS } from "../src/components/narrow-drawer";
+import { SHEET_DISMISS_PX, Sheet, SheetCheck, SheetGroup, SheetRow } from "../src/components/sheet";
 
 /** The two tiers, because the sheet now has one implementation each. `useNarrowShell` reads
  *  `window.matchMedia` — the same limitation channel-rail.test.tsx and inbox-row-swipe.test.tsx
@@ -214,7 +208,7 @@ describe("Sheet, the narrow tier — vaul's drawer (motion-OSS S5)", () => {
   // the assertion is "the sheet opens covering half the screen" — which is the M125 behaviour the
   // number is there for, not the number itself.
   it("opens at the half-height snap point and offers the second one", () => {
-    expect([...SHEET_SNAP_POINTS]).toEqual([0.5, 0.92]);
+    expect([...NARROW_DRAWER_SNAP_POINTS]).toEqual([0.5, 0.92]);
     render(<Harness />);
     const dialog = openSheet();
     expect(dialog.getAttribute("data-vaul-snap-points")).toBe("true");

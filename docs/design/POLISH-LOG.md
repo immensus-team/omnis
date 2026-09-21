@@ -573,13 +573,46 @@ calls** — slice by slice, with the probe or the measurement behind each — an
 here. In one line each: **S1** (the libraries, `TIER_MS`/`SPRING` mirroring the `--dur-*` rungs with
 a drift test that reads `tokens.css` off disk, `useMotionPrefs()`, `MotionConfig` at the root), **S3**
 (the divider drag is `useDrag`, the width maths stays in `lib/detail-pane.ts`), **S4** (the leaving
-row collapses through `motion`'s `animate`, and `useCollapseHeight` is deleted), **S5** (the `<900`
-sheet is `vaul`'s drawer with `snapPoints={[0.5, 0.92]}`) and **S6** (the app's first toast,
+row collapses through `motion`'s `animate`, and `useCollapseHeight` is deleted), **S5** (all three
+`<900` surfaces — the filters sheet, the thread sheet and the AI panel — are `vaul`'s drawers with
+`snapPoints={[0.5, 0.92]}`, through one `NarrowDrawer`) and **S6** (the app's first toast,
 `auto-animate` on the two lists whose *membership* changes on a user action) landed; **S2** — the
 rail's reorder — did not, and §c.1.1 gives its two reasons: `Reorder` would replace the FLIP and
 nothing else (every gesture gate around it, ~70 lines, is still needed by the row swipe), and its own
 drag could not be driven in jsdom, so a port would need its own Playwright sequence before anything
 could be believed about it.
+
+**S5 landed for the filters sheet first, and this entry said "the `<900` sheet" as though that were
+the slice.** The brief names three surfaces at that width and the tree had one: the pane's narrow box
+and the AI panel's upward rule were untouched, and neither §c.1.1 nor this entry mentioned it. Both
+now say which three, and all three are ported. Three of the consequences are visible outside the
+drawers: the pane's floating action bar — portaled into the BottomBar's row, so a modal drawer's scrim
+would have left it visible and untouchable — is now the drawer's own chrome row (the same shape it
+already had at 900–1279.98); both new drawers carry an explicit `z-index: 40`, because neither
+`vaul` nor Radix gives `Drawer.Content` one; and the pane's own auto-open now lands *over* the shell's
+chrome rather than under it. That last one is a behaviour change at the tier, not a code shape:
+`App.tsx` opens the pane on the inbox's pending-approval queue, and below 900 that pane is a modal
+drawer whose scrim covers the BottomBar — the rail's tiles, Filters and compose are unreachable until
+it is dismissed (scrim, Escape, or the grabber), where the pre-S5 `z-20` sheet had the `z-30` bar over
+it and stayed pressable. Both Playwright drivers encode it: `d9-surfaces.spec.ts` closes the thread
+drawer before pressing Filters, and `shots-motion-oss.ts` gained a `dismissPaneDrawer` step, without
+which the 390 rail reorder had nothing to press and the whole evidence run stopped on its own
+assertion.
+
+**The evidence run also caught a defect in the panel itself, which is the reason it is here rather
+than in a footnote.** `NarrowDrawer` returns focus to whatever opened it when it closes — that is
+Radix's `onCloseAutoFocus` with `useReturnFocusTarget` in front of it, because none of the three
+drawers is opened by a `Dialog.Trigger` Radix could find on its own. For the AI panel that opener is
+the ask bar's input, and the input's `onFocus` is *what opens the panel*: so Escape closed the drawer
+and the focus it restored opened it again, in the same breath, and the panel had no way out at that
+tier at all — every press of Escape and every tap on the scrim was a reopen. Nothing in the unit
+suite could see it, because a test that opens the panel directly never has the input focused when the
+drawer opens, and `useReturnFocusTarget` captures `document.activeElement` at exactly that moment. It
+surfaced as `locator.waitFor: Timeout 10000ms exceeded … waiting for '[data-vaul-drawer].ask-panel'
+to be detached`, on a drawer that was open again. The fix is a prop rather than a special case:
+`NarrowDrawer` takes `returnFocusToOpener` (default true) and the panel passes `false`, keeping
+Radix's `preventDefault` — focus is not handed to the trigger path either — and the regression test
+in `command-palette.test.tsx` opens the panel the app's own way, by focusing the bar.
 
 **This entry replaced an earlier version of itself, and what it corrected is worth keeping visible,
 because each of the three was a claim that read as a finding.** (1) It said two slices landed and
@@ -636,8 +669,10 @@ more than the app's delta because the app imports neither `Reorder` nor `Animate
 | `@formkit/auto-animate` | 3.1 kB |
 
 Two lines carry most of it, and both are load-bearing: `motion` is the runtime S1, S4 and S6 sit on,
-and `vaul` is 21.8 kB for one drawer — the price of S5's snap points, `handleOnly` drag and
-drag-to-dismiss, where the hand-rolled sheet was a CSS keyframe and a `pointerDrag` swipe. If the
+and `vaul` is 21.8 kB for three drawers — the price of S5's snap points, `handleOnly` drag and
+drag-to-dismiss, where the hand-rolled sheet was a CSS keyframe and a `pointerDrag` swipe. (It was one
+drawer when this was measured; S5's other two surfaces are the same 21.8 kB, which is the whole
+argument for porting them through one component rather than buying the mechanism twice.) If the
 number has to come down, `vaul` is the one to re-open (a `pointerDrag({ axis: "y" })` dismissal is
 already in the repo's vocabulary at §c.6); the report is that it is over, not that it should be
 smoothed over.
@@ -690,9 +725,10 @@ reproduced the previously recorded baseline to the byte: 267.72 / 4.12 / 12.28.
 
 ### The evidence, and the one thing it cannot show
 
-`pnpm tsx tools/e2e/shots-motion-oss.ts` exits 0 and writes **27 frames** into
+`pnpm tsx tools/e2e/shots-motion-oss.ts` exits 0 and writes **29 frames** into
 `docs/design/screens/motion-oss/` — three-frame (and, for the rail, five-frame) sequences of the four
-gestures the wave touched, at both tiers, plus one frame of the tier the divider does not exist on:
+gestures the wave touched, at both tiers, plus one frame of the tier the divider does not exist on and
+one still of each S5 drawer that is not the sheet:
 
 - **reorder** — 5 frames at 1440 and 5 at 390 (`reorder-{1440,390}-*`): the lifted tile, the
   neighbours' travel parked at 0/110/219ms of the 220ms settle (48px at 1440, 64px at 390), and the
@@ -702,7 +738,12 @@ gestures the wave touched, at both tiers, plus one frame of the tier the divider
 - **sheet open** — 3 at 390 (`sheet-open-390-150/325/499ms`, the `vaul` drawer) and 3 at 1440
   (`sheet-open-1440-*`, the same component as the centred dialog).
 - **divider drag** — 4 at 1440 (`divider-drag-1440-{a-inside,b-at-limit,c-band,d-release-120ms}`)
-  and 1 at 390 (`divider-drag-390-no-grip`).
+  and 1 at 390 (`divider-drag-390-no-grip`, which is also the thread sheet's frame: at that tier the
+  pane *is* the drawer).
+- **S5's other two drawers** — 1 still each (`thread-sheet-390`, `ai-panel-390`). A state rather than
+  a travel, so no sequence: the thread sheet and the ask bar's panel at their `0.5` rest snap, shot
+  after the same three measurements (`width === innerWidth`, `top === (1 - 0.5) * innerHeight`, and a
+  hit test at a point inside the drawer that must land on the drawer rather than on the scrim).
 
 Each sequence asserts what the pictures cannot: the rail's order string actually changes
 (`Slack System Gmail Google Calendar Agent` → `Slack Gmail System Google Calendar Agent` at 1440, and

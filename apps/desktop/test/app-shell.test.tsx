@@ -221,11 +221,14 @@ describe("App shell bottom bars (US-D08 §c.9)", () => {
     expect(ruleBody(css, ".bottom-bar")).toContain("bottom: calc(56px + var(--bar-gap));");
   });
 
-  it("reserves room for both bars in the list, the sheet and the panel", () => {
+  it("reserves the bars' band in the list, where the bars actually overlap it", () => {
     const css = narrowTier();
     expect(ruleBody(css, ".app-shell__main")).toContain(`padding-bottom: ${TWO_BARS};`);
-    expect(ruleBody(css, ".app-shell__detail")).toContain(`bottom: ${TWO_BARS};`);
-    expect(ruleBody(css, ".bottom-bar .ask-panel")).toContain(`bottom: ${TWO_BARS};`);
+    // S5: the pane and the AI panel are modal drawers below 900 — full viewport, `bottom: 0`, with a
+    // scrim over everything else — so neither reserves the band any more. They are the two rules
+    // this test used to read; the drawers sit *on* the bars rather than between them.
+    expect(baseRule("[data-vaul-drawer].app-shell__detail")).toContain("bottom: 0;");
+    expect(baseRule("[data-vaul-drawer].ask-panel")).toContain("bottom: 0;");
   });
 
   // §c.9's three pieces: a 44px circle, a pill of --bar-h, a 52px circle. The pill's height is the
@@ -238,17 +241,15 @@ describe("App shell bottom bars (US-D08 §c.9)", () => {
     expect(ruleBody(css, ".bottom-bar__piece--compose")).toMatch(/width: 52px;/);
   });
 
-  // The panel opens upward (below the bar there is a 12px gap and then the rail) and is pinned to
-  // the shell's gutters rather than to the pill it belongs to: at 390 the pill is ~246px wide, and
-  // a panel clipped to that is a column of ellipses. Both edges pinned is also what keeps it from
-  // widening the page — the left/right insets are the constraint, not its content.
-  it("opens the panel upward, pinned to the bar's gutters", () => {
-    const panel = ruleBody(narrowTier(), ".bottom-bar .ask-panel");
-    expect(panel).toMatch(/top: auto;/);
-    expect(panel).toMatch(/left: var\(--bar-gap\);/);
-    expect(panel).toMatch(/right: var\(--bar-gap\);/);
-    expect(panel).toMatch(/width: auto;/);
-    expect(panel).toMatch(/max-width: none;/);
+  // The panel used to open upward inside the shell, pinned to the bar's own gutters (a panel clipped
+  // to the ~246px pill would have been a column of ellipses). S5 made it the AI drawer, so the
+  // gutters are gone: it is the window's width, like the filters sheet, and the constraint that
+  // keeps it from widening the page is now `inset-inline: 0` rather than two insets.
+  it("opens the panel as the window's width, not the bar's gutters", () => {
+    const panel = baseRule("[data-vaul-drawer].ask-panel");
+    expect(panel).toContain("inset-inline: 0;");
+    expect(panel).toContain("width: auto;");
+    expect(panel).not.toMatch(/--bar-gap/);
   });
 });
 
@@ -316,6 +317,17 @@ function chromeRowTier(): string {
   return css.slice(start, css.indexOf("\n}", start));
 }
 
+/** A rule at the top level of app.css — the base file rather than a tier. Not `ruleBody`, which
+ *  reads the indented form of a rule declared inside an at-rule. The drawer rules are top-level even
+ *  though they only ever match one tier: `[data-vaul-drawer].app-shell__detail` *is* the media query
+ *  (a portal is outside `#root`, so no container query reaches it). */
+function baseRule(selector: string): string {
+  const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
+  const start = css.indexOf(`\n${selector} {`);
+  expect(start, `${selector} is not in app.css`).toBeGreaterThan(-1);
+  return css.slice(start, css.indexOf("}", start));
+}
+
 describe("App shell thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
   // The wide tier's bar is a row of the conversation that stays put, not a floating panel: `sticky`
   // keeps it in the scrolling flow, and `margin-left: auto` with `width: max-content` pins a block
@@ -346,38 +358,35 @@ describe("App shell thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
     expect(Number(margin?.[1])).toBeGreaterThanOrEqual(28);
   });
 
-  // §c.5 pins the narrow tier's bar at `bottom: var(--bar-gap)`, which is where §c.9 leaves the rail
-  // bar — the same adaptation the BottomBar needed. These three numbers have to be the BottomBar's
-  // own: the bar stands in that row, between its 44px filters circle and its 52px compose circle, so
-  // the insets that clear them are what keeps it from covering either.
-  it("floats it in the BottomBar's row, clear of both circles", () => {
-    const body = ruleBody(
-      atRuleBody("@media (max-width: 899.98px) {"),
-      ".thread-toolbar--floating",
-    );
+  // S5 replaced §c.5's third bar shape. Until then the narrow tier pinned a *floating* capsule at
+  // `bottom: var(--bar-gap)`, in the BottomBar's own row between its two circles; the pane is a modal
+  // `vaul` drawer now, and a modal drawer owns the pointer for everything outside itself — a bar
+  // portaled into the BottomBar's line would have sat visible under the scrim and untouchable. It is
+  // the drawer's chrome row instead, which is the shape the 900–1279.98 tier already uses, for the
+  // same reason: the drawer's own field is the material the buttons stand on.
+  it("makes the bar a static row of the drawer, not a capsule in the bar's row", () => {
+    const body = baseRule("[data-vaul-drawer].app-shell__detail .thread-toolbar--pane");
 
-    expect(body).toMatch(/position: fixed;/);
-    expect(body).toContain("bottom: calc(56px + var(--bar-gap));");
-    expect(body).toContain("left: calc(var(--bar-gap) + 44px + 8px);");
-    expect(body).toContain("right: calc(var(--bar-gap) + 52px + 8px);");
+    expect(body).toContain("position: static;");
+    expect(body).toContain("align-self: flex-end;");
+    // The chrome row casts nothing (there is no capsule to cast a shadow), so the band the sticky
+    // tier reserves for `--shadow-glass` would only be a hole here.
+    expect(body).toContain("margin-bottom: 0;");
+    // `position: static` is the load-bearing one: the `>=900` block's sticky rule has the same
+    // specificity, so a bar that lost this line would go back to hovering over the conversation with
+    // no field behind it — the sender's date travelling through the glyphs.
+    expect(body).not.toMatch(/position: (fixed|sticky|absolute);/);
   });
 
   // §c.5/M103: 36px in the capsule at the desk, 44px on a touch screen — the BottomBar's own circle
-  // size. The base rule is the wide tier's, because it is the one that applies everywhere.
-  it("sizes the buttons for the pointer: 36px wide, 44px narrow", () => {
-    const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
-    // The base rule is top-level, so it sits at column 0 and ruleBody's two-space match would not
-    // find it; the narrow tier's is indented inside its at-rule.
-    const start = css.indexOf("\n.thread-toolbar__button {");
-    expect(start, ".thread-toolbar__button is not declared at the top level").toBeGreaterThan(-1);
-    const wide = css.slice(start, css.indexOf("}", start));
+  // size. Both rules are top-level: the first because it applies everywhere, the second because its
+  // selector is its media query.
+  it("sizes the buttons for the pointer: 36px at the desk, 44px in the drawer", () => {
+    const wide = baseRule(".thread-toolbar__button");
     expect(wide).toMatch(/width: 36px;/);
     expect(wide).toMatch(/height: 36px;/);
 
-    const narrow = ruleBody(
-      atRuleBody("@media (max-width: 899.98px) {"),
-      ".thread-toolbar--floating .thread-toolbar__button",
-    );
+    const narrow = baseRule("[data-vaul-drawer].app-shell__detail .thread-toolbar__button");
     expect(narrow).toMatch(/width: 44px;/);
     expect(narrow).toMatch(/height: 44px;/);
   });
@@ -437,27 +446,51 @@ describe("App shell thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
     );
   });
 
-  // The compose circle is the bar's *trailing* piece, and the auto margin is what keeps it there:
-  // with a thread open the shell hands the bar no ask pill (`App.tsx` renders `null` for children),
-  // so the pill's `flex: 1 1 auto` is gone and the circle slid left to sit 8px after the filters —
-  // exactly where the floating action bar stands. The 390 shot had the bar covering it.
-  it("keeps the compose circle at the bar's trailing edge when there is no ask pill", () => {
+  // The compose circle is the bar's *trailing* piece, and the auto margin is what keeps it there.
+  // The pill's `flex: 1 1 auto` already takes every spare pixel, so with the ask bar in the row the
+  // margin is zero and the two are equivalent — it is kept for the case the slot is rendered without
+  // one, which is how the circle ended up 8px after the filters once before. (S5 removed the
+  // floating action bar that used to stand there, so that shot cannot repeat; the rule stays because
+  // the BottomBar takes its middle piece as children and is not the shell's private component.)
+  it("keeps the compose circle at the bar's trailing edge whatever the slot holds", () => {
     expect(ruleBody(narrowTier(), ".bottom-bar__piece--compose")).toContain("margin-left: auto;");
   });
 
-  // `--bar-h` is the BottomBar's own row height and this capsule stands in that row, but the box is
-  // content-box: said as `height: var(--bar-h)` the 2px of padding and the 1px hairline per side
-  // landed *outside* it and the bar measured 58 — three pixels proud of the two circles it stands
-  // between. The subtraction is the chrome (2 × 2px + 2 × 1px), which is the one thing a test can
-  // hold: the rule may not go back to the bare token.
-  it("sizes the floating capsule to the row rather than to the row plus its own chrome", () => {
-    const body = ruleBody(
-      atRuleBody("@media (max-width: 899.98px) {"),
-      ".thread-toolbar--floating",
+  // S5's two new drawers, stated as the box `vaul` needs rather than as a look. The full height is
+  // the declaration that makes them drawers at all: `vaul` offsets a snap point by
+  // `viewport - snap * viewport`, so a box shorter than the viewport shows a fraction of the wrong
+  // height. Each is also the pane's/card's own geometry replaced — the pane is a 420px column with a
+  // 16px grip gutter, and a drawer is the window's width, flush to the bottom edge.
+  it("gives the thread drawer the sheet's box: full viewport, flush to the bottom", () => {
+    const body = baseRule("[data-vaul-drawer].app-shell__detail");
+    expect(body).toContain("height: 100dvh;");
+    expect(body).toContain("bottom: 0;");
+    expect(body).toContain("width: auto;");
+    expect(body).toContain("margin-left: 0;");
+    expect(body).toContain("max-height: none;");
+    // The material is the `<=1279.98` sheet's recipe written out again, because that block is a
+    // container query and a portal is outside `#root`. It is the pane's glass at its third shape.
+    expect(body).toContain("background: var(--bg-overlay);");
+    expect(body).toContain("backdrop-filter: blur(24px) saturate(1.4);");
+    // Topmost while it is up, over the BottomBar's 30 and the filters sheet's own 40 — the drawer
+    // content has to clear the scrim it is portaled beside.
+    expect(body).toMatch(/z-index: 40;/);
+    // `vaul` moves the box through a transform and animates it; a second animation on the same
+    // property (the pane's fold, the floating sheet's slide) would fight the gesture.
+    expect(body).toContain("animation: none;");
+  });
+
+  it("gives the AI panel drawer the same box, filled by its own glass", () => {
+    const body = baseRule("[data-vaul-drawer].ask-panel");
+    expect(body).toContain("height: 100dvh;");
+    expect(body).toContain("bottom: 0;");
+    expect(body).toMatch(/z-index: 40;/);
+    // The card's cap is the opposite decision — a floating panel must not outgrow the screen — and
+    // with the drawer a full viewport tall it would leave a band of bare aurora under the glass.
+    expect(body).not.toContain("min(60vh, 420px)");
+    expect(baseRule("[data-vaul-drawer].ask-panel .ask-panel__glass")).toContain(
+      "max-height: none;",
     );
-    expect(body).toContain("height: calc(var(--bar-h) - 6px);");
-    expect(body).toContain("min-height: calc(var(--bar-h) - 6px);");
-    expect(body).not.toContain("height: var(--bar-h);");
   });
 
   // §c.6/§c.7/§c.8 under reduced transparency: the three D9 surfaces go flat, and the fill is only
@@ -482,15 +515,6 @@ describe("App shell thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
 });
 
 describe("App shell detail card (US-D10 §c.5: the pane is the list's own card)", () => {
-  /** A rule at the top level of app.css — the base file rather than a tier. Not `ruleBody`, which
-   *  reads the indented form of a rule declared inside an at-rule. */
-  function baseRule(selector: string): string {
-    const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
-    const start = css.indexOf(`\n${selector} {`);
-    expect(start, `${selector} is not in app.css`).toBeGreaterThan(-1);
-    return css.slice(start, css.indexOf("}", start));
-  }
-
   function listCard(): string {
     return baseRule(".inbox-card");
   }

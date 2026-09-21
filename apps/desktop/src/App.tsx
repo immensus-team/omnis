@@ -11,7 +11,9 @@ import {
   DETAIL_WIDTH_KEY,
   DetailPaneHandle,
   DetailPaneToggle,
+  DrawerGrabber,
   LEAVE_MS,
+  NarrowDrawer,
   type PaletteAction,
   type RailSelection,
   type UiChannel,
@@ -123,6 +125,12 @@ function Shell({ screen }: { screen: ShellScreen }) {
   // own filter state — so the open flag lives here (the trigger is in this file's bar) while the
   // rows live in Inbox.tsx (which owns what they change).
   const [filtersOpen, setFiltersOpen] = useState(false);
+  /** Set when the user pulls the narrow pane's drawer away. Below 900 the pane has no toggle to
+   *  collapse it, so that gesture *is* the decision the collapse flag is above — and it has to be
+   *  remembered separately, because the reason the pane opened on its own (the inbox's pending
+   *  approvals, see `paneVisible`) is still true a frame later and would spring the drawer back up.
+   *  An explicit open outranks it: see the effect below. */
+  const [paneDismissed, setPaneDismissed] = useState(false);
   // US-D08 §c.9: below 900 the ask bar leaves the top of the list and becomes the BottomBar's
   // middle piece. One element in one of two places, never both — a second render of the palette
   // would be a second cmdk list, a second action list to keep in sync, and two things answering
@@ -170,7 +178,8 @@ function Shell({ screen }: { screen: ShellScreen }) {
   // which is the real one, so they are merged into one.
   // CommandPalette mode="dialog" itself stays in @omnis/ui with its tests — the shell just does
   // not use it.
-  useCommandPaletteKey(() => setAskOpen((v) => !v));
+  // (The binding itself is below `paneVisible`: in the narrow tier it has to know whether a drawer
+  // is already up.)
 
   // Approvals are read through Zero (the read-only path) and only the decision goes to the hub
   // over HTTP — contract §5.
@@ -329,7 +338,21 @@ function Shell({ screen }: { screen: ShellScreen }) {
   const paneVisible =
     open !== null ||
     openPersonId !== null ||
-    (!paneCollapsed && screen === "inbox" && approvals.length > 0);
+    (!paneCollapsed && !paneDismissed && screen === "inbox" && approvals.length > 0);
+  // An explicit target is a newer decision than a dismissal, so it releases it. An effect rather
+  // than a wrapper around every `setOpen` call: the render that carries the new target already
+  // shows the pane whatever this flag says, so nothing is waiting on it to be right.
+  useEffect(() => {
+    if (open !== null || openPersonId !== null) setPaneDismissed(false);
+  }, [open, openPersonId]);
+  // Below 900 the ask panel is a drawer too, and `vaul`'s drawer is modal: its scrim covers the
+  // shell, and Cmd+K is a window listener that no scrim can intercept. So the tier is what keeps a
+  // second drawer from stacking on the one already up. Above 900 the pane is a column and the
+  // shortcut is the panel's way in — which is why this is not simply `paneVisible`.
+  useCommandPaletteKey(() => {
+    if (narrow && (paneVisible || filtersOpen)) return;
+    setAskOpen((v) => !v);
+  });
   // The pane stays mounted while it leaves, because the close is animated and CSS cannot animate a
   // node React has already unmounted (lib/motion.ts — the same hold the ask panel uses).
   const closing = useClosingSpring(paneVisible, LEAVE_MS);
@@ -385,11 +408,15 @@ function Shell({ screen }: { screen: ShellScreen }) {
   }, []);
 
   useDetailPaneKey(onPaneToggle, !narrow);
-  // §c.5: a thread — not the approval queue, and not an agent session, which draws no toolbar —
-  // owns the narrow tier's action-band when one is open. It is the same condition Thread.tsx uses
-  // to decide whether to portal its floating bar, and it has to be, or the band would hold both the
-  // pill and the bar.
-  const threadOpen = open !== null && !open.agentSession;
+
+  /** Below 900 the pane is a drawer and this is what its drag, its scrim and Escape call. Clearing
+   *  the two targets is what closes a pane the user opened; the flag is what closes one that opened
+   *  itself (the approval queue above), whose reason is still true on the next render. */
+  const onPaneDismiss = useCallback(() => {
+    setOpen(null);
+    setOpenPersonId(null);
+    setPaneDismissed(true);
+  }, []);
 
   /** US-B27's search mode and US-D08 §c.9's two homes, in one element: the shell builds it once and
    *  renders it in exactly one of the two places below. */
@@ -443,6 +470,52 @@ function Shell({ screen }: { screen: ShellScreen }) {
       />
     );
 
+  /** What the pane draws, whichever box it draws it in. One expression rather than two because the
+   *  breakpoint changes the surface, not the subject — the rules in the branches below (US-B30's
+   *  person, US-D03's scoped approval queue, US-D09 §c.5's in-flow approvals) have not moved with
+   *  the box.
+   *
+   *  US-B30: a person is not a thread, so it is the pane's own branch rather than a second variant
+   *  of the thread route.
+   *
+   *  US-D03: one approval is the expanded card, the rest are one-line rows under a count. The scope
+   *  is the open thread — an approval that belongs to the conversation in front of you is the one
+   *  you are working on; with nothing open the whole queue is the scope. The decision still goes to
+   *  the hub over HTTP (contract §5) — Zero only carries the read.
+   *
+   *  With nothing open the pane *is* the queue, so the stack is the whole pane. With a thread open
+   *  the stack is handed to the screen instead, which draws it under the thread's own title: the
+   *  pane has to open on what it is about. (An agent session has no header of its own, so there it
+   *  stays on top.) */
+  const paneBody =
+    openPersonId !== null ? (
+      <PersonDetail personId={openPersonId} onOpenThread={openThreadFromPerson} />
+    ) : open === null ? (
+      <ApprovalStack
+        approvals={approvals as unknown as ApprovalStackItem[]}
+        openThreadId={null}
+        onDecide={onDecide}
+      />
+    ) : open.agentSession ? (
+      <>
+        <ApprovalStack
+          approvals={approvals as unknown as ApprovalStackItem[]}
+          openThreadId={open.threadId}
+          onDecide={onDecide}
+        />
+        <AgentSession sessionThreadId={open.threadId} />
+      </>
+    ) : (
+      // US-D09 §c.5: the thread's approvals go *into* the conversation, in document order, so this
+      // screen gets the list rather than a stack to draw above it. The stack still owns the pane
+      // with nothing open, where the queue is the whole subject.
+      <Thread
+        threadId={open.threadId}
+        approvals={approvals as unknown as ApprovalStackItem[]}
+        onDecide={onDecide}
+      />
+    );
+
   return (
     <main
       data-testid="app-shell"
@@ -471,15 +544,12 @@ function Shell({ screen }: { screen: ShellScreen }) {
           grid; it lives inside <main> because that is what makes it a descendant of the container
           the shell's container queries are measured on.
 
-          US-D09 §c.5: with a thread open in this tier the middle piece is not the ask pill — that
-          band belongs to the thread's floating action bar, which Thread.tsx portals to the body so
-          it can sit in the BottomBar's line between the two circles. Rendering the pill as well
-          would put two controls in one slot (§e guard 11 wants a twin, not a duplicate). */}
-      {narrow ? (
-        <BottomBar onOpenFilters={() => setFiltersOpen(true)}>
-          {threadOpen ? null : askBar}
-        </BottomBar>
-      ) : null}
+          US-D09 §c.5 gave this band to the thread's floating action bar while a thread was open.
+          That bar is gone with S5's port: below 900 a thread is a drawer, a modal one covers this
+          whole line with its scrim, and an action bar underneath a scrim is a row of controls the
+          eye can see and the finger cannot reach. The thread's bar is the drawer's chrome row now
+          (Thread.tsx), so the middle piece is the ask pill in every state. */}
+      {narrow ? <BottomBar onOpenFilters={() => setFiltersOpen(true)}>{askBar}</BottomBar> : null}
       {/* US-D02b/US-D09: the detail pane no longer carries `.glass-surface`. It used to, and app.css
           took the glass back off at >=1280 — but the class itself stayed in the DOM, and §c.5 puts a
           glass toolbar inside the pane, which would then be a glass surface nested in a glass
@@ -497,53 +567,39 @@ function Shell({ screen }: { screen: ShellScreen }) {
           className="detail-pane__toggle--floating"
         />
       ) : null}
-      {paneRendered && (
+      {/* S5: below 900 the pane is `vaul`'s drawer — the same mechanism, the same two snap points and
+          the same scrim as the filters sheet and the AI panel (narrow-drawer.tsx). It is mounted
+          whenever the tier is narrow rather than only while it is up, because `vaul` animates its
+          own exit and a node React had already unmounted has no animation left to run.
+          `className` lands on `Drawer.Content`, which *is* the pane's box in this tier — hence
+          `.app-shell__detail` here rather than on the section, and hence app.css's
+          `[data-vaul-drawer].app-shell__detail` block: the pane's box rewritten for a drawer (flush
+          to the bottom edge, a full viewport tall, rounded at the top only). */}
+      {narrow ? (
+        <NarrowDrawer
+          open={paneVisible}
+          onOpenChange={(next) => {
+            if (!next) onPaneDismiss();
+          }}
+          className="app-shell__detail"
+          label="Details"
+        >
+          <section data-testid="detail-pane">
+            {/* The drawer's chrome row is the grabber: its edge is the viewport's, so there is no
+                column to collapse and no divider to drag — the gesture at this edge is the drawer's
+                own. (The chevron below is therefore drawn by the other branch only.) */}
+            <DrawerGrabber />
+            {paneBody}
+          </section>
+        </NarrowDrawer>
+      ) : paneRendered ? (
         <section data-testid="detail-pane" className="app-shell__detail">
           <div className="detail-pane__chrome">
             <DetailPaneToggle collapsed={paneCollapsed} onToggle={onPaneToggle} />
           </div>
-          {/* US-B30: a person is not a thread, so it is the pane's own branch rather than a second
-              variant of the thread route.
-
-              US-D03: one approval is the expanded card, the rest are one-line rows under a count.
-              The scope is the open thread — an approval that belongs to the conversation in front
-              of you is the one you are working on; with nothing open the whole queue is the scope.
-              The decision still goes to the hub over HTTP (contract §5) — Zero only carries the
-              read.
-
-              With nothing open the pane *is* the queue, so the stack is the whole pane. With a
-              thread open the stack is handed to the screen instead, which draws it under the
-              thread's own title: the pane has to open on what it is about. (An agent session has
-              no header of its own, so there it stays on top.) */}
-          {openPersonId !== null ? (
-            <PersonDetail personId={openPersonId} onOpenThread={openThreadFromPerson} />
-          ) : open === null ? (
-            <ApprovalStack
-              approvals={approvals as unknown as ApprovalStackItem[]}
-              openThreadId={null}
-              onDecide={onDecide}
-            />
-          ) : open.agentSession ? (
-            <>
-              <ApprovalStack
-                approvals={approvals as unknown as ApprovalStackItem[]}
-                openThreadId={open.threadId}
-                onDecide={onDecide}
-              />
-              <AgentSession sessionThreadId={open.threadId} />
-            </>
-          ) : (
-            // US-D09 §c.5: the thread's approvals go *into* the conversation, in document order,
-            // so this screen gets the list rather than a stack to draw above it. The stack still
-            // owns the pane with nothing open, where the queue is the whole subject.
-            <Thread
-              threadId={open.threadId}
-              approvals={approvals as unknown as ApprovalStackItem[]}
-              onDecide={onDecide}
-            />
-          )}
+          {paneBody}
         </section>
-      )}
+      ) : null}
       {/* US-D10 §c.1: the grip on the pane's left edge, and a sibling of the pane rather than a
           child of it. Two reasons, both structural. The grip is `position: fixed` (it must not
           scroll with the pane's own scroller), and a fixed box is positioned against the nearest

@@ -161,9 +161,6 @@ describe("Thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
     expect(bar).not.toBeNull();
     expect(bar).toHaveClass("glass-surface");
     expect(bar).toHaveAttribute("data-glass-slot", "toolbar");
-    // The floating tier's class is what app.css positions by; carrying both would put the wide bar
-    // in the BottomBar's row.
-    expect(bar).not.toHaveClass("thread-toolbar--floating");
     // The pane is an opaque grid column at this tier, so the bar is a child of it — that is the
     // arrangement the glass recipe is for.
     expect(document.querySelector(".thread-screen")?.contains(bar ?? null)).toBe(true);
@@ -186,7 +183,6 @@ describe("Thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
     expect(bar).toHaveClass("thread-toolbar--chrome");
     expect(bar).not.toHaveClass("glass-surface");
     expect(bar).not.toHaveAttribute("data-glass-slot");
-    expect(bar).not.toHaveClass("thread-toolbar--floating");
     // A sibling of the scroller, not a row inside it: app.css turns the pane into a column at this
     // tier and `.thread-screen` into the scroller, so a bar left in the flow would scroll away with
     // the message — and a sticky one with no field behind it would let the message travel through
@@ -205,20 +201,28 @@ describe("Thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
     expect(screen.getByRole("button", { name: "Reply" })).toBeDisabled();
   });
 
-  it("narrow: one floating bar, portaled out of the pane", () => {
+  // S5: below 900 the pane is the same `vaul` drawer the filters come up in, so the bar is that
+  // drawer's chrome row — the same shape it already has at 900–1279.98, and for the same reason (the
+  // drawer's own field is the material). What it is *not* any more is the floating bar that used to
+  // be portaled into the BottomBar's line: a modal drawer owns the pointer for everything outside
+  // itself, so a bar under its scrim would have been visible and untouchable.
+  it("narrow: the same chrome row as the sheet tier, above the drawer's scroller", () => {
     stubTier("narrow");
     renderThread();
 
     expect(toolbars()).toHaveLength(1);
-    const bar = document.querySelector(".thread-toolbar--floating");
+    const bar = document.querySelector(".thread-toolbar--pane");
     expect(bar).not.toBeNull();
-    expect(bar).toHaveClass("glass-surface");
-    expect(document.querySelector(".thread-toolbar--pane")).toBeNull();
-    // It has to live outside `.thread-screen`: at this tier the pane is a fixed sheet carrying
-    // `backdrop-filter`, which would make it the containing block for a fixed descendant and land
-    // the bar above the BottomBar instead of in its line.
-    expect(bar?.parentElement).toBe(document.body);
+    expect(bar).toHaveClass("thread-toolbar--chrome");
+    expect(bar).not.toHaveClass("glass-surface");
+    // Nothing is portaled out of the pane at this tier: the drawer is the pane, and a row of the
+    // pane is what the user sees inside it.
+    expect(bar?.parentElement).not.toBe(document.body);
+    // A sibling of the scroller rather than a row inside it — the drawer's column does the same job
+    // the sheet's did, so a bar in the flow would scroll away with the conversation.
     expect(document.querySelector(".thread-screen")?.contains(bar ?? null)).toBe(false);
+    expect(screen.getByRole("button", { name: "Archive thread" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Reply" })).toBeDisabled();
   });
 
   it("never puts a glass surface inside another one, in any tier", () => {

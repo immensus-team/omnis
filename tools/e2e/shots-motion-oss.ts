@@ -27,9 +27,20 @@
 //                 viewport sweep already walks through.
 //   divider drag  1440 only, and that is the app's own rule: the grip is `display: none` below 900
 //                 (app.css, and shots-detail-pane.ts asserts it). What 390 gets here is a single
-//                 frame of the tier proving there is no divider to drag, with the assertion behind
-//                 it — three frames of a press that does nothing is a sequence of nothing, and
-//                 shots-detail-pane.ts already records the attempt that photographed exactly that.
+//                 frame of the tier proving there is no divider to drag — the pane is the `vaul`
+//                 drawer there, which is the same moment `thread-sheet-390` is shot from — with the
+//                 assertion behind it: three frames of a press that does nothing is a sequence of
+//                 nothing, and shots-detail-pane.ts already records the attempt that photographed
+//                 exactly that.
+//
+// S5's two stills are the exception to the sequences: `thread-sheet-390` and `ai-panel-390` are one
+// frame each, because what they document is a *state* rather than a travel — the thread sheet and the
+// AI panel as `vaul` drawers below 900, at their rest snap, with the grabber they drag by and the
+// scrim over the list. The travel is the same mechanism the sheet's sequence above already frames.
+// Both are measured before they are shot: the box `vaul`'s snap offset needs (the window's width, a
+// viewport tall, top edge at the snap's fraction) and a hit test at a point inside the drawer, which
+// is the one claim about them no stylesheet states — neither `vaul` nor Radix gives the content a
+// z-index, so "it paints above the scrim" is read from the browser, not from app.css.
 //
 // Why the leave sequence runs on its own page: it is the only one needing `page.clock` (a JavaScript
 // timer holds the row in the list, so wall-clock screenshots of a 240ms travel are a race), and an
@@ -81,6 +92,11 @@ const LEAVE_MS = 240; // --dur-move, the leaving row's own length (and Inbox.tsx
 const PANEL_MS = 240; // --dur-panel, `.sheet`'s sheet-in
 const REORDER_MS = 220; // --dur-reorder, the rail's FLIP
 const DRAWER_MS = 500; // `vaul`'s own transform transition, written inline on the drawer
+/** The lowest of the three drawers' two rest points, as a fraction of the viewport
+ *  (narrow-drawer.tsx's `NARROW_DRAWER_SNAP_POINTS`, which packages/ui/test/sheet.test.tsx is what
+ *  asserts the literal of). Restated here for the same reason the durations above are: the frames
+ *  are checked *against* the number, so a script that imported it would agree with itself. */
+const DRAWER_SNAP = 0.5;
 
 /** Three frames per travel, the middle one at the halfway mark. The first is a quarter in for the
  *  two sheet sequences (their `sheet-in` starts off-screen — see the header) and at the start for
@@ -158,6 +174,40 @@ function boxOf(selector: string): { top: number; left: number; width: number; he
   if (el === null) return { top: 0, left: 0, width: 0, height: 0 };
   const rect = el.getBoundingClientRect();
   return { top: rect.top, left: rect.left, width: rect.width, height: rect.height };
+}
+
+/** Whether a point in the viewport hit-tests *inside* a drawer: `null` when it does, otherwise what
+ *  it landed on instead. Neither `vaul` nor Radix gives `Drawer.Content` a z-index — app.css sets one
+ *  on the two S5 drawers for that reason — so "the panel paints above the scrim" is not a claim a
+ *  stylesheet can carry, and before this it was one a frame was read for by eye. The scrim is what a
+ *  miss lands on, which is exactly the failure it is here to catch. */
+function hitsDrawer(point: { x: number; y: number }): string | null {
+  const el = document.elementFromPoint(point.x, point.y);
+  if (el === null) return "nothing";
+  if (el.closest("[data-vaul-drawer]") !== null) return null;
+  return `${el.tagName.toLowerCase()}.${String(el.className)}`;
+}
+
+/** Puts the 390 tier's pane drawer down if it is up, and says whether it was.
+ *
+ *  It is up on a fresh 390 load, and not because anyone opened it: the seed proposes one pending
+ *  approval, App.tsx auto-opens the pane on that queue (`approvals.length > 0` with nothing
+ *  selected) and S5 made the narrow pane a *modal* drawer. Pre-S5 the same auto-opened pane was the
+ *  z-20 sheet the BottomBar (z-30) sat above, so the bar stayed pressable; a modal drawer is
+ *  `pointer-events: none` on everything outside itself, so the whole bar — rail tiles, filters,
+ *  compose — is behind its scrim until it is dismissed. Every gesture at this tier that presses the
+ *  shell's own chrome therefore has to put it down first, which is the same rule the AI panel's step
+ *  below already states. Dismissal sticks (`paneDismissed`), so one Escape is enough per page. */
+async function dismissPaneDrawer(page: Page): Promise<void> {
+  const drawer = page.locator("[data-vaul-drawer].app-shell__detail");
+  const up = await drawer
+    .waitFor({ state: "visible", timeout: 5000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!up) return;
+  await page.keyboard.press("Escape");
+  await drawer.waitFor({ state: "detached", timeout: 10_000 });
+  await page.waitForTimeout(400);
 }
 
 /** The rail's tiles in the order they are drawn. The reorder is only evidenced by this: the tiles
@@ -689,12 +739,14 @@ async function main(): Promise<void> {
     await page.reload();
     await page.waitForSelector(".inbox-row", { timeout: 60_000 });
     await page.waitForTimeout(2500);
+    await dismissPaneDrawer(page);
     await reorderSequence(page, NARROW);
 
     console.log("390 — the Filters sheet (vaul)");
     await page.reload();
     await page.waitForSelector(".inbox-row", { timeout: 60_000 });
     await page.waitForTimeout(2500);
+    await dismissPaneDrawer(page);
     await drawerSequence(page, DRAWER_FRAMES);
 
     console.log("1440 — the same sheet above the narrow tier (the centred dialog)");
@@ -709,27 +761,95 @@ async function main(): Promise<void> {
     await page.waitForTimeout(500);
 
     console.log("1440 — the divider drag and the band");
+    // The pane has to be up for there to be a divider, and by now it is not: the two 390 sequences
+    // above dismissed the auto-opened one, and a dismissal sticks. A press on a row is how the shell
+    // opens a thread at every tier (the D9 spec does the same), and it is an explicit target, which
+    // is what releases the dismissal.
+    if ((await page.locator('[data-testid="detail-pane"]').count()) === 0) {
+      await page.locator(".inbox-row").first().click();
+      await page.mouse.move(2, 2);
+      await page.locator('[data-testid="detail-pane"]').waitFor({ timeout: 15_000 });
+      await page.waitForTimeout(400);
+    }
     await dividerSequence(page);
 
-    console.log("390 — the tier with no divider");
+    console.log("390 — the thread sheet (vaul), and no divider");
     await page.setViewportSize({ width: NARROW, height: HEIGHT });
     await page.waitForTimeout(800);
     if ((await page.getByRole("separator", { name: "Resize details pane" }).count()) !== 0) {
       throw new Error("the divider is in the DOM at 390 — it is display:none in app.css");
     }
-    const sheet = await page.evaluate(boxOf, ".app-shell__detail");
+    // S5: below 900 the pane is the same `vaul` drawer the filters come up in, so the pane's box is
+    // read off `Drawer.Content` rather than off `.app-shell__detail`'s own rule. Two numbers are the
+    // whole of it: a bottom drawer is the window's width, and `vaul`'s snap offset is a *translate*
+    // of `viewport - snap * viewport`, which is what puts the element's top edge at the snap's
+    // fraction of the viewport while the box itself is a full viewport tall.
+    const drawer = await page.evaluate(boxOf, "[data-vaul-drawer].app-shell__detail");
     const viewport = await page.evaluate("window.innerWidth");
-    if (Math.abs(sheet.width - (viewport - 32)) > 1) {
+    if (Math.abs(drawer.width - viewport) > 1) {
       throw new Error(
-        `the 390 sheet is ${sheet.width.toFixed(1)}px, not the viewport less its 32px of margin`,
+        `the 390 thread drawer is ${drawer.width.toFixed(1)}px wide, not the window's ${viewport}px`,
       );
+    }
+    const restingTop = HEIGHT * (1 - DRAWER_SNAP);
+    if (Math.abs(drawer.top - restingTop) > 2) {
+      throw new Error(
+        `the 390 thread drawer rests at top ${drawer.top.toFixed(0)}px, not at the ${DRAWER_SNAP} snap's ${restingTop}px`,
+      );
+    }
+    const missed = await page.evaluate(hitsDrawer, { x: viewport / 2, y: drawer.top + 60 });
+    if (missed !== null) {
+      throw new Error(`a point inside the thread drawer lands on ${missed}, not on the drawer`);
     }
     await parkPointer(page);
     await shot(
       page,
       "divider-drag-390-no-grip",
-      `no splitter in the DOM; the pane is the ${sheet.width.toFixed(0)}px sheet instead`,
+      `no splitter in the DOM; the pane is the window's own ${drawer.width.toFixed(0)}px drawer instead`,
     );
+    await shot(
+      page,
+      "thread-sheet-390",
+      `the thread sheet at rest: top ${drawer.top.toFixed(0)}px, snap ${DRAWER_SNAP} of ${HEIGHT}`,
+    );
+
+    console.log("390 — the AI panel (vaul), the same drawer");
+    // The thread sheet has to be down first, for the reason the Filters press needed it: a modal
+    // drawer owns the pointer for everything outside itself, and App.tsx ignores the ask bar's own
+    // shortcut while one of them is up.
+    await page.keyboard.press("Escape");
+    await page
+      .locator("[data-vaul-drawer].app-shell__detail")
+      .waitFor({ state: "detached", timeout: 10_000 });
+    await page.locator(".ask-bar input").click();
+    await page.locator("[data-vaul-drawer].ask-panel").waitFor({ timeout: 10_000 });
+    await page.waitForTimeout(800);
+    const panel = await page.evaluate(boxOf, "[data-vaul-drawer].ask-panel");
+    if (
+      Math.abs(panel.width - viewport) > 1 ||
+      Math.abs(panel.left) > 1 ||
+      Math.abs(panel.top - restingTop) > 2
+    ) {
+      throw new Error(
+        `the 390 AI drawer is ${panel.width.toFixed(0)}px at x=${panel.left.toFixed(0)}, top=${panel.top.toFixed(0)} — not the window's width at the ${DRAWER_SNAP} snap`,
+      );
+    }
+    const panelMissed = await page.evaluate(hitsDrawer, { x: viewport / 2, y: panel.top + 60 });
+    if (panelMissed !== null) {
+      throw new Error(`a point inside the AI drawer lands on ${panelMissed}, not on the drawer`);
+    }
+    await parkPointer(page);
+    await shot(
+      page,
+      "ai-panel-390",
+      `the ask bar's panel, the same drawer: top ${panel.top.toFixed(0)}px`,
+    );
+    // Down before the sweep: a full-viewport fixed drawer is not the page that floor is measured on.
+    await page.keyboard.press("Escape");
+    await page
+      .locator("[data-vaul-drawer].ask-panel")
+      .waitFor({ state: "detached", timeout: 10_000 });
+    await page.waitForTimeout(400);
 
     console.log(`no-overflow sweep at ${SWEEP_WIDTHS.join(", ")}`);
     for (const width of SWEEP_WIDTHS) {

@@ -8,6 +8,7 @@ import {
   readAskModel,
   writeAskModel,
 } from "../lib/ask-model.js";
+import { useNarrowShell } from "../lib/media-query.js";
 import { useClosingSpring } from "../lib/motion.js";
 import { AskPanel } from "./ask-panel.js";
 import { GlassSurface } from "./glass-surface.js";
@@ -270,6 +271,7 @@ function InlinePalette({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const narrow = useNarrowShell();
   const closing = useClosingSpring(open);
   // Nothing is focused when ⌘K opens it — you have to be able to type straight away (the palette's
   // basic promise), and the Escape/typing handlers only fire while focus is inside the Command root.
@@ -279,7 +281,14 @@ function InlinePalette({
   useEffect(() => {
     if (!open) return;
     function onPointerDown(e: PointerEvent) {
-      if (!ref.current?.contains(e.target as Node)) onOpenChange(false);
+      if (ref.current?.contains(e.target as Node)) return;
+      // Below 900px the panel is a drawer and `vaul` portals it out of this subtree, so "inside the
+      // bar" is no longer "inside the element that opened it" — a press on the drawer's own tabs
+      // would arrive here as a press outside the bar and close the panel it is standing in. The
+      // drawer is modal: while one is up it owns the pointer, and nothing under it is an
+      // outside-press for this bar's purposes.
+      if (e.target instanceof Element && e.target.closest("[data-vaul-drawer]") !== null) return;
+      onOpenChange(false);
     }
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
@@ -346,8 +355,15 @@ function InlinePalette({
           </>
         )}
       </GlassSurface>
-      {(open || closing) && (
+      {/* Two tiers, two lifecycles. Above 900px the panel is a card the bar owns: it is mounted for
+          exactly as long as it should be up, plus the length of its close spring (`closing`), which
+          is how a CSS exit animation gets to run on an element React would otherwise have removed.
+          Below 900px it is a drawer and `vaul` owns both ends of it — so it stays mounted and the
+          drawer's own open/close is the whole of the animation, which is what makes the narrow exit
+          the same 500ms travel the filters sheet has instead of a 240ms hold and a cut. */}
+      {(narrow || open || closing) && (
         <AskPanel
+          open={open}
           commands={commands}
           threadSelected={threadSelected}
           threadTitle={threadTitle}

@@ -22,18 +22,33 @@ interface Assertion {
 }
 const results: Assertion[] = [];
 
+/** Playwright colours its matcher errors, and the escapes end up in `.tmp/assertions.json` and in
+ *  REPORT.md. Spelled rather than typed: biome rejects a literal control character in a regex, and
+ *  a note is not the place to argue with it about that. */
+const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+
+/** A failed row's note, values included. Playwright names the matcher on the first line and puts
+ *  what it read on the third and fourth, so a note built from the first line alone records *that*
+ *  something failed rather than what it saw — which is how A-archive and G5 read in the motion-OSS
+ *  S5 run's `.tmp/assertions.json`, and why their cause took a second run to find. Six lines fit in
+ *  the report's cell. */
+function noteOf(e: unknown): string {
+  const plain = (e instanceof Error ? e.message : String(e)).replace(ANSI, "");
+  return plain
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .slice(0, 6)
+    .join(" | ")
+    .slice(0, 400);
+}
+
 async function check(name: string, fn: () => Promise<string | undefined>): Promise<void> {
   const started = Date.now();
   try {
     const note = await fn();
     results.push({ name, ok: true, ms: Date.now() - started, ...(note ? { note } : {}) });
   } catch (e) {
-    results.push({
-      name,
-      ok: false,
-      ms: Date.now() - started,
-      note: e instanceof Error ? e.message.split("\n")[0] : String(e),
-    });
+    results.push({ name, ok: false, ms: Date.now() - started, note: noteOf(e) });
   }
 }
 

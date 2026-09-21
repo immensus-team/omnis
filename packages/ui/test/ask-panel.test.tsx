@@ -4,7 +4,7 @@
 import "./setup";
 
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AskPanel } from "../src/components/ask-panel";
 
 const panel = (threadSelected: boolean, summary: string | null) => (
@@ -185,5 +185,85 @@ describe("AskPanel aurora backdrop (US-D06)", () => {
     expect(dialog).toHaveClass("ask-panel");
     expect(dialog).toHaveClass("ask-panel--closing");
     expect(dialog).toContainElement(container.querySelector(".ask-panel__glass"));
+  });
+});
+
+// motion-OSS S5: below 900px the panel is the same `vaul` drawer the filters sheet is, rather than
+// the card hanging off the ask bar's box. What the drawer buys is the mechanism — snap points, a drag
+// that settles where it is released, Radix's modal machinery — and what that costs is the anchor
+// (app.css's `[data-vaul-drawer].ask-panel` block). This file holds the mount and the two behaviours
+// a mount can be asked about; the box itself is asserted against app.css in
+// apps/desktop/test/app-shell.test.tsx, because that is where the numbers live.
+describe("AskPanel, the narrow tier — vaul's drawer (motion-OSS S5)", () => {
+  const REAL_MATCH_MEDIA = window.matchMedia;
+  afterEach(() => {
+    window.matchMedia = REAL_MATCH_MEDIA;
+  });
+  /** `useNarrowShell` reads `window.matchMedia`, so the tier is this stub and nothing else. */
+  function stubTier(narrow: boolean): void {
+    window.matchMedia = (() => ({
+      matches: narrow,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+  }
+
+  it("is the anchored card above the breakpoint, and not a drawer", () => {
+    stubTier(false);
+    render(panel(true, null));
+    const dialog = screen.getByRole("dialog", { name: "AI panel" });
+    expect(dialog.hasAttribute("data-vaul-drawer")).toBe(false);
+    expect(document.querySelector("[data-vaul-overlay]")).toBeNull();
+  });
+
+  it("is the drawer below it, with the grabber and the half-height snap point", () => {
+    stubTier(true);
+    render(panel(true, null));
+    const dialog = screen.getByRole("dialog", { name: "AI panel" });
+
+    // The drawer's own attributes land on the aurora wrapper because `Drawer.Content asChild` hands
+    // them to it through Radix's Slot — which is why `AuroraSurface` forwards a ref.
+    expect(dialog.hasAttribute("data-vaul-drawer")).toBe(true);
+    expect(dialog).toHaveAttribute("data-vaul-drawer-direction", "bottom");
+    expect(dialog).toHaveAttribute("data-vaul-snap-points", "true");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    // The brief's "snap points [0.5, 0.92]", observed where it is observable: `vaul` writes the
+    // active rest point to `--snap-point-height`, and for a bottom drawer that is a *translate* of
+    // `viewport - snap * viewport` — half the viewport at the first snap.
+    expect(dialog.style.getPropertyValue("--snap-point-height")).toBe(
+      `${window.innerHeight - 0.5 * window.innerHeight}px`,
+    );
+    // `handleOnly` puts the whole gesture on the grabber: the panel's own list scrolls, and a drawer
+    // that dragged from anywhere could not tell the two apart.
+    const handle = dialog.querySelector("[data-vaul-handle].drawer__grabber");
+    expect(handle).not.toBeNull();
+    expect(dialog.querySelectorAll("[data-vaul-handle]")).toHaveLength(1);
+    expect(handle?.querySelector("[data-vaul-handle-hitarea]")).not.toBeNull();
+    // §2.7 holds at this tier too: the aurora wrapper is the drawer element, and the glass that
+    // scrolls is still a child of it rather than the same element.
+    expect(dialog).toHaveClass("ask-panel__aurora");
+    expect(dialog).not.toHaveClass("glass-surface");
+    expect(dialog).toContainElement(document.querySelector(".ask-panel__glass"));
+    expect(document.querySelectorAll(".glass-surface .glass-surface")).toHaveLength(0);
+  });
+
+  it("closes on the scrim and on Escape, both of which are Radix's here", () => {
+    stubTier(true);
+    const onClose = vi.fn();
+    render(<AskPanel commands={null} threadSelected summary={null} onClose={onClose} />);
+
+    fireEvent.click(document.querySelector("[data-vaul-overlay]") as HTMLElement);
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it("moves focus into the drawer on open", () => {
+    stubTier(true);
+    render(panel(true, null));
+    // `vaul`'s `autoFocus` defaults to *off* and prevents Radix's mount autofocus when it is off;
+    // the drawer passes it, and the panel's first control is where Radix's focus scope lands.
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Suggestions" }));
   });
 });

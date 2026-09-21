@@ -11,6 +11,7 @@ export * from "./components/ask-panel.js";
 export * from "./lib/ask-model.js";
 export * from "./lib/motion.js";
 export * from "./lib/focus-trap.js";
+export * from "./components/narrow-drawer.js";
 export * from "./components/sheet.js";
 export * from "./components/toast.js";
 export * from "./components/animated-list.js";

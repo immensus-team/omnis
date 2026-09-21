@@ -10,16 +10,11 @@ import {
 import { createPortal } from "react-dom";
 import { Drawer } from "vaul";
 import { cn } from "../lib/cn.js";
-import {
-  restoreFocus,
-  trapTab,
-  useInitialFocus,
-  useReturnFocus,
-  useReturnFocusTarget,
-} from "../lib/focus-trap.js";
+import { trapTab, useInitialFocus, useReturnFocus } from "../lib/focus-trap.js";
 import { useNarrowShell } from "../lib/media-query.js";
 import { pointerDrag } from "../lib/pointer-drag.js";
 import { GlassSurface, OpaqueSurface } from "./glass-surface.js";
+import { DrawerGrabber, NarrowDrawer } from "./narrow-drawer.js";
 
 // US-D09 §c.6: the sheet. M125 (Filters) and M115 (grouped menu) are the two references; one
 // component serves both, so the grammar is written once — the groups, the rows, the confirm, the
@@ -45,17 +40,16 @@ import { GlassSurface, OpaqueSurface } from "./glass-surface.js";
 // What the narrow tier gets out of `vaul` is the three things `pointerDrag` + `trapTab` were
 // approximating: a drag that measures its own velocity and snaps between rest points, the snap
 // points themselves (0.5 and 0.92 of the viewport), and a modal's focus machinery — trap, initial
-// focus and return-to-trigger — from Radix rather than from `focus-trap.ts`.
+// focus and return-to-trigger — from Radix rather than from `focus-trap.ts`. That half is
+// `NarrowDrawer` (narrow-drawer.tsx) rather than code in this file, because it turned out to be the
+// mechanism every `<900` surface wants: the two sheets and the AI panel are the same drawer with
+// different boxes, and the fourth and fifth copy of `handleOnly`/`snapPoints`/`autoFocus` would be
+// three chances to drift.
 
 /** §c.6: a downward drag past this dismisses the wide tier's sheet (M125's drag-to-close). The
  *  narrow tier's dismissal is `vaul`'s: it is measured against the drawer's own height, and it is
  *  the velocity-aware version of the same gesture. */
 export const SHEET_DISMISS_PX = 96;
-
-/** The narrow tier's rest points, as fractions of the viewport: M125's Filters sheet opens at half
- *  height with its first group under the header, and pulls up to 0.92 to show the rest without
- *  ever covering the status bar. */
-export const SHEET_SNAP_POINTS = [0.5, 0.92] as const;
 
 export interface SheetConfirm {
   /** The visible word on the filled circle ("Done"). Also its accessible name. */
@@ -132,83 +126,26 @@ function SheetHeader({ title, confirm, actionRef, onClose, onPointerDown }: Shee
   );
 }
 
-/** The narrow tier: `vaul`'s drawer, full-height and translated to a snap offset.
- *
- *  Four things it does that are worth naming, because they are the reason this branch exists:
- *  `handleOnly` puts the drag on the grabber alone — the same call the wide tier makes by binding
- *  the gesture to the header and not the panel, since the body is the half with something to
- *  scroll; `fadeFromIndex={0}` names the lowest snap as the one the scrim belongs to; `autoFocus`
- *  is `vaul`'s own prop and defaults **off**, which is a detail worth stating because turning it on
- *  is what hands the modal's focus machinery to Radix; and Escape, the focus trap and the
- *  return-to-trigger on close are all Radix's, so nothing here imports `focus-trap.ts`. */
+/** The narrow tier: the shared `vaul` drawer (narrow-drawer.tsx), which is where the four
+ *  load-bearing props and the return-to-trigger live now that three surfaces are drawers. What is
+ *  this sheet's own is the box it draws in (`.sheet`, positioned by app.css), its `Drawer.Title` —
+ *  Radix derives the dialog's name from it, so the narrow header is the one element the two tiers
+ *  cannot share — and the grabber the drag is bound to. */
 function SheetDrawer({ open, onOpenChange, title, confirm, children }: SheetProps) {
-  /** Which rest point the sheet is at, so it comes back to where it was left. `vaul` hands back the
-   *  snap point itself, which is `number | string | null` — the strings are the px form of the same
-   *  option, which this sheet does not use. */
-  const [snap, setSnap] = useState<number | string | null>(SHEET_SNAP_POINTS[0]);
   const headerAction = useRef<HTMLButtonElement>(null);
-  // The one piece of the modal's focus machinery Radix cannot supply on its own. Radix restores
-  // focus to `Dialog.Trigger`'s ref, and this sheet's trigger is the BottomBar's filters button —
-  // a different component in a different file, so there is no ref to give it. Radix's own
-  // `onCloseAutoFocus` takes that path, finds no trigger, and preventDefaults the restore, which is
-  // how focus ends up on <body>; the handler on `Drawer.Content` below is the same job done from
-  // the element that actually opened the sheet. It has to be *that* hook rather than a cleanup —
-  // see `useReturnFocusTarget` for why the wide tier can restore from a cleanup and this one
-  // cannot.
-  const returnTo = useReturnFocusTarget(open);
   return (
-    <Drawer.Root
-      open={open}
-      onOpenChange={onOpenChange}
-      snapPoints={[...SHEET_SNAP_POINTS]}
-      activeSnapPoint={snap}
-      setActiveSnapPoint={setSnap}
-      fadeFromIndex={0}
-      handleOnly
-      autoFocus
-    >
-      <Drawer.Portal>
-        {/* The backdrop is the overlay's own fill, so a click that lands on the overlay itself (not
-            on the panel) is a click outside. Radix's own outside-pointerdown does not fire for a
-            click on the overlay in every engine, so the target test is not redundant here — it is
-            the path that is actually taken, and it is the same rule the wide tier uses. */}
-        <Drawer.Overlay
-          className="sheet-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) onOpenChange(false);
-          }}
+    <NarrowDrawer open={open} onOpenChange={onOpenChange} className="sheet">
+      <GlassSurface slot="sheet">
+        <DrawerGrabber />
+        <SheetHeader
+          title={<Drawer.Title className="sheet__title">{title}</Drawer.Title>}
+          {...(confirm ? { confirm } : {})}
+          actionRef={headerAction}
+          onClose={() => onOpenChange(false)}
         />
-        <Drawer.Content
-          className="sheet"
-          aria-modal="true"
-          // Radix warns on every render when a dialog has a title and no description. This sheet
-          // has nothing to describe — every word in it is a control — and the explicit `undefined`
-          // is the documented way to say so rather than a missing attribute it has to guess at.
-          aria-describedby={undefined}
-          // Focus goes back to the trigger here because Radix's own path cannot reach it: it
-          // restores to `Dialog.Trigger`, and this sheet's trigger is the BottomBar's filters
-          // button, in another component. `preventDefault` is what stops Radix's fallback (which,
-          // with no trigger, is to drop focus) — this handler is composed ahead of Radix's, so
-          // preventing here is also what keeps it from running at all.
-          onCloseAutoFocus={(event) => {
-            event.preventDefault();
-            restoreFocus(returnTo.current);
-          }}
-          asChild
-        >
-          <GlassSurface slot="sheet">
-            <Drawer.Handle className="sheet__grabber" />
-            <SheetHeader
-              title={<Drawer.Title className="sheet__title">{title}</Drawer.Title>}
-              {...(confirm ? { confirm } : {})}
-              actionRef={headerAction}
-              onClose={() => onOpenChange(false)}
-            />
-            <div className="sheet__body">{children}</div>
-          </GlassSurface>
-        </Drawer.Content>
-      </Drawer.Portal>
-    </Drawer.Root>
+        <div className="sheet__body">{children}</div>
+      </GlassSurface>
+    </NarrowDrawer>
   );
 }
 
