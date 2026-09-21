@@ -56,9 +56,9 @@ function textOf(content: unknown): string {
  * which is also what `startedAt` ends up being in that case. A rollout with no readable turn at all,
  * or a turn with no timestamp to fall back to, has `startedAt === null` and is dropped by the scanner.
  *
- * `fallbackId` is the rollout file's own identity, and it is required rather than defaulted: a turn
- * key has to be unique across every rollout a host imports, and a constant default would silently
- * reintroduce the collision it exists to prevent. Only an id-less `session_meta` ever uses it.
+ * `fallbackId` is the rollout file's own identity, and it is required rather than defaulted: without a
+ * session id every rollout would otherwise produce the same turn keys, and a constant default is
+ * exactly how that collision would come back. Only an id-less `session_meta` ever uses it.
  */
 export function parseCodexRollout(
   text: string,
@@ -111,6 +111,7 @@ export function parseCodexRollout(
     if (at === null) continue; // `ImportedTurn.at` is a required datetime
     turns.push({
       // Codex message records are not assumed to carry an id; the pass below keys them by position.
+      // An id that *does* appear is kept verbatim, so its uniqueness is the vendor's to guarantee.
       source_id: asString(payload.id) ?? "",
       role,
       at,
@@ -124,6 +125,14 @@ export function parseCodexRollout(
     // host, not merely within one: the prefix is the vendor's session id when it supplied one, and the
     // rollout file's identity otherwise. A bare `codex:<index>` would be the same key in every id-less
     // rollout, and the hub's item dedupe is not scoped to a single session.
+    //
+    // Two ways a key can still repeat, both UNVERIFIED until US-C29's live check decides them, and
+    // both left as they are for now because each fix trades one guess for another:
+    //   - an id the vendor does supply is taken verbatim, so a per-conversation `msg_0` would repeat
+    //     across files. The plan assumes message records carry no id at all.
+    //   - two rollout files sharing one `session_meta.id` — the shape a resumed session would take —
+    //     both start again at index 0. If the second file replays the first, that repeat is the
+    //     dedupe we want; file-scoped keys would import the replayed turns twice instead.
     if (turn.source_id.length === 0) turn.source_id = `${sessionId ?? fallbackId}:${index}`;
   });
 
