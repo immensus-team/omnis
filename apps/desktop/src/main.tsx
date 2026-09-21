@@ -33,6 +33,9 @@ function previewElement() {
   if (screen === "today") return <App screen="today" />;
   if (screen === "tasks") return <App screen="tasks" />;
   if (screen === "network") return <App screen="network" />;
+  // `notes` (US-B31): same reason as `today`/`tasks`/`network` — the rail that switches screens is
+  // not built yet, and the story has to be able to photograph the screen in the real shell.
+  if (screen === "notes") return <App screen="notes" />;
   return <App />;
 }
 
