@@ -6,7 +6,7 @@
    changes, re-copy the whole file below this comment — verbatim, do not hand-pick a subset, or a
    screen composing an unlisted selector silently loses its styling.
 
-   Source: apps/desktop/src/app.css at the motion-OSS S5 commit (5980 lines). A commit cannot cite
+   Source: apps/desktop/src/app.css at the motion-OSS S5 commit (5990 lines). A commit cannot cite
    its own sha, so the header names the wave that produced this copy instead of a hash it would
    have to be amended to learn. */
 /* Shell layout only. Colour and type come from @omnis/ui/tokens.css (A5 §1).
@@ -4742,6 +4742,16 @@ button.today-screen__event-title:focus-visible {
      grow to fit the conversation instead of scrolling it. */
   min-height: 0;
   overflow-y: auto;
+}
+
+/* §c.5/§b.4's arm's-length body type. The 17px step lives in the `max-width: 899.98px` container
+   block, and that block cannot reach this element either — the reason above — so the step is
+   restated here. It was missed when S5 landed and the pane's conversation rendered at the desk's
+   15px inside a full-width sheet; `d9-surfaces.spec.ts`'s "the detail body measures 17px/1.5 at
+   390px" is what caught it, and that check is the reason this rule exists rather than being an
+   oversight nobody would have seen in a screenshot. */
+[data-vaul-drawer].app-shell__detail .thread-screen__item p {
+  font-size: 17px;
 }
 
 /* The AI panel — the ask bar's panel below 900 (ask-panel.tsx). `.ask-panel` is on `Drawer.Content`

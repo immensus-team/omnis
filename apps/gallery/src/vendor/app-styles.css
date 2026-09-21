@@ -4741,6 +4741,16 @@ button.today-screen__event-title:focus-visible {
   overflow-y: auto;
 }
 
+/* §c.5/§b.4's arm's-length body type. The 17px step lives in the `max-width: 899.98px` container
+   block, and that block cannot reach this element either — the reason above — so the step is
+   restated here. It was missed when S5 landed and the pane's conversation rendered at the desk's
+   15px inside a full-width sheet; `d9-surfaces.spec.ts`'s "the detail body measures 17px/1.5 at
+   390px" is what caught it, and that check is the reason this rule exists rather than being an
+   oversight nobody would have seen in a screenshot. */
+[data-vaul-drawer].app-shell__detail .thread-screen__item p {
+  font-size: 17px;
+}
+
 /* The AI panel — the ask bar's panel below 900 (ask-panel.tsx). `.ask-panel` is on `Drawer.Content`
    in this tier, and the class it shares with the floating card is the aurora wrapper; the glass
    inside it is the same element at both tiers. */
