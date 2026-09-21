@@ -24,6 +24,8 @@ const CLAUDE_HOME = join(here, "fixtures", "claude-home");
 const CODEX_HOME = join(here, "fixtures", "codex-home");
 const SESSIONS = join(CODEX_HOME, "sessions");
 const ROLLOUT = join(SESSIONS, "2026", "09", "21", "rollout-2026-09-21T10-00-00-0b6c1d2e.jsonl");
+/** A non-rollout `.jsonl` beside the rollout: C-D7 admits `rollout-*.jsonl` only. */
+const HISTORY = join(SESSIONS, "2026", "09", "21", "history.jsonl");
 const AUTH = join(CODEX_HOME, "auth.json");
 /** The Claude Code fixture's session id — the dispatcher test merges both scanners, so they differ. */
 const CLAUDE_SESSION = "0b6c1d2e-0000-4000-8000-000000000001";
@@ -92,8 +94,9 @@ describe("parseCodexRollout", () => {
 
     expect(parsed.cwd).toBe("/repo/omnis");
     expect(parsed.sessionId).toBe(CODEX_SESSION);
-    // The first *turn*, not `session_meta.payload.timestamp`: a rollout with nothing readable in it
-    // is not a session (same rule as the Claude scanner).
+    // The first turn's own timestamp, a second after `session_meta`'s — so this is the turn's `at` and
+    // not the meta time. (A turn that carried none would fall back to the meta time; the test below
+    // pins that, and a rollout with no readable turn at all is dropped rather than started at meta.)
     expect(parsed.startedAt).toBe("2026-09-21T10:00:01.000Z");
     expect(parsed.turns.map((t) => t.role)).toEqual(["user", "agent", "agent"]);
     expect(parsed.turns.map((t) => t.at)).toEqual([
@@ -199,7 +202,14 @@ describe("scanCodexSessions", () => {
     expect(masked).not.toContain("sk-");
     expect(masked).not.toContain("ghp_");
     expect(masked).not.toContain(KNOWN_SECRET);
-    expect(JSON.stringify(sessions)).not.toContain("provenance");
+    // The fixture also hides secrets in a function call's `arguments` and in a call output — the
+    // channels a shell command would actually carry a token through. Neither field is read at all
+    // today, so these assertions are what would catch a future change that starts echoing them.
+    const blob = JSON.stringify(sessions);
+    expect(blob).not.toContain("provenance");
+    expect(blob).not.toContain(KNOWN_SECRET);
+    expect(blob).not.toContain("sk-");
+    expect(blob).not.toContain("ghp_");
     // And what the scanner produced is what the hub will parse (packages/protocol/src/bridge.ts).
     expect(ImportScanResult.parse({ sessions }).sessions).toHaveLength(1);
   });
@@ -271,10 +281,16 @@ describe("scanCodexSessions", () => {
     expect(violations).toEqual([]);
     expect(opened).toEqual([ROLLOUT]);
     expect(opened).not.toContain(AUTH);
-    // The decoy has to be on disk and inside `codexHome` for the line above to mean anything: a
-    // credential that was never written is one the scanner trivially never opens. This pins the
-    // fixture itself, so deleting it fails the containment test instead of hollowing it out.
+    expect(opened).not.toContain(HISTORY);
+    // The credential decoy has to be on disk and inside `codexHome` for the line above to mean
+    // anything: a secret that was never written is one the scanner trivially never opens. This pins
+    // the fixture itself, so deleting it fails the containment test instead of hollowing it out.
     expect(await readFile(AUTH, "utf8")).toContain("DECOY-MUST-NOT-BE-READ");
+    // `history.jsonl` is the decoy for the *name* filter rather than for the directory: it sits in a
+    // real date directory beside the rollout, and a walk widened to any `.jsonl` would import it (it
+    // parses, and its cwd is inside the allowed root) without tripping the path rules above. Reading
+    // it here proves the decoy is not inert — the same lesson the Claude suite learned the hard way.
+    expect(parseCodexRollout(await readFile(HISTORY, "utf8")).cwd).toBe("/repo/omnis");
   });
 
   it("returns an empty list when the host has no ~/.codex/sessions", async () => {
@@ -316,6 +332,48 @@ describe("scanCodexSessions", () => {
     expect(sessions[0]?.turns).toHaveLength(1);
     expect(sessions[0]?.turns[0]?.tool_calls).toEqual(["***"]);
     // Masking must not push any field outside what the hub's schema accepts.
+    expect(ImportScanResult.parse({ sessions }).sessions).toHaveLength(1);
+  });
+
+  it("drops a rollout whose session_meta never named a cwd", async () => {
+    const home = await tempCodexHome({
+      // No `session_meta` at all: nothing to key or contain the rollout by, so it is dropped without
+      // its turns ever being considered.
+      "sessions/2026/09/21/rollout-2026-09-21T09-00-00-0b6c1d2e-0000-4000-8000-0000000000e1.jsonl":
+        msgLine("user", "no meta line"),
+      // A `session_meta` that simply omits `cwd` is the case that actually reaches masking: the turn
+      // still takes the meta timestamp, so only the cwd guard stands between it and `maskSecrets(null)`
+      // — which throws *outside* the try that guards the read, taking every other session in the same
+      // answer down with it.
+      "sessions/2026/09/21/rollout-2026-09-21T09-00-00-0b6c1d2e-0000-4000-8000-0000000000e2.jsonl":
+        [metaLine({ cwd: undefined }), msgLine("user", "meta without a cwd")].join("\n"),
+    });
+
+    const sessions = await scanCodexSessions(
+      null,
+      10,
+      deps({ codexHome: home, allowedRoots: ["/"] }),
+    );
+
+    expect(sessions).toEqual([]);
+    expect(ImportScanResult.parse({ sessions }).sessions).toEqual([]);
+  });
+
+  it("truncates a turn to the protocol's 1,000-char limit", async () => {
+    const home = await tempCodexHome({
+      "sessions/2026/09/21/rollout-2026-09-21T10-00-00-0b6c1d2e-0000-4000-8000-0000000000f1.jsonl":
+        [metaLine(), msgLine("assistant", "x".repeat(1500))].join("\n"),
+    });
+
+    const sessions = await scanCodexSessions(
+      null,
+      10,
+      deps({ codexHome: home, allowedRoots: ["/"] }),
+    );
+
+    // `ImportedTurn.text` is `.max(1000)`: an untruncated turn would fail the hub's parse of the whole
+    // answer, so the codex scanner has to run the same mask-then-cut pair the Claude one does.
+    expect(sessions[0]?.turns[0]?.text).toHaveLength(1000);
     expect(ImportScanResult.parse({ sessions }).sessions).toHaveLength(1);
   });
 });

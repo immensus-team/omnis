@@ -2,9 +2,10 @@
 // `claude-jsonl.ts`, and deliberately the same shape: enumerate one vendor directory, read only the
 // files it names, keep the sessions whose cwd is inside this host's allowed_roots, mask on the way out.
 //
-// The bridge opens exactly one path shape — `codexHome/sessions/<YYYY>/<MM>/<DD>/rollout-*.jsonl` —
-// and never enumerates `codexHome` itself, so `.codex/auth.json` (Codex's subscription credential) is
-// unreachable by construction rather than by a blocklist.
+// The bridge opens exactly one path shape — `codexHome/sessions/**/rollout-*.jsonl`, which in practice
+// sits `<YYYY>/<MM>/<DD>/` deep but is walked at any depth — and never enumerates `codexHome` itself,
+// so `.codex/auth.json` (Codex's subscription credential) is unreachable by construction rather than
+// by a blocklist.
 //
 // The record shapes this parses are the ones the plan states and are UNVERIFIED until US-C29's live
 // check: `session_meta` carries the session's id/cwd/time, `response_item` carries messages and
@@ -49,7 +50,9 @@ function textOf(content: unknown): string {
  * The turn text is returned **unmasked**: masking and truncation are the scanner's job, and the order
  * between them matters (mask first — see `scanCodexSessions`).
  *
- * `session_meta` is assumed to come first, so a message without a timestamp can fall back to it.
+ * `session_meta` is assumed to come first, so a message without a timestamp can fall back to it —
+ * which is also what `startedAt` ends up being in that case. A rollout with no readable turn at all,
+ * or a turn with no timestamp to fall back to, has `startedAt === null` and is dropped by the scanner.
  */
 export function parseCodexRollout(text: string): {
   cwd: string | null;

@@ -213,8 +213,9 @@ export function createDispatcher(
       }
 
       // US-C14/US-C15 (C-D7): read-only and pull-based. Each scanner opens nothing but its own
-      // vendor's transcript path, and keeps only sessions whose cwd is inside the union of this
-      // host's allowed_roots — the same boundary `session.create` enforces for turns.
+      // vendor's transcript path, and keeps only sessions whose cwd is inside this host's
+      // allowed_roots. C-D7 flattens those to the union across runtimes — unlike `session.create`,
+      // which is per-runtime, so a Codex rollout under a Claude-only root is still imported.
       case "sessions.import_scan": {
         const p = ImportScanParams.parse(params);
         const since = p.since === null ? null : new Date(p.since);
@@ -224,10 +225,12 @@ export function createDispatcher(
           allowedRoots: [...new Set([...deps.allowedRoots.values()].flat())],
           secrets: deps.importSecrets ?? [],
         };
-        // Each scanner already capped itself at `max_sessions`, so merging the two bounded lists and
-        // slicing again keeps the whole request at that cap. Newest first by start time: file mtime is
-        // each scanner's recency signal but is not part of `ImportedSession`, and the cap only ever
-        // drops sessions older than the ones kept.
+        // Each scanner capped itself at `max_sessions` by *file mtime*, its own freshness signal; this
+        // re-caps the merged list by `started_at`, because mtime is not part of `ImportedSession`. The
+        // two keys disagree for a long-lived session whose file was written recently: it can lose its
+        // own scanner's cap to a shorter, newer-mtime session and then lose the merge to a session that
+        // merely started later. So a small `max_sessions` approximates which sessions are freshest;
+        // which sessions a repeated scan eventually reaches is US-C16's `since` cursor.
         const sessions = [
           ...(await scanClaudeProjects(since, p.max_sessions, scanDeps)),
           ...(await scanCodexSessions(since, p.max_sessions, scanDeps)),
