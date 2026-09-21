@@ -153,7 +153,10 @@ function pickChips(labels: LabelChip[]): { shown: LabelChip[]; more: number } {
   return { shown, more: labels.length - shown.length };
 }
 
-function RowAvatarView({ avatar }: { avatar: RowAvatar }) {
+/** loop-r1-07: exported for the session header, which is the second surface that draws a runtime's
+ *  own tile (32px there, 40px here). The four branches below — a brand mark, a letter fallback, a
+ *  photo and initials — are the whole reason this is one component and not a second copy. */
+export function RowAvatarView({ avatar }: { avatar: RowAvatar }) {
   if (avatar.kind === "runtime") {
     // U5: a runtime with a real brand mark (Claude, DeepSeek, ...) shows that logo; one without
     // (Hermes) shows a single letter (RUNTIME_LETTER), the same idea as a person's initials

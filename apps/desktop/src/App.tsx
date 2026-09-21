@@ -887,21 +887,22 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
 
               With nothing open the pane *is* the queue, so the stack is the whole pane. With a
               thread open the stack is handed to the screen instead, which draws it under the
-              thread's own title: the pane has to open on what it is about. (An agent session has
-              no header of its own, so there it stays on top.) */}
+              thread's own title: the pane has to open on what it is about. loop-r1-07 gives an
+              agent session a title of its own, so it takes the same two props and does the same
+              thing with them. */}
           {openPersonId !== null ? (
             <PersonDetail personId={openPersonId} onOpenThread={openThreadFromPerson} />
           ) : open === null ? (
             <ApprovalStack approvals={visibleApprovals} openThreadId={null} onDecide={onDecide} />
           ) : open.agentSession ? (
-            <>
-              <ApprovalStack
-                approvals={visibleApprovals}
-                openThreadId={open.threadId}
-                onDecide={onDecide}
-              />
-              <AgentSession sessionThreadId={open.threadId} />
-            </>
+            // loop-r1-07: the approvals go *into* the session screen, under its new header, rather
+            // than sitting above it — a stack with no subject over a pane with no title was the
+            // shape that let a "Blocked" session say nothing about what it was blocked on.
+            <AgentSession
+              sessionThreadId={open.threadId}
+              approvals={visibleApprovals}
+              onDecide={onDecide}
+            />
           ) : (
             // US-D09 §c.5: the thread's approvals go *into* the conversation, in document order,
             // so this screen gets the list rather than a stack to draw above it. The stack still
