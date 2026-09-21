@@ -37,6 +37,7 @@ export {
   type LoopBudget,
   type LoopId,
   type LoopKind,
+  type LoopSkip,
   type LoopResult,
   type LoopSpec,
   type LoopTrigger,
@@ -63,8 +64,9 @@ export {
   type DecisionResponse,
   type Decider,
 } from "./decision/types.js";
+export { itemState, personState, threadTail } from "./decision/state.js";
 export {
-  FOLLOWUP_KIND_OPTIONS,
+  HOST_OPTIONS,
   PRIORITY_OPTIONS,
   QUESTION,
   RUNTIME_OPTIONS,
@@ -135,9 +137,11 @@ export {
   type Routing,
 } from "./delegate/route.js";
 export {
+  DELEGATION_JEV_MIN,
   TASK_CONFIDENCE_MIN,
   TASK_MAX_PER_ITEM,
   TaskOutput,
+  routeDelegation,
   taskLoop,
   type TaskOutputT,
 } from "./loops/task.js";
@@ -153,6 +157,7 @@ export {
 export {
   DRAFT_PLACEHOLDER_MS,
   DRAFT_SLA_MS,
+  DRAFT_WORTHINESS_VETO_BELOW,
   DraftOutput,
   draftLoop,
   shouldEscalate,
@@ -167,6 +172,7 @@ export {
   type RouteOutputT,
 } from "./loops/note-route.js";
 export {
+  FOLLOWUP_VETO_BELOW,
   FollowupOutput,
   INACTIVE_SWEEP_LIMIT,
   NO_COLD_OUTREACH_CHANNELS,

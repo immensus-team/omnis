@@ -103,7 +103,7 @@ function confidenceOf(meta: Record<string, unknown> | undefined): Record<string,
 }
 
 export class JevDecider implements Decider {
-  readonly run = { provider: JEV_RUN_PROVIDER, model: JEV_RUN_MODEL };
+  readonly run = { provider: JEV_RUN_PROVIDER, model: JEV_RUN_MODEL } as const;
 
   constructor(private readonly opts: JevOptions = {}) {}
 
@@ -148,6 +148,8 @@ export class JevDecider implements Decider {
     const tokensOut = res.usage.outputTokens ?? 0;
 
     return {
+      provider: this.run.provider,
+      model: this.run.model,
       answers,
       confidence: confidenceOf(res.providerMetadata as Record<string, unknown> | undefined),
       latencyMs,

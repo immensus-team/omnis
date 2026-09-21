@@ -3,12 +3,21 @@ import type { Channel } from "@omnis/protocol";
 import type { Pool } from "pg";
 import { z } from "zod";
 import { type ContextRequest, buildContext } from "../context/assemble.js";
+import { QUESTION, followupRequest } from "../decision/decisions.js";
+import { decideOrNull } from "../decision/router.js";
+import { personState, threadTail } from "../decision/state.js";
+import { probabilityOf } from "../decision/types.js";
 import { registerLoop } from "../loop/registry.js";
 import type { LoopSpec, TriggerContext } from "../loop/spec.js";
 import { getAgentsPool } from "../pool.js";
 
 /** A4 §7.3: at most 10 people per day — beyond that it is spam, not follow-up. */
 export const INACTIVE_SWEEP_LIMIT = 10;
+/**
+ * Below this P(reach out) the decision tier vetoes the nudge. A4 §7.3 already waited a full
+ * cadence, so this catches the case where the silence was the right answer all along.
+ */
+export const FOLLOWUP_VETO_BELOW = 0.15;
 /** Master §13: we never initiate outreach on these two channels. */
 export const NO_COLD_OUTREACH_CHANNELS: readonly Channel[] = ["linkedin", "kakaotalk"];
 
@@ -128,6 +137,33 @@ export const followupLoop: LoopSpec<FollowupOutputT> = {
   budget: { inputTokens: 5500, outputTokens: 800, wallClockMs: 40_000, maxSteps: 5 },
   tier: "T1",
   outputSchema: FollowupOutput,
+
+  // Decision #4, veto-only but for an egress path — the strongest version of the safety rule. Jev
+  // may only cancel a nudge here; a "yes" leaves the run to the T1 model, and the channel gates
+  // (pickFollowupChannel, NO_COLD_OUTREACH_CHANNELS) run afterwards untouched.
+  async decide(ctx: TriggerContext) {
+    const personId = ctx.person_id;
+    if (personId === undefined) return null;
+    // Lazy, same as decision #3: neither read happens while the flag is off.
+    const jev = await decideOrNull(async () => {
+      const person = await personState(personId);
+      if (person === null) return null;
+      return followupRequest({
+        person: person.name,
+        ...(person.notes !== null ? { notes: person.notes } : {}),
+        lastContactAt: person.lastContactAt,
+        threadTail:
+          person.threadId === null
+            ? "No thread is linked to this person."
+            : await threadTail(person.threadId),
+      });
+    });
+    const reachOut = jev === null ? null : probabilityOf(jev, QUESTION.reachOut);
+    if (reachOut === null || reachOut >= FOLLOWUP_VETO_BELOW) return null;
+    return {
+      skip: `decision model: reaching out now is not appropriate (P = ${reachOut.toFixed(2)})`,
+    };
+  },
 
   assemble: (ctx: TriggerContext) => {
     // ponytail: only attach the thread slot when thread_id exists — the plan's `ctx.thread_id ?? ""`

@@ -36,11 +36,20 @@ export interface DecisionOptions {
 }
 
 /**
+ * A call site whose state costs a query passes a thunk, so that read happens only when the flag is
+ * on; a thunk resolving to null means "the state is gone, abstain".
+ */
+export type DecisionRequestSource =
+  | DecisionRequest
+  | null
+  | (() => Promise<DecisionRequest | null>);
+
+/**
  * The one entry point every call site uses. Returns null when omnis should keep doing what it
  * does today: flag off, no credential, or Jev failed.
  */
 export async function decideOrNull(
-  request: DecisionRequest,
+  request: DecisionRequestSource,
   opts: DecisionOptions = {},
 ): Promise<DecisionResponse | null> {
   if ((await activeDecisionProvider(opts.pool)) !== "jev") return null;
@@ -48,13 +57,17 @@ export async function decideOrNull(
   const decider = opts.jev === undefined ? new JevDecider() : opts.jev;
   if (decider === null) return null;
 
+  // A thunk's kind is unknown until it resolves, so the log names it generically.
+  const kind = typeof request === "function" ? "request" : (request?.kind ?? "request");
   try {
+    const req = typeof request === "function" ? await request() : request;
+    if (req === null) return null;
     if (!(await decider.available())) return null;
-    return await decider.decide(request);
+    return await decider.decide(req);
   } catch (e) {
     // A degraded path is worth a line in the log and nothing more — the caller still concludes.
     console.warn(
-      `[decision] ${request.kind}: Jev failed, falling back to the LLM path — ${
+      `[decision] ${kind}: Jev failed, falling back to the LLM path — ${
         e instanceof Error ? e.message : String(e)
       }`,
     );

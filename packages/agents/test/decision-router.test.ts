@@ -15,6 +15,8 @@ function stubPool(value: unknown): Pool {
 }
 
 const RESULT: DecisionResponse = {
+  provider: "vercel-ai-gateway",
+  model: "jev-latest",
   answers: { scope: { type: "choice", choice: "work", probabilities: { work: 0.9 } } },
   confidence: {},
   latencyMs: 5,
@@ -107,6 +109,31 @@ describe("decision provider flag", () => {
     expect(warn).toHaveBeenCalledOnce();
     expect(String(warn.mock.calls[0]?.[0])).toContain("classify");
     expect(String(warn.mock.calls[0]?.[0])).toContain("gateway exploded");
+  });
+
+  it("does not evaluate a lazy request while the flag is off", async () => {
+    const { decider } = countingDecider();
+    let built = 0;
+    const source = async () => {
+      built += 1;
+      return REQ;
+    };
+
+    expect(await decideOrNull(source, { pool: stubPool("llm"), jev: decider })).toBe(null);
+    expect(built).toBe(0); // draft and follow-up read the DB here; with the flag off they must not
+
+    expect(await decideOrNull(source, { pool: stubPool("jev"), jev: decider })).toEqual(RESULT);
+    expect(built).toBe(1);
+  });
+
+  it("treats a lazy request that resolves to null as an abstention", async () => {
+    const { decider, calls, availableChecks } = countingDecider();
+
+    expect(await decideOrNull(async () => null, { pool: stubPool("jev"), jev: decider })).toBe(
+      null,
+    );
+    expect(calls).toEqual([]);
+    expect(availableChecks.n).toBe(0); // never asked, so never probed either
   });
 
   it("reads the flag from the settings key the memo names", async () => {

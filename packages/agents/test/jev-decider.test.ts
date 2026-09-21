@@ -190,6 +190,8 @@ describe("JevDecider (mocked HTTP layer)", () => {
 
 describe("answer readers", () => {
   const response: DecisionResponse = {
+    provider: "vercel-ai-gateway",
+    model: "jev-latest",
     answers: {
       sensitivity: {
         type: "choice",

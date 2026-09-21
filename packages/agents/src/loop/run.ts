@@ -232,6 +232,11 @@ export async function runLoopSpec<T>(
 
   // ── T0 pre-decision: paths that finish without calling a model (A4 §9.2 ①③④)
   const decided = spec.decide === undefined ? null : await spec.decide(ctx);
+  // A veto ends the run before apply() — the decision tier's "do not draft this" must not reach
+  // propose_draft. Same `skipped()` path the quarantine and failure gates use.
+  if (decided !== null && "skip" in decided) {
+    return skipped(spec, ctx, decided.skip);
+  }
   if (decided !== null) {
     const runId = await recordRun({
       loop: spec.id,

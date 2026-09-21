@@ -1,5 +1,8 @@
 import { getAgentsPool } from "./pool.js";
 
+/** The `agent_runs.provider` column's domain. Exported so a decision provider can name its own runs. */
+export type RunProvider = "local" | "deepseek" | "anthropic" | "openrouter" | "vercel-ai-gateway";
+
 export interface RecordRunInput {
   loop:
     | "classify"
@@ -18,7 +21,7 @@ export interface RecordRunInput {
   trigger_ref?: string;
   model_tier: "T0" | "T1" | "T2" | "T3";
   /** "vercel-ai-gateway" is the Jev decision tier — see docs/decisions/2026-09-21-jev-decision-tier.md. */
-  provider: "local" | "deepseek" | "anthropic" | "openrouter" | "vercel-ai-gateway";
+  provider: RunProvider;
   model: string;
   tokens_in?: number;
   tokens_out?: number;

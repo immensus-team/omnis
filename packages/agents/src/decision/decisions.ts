@@ -13,6 +13,7 @@ export const QUESTION = {
   reachOut: "reach_out",
   followupKind: "kind",
   delegate: "delegate",
+  host: "host",
   runtime: "runtime",
   sensitivity: "sensitivity",
 } as const;
@@ -22,22 +23,27 @@ export const SCOPE_OPTIONS = ["work", "personal", "unknown"] as const;
 export const PRIORITY_OPTIONS = ["now", "today", "week", "fyi"] as const;
 export const SENSITIVITY_OPTIONS = ["normal", "personal", "finance", "legal", "health"] as const;
 export const RUNTIME_OPTIONS = ["omnis", "codex", "claude_code", "claude_ds"] as const;
-export const FOLLOWUP_KIND_OPTIONS = [
-  "post_meeting",
-  "first_contact",
-  "dormant_revive",
-  "pending_step",
-] as const;
+export const HOST_OPTIONS = ["mini", "macbook"] as const;
+
+/** The sender is not always in hand (ItemRow carries no handle), so it is optional here. */
+function stateOf(i: { from?: string; subject: string | null; body: string }): string {
+  return [
+    ...(i.from !== undefined ? [`From: ${i.from}`] : []),
+    `Subject: ${i.subject ?? ""}`,
+    "",
+    i.body,
+  ].join("\n");
+}
 
 /** 1. work/personal scope + label (A4 §2.4). Sensitivity is decision #6, not asked twice. */
 export function classifyRequest(i: {
-  from: string;
+  from?: string;
   subject: string | null;
   body: string;
 }): DecisionRequest {
   return {
     kind: "classify",
-    state: [`From: ${i.from}`, `Subject: ${i.subject ?? ""}`, "", i.body].join("\n"),
+    state: stateOf(i),
     questions: {
       [QUESTION.scope]: {
         type: "choice",
@@ -97,7 +103,6 @@ export function autoArchiveRequest(i: {
 
 /** 3. draft-worthiness (A4 §3.1). Veto-only: a true answer leaves the existing trigger gate alone. */
 export function draftWorthinessRequest(i: {
-  from: string;
   subject: string | null;
   body: string;
   threadTail: string;
@@ -105,7 +110,6 @@ export function draftWorthinessRequest(i: {
   return {
     kind: "draft_worthiness",
     state: [
-      `From: ${i.from}`,
       `Subject: ${i.subject ?? ""}`,
       "",
       "Recent thread:",
@@ -132,8 +136,8 @@ export function draftWorthinessRequest(i: {
 /** 4. follow-up nudge (A4 §7). Veto-only for reach_out; the channel gate stays deterministic. */
 export function followupRequest(i: {
   person: string;
-  notes: string;
-  lastContactAt: string | null;
+  notes?: string;
+  lastContactAt?: string | null;
   threadTail: string;
 }): DecisionRequest {
   return {
@@ -141,7 +145,7 @@ export function followupRequest(i: {
     state: [
       `Person: ${i.person}`,
       `Last contact: ${i.lastContactAt ?? "none recorded"}`,
-      `Notes: ${i.notes}`,
+      `Notes: ${i.notes ?? "none"}`,
       "",
       "Recent thread:",
       i.threadTail,
@@ -154,16 +158,6 @@ export function followupRequest(i: {
         criteria: {
           true: "The relationship is alive and a short, useful nudge fits where it left off.",
           false: "Reaching out now would be unwelcome, premature, or unwanted.",
-        },
-      },
-      [QUESTION.followupKind]: {
-        type: "choice",
-        instructions: "What kind of follow-up is this?",
-        criteria: {
-          post_meeting: "Following up on a meeting that already happened.",
-          first_contact: "A first message to someone newly met.",
-          dormant_revive: "Reviving a relationship that has gone quiet.",
-          pending_step: "Chasing something this person owes Logan, or Logan owes them.",
         },
       },
     },
@@ -201,6 +195,16 @@ export function delegationRequest(i: {
           claude_ds: "A small, well-specified code change in one or two files.",
         },
       },
+      // routeByRule() answers host for every case it can; Jev is asked only for the residue, so the
+      // criteria here are the same two host rules of A4 §5.2 in the order that section lists them.
+      [QUESTION.host]: {
+        type: "choice",
+        instructions: "Which machine should run it, if it is delegated?",
+        criteria: {
+          macbook: "The work needs Logan's own files under /Users/, or his logged-in desktop apps.",
+          mini: "The work must keep running when the MacBook is closed, or is a long batch job.",
+        },
+      },
     },
   };
 }
@@ -210,13 +214,13 @@ export function delegationRequest(i: {
  * Jev answer can raise a level but never lower one the T0 path already found.
  */
 export function sensitivityRequest(i: {
-  from: string;
+  from?: string;
   subject: string | null;
   body: string;
 }): DecisionRequest {
   return {
     kind: "sensitivity",
-    state: [`From: ${i.from}`, `Subject: ${i.subject ?? ""}`, "", i.body].join("\n"),
+    state: stateOf(i),
     questions: {
       [QUESTION.sensitivity]: {
         type: "choice",

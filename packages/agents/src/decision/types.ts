@@ -4,6 +4,7 @@
 // This module deliberately imports nothing from a provider SDK: the question shape below is
 // structurally the AI SDK's `Experimental_EvaluationQuestion`, and providers/jev.ts is what
 // translates it. Same adapter-isolation rule as src/t1/provider.ts (A7 §7).
+import type { RunProvider } from "../record-run.js";
 
 /** A4's decisions that a typed-answer model can take over. Closed set — a new kind needs a memo entry. */
 export type DecisionKind =
@@ -40,6 +41,9 @@ export interface DecisionAnswer {
 }
 
 export interface DecisionResponse {
+  /** agent_runs.provider / agent_runs.model for the run this answer should be recorded under. */
+  provider: RunProvider;
+  model: string;
   answers: Record<string, DecisionAnswer>;
   /**
    * TypeSafe's per-question confidence (`providerMetadata.typesafe.confidence`). Diagnostic only:
@@ -81,12 +85,12 @@ export function probabilityOf(response: DecisionResponse, questionId: string): n
  * Reads a choice answer, rejecting anything outside `allowed`. A model that answers with an
  * unknown option must not reach a call site as a cast — it returns null and the LLM path runs.
  */
-export function choiceOf(
+export function choiceOf<T extends string>(
   response: DecisionResponse,
   questionId: string,
-  allowed: readonly string[],
-): string | null {
+  allowed: readonly T[],
+): T | null {
   const a = response.answers[questionId];
   if (a === undefined || a.type !== "choice" || a.choice === undefined) return null;
-  return allowed.includes(a.choice) ? a.choice : null;
+  return allowed.find((o) => o === a.choice) ?? null;
 }
