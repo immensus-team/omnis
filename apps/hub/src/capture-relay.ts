@@ -207,8 +207,8 @@ export class CaptureRelayAdapter implements Adapter {
 
   async send(thread: ThreadRef, draft: Outbound): Promise<SendResult> {
     const result = await this.captureSend(thread, draft);
-    // The mini's real message id is not in the contract, and there is none to report anyway while
-    // `write` is closed: in W1 every send is dry.
+    // The mini's real message id is not in the contract, so the id is synthesized from its answer:
+    // `dry-run:` when nothing was typed, `capture:` when the message left the machine.
     return {
       externalId: `${result.sent ? "capture" : "dry-run"}:${thread.externalId}`,
       sentAt: new Date().toISOString(),
@@ -369,9 +369,14 @@ export function startCaptureSendExecutor(deps: CaptureSendExecDeps): CaptureSend
    *  itself would otherwise skip the dry run, which is the single thing US-C13 forbids. Null means
    *  "the dry run is there"; a string is the failure reason. */
   async function confirmGap(a: PendingApproval, confirmOf: string): Promise<string | null> {
-    const rows = await query<{ state: string; thread_id: string | null; preview: unknown }>(
+    const rows = await query<{
+      state: string;
+      thread_id: string | null;
+      preview: unknown;
+      confirmed: string | null;
+    }>(
       pool,
-      `SELECT state, thread_id, args->'dry_run_preview' AS preview
+      `SELECT state, thread_id, args->'dry_run_preview' AS preview, args->>'confirm_of' AS confirmed
          FROM pending_approvals WHERE action = 'send' AND id::text = $1`,
       [confirmOf],
     );
@@ -382,6 +387,12 @@ export function startCaptureSendExecutor(deps: CaptureSendExecDeps): CaptureSend
     }
     if (dry.preview === null || dry.preview === undefined) {
       return `kakao send confirm_of ${confirmOf} has no dry run preview`;
+    }
+    // A confirm carries a `confirm_of` of its own, so it is an executed `send` with a preview too —
+    // naming one would let a chain of approvals reach the window with no dry run in front of it.
+    // US-C13 allows exactly one real send per dry run: the second approval.
+    if (dry.confirmed !== null && dry.confirmed !== undefined) {
+      return `kakao send confirm_of ${confirmOf} is a confirmation, not a dry run`;
     }
     // A dry run on another thread previewed another conversation, not this one.
     if (dry.thread_id !== a.thread_id) {

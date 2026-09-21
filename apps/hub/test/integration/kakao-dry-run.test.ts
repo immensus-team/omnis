@@ -254,6 +254,23 @@ describe("KakaoTalk send gate (US-C13)", () => {
     expect((await failedRow(forged)).fail_reason).toContain("not an executed dry run");
   });
 
+  it("refuses a confirm that chains off another confirm", async () => {
+    const dryRunId = await proposeSend(kakaoThreadId);
+    await decide(dryRunId);
+    const confirm = await until(() => pendingConfirm(dryRunId));
+    await decide(confirm.id);
+    await until(() => (realCalls().length === 1 ? true : null));
+
+    // The confirm is itself an executed `send` carrying a preview, so without this check a third
+    // approval naming it would reach the window for real — and the dry run would be optional from
+    // the second real send on. US-C13 allows exactly one: the second approval.
+    const chained = await proposeSend(kakaoThreadId, { confirm_of: confirm.id });
+    await decide(chained);
+
+    expect((await failedRow(chained)).fail_reason).toContain("not a dry run");
+    expect(realCalls()).toHaveLength(1);
+  });
+
   it("ignores a send approval on a channel it does not relay", async () => {
     const accountId = await insertAccount("slack", "slack:test");
     const thread = await one<{ id: string }>(
