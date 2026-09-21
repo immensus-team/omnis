@@ -203,11 +203,14 @@ describe("US-D06 the aurora palette stays at Logan's eight anchors", () => {
     expect([...new Set(declared)].sort()).toEqual([...anchors].sort());
   });
 
-  it("keeps the semantic tones hued and the accent hueless", () => {
-    // §5.3 guard 6: the accent is graphite and semantic colour is limited to the three tones. A
-    // fourth coloured UI token is a reject.
-    expect(tokensCss).toContain("--accent: var(--ink-600);");
-    expect(tokensCss).toContain("--ink-600: oklch(0.26 0.008 80);");
+  it("keeps the accent to one hue and the semantic tones to their three", () => {
+    // §5.3 guard 6 as US-D08/§a.2 leaves it: exactly one accent hue, and semantic colour limited to
+    // the three tones. The *value* changed (D6's graphite is superseded — v3 §b.1 puts the accent
+    // back on blue at L 0.48, which is the ceiling above which white label text on an accent-filled
+    // chip drops under 4.5:1), but the structural rule this asserts is the one that did not move: a
+    // fourth coloured UI token, or a second hue used for emphasis, is still a reject.
+    expect(tokensCss).toContain("--accent: var(--accent-600);");
+    expect(tokensCss).toContain("--accent-600: oklch(0.48 0.18 255);");
     for (const tone of ["--danger-500", "--warn-500", "--success-500"]) {
       expect(tokensCss).toMatch(new RegExp(`${tone}: oklch\\([\\d.]+ 0\\.[1-9]`));
     }

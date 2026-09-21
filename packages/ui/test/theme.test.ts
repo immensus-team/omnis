@@ -1,8 +1,9 @@
-// jsdom은 CSS 커스텀 프로퍼티 캐스케이드를 계산하지 않는다(getComputedStyle이 <style> 규칙을
-// 실제로 적용하지 않음) — tokens.ts를 값으로 검증하는 tokens.test.ts와 같은 방식으로,
-// tokens.css 원문을 읽어 ":root"(속성 없음)가 라이트 기본값을, ":root[data-theme=\"dark\"]"가
-// 다크 값을 갖는지 텍스트로 검증한다. (환경은 패키지 vitest.config.ts 기본 jsdom 그대로 —
-// setup.ts가 전역 setupFiles로 항상 실행되고 Element를 참조하므로 node로 바꾸면 깨진다.)
+// jsdom does not compute the CSS custom-property cascade (getComputedStyle does not actually apply
+// <style> rules), so — the same way tokens.test.ts verifies tokens.ts by value — this reads
+// tokens.css as text and checks that ":root" (no attribute) carries the light defaults and
+// ':root[data-theme="dark"]' carries the dark ones. (The environment stays the package
+// vitest.config.ts default, jsdom: setup.ts always runs as a global setupFile and touches Element,
+// so switching to node breaks it.)
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,8 +14,8 @@ const css = readFileSync(
   "utf-8",
 );
 
-/** ":root {"(속성 셀렉터 없는 순수 :root) 블록만 뽑는다 — ":root[data-theme=...] {" 블록과
- *  분리해야 "기본값=라이트"를 확실히 확인할 수 있다. */
+/** Extracts only the ":root {" block (the plain one, with no attribute selector) — it has to be
+ *  separated from the ':root[data-theme=...] {' blocks to be sure that "default = light" holds. */
 function rootDefaultBlock(source: string): string {
   const start = source.indexOf(":root {");
   const end = source.indexOf("\n}", start);
@@ -28,7 +29,7 @@ function themeBlock(source: string, theme: string): string {
   return source.slice(start, end);
 }
 
-describe("U1 theme default = light (DESIGN-DIRECTION.md '라이트 테마 기본')", () => {
+describe("U1 theme default = light (DESIGN-DIRECTION.md: light theme by default)", () => {
   it("the attribute-less :root block ships light values, not dark", () => {
     const block = rootDefaultBlock(css);
     expect(block).toContain("--bg-base: var(--gray-000)");
@@ -45,23 +46,34 @@ describe("U1 theme default = light (DESIGN-DIRECTION.md '라이트 테마 기본
   });
 });
 
-describe("U1 canvas backdrop actually renders (CSS 유효성)", () => {
-  it("--canvas-grid holds only <image> layers — a position/size clause would void background-image", () => {
-    // `background-image: linear-gradient(...) 0 0 / 32px 32px`는 문법 오류라 선언 전체가 버려진다
-    // (실측: getComputedStyle(body).backgroundImage === "none"). 크기는 --canvas-grid-size로 분리한다.
+describe("US-D08 §b.2 canvas backdrop: plain paper, no pattern", () => {
+  // The canvas is a flat near-white in both themes. US-D06 removed the peach/mint radials; US-D08
+  // removed the faint grid that was left. The film grain `.app-shell::before` paints at 3.5% is the
+  // only thing on it, and it is not a `--canvas-grid` layer — so "none" here is the whole assertion,
+  // in both blocks. (The alternative — a grid value that merely looks faint — is what guard 1
+  // rejects: "if you can point at the background and describe a shape, it fails".)
+  it("the light block declares no grid image", () => {
     const block = rootDefaultBlock(css);
-    const grid = block.slice(block.indexOf("--canvas-grid:"));
-    const value = grid.slice(0, grid.indexOf(";"));
-    // 괄호 안의 `/`는 oklch(... / alpha)라 정상 — 레이어 사이에 남은 `/`만이 size 절이다.
-    let stripped = value;
-    while (/\([^()]*\)/.test(stripped)) stripped = stripped.replace(/\([^()]*\)/g, "");
-    expect(stripped).not.toMatch(/\//);
+    const marker = "--canvas-grid:";
+    const grid = block.slice(block.indexOf(marker) + marker.length);
+    expect(grid.slice(0, grid.indexOf(";")).trim()).toBe("none");
     expect(block).toContain("--canvas-grid-size:");
   });
 
-  it("dark theme blanks both the layers and their sizes", () => {
+  it("the dark block declares no grid image either", () => {
     const block = themeBlock(css, "dark");
     expect(block).toContain("--canvas-grid: none");
     expect(block).toContain("--canvas-grid-size:");
+  });
+
+  // The declaration is still read by `body` (app.css), so the token is a live switch rather than
+  // dead weight. If the grid ever comes back, both blocks have to say so together — which is the
+  // drift these two tests exist to catch.
+  it("body still reads the token, so `none` is a switch and not an orphan", () => {
+    const appCss = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), "../../../apps/desktop/src/app.css"),
+      "utf-8",
+    );
+    expect(appCss).toContain("background-image: var(--canvas-grid);");
   });
 });
