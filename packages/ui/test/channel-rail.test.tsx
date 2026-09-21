@@ -9,6 +9,10 @@ import { ChannelRail } from "../src/components/channel-rail";
 import { RAIL_ORDER_STORAGE_KEY } from "../src/lib/rail-order";
 import type { UiChannel } from "../src/types.js";
 
+/** The two props every case but the navigation ones shares: the shell is on the Inbox and nothing
+ *  is listening for a screen change. Spread first, so a case that does care overrides either. */
+const RAIL_AT_REST = { screen: "inbox", onScreenChange: () => undefined } as const;
+
 // US-D02b: stand in for the narrow shell (<900px). jsdom's window.matchMedia always reports
 // matches:false, so it has to be replaced — the component calls window.matchMedia, not globalThis.
 const REAL_MATCH_MEDIA = window.matchMedia;
@@ -32,7 +36,12 @@ afterEach(() => {
 describe("ChannelRail (U1 kinso left rail)", () => {
   it("renders one tile per connected channel, plus the fixed Inbox tile", () => {
     render(
-      <ChannelRail channels={["gmail", "slack", "agent"]} selected={null} onSelect={vi.fn()} />,
+      <ChannelRail
+        {...RAIL_AT_REST}
+        channels={["gmail", "slack", "agent"]}
+        selected={null}
+        onSelect={vi.fn()}
+      />,
     );
     expect(screen.getByRole("button", { name: "Inbox" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Gmail" })).toBeInTheDocument();
@@ -44,20 +53,36 @@ describe("ChannelRail (U1 kinso left rail)", () => {
 
   it("clicking a channel tile calls onSelect with that channel", () => {
     const onSelect = vi.fn();
-    render(<ChannelRail channels={["gmail", "slack"]} selected={null} onSelect={onSelect} />);
+    render(
+      <ChannelRail
+        {...RAIL_AT_REST}
+        channels={["gmail", "slack"]}
+        selected={null}
+        onSelect={onSelect}
+      />,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Slack" }));
     expect(onSelect).toHaveBeenCalledWith("slack");
   });
 
   it("clicking the Inbox tile calls onSelect with null (show everything)", () => {
     const onSelect = vi.fn();
-    render(<ChannelRail channels={["gmail"]} selected="gmail" onSelect={onSelect} />);
+    render(
+      <ChannelRail {...RAIL_AT_REST} channels={["gmail"]} selected="gmail" onSelect={onSelect} />,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Inbox" }));
     expect(onSelect).toHaveBeenCalledWith(null);
   });
 
   it("marks the selected channel tile pressed for a11y/visual state", () => {
-    render(<ChannelRail channels={["gmail", "slack"]} selected="slack" onSelect={vi.fn()} />);
+    render(
+      <ChannelRail
+        {...RAIL_AT_REST}
+        channels={["gmail", "slack"]}
+        selected="slack"
+        onSelect={vi.fn()}
+      />,
+    );
     expect(screen.getByRole("button", { name: "Slack" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Gmail" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "Inbox" })).toHaveAttribute("aria-pressed", "false");
@@ -67,7 +92,14 @@ describe("ChannelRail (U1 kinso left rail)", () => {
 // US-D02b: a rail tile's mark is the real brand PNG, not a react-icons glyph tinted with a brand hex.
 describe("ChannelRail brand marks (US-D02b: official brand PNGs)", () => {
   it("renders each channel tile's real brand PNG at the 18px rail size", () => {
-    render(<ChannelRail channels={["gmail", "slack"]} selected={null} onSelect={vi.fn()} />);
+    render(
+      <ChannelRail
+        {...RAIL_AT_REST}
+        channels={["gmail", "slack"]}
+        selected={null}
+        onSelect={vi.fn()}
+      />,
+    );
     const img = screen.getByRole("button", { name: "Slack" }).querySelector("img");
     expect(img?.getAttribute("src")).toMatch(/slack@1x\.png$/);
     expect(img?.getAttribute("srcSet")).toMatch(/slack@1x\.png 1x, .*slack@2x\.png 2x$/);
@@ -76,7 +108,9 @@ describe("ChannelRail brand marks (US-D02b: official brand PNGs)", () => {
   });
 
   it("renders the agent silhouette on the Agents tile", () => {
-    render(<ChannelRail channels={["gmail"]} selected={null} onSelect={vi.fn()} />);
+    render(
+      <ChannelRail {...RAIL_AT_REST} channels={["gmail"]} selected={null} onSelect={vi.fn()} />,
+    );
     const img = screen.getByRole("button", { name: "Agent" }).querySelector("img");
     expect(img?.getAttribute("src")).toMatch(/agent@1x\.png$/);
   });
@@ -84,12 +118,21 @@ describe("ChannelRail brand marks (US-D02b: official brand PNGs)", () => {
 
 describe("ChannelRail fixed tiles", () => {
   it("renders the Agents tile even when no agent account is connected", () => {
-    render(<ChannelRail channels={["gmail"]} selected={null} onSelect={vi.fn()} />);
+    render(
+      <ChannelRail {...RAIL_AT_REST} channels={["gmail"]} selected={null} onSelect={vi.fn()} />,
+    );
     expect(screen.getByRole("button", { name: "Agent" })).toBeInTheDocument();
   });
 
   it("does not duplicate the Agents tile when an agent account is connected", () => {
-    render(<ChannelRail channels={["gmail", "agent"]} selected={null} onSelect={vi.fn()} />);
+    render(
+      <ChannelRail
+        {...RAIL_AT_REST}
+        channels={["gmail", "agent"]}
+        selected={null}
+        onSelect={vi.fn()}
+      />,
+    );
     expect(screen.getAllByRole("button", { name: "Agent" })).toHaveLength(1);
   });
 });
@@ -102,7 +145,7 @@ describe("ChannelRail narrow shell (US-D02b: bottom bar + More popover)", () => 
 
   it("keeps only the first 4 tiles in the bar and moves the rest into More", () => {
     stubNarrowRail(true);
-    render(<ChannelRail channels={MANY} selected={null} onSelect={vi.fn()} />);
+    render(<ChannelRail {...RAIL_AT_REST} channels={MANY} selected={null} onSelect={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: "Inbox" })).toBeInTheDocument();
     for (const name of ["Gmail", "Slack", "Outlook", "Telegram"]) {
@@ -111,15 +154,16 @@ describe("ChannelRail narrow shell (US-D02b: bottom bar + More popover)", () => 
     // From the fifth on they are not in the bar — they are inside More.
     expect(screen.queryByRole("button", { name: "WhatsApp" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Agent" })).not.toBeInTheDocument();
-    // The two that stand at the foot of the wide rail are not in the bar either.
-    expect(screen.queryByRole("button", { name: "Account" })).not.toBeInTheDocument();
+    // Nor are the screens: the wide rail's five tiles are six rows in the popover here, and the
+    // foot Settings button is not in the bar either (loop-r1-01).
+    expect(screen.queryByRole("button", { name: "Today" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Settings" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "More" })).toBeInTheDocument();
   });
 
-  it("More opens a popover with the overflow tiles plus the Account/Settings rows", () => {
+  it("More opens a popover with the six screens and the overflow tiles", () => {
     stubNarrowRail(true);
-    render(<ChannelRail channels={MANY} selected={null} onSelect={vi.fn()} />);
+    render(<ChannelRail {...RAIL_AT_REST} channels={MANY} selected={null} onSelect={vi.fn()} />);
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "More" }));
@@ -129,9 +173,11 @@ describe("ChannelRail narrow shell (US-D02b: bottom bar + More popover)", () => 
     expect(within(popover).getByRole("button", { name: "KakaoTalk" })).toBeInTheDocument();
     expect(within(popover).getByRole("button", { name: "Agent" })).toBeInTheDocument();
     // Unlike the 44px bar tiles there is room for words here — an icon alone does not say which
-    // tile it is.
-    expect(within(popover).getByText("Account")).toBeInTheDocument();
-    expect(within(popover).getByText("Settings")).toBeInTheDocument();
+    // screen or channel it is, which is why a screen that is a bare icon in the wide rail is a
+    // labelled row here.
+    for (const name of ["Today", "Tasks", "Network", "Notes", "Digest", "Settings"]) {
+      expect(within(popover).getByRole("button", { name })).toBeInTheDocument();
+    }
     // The four already standing in the bar are not repeated in the popover.
     expect(within(popover).queryByRole("button", { name: "Gmail" })).not.toBeInTheDocument();
   });
@@ -139,7 +185,7 @@ describe("ChannelRail narrow shell (US-D02b: bottom bar + More popover)", () => 
   it("picking an overflow channel selects it and closes the popover", () => {
     stubNarrowRail(true);
     const onSelect = vi.fn();
-    render(<ChannelRail channels={MANY} selected={null} onSelect={onSelect} />);
+    render(<ChannelRail {...RAIL_AT_REST} channels={MANY} selected={null} onSelect={onSelect} />);
 
     fireEvent.click(screen.getByRole("button", { name: "More" }));
     fireEvent.click(screen.getByRole("button", { name: "WhatsApp" }));
@@ -150,17 +196,16 @@ describe("ChannelRail narrow shell (US-D02b: bottom bar + More popover)", () => 
 
   it("keeps every tile in the wide shell's bar", () => {
     stubNarrowRail(false);
-    render(<ChannelRail channels={MANY} selected={null} onSelect={vi.fn()} />);
+    render(<ChannelRail {...RAIL_AT_REST} channels={MANY} selected={null} onSelect={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: "WhatsApp" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Account" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
   });
 
   it("does not offer a More button in the wide shell, where nothing overflows", () => {
     stubNarrowRail(false);
     const { container } = render(
-      <ChannelRail channels={MANY} selected={null} onSelect={vi.fn()} />,
+      <ChannelRail {...RAIL_AT_REST} channels={MANY} selected={null} onSelect={vi.fn()} />,
     );
 
     // The chevron is a mark, not a control: it stays out of the accessibility tree and out of the
@@ -170,35 +215,131 @@ describe("ChannelRail narrow shell (US-D02b: bottom bar + More popover)", () => 
   });
 });
 
-// US-D02b: Account and Settings have no screen behind them yet. A labelled, focusable button that
-// does nothing is worse than a visibly gated one, so they are disabled and say why.
-describe("ChannelRail Phase B controls", () => {
-  it("disables Account and Settings and explains the gate in the wide shell", () => {
+// loop-r1-01: the rail is the app's navigation. Every screen the shell has is reachable from it —
+// five tiles in the wide rail, six rows in the narrow popover — and the two controls that used to
+// stand at the foot disabled (Account, Settings) are gone or real. L-33 and NC-01 are the findings:
+// the gear was a lookalike and the Inbox tile claimed "you are here" on every screen.
+describe("ChannelRail screen navigation (loop-r1-01)", () => {
+  const SCREENS = ["Today", "Tasks", "Network", "Notes", "Digest"];
+
+  it("renders the five screen tiles and an enabled Settings button, and no Account button", () => {
     stubNarrowRail(false);
-    render(<ChannelRail channels={["gmail"]} selected={null} onSelect={vi.fn()} />);
-
-    for (const name of ["Account", "Settings"]) {
-      const button = screen.getByRole("button", { name });
-      expect(button).toBeDisabled();
-      expect(button.getAttribute("title")).toMatch(/Phase B/);
-    }
-  });
-
-  it("disables the Account and Settings rows inside the narrow shell's More popover", () => {
-    stubNarrowRail(true);
     render(
       <ChannelRail
-        channels={["gmail", "slack", "outlook", "telegram", "whatsapp"]}
+        {...RAIL_AT_REST}
+        channels={["gmail"]}
         selected={null}
+        onSelect={vi.fn()}
+        onScreenChange={vi.fn()}
+      />,
+    );
+
+    for (const name of SCREENS) {
+      expect(screen.getByRole("button", { name })).toBeInTheDocument();
+    }
+    const settings = screen.getByRole("button", { name: "Settings" });
+    expect(settings).toBeEnabled();
+    // Nothing is behind an Account button, and a disabled one is what the finding reported.
+    expect(screen.queryByRole("button", { name: "Account" })).not.toBeInTheDocument();
+  });
+
+  it("gives every screen tile the shortcut it is reachable by", () => {
+    stubNarrowRail(false);
+    render(
+      <ChannelRail {...RAIL_AT_REST} channels={["gmail"]} selected={null} onSelect={vi.fn()} />,
+    );
+
+    // The tiles are icon-only, so the title is the only place the rail can name the key — A5 §2.4
+    // resolves exactly these.
+    expect(screen.getByRole("button", { name: "Today" })).toHaveAttribute("title", "Today (g t)");
+    expect(screen.getByRole("button", { name: "Settings" })).toHaveAttribute(
+      "title",
+      "Settings (g s)",
+    );
+  });
+
+  it("clicking Today calls onScreenChange with that screen", () => {
+    stubNarrowRail(false);
+    const onScreenChange = vi.fn();
+    render(
+      <ChannelRail
+        {...RAIL_AT_REST}
+        channels={["gmail"]}
+        selected={null}
+        onSelect={vi.fn()}
+        onScreenChange={onScreenChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Today" }));
+    expect(onScreenChange).toHaveBeenCalledWith("today");
+  });
+
+  it("marks the current screen current, and the Inbox tile pressed only on the Inbox", () => {
+    stubNarrowRail(false);
+    render(
+      <ChannelRail
+        {...RAIL_AT_REST}
+        screen="today"
+        channels={["gmail"]}
+        selected="gmail"
         onSelect={vi.fn()}
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "More" }));
-    const popover = screen.getByRole("dialog");
-    for (const name of ["Account", "Settings"]) {
-      expect(within(popover).getByRole("button", { name })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Today" })).toHaveAttribute("aria-current", "page");
+    for (const name of ["Tasks", "Network", "Notes", "Digest", "Settings"]) {
+      expect(screen.getByRole("button", { name })).not.toHaveAttribute("aria-current");
     }
+    // L-33: the Inbox tile used to stay pressed on every other screen, and with it the channel
+    // filter that only the Inbox honours.
+    expect(screen.getByRole("button", { name: "Inbox" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Gmail" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("returns to the Inbox when the Inbox tile or a channel tile is pressed elsewhere", () => {
+    stubNarrowRail(false);
+    const onScreenChange = vi.fn();
+    const onSelect = vi.fn();
+    render(
+      <ChannelRail
+        {...RAIL_AT_REST}
+        screen="digest"
+        channels={["gmail"]}
+        selected={null}
+        onSelect={onSelect}
+        onScreenChange={onScreenChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Inbox" }));
+    expect(onScreenChange).toHaveBeenCalledWith("inbox");
+    expect(onSelect).toHaveBeenCalledWith(null);
+
+    onScreenChange.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Gmail" }));
+    expect(onScreenChange).toHaveBeenCalledWith("inbox");
+    expect(onSelect).toHaveBeenCalledWith("gmail");
+  });
+
+  it("switches screens from the narrow popover's rows and closes it", () => {
+    stubNarrowRail(true);
+    const onScreenChange = vi.fn();
+    render(
+      <ChannelRail
+        {...RAIL_AT_REST}
+        channels={["gmail", "slack", "outlook", "telegram", "whatsapp"]}
+        selected={null}
+        onSelect={vi.fn()}
+        onScreenChange={onScreenChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Tasks" }));
+
+    expect(onScreenChange).toHaveBeenCalledWith("tasks");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
 
@@ -208,7 +349,7 @@ describe("ChannelRail Phase B controls", () => {
 describe("ChannelRail aurora backdrop (US-D06)", () => {
   it("paints the mist aurora on an ancestor of the plate, never on the plate itself", () => {
     const { container } = render(
-      <ChannelRail channels={["gmail"]} selected={null} onSelect={vi.fn()} />,
+      <ChannelRail {...RAIL_AT_REST} channels={["gmail"]} selected={null} onSelect={vi.fn()} />,
     );
     const plate = container.querySelector(".channel-rail__plate");
     const aura = container.querySelector(".channel-rail__aurora");
@@ -295,12 +436,16 @@ describe("ChannelRail reorder (D7 §c.2)", () => {
 
   it("reads the stored order on mount", () => {
     localStorage.setItem(RAIL_ORDER_STORAGE_KEY, JSON.stringify(["agent", "slack"]));
-    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    render(
+      <ChannelRail {...RAIL_AT_REST} channels={CHANNELS} selected={null} onSelect={vi.fn()} />,
+    );
     expect(renderedOrder()).toEqual(["Agent", "Slack", "Gmail"]);
   });
 
   it("moves a dragged tile one slot and writes the order as a JSON array of channel ids", () => {
-    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    render(
+      <ChannelRail {...RAIL_AT_REST} channels={CHANNELS} selected={null} onSelect={vi.fn()} />,
+    );
     stubTileRects("y");
     expect(renderedOrder()).toEqual(["Gmail", "Slack", "Agent"]);
 
@@ -315,17 +460,23 @@ describe("ChannelRail reorder (D7 §c.2)", () => {
   });
 
   it("keeps the order across a remount — the reload the reviewer checks", () => {
-    const first = render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    const first = render(
+      <ChannelRail {...RAIL_AT_REST} channels={CHANNELS} selected={null} onSelect={vi.fn()} />,
+    );
     stubTileRects("y");
     dragTile(screen.getByRole("button", { name: "Slack" }), { y: 60 });
     first.unmount();
 
-    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    render(
+      <ChannelRail {...RAIL_AT_REST} channels={CHANNELS} selected={null} onSelect={vi.fn()} />,
+    );
     expect(renderedOrder()).toEqual(["Gmail", "Agent", "Slack"]);
   });
 
   it("moves the lifted tile on transform alone — no top, left or margin", () => {
-    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    render(
+      <ChannelRail {...RAIL_AT_REST} channels={CHANNELS} selected={null} onSelect={vi.fn()} />,
+    );
     stubTileRects("y");
     const slack = screen.getByRole("button", { name: "Slack" });
 
@@ -372,7 +523,9 @@ describe("ChannelRail reorder (D7 §c.2)", () => {
   });
 
   it("keeps the lifted tile under the pointer across a slot crossing", () => {
-    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    render(
+      <ChannelRail {...RAIL_AT_REST} channels={CHANNELS} selected={null} onSelect={vi.fn()} />,
+    );
     stubTileRects("y");
     const slack = screen.getByRole("button", { name: "Slack" });
 
@@ -398,7 +551,9 @@ describe("ChannelRail reorder (D7 §c.2)", () => {
 
   it("does not select the channel a drag just ended on, but does on the next click", () => {
     const onSelect = vi.fn();
-    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={onSelect} />);
+    render(
+      <ChannelRail {...RAIL_AT_REST} channels={CHANNELS} selected={null} onSelect={onSelect} />,
+    );
     stubTileRects("y");
     const slack = screen.getByRole("button", { name: "Slack" });
 
@@ -412,7 +567,9 @@ describe("ChannelRail reorder (D7 §c.2)", () => {
   });
 
   it("puts an escaped drag back where it started, store and all", () => {
-    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    render(
+      <ChannelRail {...RAIL_AT_REST} channels={CHANNELS} selected={null} onSelect={vi.fn()} />,
+    );
     stubTileRects("y");
     const slack = screen.getByRole("button", { name: "Slack" });
 
@@ -433,7 +590,9 @@ describe("ChannelRail reorder (D7 §c.2)", () => {
   });
 
   it("marks the channel tiles reorderable and the Inbox tile not", () => {
-    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    render(
+      <ChannelRail {...RAIL_AT_REST} channels={CHANNELS} selected={null} onSelect={vi.fn()} />,
+    );
     expect(screen.getByRole("button", { name: "Slack" })).toHaveAttribute(
       "aria-roledescription",
       "reorderable",
@@ -446,7 +605,9 @@ describe("ChannelRail reorder (D7 §c.2)", () => {
   });
 
   it("cannot drag the Inbox tile, and cannot drop a channel above it", () => {
-    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    render(
+      <ChannelRail {...RAIL_AT_REST} channels={CHANNELS} selected={null} onSelect={vi.fn()} />,
+    );
     stubTileRects("y");
     const inbox = screen.getByRole("button", { name: "Inbox" });
 
@@ -464,7 +625,9 @@ describe("ChannelRail reorder (D7 §c.2)", () => {
 
   it("reorders on the x axis in the narrow shell, where the rail is a bottom bar", () => {
     stubNarrowRail(true);
-    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    render(
+      <ChannelRail {...RAIL_AT_REST} channels={CHANNELS} selected={null} onSelect={vi.fn()} />,
+    );
     stubTileRects("x");
     const slack = screen.getByRole("button", { name: "Slack" });
 
@@ -478,7 +641,9 @@ describe("ChannelRail reorder (D7 §c.2)", () => {
 
   it("lifts a touch after the 350ms hold", () => {
     vi.useFakeTimers();
-    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    render(
+      <ChannelRail {...RAIL_AT_REST} channels={CHANNELS} selected={null} onSelect={vi.fn()} />,
+    );
     stubTileRects("y");
     const slack = screen.getByRole("button", { name: "Slack" });
 
@@ -505,7 +670,9 @@ describe("ChannelRail reorder (D7 §c.2)", () => {
 
   it("lets a finger that moves first scroll instead of lifting the tile", () => {
     vi.useFakeTimers();
-    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    render(
+      <ChannelRail {...RAIL_AT_REST} channels={CHANNELS} selected={null} onSelect={vi.fn()} />,
+    );
     stubTileRects("y");
     const slack = screen.getByRole("button", { name: "Slack" });
 
@@ -531,7 +698,7 @@ describe("ChannelRail reorder (D7 §c.2)", () => {
 
   it("reorders from the keyboard with Ctrl+Arrow and announces where the tile went", () => {
     const { container } = render(
-      <ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />,
+      <ChannelRail {...RAIL_AT_REST} channels={CHANNELS} selected={null} onSelect={vi.fn()} />,
     );
     const slack = screen.getByRole("button", { name: "Slack" });
 
@@ -564,7 +731,9 @@ describe("ChannelRail reorder (D7 §c.2)", () => {
 
   it("reorders from the keyboard on the x axis in the narrow shell", () => {
     stubNarrowRail(true);
-    render(<ChannelRail channels={CHANNELS} selected={null} onSelect={vi.fn()} />);
+    render(
+      <ChannelRail {...RAIL_AT_REST} channels={CHANNELS} selected={null} onSelect={vi.fn()} />,
+    );
     const slack = screen.getByRole("button", { name: "Slack" });
 
     fireEvent.keyDown(slack, { key: "ArrowRight", ctrlKey: true });

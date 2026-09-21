@@ -1,5 +1,8 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+
+// OMNIS_HUB_PORT moves the proxy target with the hub (tools/e2e runs a second stack on other ports).
+const hub = `http://127.0.0.1:${process.env.OMNIS_HUB_PORT ?? 8787}`;
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
@@ -32,13 +35,13 @@ export default defineConfig({
     strictPort: true,
     host: "127.0.0.1",
     proxy: {
-      "/api": "http://127.0.0.1:8787",
-      "/approvals": "http://127.0.0.1:8787",
-      "/health": "http://127.0.0.1:8787",
+      "/api": hub,
+      "/approvals": hub,
+      "/health": hub,
       // US-B36: the push subscribe call is a cross-origin POST with a JSON content-type, which
       // means a preflight the hub does not answer (it sends no CORS headers) — so it has to travel
       // through this proxy like every other hub write. The hub accepts /push/… and /api/push/… alike.
-      "/push": "http://127.0.0.1:8787",
+      "/push": hub,
     },
   },
 });

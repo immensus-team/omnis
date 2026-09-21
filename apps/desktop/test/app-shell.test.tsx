@@ -71,6 +71,65 @@ describe("App shell (US-A25 'empty shell' + A26-A31 screen routing)", () => {
   });
 });
 
+/** loop-r1-01: the rail is not the only door. A5 §2.4's `g`+letter keymap and the palette's
+ *  Navigate actions both call the shell's one goTo, and what these cases assert is that the door is
+ *  wired — that the screen actually mounts is the screens' own tests' business. */
+describe("App shell screen navigation (loop-r1-01)", () => {
+  const inboxFilters = () => screen.queryByRole("radiogroup", { name: "Inbox filters" });
+
+  /** ⌘K plus the panel's own tab. The action list is not in the DOM until it is asked for: the
+   *  panel derives its tab from the input (ask-panel.tsx), showing Suggestions while the bar is
+   *  empty — the same reason the search-mode test below has to type before it can see an action. */
+  const openCommands = () => {
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    fireEvent.click(screen.getByRole("button", { name: "Commands" }));
+  };
+
+  it("goes to Settings on `g s`, and back to the Inbox on `g i`", () => {
+    render(<App />);
+    expect(inboxFilters()).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "g" });
+    fireEvent.keyDown(window, { key: "s" });
+    expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    // One screen at a time: the list is gone, not merely covered.
+    expect(inboxFilters()).not.toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "g" });
+    fireEvent.keyDown(window, { key: "i" });
+    expect(inboxFilters()).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Settings" })).not.toBeInTheDocument();
+  });
+
+  // NC-01: the Commands list held one item. Seven screens, seven Navigate actions — the palette is
+  // the third door onto the same navigation, and a screen missing from it is a screen most users
+  // never find.
+  it("offers all seven screens as Navigate actions in the palette", () => {
+    render(<App />);
+    openCommands();
+
+    for (const name of [
+      "Go to Inbox",
+      "Go to Today",
+      "Go to Tasks",
+      "Go to Network",
+      "Go to Notes",
+      "Go to Digest",
+      "Go to Settings",
+    ]) {
+      expect(screen.getByText(name)).toBeInTheDocument();
+    }
+  });
+
+  it("switches screen from a palette action's perform", () => {
+    render(<App />);
+    openCommands();
+
+    fireEvent.click(screen.getByText("Go to Tasks"));
+    expect(screen.getByRole("radiogroup", { name: "Task views" })).toBeInTheDocument();
+  });
+});
+
 describe("App shell search mode (US-B27)", () => {
   afterEach(() => vi.unstubAllGlobals());
 

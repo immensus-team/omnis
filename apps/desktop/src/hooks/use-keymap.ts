@@ -31,7 +31,8 @@ export interface KeySeqState {
   at: number;
 }
 
-/** A5 §2.4: 'g' 다음 300ms 안에 letter가 오면 go-to 액션으로 resolve. 순수 리듀서라 타이머 없이 테스트 가능. */
+/** A5 §2.4: a letter within 300ms of a `g` resolves to a go-to action. A pure reducer, so it is
+ *  testable without a timer. */
 export function reduceKeySequence(
   prev: KeySeqState | null,
   key: string,
@@ -50,7 +51,8 @@ export function reduceKeySequence(
     : { pending: null, at: atMs };
 }
 
-/** ask 바·Composer·팔레트에 타이핑하는 동안 단일 키가 액션으로 새면 안 된다("e"를 치면 보관됐다). */
+/** A single key must not leak into an action while someone is typing in the ask bar, a composer or
+ *  the palette — typing an "e" used to archive the thread. */
 export function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return (

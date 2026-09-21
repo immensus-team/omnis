@@ -30,7 +30,7 @@ import {
 const OUT = join(REPO_ROOT, "docs/design/screens");
 const logger = createLogger("@omnis/shots");
 
-async function densify(pool: Pool): Promise<void> {
+export async function densify(pool: Pool): Promise<void> {
   const kernel = createKernel({ pool, logger });
   try {
     // Several needs-approval items, all through the kernel's real propose path.
@@ -294,4 +294,5 @@ async function main(): Promise<void> {
   }
 }
 
-await main();
+// Imported by hold.ts for densify(); only a direct run shoots.
+if (process.argv[1]?.endsWith("shots.ts")) await main();

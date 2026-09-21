@@ -13,6 +13,7 @@ import {
   DetailPaneToggle,
   LEAVE_MS,
   type PaletteAction,
+  type RailScreen,
   type RailSelection,
   type UiChannel,
   type UiSearchGroup,
@@ -29,6 +30,7 @@ import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState }
 import { decideApproval } from "./api/approvals.js";
 import { type SearchHit, search, toUiSearchGroups } from "./api/search.js";
 import { fetchSettings, putSetting } from "./api/settings.js";
+import { useKeymap } from "./hooks/use-keymap.js";
 import { AgentSession } from "./screens/AgentSession.js";
 import { Digest } from "./screens/Digest.js";
 import { Inbox, type OpenTarget } from "./screens/Inbox.js";
@@ -46,6 +48,19 @@ function getZero() {
   zeroClient ??= initZero();
   return zeroClient;
 }
+
+/** The other half of A5 §2.4's go-to pair. The letters live in hooks/use-keymap.ts (GOTO_KEYS:
+ *  `i` → `go-inbox`, …) next to the rest of the map; this is what those action names mean to the
+ *  shell, and it is the only place that reads them. */
+const GO_TO_SCREENS: Record<string, ShellScreen> = {
+  "go-inbox": "inbox",
+  "go-today": "today",
+  "go-tasks": "tasks",
+  "go-network": "network",
+  "go-notes": "notes",
+  "go-digest": "digest",
+  "go-settings": "settings",
+};
 
 /** A5 §2.4's keymap (useKeymap) deliberately ignores input with modifier keys, so Cmd+K is handled
  *  by the shell itself. */
@@ -98,19 +113,26 @@ function useShellWidth(): number {
 }
 
 /** The screens the shell can show. The rail switches between them by screen, not by route —
- *  there is no URL router in the desktop app (src-tauri loads one documents). */
-export type ShellScreen = "inbox" | "today" | "tasks" | "network" | "notes" | "digest" | "settings";
+ *  there is no URL router in the desktop app (src-tauri loads one documents).
+ *
+ *  An alias of the rail's own type rather than a second list: the tiles are what name the screens,
+ *  and packages/ui cannot import from an app, so the type lives there and the shell borrows it. */
+export type ShellScreen = RailScreen;
 
 export function App({ screen = "inbox" }: { screen?: ShellScreen }) {
   // Without ZeroProvider, useQuery dies with "useZero must be used within a ZeroProvider".
   return (
     <ZeroProvider zero={getZero()}>
-      <Shell screen={screen} />
+      <Shell initialScreen={screen} />
     </ZeroProvider>
   );
 }
 
-function Shell({ screen }: { screen: ShellScreen }) {
+function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
+  // The screen is shell state, not a prop: every way of changing it (a rail tile, `g` + a letter,
+  // a palette action) goes through goTo below, and a prop that the shell then re-assigns would be
+  // two owners for one value. The prop the shell is handed is where it *starts*.
+  const [screen, setScreen] = useState<ShellScreen>(initialScreen);
   const zero = useZeroClient();
   const [open, setOpen] = useState<OpenTarget | null>(null);
   // US-B30: a person is not a thread, so the detail pane's target is its own state rather than a
@@ -243,16 +265,80 @@ function Shell({ screen }: { screen: ShellScreen }) {
     setOpen({ threadId, agentSession: false });
   }, []);
 
+  /** The one way the screen changes, whichever control asked for it. It clears the pane's targets
+   *  with it: a thread or a person open in the pane belongs to the screen you were looking at, and
+   *  leaving it open would draw someone else's screen around it. The channel filter goes back to
+   *  "everything" only on the way *to* the Inbox, which is what `go-inbox` has always done — coming
+   *  back from Settings to the Slack view you left is the behaviour the tile's own press describes. */
+  const goTo = useCallback((next: ShellScreen) => {
+    setScreen(next);
+    setOpen(null);
+    setOpenPersonId(null);
+    if (next === "inbox") setRailChannel(null);
+  }, []);
+
+  // A5 §2.4's go-to half of the keymap. Inbox.tsx registers its own for the row actions (archive,
+  // unarchive, …) and the two handle disjoint action names, so `g` followed by a letter resolves
+  // here and a bare `e` there, with neither hook needing to know about the other.
+  useKeymap(
+    useCallback(
+      (action: string) => {
+        const target = GO_TO_SCREENS[action];
+        if (target !== undefined) goTo(target);
+      },
+      [goTo],
+    ),
+  );
+
   const actions: PaletteAction[] = [
     {
       id: "go-inbox",
       name: "Go to Inbox",
       shortcut: "g i",
       group: "Navigate",
-      perform: () => {
-        setOpen(null);
-        setRailChannel(null);
-      },
+      perform: () => goTo("inbox"),
+    },
+    {
+      id: "go-today",
+      name: "Go to Today",
+      shortcut: "g t",
+      group: "Navigate",
+      perform: () => goTo("today"),
+    },
+    {
+      id: "go-tasks",
+      name: "Go to Tasks",
+      shortcut: "g k",
+      group: "Navigate",
+      perform: () => goTo("tasks"),
+    },
+    {
+      id: "go-network",
+      name: "Go to Network",
+      shortcut: "g n",
+      group: "Navigate",
+      perform: () => goTo("network"),
+    },
+    {
+      id: "go-notes",
+      name: "Go to Notes",
+      shortcut: "g o",
+      group: "Navigate",
+      perform: () => goTo("notes"),
+    },
+    {
+      id: "go-digest",
+      name: "Go to Digest",
+      shortcut: "g d",
+      group: "Navigate",
+      perform: () => goTo("digest"),
+    },
+    {
+      id: "go-settings",
+      name: "Go to Settings",
+      shortcut: "g s",
+      group: "Navigate",
+      perform: () => goTo("settings"),
     },
   ];
 
@@ -460,7 +546,13 @@ function Shell({ screen }: { screen: ShellScreen }) {
       // there is exactly one number behind both shapes.
       style={{ "--detail-width": `${detailWidth}px` } as CSSProperties}
     >
-      <ChannelRail channels={connectedChannels} selected={railChannel} onSelect={setRailChannel} />
+      <ChannelRail
+        channels={connectedChannels}
+        selected={railChannel}
+        onSelect={setRailChannel}
+        screen={screen}
+        onScreenChange={goTo}
+      />
       <div className="app-shell__main">
         {/* The wide tier keeps the ask bar at the top of the list, where it has been since US-D01. */}
         {narrow ? null : askBar}

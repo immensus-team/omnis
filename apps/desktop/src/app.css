@@ -98,7 +98,11 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  /* v3 §c.7's section gap. The rail is three groups now — the Inbox tile, the screens, the channel
+     plate — and a group is separated by 6px of gap, never a rule. The plate used to sit 8px under
+     the Inbox tile; 6 is the same rhythm one step tighter, and it is the number the brief and §c.7
+     both name. (The narrow tier overrides this with its own bar gap.) */
+  gap: 6px;
   padding: 12px 0;
 }
 
@@ -156,10 +160,21 @@ body {
   background: var(--bg-elevated);
 }
 
+/* The size is the Inbox tile's own at every state; the dark fill is not. */
 .channel-rail__tile--inbox {
   width: 48px;
   height: 48px;
   margin-bottom: 4px;
+}
+
+/* loop-r1-01: the dark pill is the Inbox tile's *selected* look, so it is keyed to the state that
+   says so. It used to be unconditional, and that was L-33 — on Today, Tasks and Settings the tile
+   went on claiming "you are here" next to the screen tile that actually was, which is two filled
+   pills where ACCENT §4.4 allows one. `aria-pressed` and not a class: the attribute already carries
+   exactly this condition (`screen === "inbox" && selected === null`), so the fill cannot drift from
+   it. Same three declarations, no new colour — the tile is a plain 18px glyph off the Inbox, like
+   the screen tiles beside it. */
+.channel-rail__tile--inbox[aria-pressed="true"] {
   background: var(--gray-950, #14141a);
   color: var(--gray-000, #fff);
   box-shadow: var(--shadow-row-selected);
@@ -169,8 +184,23 @@ body {
   box-shadow: 0 0 0 2px var(--accent);
 }
 
-.channel-rail__more,
-.channel-rail__avatar {
+/* The five screen tiles. They stand outside the plate (a screen is not a channel — the same reason
+   the Inbox tile does), so the plate's own hover cannot reach them and they take their own. */
+.channel-rail__tile--screen:hover {
+  background: var(--bg-elevated);
+}
+
+/* ACCENT §4.4's "selected item = one filled pill", and the same two declarations every other
+   selected surface in this file uses. The state is `aria-current="page"` rather than `aria-pressed`
+   — a screen tile is not a toggle, and exactly one of them is the page you are on. The Inbox tile
+   is deliberately not in this rule: it is filled dark at rest, which is a different statement. */
+.channel-rail__tile--screen[aria-current="page"],
+.channel-rail__icon-button[aria-current="page"] {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.channel-rail__more {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -181,24 +211,6 @@ body {
   background: transparent;
   color: var(--text-tertiary);
   cursor: pointer;
-}
-
-.channel-rail__avatar {
-  width: 44px;
-  height: 44px;
-  background: var(--gray-950, #14141a);
-  color: var(--gray-000, #fff);
-  border-radius: 30%;
-}
-
-/* Account and Settings have no screen behind them yet. They are disabled rather than silently
-   inert, and they read as gated at the same 0.55 floor the ask panel's un-wired actions use — any
-   fainter and it stops looking gated and starts looking erased. */
-.channel-rail__avatar:disabled,
-.channel-rail__icon-button:disabled,
-.channel-rail__popover-row:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
 }
 
 .channel-rail__spacer {
@@ -212,12 +224,20 @@ body {
 .channel-rail__popover {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  /* §c.7: this is the gap *between* groups (the screens and the channels). Rows inside a group are
+     2px apart — see .channel-rail__popover-group. */
+  gap: 6px;
   min-width: 176px;
   padding: 6px;
   /* The floating-surface radius (DESIGN-DIRECTION radius scale) — same value as the filter
      popover. */
   border-radius: 12px;
+}
+
+.channel-rail__popover-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .channel-rail__popover-row {

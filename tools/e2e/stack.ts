@@ -16,14 +16,17 @@ import { MIGRATIONS_DIR, Pool, migrate, query } from "../../packages/db/src/inde
 export const E2E_DIR = fileURLToPath(new URL(".", import.meta.url));
 export const REPO_ROOT = join(E2E_DIR, "..", "..");
 export const EVIDENCE_DIR = join(E2E_DIR, "evidence");
-const LOG_DIR = join(E2E_DIR, ".logs");
+const LOG_DIR = join(E2E_DIR, ".logs", process.env.OMNIS_E2E_DB ?? "");
 const TMP_DIR = join(E2E_DIR, ".tmp");
 const ENV_FILE = join(E2E_DIR, ".env");
 
-export const DB_NAME = "omnis_e2e";
-export const HUB_PORT = 8787;
-export const ZERO_PORT = 4848;
-export const VITE_PORT = 5173;
+/** OMNIS_E2E_DB lets a worktree hold its own stack DB instead of sharing omnis_e2e. */
+export const DB_NAME = process.env.OMNIS_E2E_DB ?? "omnis_e2e";
+// OMNIS_E2E_PORT_OFFSET shifts all three so a second stack can run beside the default one.
+const OFFSET = Number(process.env.OMNIS_E2E_PORT_OFFSET ?? 0);
+export const HUB_PORT = 8787 + OFFSET;
+export const ZERO_PORT = 4848 + OFFSET;
+export const VITE_PORT = 5173 + OFFSET;
 /** Contract §8: this smoke's bridge attaches as the macbook host. */
 export const BRIDGE_HOST = "macbook";
 
@@ -58,6 +61,8 @@ export function loadOrCreateEnv(): E2EEnv {
     const eq = trimmed.indexOf("=");
     if (eq > 0) env[trimmed.slice(0, eq)] = trimmed.slice(eq + 1);
   }
+  if (process.env.OMNIS_E2E_DB)
+    env.DATABASE_URL = `postgres://${PG_SUPERUSER}@127.0.0.1:5432/${DB_NAME}`;
   return env;
 }
 
@@ -151,7 +156,8 @@ export async function waitForHttp(url: string, timeoutMs = 60_000): Promise<void
 
 export function startZeroCache(env: E2EEnv): void {
   mkdirSync(TMP_DIR, { recursive: true });
-  const replica = join(TMP_DIR, "zero-replica.db");
+  // Per DB: a second stack must not delete the first one's live replica.
+  const replica = join(TMP_DIR, `zero-replica-${DB_NAME}.db`);
   rmSync(replica, { force: true });
   start("zero-cache", join(REPO_ROOT, "apps/desktop/node_modules/.bin/zero-cache"), [], {
     ...process.env,
@@ -187,17 +193,22 @@ export function startDesktop(): void {
     ...process.env,
     // An empty string means a relative path → the vite dev proxy forwards to the hub (apps/desktop/vite.config.ts).
     OMNIS_HUB_HTTP_URL: "",
+    OMNIS_HUB_PORT: String(HUB_PORT),
+    OMNIS_DESKTOP_PORT: String(VITE_PORT),
+    OMNIS_ZERO_URL: `http://127.0.0.1:${ZERO_PORT}`,
   });
 }
 
 /** The PWA (apps/web). Same port as the desktop dev server on purpose: the shot tools bring up one
  *  front end at a time, and a second port would be one more thing to keep free. OMNIS_WEB_PORT is
  *  what apps/web/vite.config.ts reads; the empty hub URL is the same relative-path trick. */
-export function startWeb(): void {
+export function startWeb(port = VITE_PORT): void {
   start("web", "pnpm", ["--filter", "@omnis/web", "dev"], {
     ...process.env,
-    OMNIS_WEB_PORT: String(VITE_PORT),
+    OMNIS_WEB_PORT: String(port),
     OMNIS_HUB_HTTP_URL: "",
+    OMNIS_HUB_PORT: String(HUB_PORT),
+    OMNIS_ZERO_URL: `http://127.0.0.1:${ZERO_PORT}`,
   });
 }
 

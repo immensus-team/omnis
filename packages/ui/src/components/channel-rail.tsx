@@ -1,5 +1,15 @@
 import * as Popover from "@radix-ui/react-popover";
-import { ChevronDown, Inbox as InboxGlyph, Settings, User } from "lucide-react";
+import {
+  ChevronDown,
+  Inbox as InboxGlyph,
+  ListChecks,
+  Moon,
+  NotebookPen,
+  Settings,
+  Sun,
+  Users,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type * as React from "react";
 import { cn } from "../lib/cn.js";
@@ -21,11 +31,53 @@ import { GlassSurface } from "./glass-surface.js";
  *  whether or not an agent account is connected. */
 export type RailSelection = UiChannel | null;
 
+/** The screens the shell can show. The rail navigates by screen rather than by route — there is no
+ *  URL router in the desktop app. Declared and exported here because packages/ui may not import
+ *  from an app: apps/desktop/src/App.tsx's ShellScreen is an alias of this type. */
+export type RailScreen = "inbox" | "today" | "tasks" | "network" | "notes" | "digest" | "settings";
+
+/** One screen's rail entry: the tile in the wide rail is the same thing as the row in the narrow
+ *  popover, so both are drawn from this one list. `shortcut` is the letter the keymap resolves
+ *  (hooks/use-keymap.ts GOTO_KEYS) and the same one the palette's Navigate action shows — the title
+ *  is the only place the rail can say it, since the tiles are icon-only. */
+interface RailScreenEntry {
+  screen: RailScreen;
+  label: string;
+  icon: LucideIcon;
+  shortcut: string;
+}
+
+/** The five screens that stand as tiles in the wide rail, in the order they are drawn there. */
+const SCREEN_TILES: RailScreenEntry[] = [
+  { screen: "today", label: "Today", icon: Sun, shortcut: "g t" },
+  { screen: "tasks", label: "Tasks", icon: ListChecks, shortcut: "g k" },
+  { screen: "network", label: "Network", icon: Users, shortcut: "g n" },
+  { screen: "notes", label: "Notes", icon: NotebookPen, shortcut: "g o" },
+  { screen: "digest", label: "Digest", icon: Moon, shortcut: "g d" },
+];
+
+/** The sixth screen. In the narrow popover it is a row like the five above; in the wide rail it is
+ *  the button at the foot rather than a tile, so it is kept out of SCREEN_TILES. */
+const SETTINGS_ENTRY: RailScreenEntry = {
+  screen: "settings",
+  label: "Settings",
+  icon: Settings,
+  shortcut: "g s",
+};
+
+/** The popover's own list: the five tiles, then Settings. One array, so a screen cannot be missing
+ *  from the tier that cannot show the wide rail's tiles. */
+const POPOVER_ENTRIES: RailScreenEntry[] = [...SCREEN_TILES, SETTINGS_ENTRY];
+
 export interface ChannelRailProps {
   /** Connected channels (accounts), de-duplicated, in display order. */
   channels: UiChannel[];
   selected: RailSelection;
   onSelect: (selection: RailSelection) => void;
+  /** The screen the shell is showing. It is what the rail's own tiles mark as current, and what
+   *  tells the channel tiles whether they are even on screen. */
+  screen: RailScreen;
+  onScreenChange: (screen: RailScreen) => void;
 }
 
 /** Upper bound on the `tiles` that stand in the bottom bar — the Inbox tile is separate and is not
@@ -91,7 +143,13 @@ function applyLift(d: DragState): void {
   d.el.style.transform = `translate3d(${d.compX + d.dx}px, ${d.compY + d.dy}px, 0) scale(${LIFT_SCALE})`;
 }
 
-export function ChannelRail({ channels, selected, onSelect }: ChannelRailProps) {
+export function ChannelRail({
+  channels,
+  selected,
+  onSelect,
+  screen,
+  onScreenChange,
+}: ChannelRailProps) {
   // Agents is a fixed rail tile rather than a connected account — if an agent account does exist,
   // it takes that same slot instead of being appended twice.
   const tiles = useMemo(
@@ -333,12 +391,40 @@ export function ChannelRail({ channels, selected, onSelect }: ChannelRailProps) 
       <button
         type="button"
         className={cn("channel-rail__tile", "channel-rail__tile--inbox")}
-        aria-pressed={selected === null}
+        // The Inbox is a screen as well as a filter: it stays pressed only while it is both the
+        // screen on show and the unfiltered view. Pressed on every screen was the L-33 finding —
+        // a tile that claimed "you are here" from Today, Tasks and Settings alike.
+        aria-pressed={screen === "inbox" && selected === null}
         aria-label="Inbox"
-        onClick={() => onSelect(null)}
+        onClick={() => {
+          // A channel tile and the Inbox tile are the two ways back to the list from a screen, so
+          // both of them go through the shell — which also clears the pane's target, the same thing
+          // the previous screen change does.
+          if (screen !== "inbox") onScreenChange("inbox");
+          onSelect(null);
+        }}
       >
         <InboxGlyph size={18} aria-hidden="true" />
       </button>
+      {/* Outside the plate and outside the reorder, like the Inbox tile: a screen is not a channel,
+          so it takes no part in the drag (the drop slots the drag measures are the plate's tiles
+          only). Dashed in the narrow shell, where the same six screens are rows in the More
+          popover — a 320px bar cannot hold five more 44px tiles. */}
+      {narrow
+        ? null
+        : SCREEN_TILES.map(({ screen: target, label, icon: Icon, shortcut }) => (
+            <button
+              key={target}
+              type="button"
+              className="channel-rail__tile channel-rail__tile--screen"
+              aria-label={label}
+              title={`${label} (${shortcut})`}
+              aria-current={screen === target ? "page" : undefined}
+              onClick={() => onScreenChange(target)}
+            >
+              <Icon size={18} aria-hidden="true" />
+            </button>
+          ))}
       {/* US-D01: the plate used to be opaque white, which read as "a board laid on the canvas" and
           nothing more. It is real glass now (blur + saturate + tint + inner highlight + soft
           shadow = .glass-surface). The tiles stay on top of it — brand marks still read over glass.
@@ -369,7 +455,9 @@ export function ChannelRail({ channels, selected, onSelect }: ChannelRailProps) 
                 selected === channel && "channel-rail__tile--active",
                 dragging === channel && "channel-rail__tile--dragging",
               )}
-              aria-pressed={selected === channel}
+              // A channel filter is only the current view on the Inbox: picking Slack while Today
+              // is on show switches to the Inbox *and* filters it.
+              aria-pressed={screen === "inbox" && selected === channel}
               aria-label={CHANNEL_LABEL[channel]}
               aria-roledescription="reorderable"
               onPointerDown={(e) => {
@@ -384,6 +472,7 @@ export function ChannelRail({ channels, selected, onSelect }: ChannelRailProps) 
                   suppressClick.current = null;
                   return;
                 }
+                if (screen !== "inbox") onScreenChange("inbox");
                 onSelect(channel);
               }}
             >
@@ -395,6 +484,8 @@ export function ChannelRail({ channels, selected, onSelect }: ChannelRailProps) 
               tiles={shown.slice(NARROW_RAIL_TILE_LIMIT)}
               selected={selected}
               onSelect={onSelect}
+              screen={screen}
+              onScreenChange={onScreenChange}
             />
           ) : (
             // In the wide shell there is nothing to overflow, so the chevron is a mark, not a
@@ -410,21 +501,15 @@ export function ChannelRail({ channels, selected, onSelect }: ChannelRailProps) 
       {narrow ? null : (
         <>
           <div className="channel-rail__spacer" />
-          <button
-            type="button"
-            className="channel-rail__tile channel-rail__avatar"
-            aria-label="Account"
-            title={PHASE_B_TITLE}
-            disabled
-          >
-            <User size={16} aria-hidden="true" />
-          </button>
+          {/* Settings is a screen, so this is a real control now rather than the disabled lookalike
+              L-33 reported. There is no Account button: nothing is behind it. */}
           <button
             type="button"
             className="channel-rail__icon-button"
-            aria-label="Settings"
-            title={PHASE_B_TITLE}
-            disabled
+            aria-label={SETTINGS_ENTRY.label}
+            title={`${SETTINGS_ENTRY.label} (${SETTINGS_ENTRY.shortcut})`}
+            aria-current={screen === "settings" ? "page" : undefined}
+            onClick={() => onScreenChange("settings")}
           >
             <Settings size={16} aria-hidden="true" />
           </button>
@@ -440,19 +525,23 @@ export function ChannelRail({ channels, selected, onSelect }: ChannelRailProps) 
   );
 }
 
-/** The narrow shell's More popover: the tiles that did not fit in the bar, plus the avatar and
- *  settings. Unlike the 44px bar tiles there is room for words here, so each icon gets a label —
- *  an icon alone does not say which channel it is. The Radix Popover grammar is the same one
- *  filter-chip-bar.tsx's AddFilterPopover uses; this repo does not grow a second way to build a
- *  floating panel. */
+/** The narrow shell's More popover: the screens, then the tiles that did not fit in the bar.
+ *  Unlike the 44px bar tiles there is room for words here, so each icon gets a label — an icon
+ *  alone does not say which channel it is, still less which screen. The Radix Popover grammar is
+ *  the same one filter-chip-bar.tsx's AddFilterPopover uses; this repo does not grow a second way
+ *  to build a floating panel. */
 function RailOverflowPopover({
   tiles,
   selected,
   onSelect,
+  screen,
+  onScreenChange,
 }: {
   tiles: UiChannel[];
   selected: RailSelection;
   onSelect: (selection: RailSelection) => void;
+  screen: RailScreen;
+  onScreenChange: (screen: RailScreen) => void;
 }) {
   // Choosing a channel closes the popover (AddFilterPopover stays open because it is multi-select;
   // here one pick is the whole interaction).
@@ -472,40 +561,43 @@ function RailOverflowPopover({
           align="center"
           sideOffset={8}
         >
-          {tiles.map((channel) => (
-            <button
-              key={channel}
-              type="button"
-              className="channel-rail__popover-row"
-              aria-pressed={selected === channel}
-              onClick={() => {
-                onSelect(channel);
-                setOpen(false);
-              }}
-            >
-              <ChannelGlyph channel={channel} size={18} />
-              <span>{CHANNEL_LABEL[channel]}</span>
-            </button>
-          ))}
-          {/* The two that stand at the foot of the wide rail — gated here for the same reason. */}
-          <button
-            type="button"
-            className="channel-rail__popover-row"
-            title={PHASE_B_TITLE}
-            disabled
-          >
-            <User size={18} aria-hidden="true" />
-            <span>Account</span>
-          </button>
-          <button
-            type="button"
-            className="channel-rail__popover-row"
-            title={PHASE_B_TITLE}
-            disabled
-          >
-            <Settings size={18} aria-hidden="true" />
-            <span>Settings</span>
-          </button>
+          {/* v3 §c.7: two groups, separated by 6px of gap and never a rule — the popover's own gap
+              is that 6px, and the rows inside a group sit 2px apart. */}
+          <div className="channel-rail__popover-group">
+            {POPOVER_ENTRIES.map(({ screen: target, label, icon: Icon }) => (
+              <button
+                key={target}
+                type="button"
+                className="channel-rail__popover-row"
+                aria-current={screen === target ? "page" : undefined}
+                onClick={() => {
+                  onScreenChange(target);
+                  setOpen(false);
+                }}
+              >
+                <Icon size={18} aria-hidden="true" />
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+          <div className="channel-rail__popover-group">
+            {tiles.map((channel) => (
+              <button
+                key={channel}
+                type="button"
+                className="channel-rail__popover-row"
+                aria-pressed={screen === "inbox" && selected === channel}
+                onClick={() => {
+                  if (screen !== "inbox") onScreenChange("inbox");
+                  onSelect(channel);
+                  setOpen(false);
+                }}
+              >
+                <ChannelGlyph channel={channel} size={18} />
+                <span>{CHANNEL_LABEL[channel]}</span>
+              </button>
+            ))}
+          </div>
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
