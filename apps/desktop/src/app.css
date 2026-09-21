@@ -1463,6 +1463,10 @@ body {
    right). The hub's snippet is up to 160 characters of somebody's mail, so both cells have to be
    able to shrink — otherwise the row's min-content width becomes the panel's, and a long body
    pushes the panel past the viewport instead of ellipsizing. */
+.palette-search__hit {
+  gap: 8px;
+  align-items: center;
+}
 .palette-search__title,
 .palette-search__snippet {
   min-width: 0;
@@ -1470,11 +1474,27 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* The title takes whatever the badge and the snippet leave. Without this the row's
+   `space-between` would centre the title between them instead of leading with it. */
+.palette-search__title {
+  flex: 1 1 auto;
+}
 .palette-search__snippet {
   color: var(--text-secondary);
   font-size: 12px;
   /* The title leads; the snippet is the echo. */
+  flex: 0 1 auto;
   max-width: 60%;
+}
+/* A5 §2.5: where a memory came from (inbox / calendar / file / drive / github / self). A quiet pill
+   — it qualifies the row, it is not a second title. */
+.palette-search__source {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 11px;
 }
 /* A5 §2.5: a memory with no deep_link cannot be opened, so its row reads as unavailable — cmdk
    sets aria-disabled and drops the click handler, this is the half the eye sees. */

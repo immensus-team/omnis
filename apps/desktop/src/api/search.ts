@@ -59,7 +59,9 @@ const GROUP_LABELS: Record<UiSearchGroupKind, string> = {
 
 /** US-B27: the hub's response → what the palette renders. A memory with no `deep_link` is the one
  *  case A5 §2.5 calls out as unclickable; the palette's own order array fixes the group order, so
- *  the hub's order is not preserved here. */
+ *  the hub's order is not preserved here. `sourceKind` is only ever set on a memory hit (the hub
+ *  leaves it out everywhere else), and the palette has to read "absent" as "no badge" rather than
+ *  as an empty badge. */
 export function toUiSearchGroups(response: SearchResponse): UiSearchGroup[] {
   return response.groups.map((group) => ({
     kind: group.kind,
@@ -71,6 +73,7 @@ export function toUiSearchGroups(response: SearchResponse): UiSearchGroup[] {
         title: result.title,
         snippet: result.snippet,
         deepLinkDisabled: result.deep_link === null,
+        sourceKind: result.source_kind ?? null,
       }),
     ),
   }));

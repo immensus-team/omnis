@@ -266,7 +266,58 @@ const hit = (
   title: string,
   snippet: string,
   deepLinkDisabled = false,
-) => ({ kind, id, title, snippet, deepLinkDisabled });
+  sourceKind: string | null = null,
+) => ({ kind, id, title, snippet, deepLinkDisabled, sourceKind });
+
+describe("CommandPalette search memory badge (A5 §2.5 source_kind)", () => {
+  it("shows the source badge on a memory row and nowhere else", () => {
+    const groups: UiSearchGroup[] = [
+      {
+        kind: "items",
+        label: "Items",
+        results: [hit("item", "i1", "omnis launch sync", "sync tomorrow")],
+      },
+      {
+        kind: "memories",
+        label: "Memories",
+        results: [hit("memory", "m1", "Preference", "prefers morning meetings", false, "calendar")],
+      },
+    ];
+    render(
+      <CommandPalette
+        open
+        onOpenChange={() => {}}
+        actions={[]}
+        search={{ groups, loading: false, onQueryChange: () => {}, onSelectHit: () => {} }}
+      />,
+    );
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "prefers" } });
+
+    // The dialog renders into a portal, so the rows are not inside the test's container.
+    const badges = document.querySelectorAll(".palette-search__source");
+    expect(badges).toHaveLength(1);
+    expect(badges[0]).toHaveTextContent("calendar");
+    // The badge belongs to the memory row, not to the item above it.
+    expect(badges[0]?.closest("[cmdk-item]")).toHaveTextContent("Preference");
+  });
+
+  it("draws no badge for a hit the hub sent without a source", () => {
+    const groups: UiSearchGroup[] = [
+      { kind: "threads", label: "Threads", results: [hit("thread", "t1", "omnis launch", "sync")] },
+    ];
+    render(
+      <CommandPalette
+        open
+        onOpenChange={() => {}}
+        actions={[]}
+        search={{ groups, loading: false, onQueryChange: () => {}, onSelectHit: () => {} }}
+      />,
+    );
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "launch" } });
+
+    expect(document.querySelectorAll(".palette-search__source")).toHaveLength(0);
+  });
+});
 
 describe("CommandPalette search mode (A5 §2.5 fixed group order, memory deep_link click disabled)", () => {
   it("renders people before memories and blocks a deep_link-less memory hit", () => {

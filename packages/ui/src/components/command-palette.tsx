@@ -40,6 +40,9 @@ export interface UiSearchHit {
   snippet: string;
   /** A5 §2.5: a memory with no `deep_link` has nowhere to go, so its row is not clickable. */
   deepLinkDisabled: boolean;
+  /** A5 §2.5's memory badge (inbox / calendar / file / drive / github / self). Null everywhere
+   *  else — and null on an older memory row that carries no source. */
+  sourceKind: string | null;
 }
 
 export interface UiSearchGroup {
@@ -87,11 +90,16 @@ function SearchResultList({ query, search }: { query: string; search: CommandPal
             {group.results.map((result) => (
               <Command.Item
                 key={`${result.kind}:${result.id}`}
+                className="palette-search__hit"
                 disabled={result.deepLinkDisabled}
                 onSelect={() => {
                   if (!result.deepLinkDisabled) search.onSelectHit(result);
                 }}
               >
+                {/* A5 §2.5's memory badge — where this memory came from (inbox/calendar/file/…). */}
+                {result.sourceKind !== null && (
+                  <span className="palette-search__source">{result.sourceKind}</span>
+                )}
                 <span className="palette-search__title">{result.title}</span>
                 {result.snippet !== "" && result.snippet !== result.title && (
                   <span className="palette-search__snippet">{result.snippet}</span>

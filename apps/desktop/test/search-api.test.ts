@@ -50,7 +50,12 @@ describe("search (contract §7 GET /search)", () => {
 });
 
 describe("toUiSearchGroups (A5 §2.5 — what the palette renders)", () => {
-  const hit = (kind: "person" | "thread" | "item" | "memory", id: string, deepLink: unknown) => ({
+  const hit = (
+    kind: "person" | "thread" | "item" | "memory",
+    id: string,
+    deepLink: unknown,
+    sourceKind?: string,
+  ) => ({
     kind,
     id,
     score: 1,
@@ -59,6 +64,9 @@ describe("toUiSearchGroups (A5 §2.5 — what the palette renders)", () => {
     at: null,
     channel: null,
     deep_link: deepLink,
+    // The hub only sends source_kind on a memory hit, so it is spread in conditionally rather than
+    // set to undefined (exactOptionalPropertyTypes rejects the latter).
+    ...(sourceKind === undefined ? {} : { source_kind: sourceKind }),
   });
 
   const full: SearchResponse = {
@@ -76,7 +84,7 @@ describe("toUiSearchGroups (A5 §2.5 — what the palette renders)", () => {
         total: 2,
         results: [
           hit("memory", "m1", null),
-          hit("memory", "m2", { screen: "thread", item_id: "i9" }),
+          hit("memory", "m2", { screen: "thread", item_id: "i9" }, "calendar"),
         ],
       },
     ],
@@ -94,6 +102,11 @@ describe("toUiSearchGroups (A5 §2.5 — what the palette renders)", () => {
     const [people, memories] = toUiSearchGroups(full);
     expect(people?.results.map((r) => r.deepLinkDisabled)).toEqual([false]);
     expect(memories?.results.map((r) => r.deepLinkDisabled)).toEqual([true, false]);
+  });
+
+  it("carries source_kind through as the badge, and reads a missing one as no badge", () => {
+    const [, memories] = toUiSearchGroups(full);
+    expect(memories?.results.map((r) => r.sourceKind)).toEqual([null, "calendar"]);
   });
 
   it("has a label for all four of the hub's group kinds", () => {
