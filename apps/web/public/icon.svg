@@ -1,0 +1,14 @@
+<!-- The app mark: the omnis orb (tokens.css --aurora-orb) on the ink tile the rail uses for Inbox.
+     SVG only — a rasterized 180/192/512 set is a follow-up (Safari falls back to a screenshot of
+     the page for `apple-touch-icon`, which is why the README's install steps say so). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="orb" cx="35%" cy="28%" r="78%">
+      <stop offset="0" stop-color="oklch(0.9 0.08 90)" />
+      <stop offset="0.55" stop-color="oklch(0.75 0.1 30)" />
+      <stop offset="1" stop-color="oklch(0.35 0.15 270)" />
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="115" fill="oklch(0.26 0.008 80)" />
+  <circle cx="256" cy="256" r="132" fill="url(#orb)" />
+</svg>

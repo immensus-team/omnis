@@ -190,6 +190,17 @@ export function startDesktop(): void {
   });
 }
 
+/** The PWA (apps/web). Same port as the desktop dev server on purpose: the shot tools bring up one
+ *  front end at a time, and a second port would be one more thing to keep free. OMNIS_WEB_PORT is
+ *  what apps/web/vite.config.ts reads; the empty hub URL is the same relative-path trick. */
+export function startWeb(): void {
+  start("web", "pnpm", ["--filter", "@omnis/web", "dev"], {
+    ...process.env,
+    OMNIS_WEB_PORT: String(VITE_PORT),
+    OMNIS_HUB_HTTP_URL: "",
+  });
+}
+
 /** If an earlier run or another worktree holds the ports, we would silently mistake it for "already up". */
 export function assertPortsFree(): void {
   for (const port of [HUB_PORT, ZERO_PORT, VITE_PORT]) {

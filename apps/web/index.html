@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- UX-28 (A5 §4.1): `viewport-fit=cover` is what makes the env(safe-area-inset-*) values
+         non-zero on a notched iPhone. Without it the shell's bottom bar sits on the home indicator
+         and the top bar under the status bar, and both are unreachable by CSS. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#faf8f4" />
+    <!-- Safari ignores `display: standalone` in the manifest when it adds a page to the home
+         screen; these two are what make the added app launch without Safari's chrome (A5 §4.5). -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="omnis" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>omnis</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
