@@ -31,3 +31,24 @@ export async function handleDigestUndo(
   const restored = await deps.undoArchive({ undoToken }, "me");
   return { restored };
 }
+
+export interface DiscardRouteDeps {
+  /** Archives the item if — and only if — it is still a `draft`. Returns whether a row moved. */
+  discardDraft(itemId: string): Promise<boolean>;
+}
+
+/** POST /items/:id/discard — loop-r2-02's way out of a draft that has **no** approval left to decide
+ *  it. A draft that *is* an approval is discarded by ignoring that approval (the kernel consumes it
+ *  there); this route exists for the standalone draft, the one whose proposing agent never raised an
+ *  approval. The `status = 'draft'` guard is the whole safety property: a message that has already
+ *  reached the channel is not a draft, and this cannot archive it.
+ *
+ *  Writes go through the hub's HTTP boundary like every other write (Zero grants no write
+ *  permissions — zero-schema.ts), which is why this is a route and not a Zero mutation. */
+export async function handleDiscardDraft(
+  deps: DiscardRouteDeps,
+  itemId: string,
+): Promise<{ id: string; status: "archived" } | null> {
+  const archived = await deps.discardDraft(itemId);
+  return archived ? { id: itemId, status: "archived" } : null;
+}
