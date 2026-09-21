@@ -36,12 +36,13 @@ body {
 }
 
 body {
-  /* U1: warm off-white canvas with a faint grid behind it (DESIGN-DIRECTION.md, 23 §2, measured
-     approximation). Under data-theme="dark", tokens.css clears --canvas-grid to none and the canvas
-     becomes a plain flat colour.
-     US-D06 §1.3: the peach/mint radials are gone (monotone base), and with them the four-value
-     background-repeat list that was written against a four-layer image — what is left is a
-     two-layer image, so one value applies to all layers. */
+  /* Warm off-white canvas, plain paper. US-D06 §1.3 removed the peach/mint radials and the
+     four-value background-repeat list that was written against a four-layer image; US-D08 §b.2
+     removed the faint grid that was left, so `--canvas-grid` is `none` in both theme blocks and
+     these three lines resolve to no image at all. They are kept rather than deleted because the
+     token is the switch: a future surface that wants a pattern turns it on in one place instead of
+     re-deriving the background shorthand's layer/position/size coupling.
+     The canvas's only texture is the 3.5% film grain `.app-shell::before` paints (below). */
   background-color: var(--bg-canvas);
   background-image: var(--canvas-grid);
   background-size: var(--canvas-grid-size);
@@ -242,6 +243,72 @@ body {
 .channel-rail__popover-row svg {
   flex: 0 0 auto;
   color: var(--text-secondary);
+}
+
+/* D7 §c.2: the reorder's duration. Every other rung of the motion ladder lives in tokens.css; this
+   one is declared here instead because tokens.css's reduced-motion block must carry no `0ms` rung at
+   all — motion.test.tsx asserts it, and a zero duration is what a rung collapses *to*, not what it
+   is. --dur-reorder is exactly that case: 220ms of travel that becomes 0ms under reduce.
+   Scoped to the rail, so it inherits down to the tiles and the rail does not grow a second use
+   before a second surface needs one. Its curve, --ease-settle, is a plain value token with no 0ms
+   rung of its own and lives in tokens.css (US-D08 moved it there when the row swipe became its
+   second consumer — one value, one home). */
+.channel-rail {
+  --dur-reorder: 220ms;
+}
+
+/* §c.2: the plate's tiles are the reorderable ones, and the grab cursor is the one affordance that
+   says so. The Inbox tile is outside the plate (it is "show everything", not a channel) and keeps
+   the plain pointer — the plate is also exactly the set the drop slots are measured over. */
+.channel-rail__plate .channel-rail__tile {
+  cursor: grab;
+}
+
+/* The tile that is in hand. It has to leave the plate's row for the drag to read as "this one is
+   moving, those are making room", and the plate has no `overflow` of its own — the tile is only
+   lifted above its siblings.
+   No `touch-action` here on purpose: it would land after the lift, and a touch-action that arrives
+   mid-gesture is ignored — the browser resolved the gesture from the element it started on. So the
+   narrow tier's "once the hold fires, the finger is the drag's" is enforced where the gesture
+   lives, not in CSS: pointer-drag.ts cancels the touchmove from the moment the drag starts, and
+   leaves the scroll untouched until then. */
+.channel-rail__tile--dragging {
+  /* No `position` here, and that is deliberate. `z-index` was the only reason to want one, and the
+     plate is `display: flex` — a flex item takes `z-index` with a static position (Flexbox §5.4),
+     so the lift paints above its neighbours either way. Adding `position: relative` with no offsets
+     moves nothing but does change what the browser *reports*: Blink resolves `top`/`left` to their
+     used value (0) once a box is positioned, so the same tile reads `top: auto` at rest and
+     `top: 0px` mid-drag. §d's "moves on transform only" check compares exactly those properties,
+     and `auto -> 0px` is a false positive that a reviewer would have to reason their way out of. */
+  z-index: 1;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-glass);
+  cursor: grabbing;
+  /* A drag across the rail must not paint a text selection under the finger. */
+  user-select: none;
+}
+
+/* "This is the current view" and "this is being dragged" are different states, and the ring has to
+   survive the lift. Written as two classes so it beats both rules above on specificity rather than
+   on source order. */
+.channel-rail__tile--dragging.channel-rail__tile--active {
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow-glass);
+}
+
+/* §c.2: the announcement the keyboard reorder makes. The rail's tiles are icon-only, so this is the
+   only place the reorder can say what it did — visually hidden, but the same 1px clipped box the
+   rest of the app hides spoken-only text in, and out of flow so it cannot push the rail's column
+   around. */
+.channel-rail__announce {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 .app-shell__main {
@@ -676,13 +743,30 @@ body {
    "Archived" broke across two lines). The whole filter UI moved down into the single strip
    below. */
 .inbox-card__header {
-  padding: 14px 16px 8px;
+  padding: 20px 16px 4px;
 }
 
 .inbox-card__title {
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
+  /* US-D08 §b.4: 28px/700 desktop, 32px in the `<900` shell tier (raised with the rest of that
+     tier's type, further down). The title is the screen's one large piece of text; the subline
+     below is the small print that makes it a header rather than a label. */
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+/* US-D08 §c.3: `channel · Updated 3m · 12 unread`, minus any segment with nothing to say. 13px at
+   every width (the tier raises the chips and the rows, not this) — it is a caption, and captions do
+   not need to grow to stay readable. */
+.inbox-card__subline {
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  /* It carries the newest time and the unread count, and a count that jitters as it changes is the
+     one thing tabular figures exist to prevent (§b.4). */
+  font-variant-numeric: tabular-nums;
 }
 
 /* US-D02b: the whole filter UI — radio pills, the Archived toggle and the label chips on one
@@ -701,9 +785,12 @@ body {
   scrollbar-width: none;
   /* `overflow-x: auto` forces the computed `overflow-y` to `auto` as well, so anything drawn
      outside a child's box — a focus ring above all — is clipped by this 40px strip. The vertical
-     padding is that ring's room: 4px above and 6px below clears `outline-offset: 1px` + a 2px
-     outline while the strip stays within its 40px budget. */
-  padding: 4px 16px 6px;
+     padding is that ring's room: 4px above and 4px below clears `outline-offset: 1px` + a 2px
+     outline, and the strip stays inside its 40px budget while holding a 32px chip.
+     US-D08 §c.3: the chips are `--chip-h` (32px) at every width now, so that budget is met at the
+     base rule and the `<560` block no longer trims the bottom padding back — the correction that
+     used to live there had nothing left to correct. */
+  padding: 4px 16px 4px;
   mask-image: linear-gradient(
     to right,
     transparent,
@@ -737,34 +824,52 @@ body {
   gap: 4px;
 }
 
+/* US-D08 §c.3: the Mail category chip — a filled pill with a 16px glyph and a 13px/500 label, not
+   the hairline-outlined tab that stood here. The fill is what makes the row read as a set of
+   choices rather than as a toolbar; the outline was doing the opposite, and the one that is chosen
+   is the one filled with the accent. */
 .inbox-card__pills button {
-  border: var(--hairline);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--chip-h);
+  padding: 0 14px;
+  border: 0;
   border-radius: 999px;
-  padding: 1px 8px;
-  background: transparent;
+  background: var(--chip-bg);
   color: var(--text-secondary);
   font: inherit;
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
+  /* The strip scrolls sideways; a chip that shrinks to fit is the folding bug in a new costume. */
+  flex: 0 0 auto;
 }
 
+.inbox-card__pills button svg {
+  flex: 0 0 auto;
+}
+
+/* §c.3: the active chip is the accent fill and nothing else — no border, no shadow, no scale. The
+   count badge rides on that fill, so it is white-on-accent at 65% opacity: it has to be legible
+   against the accent, not against the paper it stopped sitting on. */
 .inbox-card__pills button[aria-checked="true"] {
   background: var(--accent);
   color: var(--accent-fg);
-  border-color: transparent;
 }
 
 .inbox-card__archived-pill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  border: var(--hairline);
-  border-radius: 999px;
-  padding: 1px 8px;
-  background: transparent;
+  justify-content: center;
+  width: var(--chip-h);
+  height: var(--chip-h);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--chip-bg);
   color: var(--text-secondary);
   font: inherit;
-  font-size: 11px;
   cursor: pointer;
   /* Same as the filter row's other children — this button does not shrink as the pane does. */
   flex: 0 0 auto;
@@ -785,28 +890,17 @@ body {
 .inbox-card__archived-pill[aria-pressed="true"] {
   background: var(--accent);
   color: var(--accent-fg);
-  border-color: transparent;
-}
-
-/* The icon stands in for the word only in a narrow pane (@container list below) — wide keeps the
-   word alone. */
-.inbox-card__archived-icon {
-  display: none;
 }
 
 /* U2: the kinso conversation row — avatar | (name·time / summary·chips) | (channel mark or status
    badge). A 3-column x 2-row grid whose right slot spans both rows and centres vertically
    (measured from kinso — pinned to the row's right edge, 23 §2). */
 .inbox-row {
-  display: grid;
-  /* US-D02b: the middle column must be minmax(0, 1fr) — a bare 1fr has a min-content minimum, so
-     a long title widens the row (horizontal scroll) and wraps to two lines instead of
-     ellipsizing. That one word is most of this fix. */
-  grid-template-columns: 40px minmax(0, 1fr) auto;
-  grid-template-rows: auto auto;
-  column-gap: 12px;
-  row-gap: 4px;
-  align-items: center;
+  /* US-D08 §c.4: the row is a plain box, not the grid it used to be — the swipe translates a
+     content wrapper inside it. Both of the things that live on this box have to stay put while the
+     content moves: the hairline is the list's grammar and divides these boxes, and the archive
+     collapse measures *this* element (a transformed box reports a transformed rect, so measuring
+     the wrapper would measure it mid-swipe). */
   /* U1/U2/U5: generous row height — kinso lowers density with padding well beyond 10px.
      P1 (kinso polish): settled on a 12px vertical rhythm (DESIGN-DIRECTION P1).
      US-D04: the vertical half is a named value because the archive collapse has to take the padding
@@ -815,8 +909,12 @@ body {
      @keyframes inbox-row-leave below. */
   --row-pad-y: 12px;
   padding: var(--row-pad-y) 16px;
-  /* No hairline separators (23 §2 — kinso divides rows with padding alone). Only the selected row
-     is set apart, by .inbox-row--selected's card and shadow. */
+  /* US-D08 §c.4: kinso divided rows with padding alone (23 §2); the v3 amendment allows a hairline,
+     and the inset is the whole of what makes it read as Mail (M100, M143) rather than as a table.
+     Drawn as a pseudo-element rather than `border-bottom` because a border is full-bleed by
+     construction — the inset and the 1px height are the feature, not decoration on top of one, and
+     a border would also join the row's box, which the height-collapse animation measures. */
+  position: relative;
   cursor: pointer;
   /* US-D04: the selection elevation. A row does not blink into a card — the fill, the radius and
      the shadow travel together over the entry rung (160ms, --dur-base) so pointing at a row and
@@ -828,6 +926,36 @@ body {
     var(--ease-spring), box-shadow var(--dur-base) var(--ease-spring);
 }
 
+/* US-D08 §c.4: the half of the row the swipe moves. Everything the grid used to lay out is in here,
+   so the two halves of the row — the divider and the collapse on the row's box, the text on this
+   one — can be positioned independently. */
+.inbox-row__content {
+  display: grid;
+  /* US-D02b: the middle column must be minmax(0, 1fr) — a bare 1fr has a min-content minimum, so
+     a long title widens the row (horizontal scroll) and wraps to two lines instead of
+     ellipsizing. That one word is most of this fix.
+     US-D08 §c.4: the leading 10px is the unread gutter. It is reserved on every row whether or not
+     there is a dot, so a read row and an unread one keep the same text origin — and that origin is
+     `--row-rule-inset` (16 padding + 10 + 12 + 40 + 12), which is where the hairline below starts.
+     Change one of these four numbers and the token has to move with it; the arithmetic is written
+     out in tokens.css next to --row-rule-inset. */
+  grid-template-columns: 10px 40px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  row-gap: 4px;
+  align-items: center;
+  /* The swipe's travel (`transform`, written inline by inbox-row.tsx) and its spring back. Nothing
+     else on this element is transitioned, so the row's own fill and elevation stay on the row's own
+     transition above and the two never fight over a property. */
+  transition: transform var(--dur-swipe) var(--ease-spring);
+}
+
+/* While the finger is down the content follows it exactly. 200ms of easing between the pointer and
+   the thing it is dragging reads as lag, not as motion. */
+.inbox-row--swiping .inbox-row__content {
+  transition: none;
+}
+
 .inbox-row--selected {
   background: var(--bg-base);
   /* P1: kinso's selection card has a shallow radius (8px) — the previous 14px was sized against
@@ -837,9 +965,37 @@ body {
   box-shadow: var(--shadow-row-selected);
 }
 
+/* US-D08 §c.4: the row hairline. `--row-rule-inset` on the left, the row's own 16px padding on the
+   right, 1px tall at the row's bottom edge.
+   The ink is written out rather than read from `--border-row`: that token is a `border` shorthand
+   (width + style + colour) and `background` cannot take it. They are the same value in two
+   syntaxes, and they have to stay equal — the value is also what the reviewer check reads off
+   `getComputedStyle(row, "::after").background`, where it must be at or under 8% alpha. */
+.inbox-row::after {
+  content: "";
+  position: absolute;
+  left: var(--row-rule-inset);
+  right: 16px;
+  bottom: 0;
+  height: 1px;
+  background: oklch(0.2 0.004 80 / 0.07);
+  /* The rule must not eat the row's own click. */
+  pointer-events: none;
+}
+
+/* §c.4: the last row has no rule — a divider under the final row divides it from nothing, and in a
+   scroller it is the line that hangs in the air when the list is scrolled to the end.
+   It is a class from the screen rather than `:last-child` on purpose. Virtuoso does not put the rows
+   in one container: each item is wrapped in its own `<div data-index …>` and the row is that div's
+   only child, so `.inbox-row:last-child` matches **every** row and would delete the whole feature
+   silently. Nothing in the row's own DOM says which one is last, so the list has to say it. */
+.inbox-row--last::after {
+  display: none;
+}
+
 .inbox-row__avatar {
   grid-row: 1 / span 2;
-  grid-column: 1;
+  grid-column: 2;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -857,9 +1013,11 @@ body {
 .inbox-row__avatar--runtime {
   background: var(--gray-950, #14141a);
   color: var(--gray-000, #fff);
-  /* P1: a runtime logo tile, told apart from a person's circular avatar by shape — the same
-     squircle the channel-rail tiles use. */
-  border-radius: 30%;
+  /* US-D08 §c.4: a runtime logo tile is told apart from a person by shape — always was. The ratio
+     used to be 30%, which is a squircle only at 40px and an accident at any other size; 10px is
+     the same shape stated as the corner it actually is. (Mail's M100 app tiles are squircles and
+     M143's people are circles; that split is the one thing this rule has to keep.) */
+  border-radius: 10px;
 }
 
 .inbox-row__avatar-img {
@@ -870,7 +1028,7 @@ body {
 
 .inbox-row__meta {
   grid-row: 1;
-  grid-column: 2;
+  grid-column: 3;
   display: flex;
   align-items: baseline;
   gap: 6px;
@@ -900,12 +1058,19 @@ body {
   font-weight: 700;
 }
 
+/* US-D08 §c.4: the dot left the meta line for the gutter. Beside the name it pushed the name and
+   the time along by its own width, so an unread row's text started 12px right of a read row's —
+   every unread row in the list was misaligned with every read one. In its own column, centred
+   across both rows, both states start at the same x. */
 .inbox-row__unread-dot {
-  width: 6px;
-  height: 6px;
+  grid-row: 1 / span 2;
+  grid-column: 1;
+  justify-self: center;
+  align-self: center;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--accent);
-  flex: 0 0 auto;
 }
 
 .inbox-row__timestamp {
@@ -927,7 +1092,7 @@ body {
      its lower half lands exactly over this line). Spilling to `2 / span 2` here buries the label
      chips under the channel mark, the approval dot and the archive button — the spot that had
      been broken ever since US-A33. The chips end in column 2. */
-  grid-column: 2;
+  grid-column: 3;
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -963,7 +1128,7 @@ body {
 
 .inbox-row__side {
   grid-row: 1 / span 2;
-  grid-column: 3;
+  grid-column: 4;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1144,16 +1309,15 @@ body {
   font-size: 12px;
 }
 
-/* US-D06 §1.4 row 8: this is a text-only affordance whose only signal was the accent's hue. At
-   graphite it is plain body copy and reads as a label rather than a control, so the underline carries
-   the affordance instead of the colour. */
+/* US-D06 §1.4 row 8 added an underline here — at graphite the colour alone made a text-only
+   affordance read as body copy. US-D08/ACCENT §1.4 drops that fix: with the accent blue again, blue
+   text on paper is a sufficient link affordance and is exactly Mail's "Unsubscribe" (M120, M112), so
+   the underline comes back off and the colour carries it. */
 .thread-screen__archived-banner button {
   border: none;
   background: none;
   padding: 0;
   color: var(--accent);
-  text-decoration: underline;
-  text-underline-offset: 2px;
   font: inherit;
   cursor: pointer;
 }
@@ -1559,9 +1723,12 @@ body {
    exactly one group). Inside a tab it has nothing to shift against, so it needs no tabular-nums,
    and it inherits the current label colour instead of going grey so it reads as part of the
    tab. */
+/* US-D08 §c.3: the count used to be faded to 0.65 to sit behind the word. On the active chip that
+   fade was white *at 65% over the accent fill* — 3.4:1, under the 4.5:1 the chip's own label has to
+   clear, on the one chip that is filled. The count now inherits the chip's ink (4.8:1 on accent,
+   and the same `--text-secondary` as the label on a grey chip) and is told apart by position alone;
+   the chip's own `gap` is what separates it from the word. */
 .inbox-card__pill-count {
-  margin-left: 5px;
-  opacity: 0.65;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1681,18 +1848,21 @@ body {
 .filter-chip button:active {
   transform: scale(0.9);
 }
+/* US-D08 §c.3: the "+ Label" trigger is the Archived toggle's twin — a 32px circle in the same
+   `--chip-bg`, icon-only at every width. The word went with the label element; the field name lives
+   in the aria-label and the tooltip (the component states both). */
 .filter-chip-bar__add {
-  /* "+" and the label word as one unit — when the word goes in a narrow pane, the "+" stays. */
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  border: var(--hairline);
-  border-radius: 8px;
-  padding: 3px 10px;
-  background: transparent;
+  justify-content: center;
+  width: var(--chip-h);
+  height: var(--chip-h);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--chip-bg);
   color: var(--text-secondary);
   font: inherit;
-  font-size: 12px;
   cursor: pointer;
   flex: 0 0 auto;
   transition: background var(--dur-base) var(--ease-spring), color var(--dur-base)
@@ -2029,37 +2199,149 @@ body {
 
 /* <900: one column for the list. The rail folds into a bottom bar (only in this tier does
    ChannelRail draw four tiles plus More and move the avatar and settings into the More popover —
-   its JS breakpoint is channel-rail.tsx's NARROW_RAIL_QUERY and must match this number), and the
-   detail pane becomes a full-width sheet with 16px of margin each side. */
+   its JS breakpoint is lib/media-query.ts's NARROW_SHELL_QUERY and must match this number, as does
+   every other JS-side reader of the tier), and the detail pane becomes a full-width sheet with
+   16px of margin each side. */
 @container shell (max-width: 899.98px) {
   .app-shell,
   .app-shell--with-detail {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* This is the tier where the rail has already collapsed to a bottom bar, i.e. the coarse-pointer
-     layout: `:hover` is not something a finger does, and there is no swipe or long-press standing
-     in for it, so the hover-only Archive/Restore button is not merely hidden here, it is
-     unreachable — and a pill that fades in over the brand mark is worse than nothing on a screen
-     where it can never legitimately appear. Switching it off entirely also keeps the row's grid
-     column free of it, which is what the responsive sweep asserts at these widths.
-     (It does not need switching off to stop taking layout — `.inbox-row__action` is absolute at
-     every width now, so the column is sized by the brand mark alone. This is purely about a
-     control that cannot be operated.) Archiving from a touch layout goes through the thread itself
-     until there is a gesture for it. */
-  .inbox-row__action {
-    display: none;
+  /* US-D08 §b.4: this tier's type steps up — the header and the chips are read at arm's length
+     here. The tier is the *shell's* width, not the list pane's: at 768px with the detail pane open
+     the list is still ~736px, so the `list` query that folds the chip labels away never fires, and
+     the one label that stays is the one that grows. That is the intended pairing, not a
+     coincidence — an icon-only chip does not care what size its hidden label is. */
+  .inbox-card__title {
+    font-size: 32px;
   }
 
-  /* Keeps the fixed bar off the last row and the ask bar — the bar's 56px plus room to
-     breathe. */
+  .inbox-card__pills button {
+    font-size: 14px;
+  }
+
+  .inbox-row__name {
+    font-size: 16px;
+  }
+
+  .inbox-row__timestamp {
+    font-size: 13px;
+  }
+
+  .inbox-row__summary {
+    font-size: 14px;
+  }
+
+  /* US-D08 §c.4: the selected row stops being a white card in this tier. A card is a thing resting
+     on a surface; here the list is the whole screen and there is no surface left for it to rest on,
+     so the row is tinted in place instead — the same fill hover uses, with the shadow and the
+     radius dropped. The hairline stays: it is the list's grammar, not the selection's. */
+  .inbox-row--selected,
+  .inbox-row--selected:hover {
+    background: var(--state-hover);
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  /* US-D08 §c.4: the hover-only Archive/Restore button is no longer switched off in this tier. It
+     was, because `:hover` is not something a finger does and there was no gesture standing in for
+     it — but there is one now, the swipe below, and the pill is the half of guard 11 that a gesture
+     cannot be: focusable, named, and revealed by `:focus-within` the moment a keyboard or a screen
+     reader reaches it. A finger can operate it too (a tap focuses the row).
+     It never takes the title's width either way: it is absolute, so the grid column is still sized
+     by the brand mark alone — which is what shots-responsive.ts measures now that the button is
+     back (the rule that used to be here is what that check used to find). */
+
+  /* §c.4: the swipe, in the one tier that has it — the tier where the rail has already collapsed
+     to a bottom bar, i.e. the coarse-pointer layout. */
+  .inbox-row {
+    /* The translating content would otherwise paint past the row's left edge and widen the page. */
+    overflow: hidden;
+    /* The browser keeps the vertical scroll and only that: without this a horizontal drag is read
+       as a scroll (or as the back gesture at the screen's edge) and arrives as `pointercancel`. */
+    touch-action: pan-y;
+  }
+
+  /* A drag is not a text selection. Without this, dragging a mouse across the summary selects the
+     words *and* swipes the row — and a two-word drag is 88px on a narrow window. */
+  .inbox-row__content {
+    user-select: none;
+  }
+
+  /* What the swipe uncovers: one 56px action with an 11px caption under it (M167), anchored to the
+     row's own 16px right padding. It is first in the DOM so the content paints over it, and it fades
+     in rather than being uncovered — the row has no opaque fill of its own for the content to hide
+     it with, which is what a Mail cell has and this one does not. */
+  .inbox-row__swipe {
+    position: absolute;
+    top: 0;
+    right: 16px;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-swipe) var(--ease-spring);
+  }
+
+  .inbox-row--revealed .inbox-row__swipe {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* The disc and its caption are one button, not two: the caption is under the circle at 11px, and
+     the pair is what the row's travel has to clear. */
+  .inbox-row__swipe-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .inbox-row__swipe-disc {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+
+  .inbox-row__swipe-caption {
+    font-size: 11px;
+    line-height: 1;
+    color: var(--text-secondary);
+  }
+
+  /* Keeps both fixed bars off the last row: the rail bar's 56px, the BottomBar's --bar-h, and a
+     --bar-gap on each side of the BottomBar. US-D08 §c.9's number (56 + 52 + 24 = 132 at the
+     tokens' current values), and the same expression `.app-shell__detail` stops at and the ask
+     panel opens to. The ask bar is *inside* the BottomBar in this tier, so the room it used to
+     need of its own at the top of the list is part of this sum now. */
   .app-shell__main {
-    padding-bottom: 72px;
+    padding-bottom: calc(56px + var(--bar-h) + var(--bar-gap) * 2);
   }
 
   /* There is no room to keep 420px — full width, with 16px of margin each side. */
   .app-shell__detail {
     width: calc(100% - 32px);
+    /* The sheet's 16px bottom margin is right for the list, and wrong for the bars: the rail bar is
+       the only navigation this tier has, it is `position: fixed` along the bottom 56px, and it has
+       no `z-index` — while this sheet is positioned *and* carries `z-index: 20`, so it paints over
+       the bar and takes its hit area. Measured at 390: `elementFromPoint` at a tile's own centre
+       returned the sheet, so the tiles were visible and untouchable — and with them the rail's
+       touch reorder, which is D7's whole narrow-tier path. The sheet stops above both bars instead,
+       on the same sum `.app-shell__main` reserves — US-D08 §c.9 raised it from the rail's 72px to
+       include the BottomBar, so the sheet does not swallow the composition bar either. */
+    bottom: calc(56px + var(--bar-h) + var(--bar-gap) * 2);
   }
 
   /* The rail has gone from a column to a toolbar, and a toolbar is a place glass belongs
@@ -2132,6 +2414,90 @@ body {
   .channel-rail__tile--inbox {
     margin-bottom: 0;
   }
+
+  /* US-D08 §c.9: the BottomBar, floating above the rail bar rather than stacked into it — one
+     rail-height bar with a top hairline at `bottom: 0` (above), and this line of controls one gap
+     above *that*. The bar itself is transparent; the three pieces carry their own glass. A
+     full-bleed glass band here would read as a second rail, which is the thing §c.9 rules out.
+     `z-index: 30` is above the rail's and the detail sheet's 20 on purpose: the bar does not
+     overlap either of them (the sheet stops below), but the ask panel opens *upward* into the
+     space the sheet is standing in, and it is the panel that has to be on top there. */
+  .bottom-bar {
+    position: fixed;
+    left: var(--bar-gap);
+    right: var(--bar-gap);
+    /* One --bar-gap above the rail's 56px. At `bottom: 0` the two bars would share a row of pixels
+       and the rail's top hairline would run through the circles. */
+    bottom: calc(56px + var(--bar-gap));
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 30;
+  }
+
+  /* The pill is the bar's middle piece and the only one that grows: with every piece `flex: none`
+     the bar would be its min-content width, floating in the middle of a 390px screen with the
+     list's full width under it. */
+  .bottom-bar > .ask-bar {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* §c.9 gives the pill `height: var(--bar-h)` here rather than the 44px it has at the top of the
+     list. Beside a 44px and a 52px circle, a 44px pill would sit 4px above the compose circle's
+     own centre and read as a different control. */
+  .bottom-bar .ask-bar__pill {
+    height: var(--bar-h);
+  }
+
+  .bottom-bar__piece {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    /* No border: .glass-surface's hairline is already the circle's edge, and this rule's own
+       border would draw a second line just inside it. The fill, the blur and the lift are the
+       glass recipe's, untouched. */
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  /* §c.9's 52px compose circle — the one piece bigger than the pill's own radius would suggest,
+     because it is the bar's primary action. */
+  .bottom-bar__piece--compose {
+    width: 52px;
+    height: 52px;
+  }
+
+  /* The same 0.55 floor the rail's gated tiles and the ask panel's un-wired actions use (the
+     hallmark slop-test's floor): below it a control stops reading as gated and starts reading as
+     erased. The accessible name and the title survive the fade — the button never becomes a
+     mystery circle. */
+  .bottom-bar__piece:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  /* The panel can only open upward in this tier: under the bar there is a 12px gap and then the
+     rail. `fixed` rather than `absolute` because the pill it belongs to is ~246px wide at 390 —
+     two circles and their gaps have taken the rest — and a 420px panel clipped to 246px is a
+     column of ellipses. Pinned to the shell's own gutters it is the width of the bar instead; and
+     being pinned on both sides it cannot widen the page, whatever its content. */
+  .bottom-bar .ask-panel {
+    top: auto;
+    left: var(--bar-gap);
+    right: var(--bar-gap);
+    /* The same sum .app-shell__main reserves: rail + bar + a gap either side. */
+    bottom: calc(56px + var(--bar-h) + var(--bar-gap) * 2);
+    width: auto;
+    max-width: none;
+    transform-origin: bottom center;
+  }
 }
 
 /* <=419.98: the ask pill's avatar comes off the line. Below this the pill is down to the input and
@@ -2165,37 +2531,22 @@ body {
    never match at the same pixel.
    ========================================================================================== */
 
-/* <=559.98: two buttons in the filter row drop their words and keep only their icons. The row
-   does slide horizontally, but five tabs + Archived + a chip + "+" simply do not fit on one
-   screen below 560px — collapsing the two that carry the least information ("Label" in "+ Label",
-   and the word "Archived") cuts how far there is to scroll in the first place.
-   The height still has to hold: the buttons become 32px in this block, so the bottom padding
-   comes down to keep the whole row inside 40px. */
+/* <=559.98: every chip that is not the current one drops its word and keeps its icon (US-D08
+   §c.3, Mail's M15 exactly). The row does slide horizontally, but five chips + two circles do not
+   fit across 560px, and the word that costs the most scroll is the one on a chip you have not
+   chosen. The active chip keeps its label: it is the "you are here" of the strip, and an icon-only
+   row with one word in it is more legible than five glyphs and a guess.
+   The chips are already `--chip-h` tall, so nothing about the strip's height changes here — this
+   block is the labels' business only. */
 @container list (max-width: 559.98px) {
-  .filter-chip-bar__add-label,
-  .inbox-card__archived-label {
+  .inbox-card__pills button[aria-checked="false"] {
+    /* 10px, not 14: an icon needs less room around it than a word does, and the two pixels a side
+       are two more pixels of the strip that fit on screen. */
+    padding: 0 10px;
+  }
+
+  .inbox-card__pills button[aria-checked="false"] .inbox-card__chip-label {
     display: none;
-  }
-
-  .inbox-card__archived-icon {
-    display: block;
-  }
-
-  /* An icon-only button keeps a target of at least 32px — the padding takes back what the word
-     gave up. The five view pills come with them: this is the phone tier, they are its primary
-     control, and 19px is half the touch floor. The strip still measures 40px (4 + 32 + 4). */
-  .inbox-card__pills button,
-  .filter-chip-bar__add,
-  .inbox-card__archived-pill {
-    min-height: 32px;
-    min-width: 32px;
-    justify-content: center;
-  }
-
-  /* The controls grow to a 32px touch target here, so the strip gives back two of its six bottom
-     pixels to stay inside the same 40px budget (4 + 32 + 4). */
-  .inbox-card__filter-row {
-    padding-bottom: 4px;
   }
 }
 
@@ -2356,5 +2707,21 @@ body {
      it, and the list closing the gap is a one-frame change of position, not an animation. */
   .inbox-row--leaving {
     animation-name: fade-out;
+  }
+
+  /* §c.4: the row's swipe settles where it was released instead of travelling — the same override
+     the rail's reorder takes below, and for the same reason. It is a token override on the row
+     rather than a rule on `.inbox-row__content`, so the component's inline `transform` keeps
+     writing the same value and only the duration goes. */
+  .inbox-row {
+    --dur-swipe: 0ms;
+  }
+
+  /* §c.2: the reorder's neighbours jump to their new slots with no travel at all — and the order
+     they land in is the same one the full-motion rail lands in. Nothing branches in the component:
+     the FLIP writes the same transform either way and only the duration token changes, which is why
+     this is a token override and not a second code path. */
+  .channel-rail {
+    --dur-reorder: 0ms;
   }
 }
