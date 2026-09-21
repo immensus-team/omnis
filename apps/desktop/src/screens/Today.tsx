@@ -1,10 +1,10 @@
-import { OpaqueSurface } from "@omnis/ui";
-import { type ApprovalCardInterrupt, ApprovalCardView } from "@omnis/ui/components/approval-card";
+import { Button, OpaqueSurface } from "@omnis/ui";
+import { type ApprovalCardDecision, ApprovalCardView } from "@omnis/ui/components/approval-card";
+import type { ApprovalStackItem } from "@omnis/ui/components/approval-stack";
 import { DigestCard } from "@omnis/ui/components/digest-card";
 import { formatRelativeTime } from "@omnis/ui/lib/relative-time";
 import { useQuery } from "@rocicorp/zero/react";
 import { useMemo, useState } from "react";
-import { decideApproval } from "../api/approvals.js";
 import { useZeroClient } from "../zero-client.js";
 
 /** A5 §3.4: greeting text, rendered as an <h1> so a screen reader announces the page's gist
@@ -147,9 +147,29 @@ export interface TodayProps {
   /** "View →" on the nightly card → the Digest screen (§3.8, US-B32). Without it the card draws no
    *  button at all rather than a control that goes nowhere. */
   onOpenDigest?: () => void;
+  /** loop-r2-06: the chip strip is the shell's queue, not this screen's own. It used to run its own
+   *  `pending_approvals` query, which is why this screen could say "8 approvals pending" while the
+   *  Inbox's subline and pill said something else on the same tick — and why a card decided here
+   *  never left the Inbox, never raised a toast and had no undo. One queue, one owner: the shell. */
+  approvals?: ApprovalStackItem[];
+  onDecide?: (
+    id: string,
+    decision: ApprovalCardDecision,
+    decidedArgs?: Record<string, unknown>,
+  ) => void;
+  /** The thread an approval belongs to, by name — the shell's own map, shared with the queue's rows
+   *  so the two surfaces cannot name the same thread differently. */
+  destinationFor?: (item: ApprovalStackItem) => string | null;
 }
 
-export function Today({ userName = "Logan", onOpenThread, onOpenDigest }: TodayProps) {
+export function Today({
+  userName = "Logan",
+  onOpenThread,
+  onOpenDigest,
+  approvals = [],
+  onDecide,
+  destinationFor,
+}: TodayProps) {
   const zero = useZeroClient();
   const [expandedApprovalId, setExpandedApprovalId] = useState<string | null>(null);
   // The screen's "today" is fixed for the life of the mount — recomputing it per render would make
@@ -170,15 +190,6 @@ export function Today({ userName = "Logan", onOpenThread, onOpenDigest }: TodayP
   const [recentItems, itemsR] = useQuery(
     zero.query.items.orderBy("sent_at", "desc").limit(ITEM_WINDOW),
   );
-  // A5 §3.4 orders the chip strip by created_at asc, so the chip that has been waiting longest is
-  // the first one in the row.
-  const [approvals, approvalsR] = useQuery(
-    zero.query.pending_approvals
-      .where("state", "=", "pending")
-      .orderBy("created_at", "asc")
-      .limit(ITEM_WINDOW),
-  );
-
   const morningRow = morningRows[0];
   const morning =
     morningRow && isSameLocalDay(new Date(morningRow.for_date), now) ? morningRow : null;
@@ -204,7 +215,11 @@ export function Today({ userName = "Logan", onOpenThread, onOpenDigest }: TodayP
   );
 
   const state = screenState({
-    resultTypes: [morningR.type, nightlyR.type, itemsR.type, approvalsR.type],
+    // loop-r2-06: `approvalsR.type` left with the query it belonged to. The queue's own loading
+    // state is the shell's to report now (the connection banner above both screens), and this
+    // screen reading "Loading…" for a queue it no longer subscribes to would be a lie about what
+    // is missing.
+    resultTypes: [morningR.type, nightlyR.type, itemsR.type],
     hasContent:
       morning !== null || nightly !== null || todaysEvents.length > 0 || approvals.length > 0,
   });
@@ -212,6 +227,10 @@ export function Today({ userName = "Logan", onOpenThread, onOpenDigest }: TodayP
 
   const expandedApproval =
     expandedApprovalId === null ? undefined : approvals.find((a) => a.id === expandedApprovalId);
+  // The card's header says where its action goes. Read here rather than inline so the `Open thread`
+  // link below and the sentence above it cannot name the same thread two different ways.
+  const expandedDestination =
+    expandedApproval === undefined ? null : (destinationFor?.(expandedApproval) ?? null);
 
   return (
     <OpaqueSurface className="today-screen" data-state={state}>
@@ -326,24 +345,33 @@ export function Today({ userName = "Logan", onOpenThread, onOpenDigest }: TodayP
             ))}
           </div>
           {/* A5 §3.4: the chip expands the card in place — no navigation. Deciding it is the whole
-              point of the strip (the briefing-coverage metric counts what got handled from here). */}
+              point of the strip (the briefing-coverage metric counts what got handled from here).
+              The decision goes up to the shell (loop-r2-06): this screen no longer writes to the
+              hub itself, so the card it just decided leaves the Inbox too and raises the same toast
+              with the same undo. */}
           {expandedApproval && (
             <ApprovalCardView
               className="today-screen__expanded"
-              interrupt={{
-                action: expandedApproval.action as ApprovalCardInterrupt["action"],
-                description: expandedApproval.description,
-                args: (expandedApproval.args ?? {}) as Record<string, unknown>,
-                config: expandedApproval.config as ApprovalCardInterrupt["config"],
-              }}
+              interrupt={expandedApproval}
+              destination={expandedDestination}
+              risk={expandedApproval.risk}
               onDecide={(decision, decidedArgs) => {
                 setExpandedApprovalId(null);
-                decideApproval(expandedApproval.id, decision, decidedArgs).catch((e: unknown) => {
-                  console.error("approval decide failed", e);
-                });
+                onDecide?.(expandedApproval.id, decision, decidedArgs);
               }}
             />
           )}
+          {expandedApproval &&
+            expandedApproval.thread_id !== null &&
+            onOpenThread !== undefined && (
+              <Button
+                variant="ghost"
+                className="approval-open-link"
+                onClick={() => onOpenThread(expandedApproval.thread_id as string)}
+              >
+                Open thread
+              </Button>
+            )}
         </section>
       )}
     </OpaqueSurface>

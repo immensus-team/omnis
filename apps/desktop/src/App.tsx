@@ -47,6 +47,7 @@ import {
 import { approvalDecideUrl, decideApproval } from "./api/approvals.js";
 import { type SearchHit, search, toUiSearchGroups } from "./api/search.js";
 import { fetchSettings, putSetting } from "./api/settings.js";
+import { setTaskDone } from "./api/tasks.js";
 import { isEditableTarget, isInsideOverlay, useKeymap } from "./hooks/use-keymap.js";
 import { useConnection } from "./lib/connection.js";
 import { AgentSession } from "./screens/AgentSession.js";
@@ -383,6 +384,37 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
     return ids;
   }, [approvals, hiddenApprovalIds]);
 
+  /** loop-r2-06/L2-24: the queue's rows have to say which conversation they belong to, and an
+   *  approval row stores that as an id (pending_approvals.thread_id). The titles are read once for
+   *  the whole visible queue rather than per row. `[""]` when there is nothing to ask for, because
+   *  the number of hooks cannot depend on the queue being non-empty — the same rule the open
+   *  thread's query below follows. */
+  const approvalThreadIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const a of visibleApprovals) if (a.thread_id !== null) ids.add(a.thread_id);
+    return ids.size === 0 ? [""] : [...ids];
+  }, [visibleApprovals]);
+  const [approvalThreadRows] = useQuery(zero.query.threads.where("id", "IN", approvalThreadIds));
+  /** The name a person would recognize: the title the hub gave the thread, or — for a thread that
+   *  has none, which is most agent sessions — the platform's own id for it. Never a fabricated one:
+   *  a row whose thread is missing from this map says nothing about where it is from. */
+  const approvalThreadTitles = useMemo(() => {
+    const titles = new Map<string, string>();
+    for (const row of approvalThreadRows as unknown as {
+      id: string;
+      title?: string | null;
+      external_id: string;
+    }[]) {
+      titles.set(row.id, row.title ?? row.external_id);
+    }
+    return titles;
+  }, [approvalThreadRows]);
+  const destinationFor = useCallback(
+    (item: { thread_id: string | null }) =>
+      item.thread_id === null ? null : (approvalThreadTitles.get(item.thread_id) ?? null),
+    [approvalThreadTitles],
+  );
+
   // US-D01: the selected thread's AI summary (threads.meta.summary, filled by the T1 summary loop
   // in packages/agents). No new backend call is needed — it is the same query shape Thread.tsx
   // uses to read archived_at. With nothing selected it queries the empty string (an empty result),
@@ -500,6 +532,51 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
         });
     },
     [visibleApprovals, notify, dismissToast],
+  );
+
+  /** loop-r2-06/L2-04: the task checkbox's write and its two answers. Ticking is undoable — the
+   *  task is gone from Today's list the moment it is done, so "Completed" carries the way back;
+   *  reopening is not, because the task is already back where it was and the toast would be offering
+   *  to undo what the person just asked for. A failure says so and offers the same retry the archive
+   *  toast does, and it is *rethrown* rather than swallowed: the optimistic box lives in `Tasks`, and
+   *  a failure this shell ate would leave a checkbox claiming something the hub never agreed to.
+   *
+   *  The title is passed down from the row (see Tasks.tsx's `onToggleDone`) because this shell does
+   *  not query the tasks table and two identical "Completed" toasts about different tasks would be
+   *  indistinguishable. */
+  const onToggleDone = useCallback(
+    function toggleDone(taskId: string, done: boolean, title: string) {
+      const retry = () =>
+        void toggleDone(taskId, done, title).catch(() => {
+          notify({ message: "Couldn't update the task." });
+        });
+      return setTaskDone(taskId, done)
+        .then(() => {
+          if (done) {
+            notify({
+              message: `Completed "${title}"`,
+              action: {
+                label: "Undo",
+                onAction: () => {
+                  void setTaskDone(taskId, false).catch(() =>
+                    notify({ message: "Couldn't update the task." }),
+                  );
+                },
+              },
+            });
+            return;
+          }
+          notify({ message: `Reopened "${title}"` });
+        })
+        .catch((error: unknown) => {
+          notify({
+            message: "Couldn't update the task.",
+            action: { label: "Retry", onAction: retry },
+          });
+          throw error;
+        });
+    },
+    [notify],
   );
 
   // A5 §3.4: a briefing item on Today deep-links to its Thread — the one navigation that screen
@@ -919,7 +996,16 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
    *  between them by screen — there is no URL router in the desktop app. */
   const screenBody =
     screen === "today" ? (
-      <Today onOpenThread={openThread} />
+      // loop-r2-06: Today's chips are the shell's queue, read and decided through the shell. It used
+      // to run its own `pending_approvals` query and call `decideApproval` directly, so it counted a
+      // different set from the Inbox's subline — and a card decided from here left no toast, no undo
+      // and no `hiddenApprovalIds` entry, so the same card was still on the Inbox a moment later.
+      <Today
+        approvals={visibleApprovals}
+        onDecide={onDecide}
+        destinationFor={destinationFor}
+        onOpenThread={openThread}
+      />
     ) : screen === "network" ? (
       <Network onOpenPerson={setOpenPersonId} onOpenThread={openThreadFromPerson} />
     ) : screen === "notes" ? (
@@ -941,6 +1027,9 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
         // tasks.delegated_session_id is the agent_session thread itself, which is what
         // AgentSession renders — the same route the Inbox uses for an agent session row.
         onOpenDelegation={(sessionId) => setOpen({ threadId: sessionId, agentSession: true })}
+        // loop-r2-06/L2-04: the checkbox's write. The screen draws the tick optimistically and puts
+        // it back if this rejects; the toast and its undo are the shell's.
+        onToggleDone={onToggleDone}
       />
     ) : (
       <Inbox
@@ -989,7 +1078,13 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
     openPersonId !== null ? (
       <PersonDetail personId={openPersonId} onOpenThread={openThreadFromPerson} />
     ) : open === null ? (
-      <ApprovalStack approvals={visibleApprovals} openThreadId={null} onDecide={onDecide} />
+      <ApprovalStack
+        approvals={visibleApprovals}
+        openThreadId={null}
+        onDecide={onDecide}
+        destinationFor={destinationFor}
+        onOpenThread={openThread}
+      />
     ) : open.agentSession ? (
       // loop-r1-07: the approvals go *into* the session screen, under its new header, rather than
       // sitting above it — a stack with no subject over a pane with no title was the shape that let
@@ -998,6 +1093,7 @@ function Shell({ initialScreen }: { initialScreen: ShellScreen }) {
         sessionThreadId={open.threadId}
         approvals={visibleApprovals}
         onDecide={onDecide}
+        onOpenThread={openThread}
       />
     ) : (
       // US-D09 §c.5: the thread's approvals go *into* the conversation, in document order, so this

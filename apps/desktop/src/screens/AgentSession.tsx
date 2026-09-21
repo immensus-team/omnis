@@ -92,6 +92,7 @@ export function AgentSession({
   sessionThreadId,
   approvals,
   onDecide,
+  onOpenThread,
 }: {
   sessionThreadId: string;
   /** Every pending approval the shell holds. This screen narrows to its own thread — §c.5's rule
@@ -103,6 +104,9 @@ export function AgentSession({
     decision: ApprovalCardDecision,
     decidedArgs?: Record<string, unknown>,
   ) => void;
+  /** loop-r2-06/L2-24: the same "Open {title}" the queue's stack offers, so the card behaves the
+   *  same wherever it is drawn. */
+  onOpenThread?: (threadId: string) => void;
 }) {
   const zero = useZeroClient();
   // Deviation from the plan's step 7 (packages/kernel/src/zero-schema.ts is the source of truth):
@@ -157,7 +161,15 @@ export function AgentSession({
       {waiting.length > 0 && onDecide !== undefined && (
         <section className="agent-session-screen__waiting">
           <p className="agent-session-screen__waiting-label">Waiting on you</p>
-          <ApprovalStack approvals={waiting} openThreadId={sessionThreadId} onDecide={onDecide} />
+          <ApprovalStack
+            approvals={waiting}
+            openThreadId={sessionThreadId}
+            onDecide={onDecide}
+            // Every approval in this stack is this thread's own (the filter above), so the
+            // destination is the title the header already read — no lookup table to thread in.
+            destinationFor={() => title}
+            {...(onOpenThread ? { onOpenThread } : {})}
+          />
         </section>
       )}
       {typedItems.length === 0

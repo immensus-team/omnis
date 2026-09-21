@@ -62,9 +62,32 @@ const personQuery: unknown = new Proxy(() => personQuery, {
   get: () => personQuery,
   apply: () => personQuery,
 });
+// loop-r2-06: `tasks` (the checkbox's row) and `threads` (the name the queue's rows and Today's
+// cards give an approval's conversation) are the two relations the new behaviours read. Same
+// pattern as `persons`: they answer [] until a case fills them, which is what keeps every test
+// above unchanged. `threads` answers every threads query with the same rows — the shell reads it
+// once for the queue's titles and once for the open thread, and no case below has a thread open.
+const tasks: { rows: unknown[] } = { rows: [] };
+const tasksQuery: unknown = new Proxy(() => tasksQuery, {
+  get: () => tasksQuery,
+  apply: () => tasksQuery,
+});
+const threads: { rows: unknown[] } = { rows: [] };
+const threadsQuery: unknown = new Proxy(() => threadsQuery, {
+  get: () => threadsQuery,
+  apply: () => threadsQuery,
+});
 const chain: unknown = new Proxy(() => chain, {
   get: (_target, prop) =>
-    prop === "pending_approvals" ? queue : prop === "persons" ? personQuery : chain,
+    prop === "pending_approvals"
+      ? queue
+      : prop === "persons"
+        ? personQuery
+        : prop === "tasks"
+          ? tasksQuery
+          : prop === "threads"
+            ? threadsQuery
+            : chain,
   apply: () => chain,
 });
 vi.mock("../src/zero-client.js", () => ({
@@ -77,7 +100,15 @@ vi.mock("../src/zero-client.js", () => ({
 }));
 vi.mock("@rocicorp/zero/react", () => ({
   useQuery: (q: unknown) => [
-    q === queue ? approvals.rows : q === personQuery ? persons.rows : [],
+    q === queue
+      ? approvals.rows
+      : q === personQuery
+        ? persons.rows
+        : q === tasksQuery
+          ? tasks.rows
+          : q === threadsQuery
+            ? threads.rows
+            : [],
     { type: "complete" },
   ],
   useZero: () => chain,
@@ -1324,5 +1355,178 @@ describe("App shell approval queue (loop-r1-02: the list comes first)", () => {
       vi.useRealTimers();
       expect(await readBody(sent[0]?.body ?? null)).toContain('"decision":"ignore"');
     });
+  });
+});
+
+/** loop-r2-06: the shell is the queue's one owner, and these are the two places that shows. The
+ *  queue's rows and Today's cards learn a thread's name from the shell (L2-24), and the task
+ *  checkbox's write goes up to the shell so that the toast, its undo and the optimistic box are the
+ *  same code for every screen that ticks one (L2-04). Neither is observable from a screen on its
+ *  own — `destinationFor` reaching `ApprovalStack` and `onToggleDone` reaching `Tasks` is exactly
+ *  what a screen-level test cannot see, because the screen is handed the prop either way. */
+describe("App shell queue destinations and task completion (loop-r2-06)", () => {
+  const approval = (id: string, threadId = `thread-${id}`) => ({
+    id,
+    thread_id: threadId,
+    risk: "normal",
+    created_at: 1,
+    action: "send",
+    description: `Approval ${id}`,
+    config: { allow_accept: true, allow_edit: true, allow_respond: true, allow_ignore: true },
+  });
+  /** A row of Today's tab: open, due today, mine. */
+  const task = (over: Record<string, unknown> = {}) => ({
+    id: "t1",
+    title: "Send Dana deck comments",
+    detail: null,
+    kind: "todo",
+    state: "open",
+    owner_kind: "me",
+    source_item_id: null,
+    person_id: null,
+    delegated_session_id: null,
+    due_at: Date.now(),
+    done_at: null,
+    created_at: Date.now(),
+    created_by: "me",
+    ...over,
+  });
+
+  interface HubCall {
+    url: string;
+    init?: RequestInit;
+  }
+
+  function stubHub(ok = true): HubCall[] {
+    const calls: HubCall[] = [];
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit): Promise<Response> => {
+      calls.push({ url, init });
+      return { ok, status: ok ? 200 : 500, json: async () => ({}) } as unknown as Response;
+    });
+    return calls;
+  }
+
+  const bodiesFor = (calls: HubCall[], path: string): unknown[] =>
+    calls.filter((call) => call.url.includes(path)).map((call) => JSON.parse(String(call.init?.body)));
+
+  beforeEach(() => {
+    approvals.rows = [];
+    tasks.rows = [];
+    threads.rows = [];
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("names the queue's threads and opens one from the card", () => {
+    threads.rows = [{ id: "thread-a1", title: "#omnis-launch", external_id: "C0123" }];
+    approvals.rows = [approval("a1"), approval("a2", "thread-a1")];
+
+    const { container } = render(<App />);
+
+    // Two approvals in one thread: the newer takes the card (a1, the first on a tie), so a2 is the
+    // collapsed row — and that row is the one that had nothing but a description on it before.
+    expect(screen.getByText("1 more waiting")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("button", { name: /Approval a2/ })).getByText("in #omnis-launch"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open #omnis-launch" }));
+    // The link opened the conversation the card was about: the pane is a thread now, not the queue.
+    expect(container.querySelector(".thread-screen")).not.toBeNull();
+    expect(screen.queryByRole("region", { name: "Pending approvals" })).toBeNull();
+  });
+
+  it("falls back to the plain noun for a thread the shell cannot name, and draws no link at all without one", () => {
+    // No thread row has synced for this approval's id. A row must not invent a name and must not
+    // leave a dangling "in" — but the way back into the conversation is still there, under a label
+    // that promises less than it cannot deliver.
+    approvals.rows = [approval("a1"), approval("a2")];
+    const { container, unmount } = render(<App />);
+    expect(container.querySelector(".approval-stack__row-where")).toBeNull();
+    expect(screen.getByRole("button", { name: "Open thread" })).toBeInTheDocument();
+    unmount();
+
+    // An approval raised outside any thread has no conversation to go back to, so the link is gone
+    // rather than pointing at nothing.
+    approvals.rows = [{ ...approval("a1"), thread_id: null }];
+    const second = render(<App />);
+    expect(second.container.querySelector(".approval-open-link")).toBeNull();
+  });
+
+  it("gives Today the shell's queue, counted from the same list the Inbox reads", () => {
+    approvals.rows = [approval("a1"), approval("a2")];
+    render(<App screen="today" />);
+
+    // The strip is a prop now; this screen runs no query of its own for it. Two approvals, and the
+    // greeting's second number is the same two.
+    expect(screen.getByRole("heading", { name: "Pending approvals (2)" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("2 approvals pending");
+  });
+
+  it("lets Today decide through the shell — one write, from the same path as the queue", () => {
+    approvals.rows = [approval("a1")];
+    const calls = stubHub();
+    render(<App screen="today" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Approval a1/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Approve" }),
+    );
+
+    // Before loop-r2-06 this screen called `decideApproval` itself, which worked but left the card
+    // in the Inbox and raised no toast. The write is the shell's now, so there is exactly one.
+    expect(bodiesFor(calls, "/approvals/a1/decide")).toEqual([{ decision: "accept" }]);
+  });
+
+  it("ticks a task through the hub, says so, and reopens it from the toast's Undo", async () => {
+    tasks.rows = [task()];
+    const calls = stubHub();
+    render(<App screen="tasks" />);
+
+    const box = screen.getByRole("checkbox", { name: "Send Dana deck comments" });
+    expect(box).not.toBeChecked();
+
+    fireEvent.click(box);
+
+    // The box fills on the click — the write is still in flight — and the hub is told "done".
+    expect(box).toBeChecked();
+    await waitFor(() =>
+      expect(bodiesFor(calls, "/tasks/t1/state")).toEqual([{ state: "done" }]),
+    );
+    // The title travels with the callback, so the toast names the task rather than saying
+    // "Completed" about nothing in particular.
+    const toast = await waitFor(() => {
+      const el = document.querySelector("[data-sonner-toast]");
+      if (el === null) throw new Error("no toast yet");
+      return el;
+    });
+    expect(toast.textContent).toContain('Completed "Send Dana deck comments"');
+
+    fireEvent.click(within(toast as HTMLElement).getByRole("button", { name: "Undo" }));
+    await waitFor(() =>
+      expect(bodiesFor(calls, "/tasks/t1/state")).toEqual([{ state: "done" }, { state: "open" }]),
+    );
+  });
+
+  it("puts the box back when the hub refuses, and offers a retry", async () => {
+    tasks.rows = [task()];
+    const calls = stubHub(false);
+    render(<App screen="tasks" />);
+
+    const box = screen.getByRole("checkbox", { name: "Send Dana deck comments" });
+    fireEvent.click(box);
+    expect(box).toBeChecked();
+
+    // A refusal is not silently kept: the box goes back to the row's own state, and the toast says
+    // what happened without claiming the task moved.
+    await waitFor(() => expect(box).not.toBeChecked());
+    const toast = await waitFor(() => {
+      const el = document.querySelector("[data-sonner-toast]");
+      if (el === null) throw new Error("no toast yet");
+      return el;
+    });
+    expect(toast.textContent).toContain("Couldn't update the task.");
+    expect(within(toast as HTMLElement).getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(bodiesFor(calls, "/tasks/t1/state")).toEqual([{ state: "done" }]);
   });
 });
