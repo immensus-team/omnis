@@ -115,8 +115,20 @@ describe("normalize() drops what it cannot represent", () => {
     expect(normalize(message({ timestamp: 8.64e15 + 1 }))).toEqual([]);
     expect(normalize(message({ timestamp: 1e18 }))).toEqual([]);
     expect(normalize(message({ timestamp: Number.POSITIVE_INFINITY }))).toEqual([]);
-    // The top of the representable range is still readable.
-    expect(firstItem(message({ timestamp: 8.64e15 })).sentAt).toBe("+275760-09-13T00:00:00.000Z");
+  });
+
+  it("keeps sentAt inside the four-digit years its own schema accepts", () => {
+    // `sentAt` is `z.string().datetime()` (packages/protocol/src/adapter.ts:104) and zod's datetime regex
+    // takes a four-digit year, so `toISOString()`'s extended years — `8.64e15` renders
+    // `+275760-09-13T00:00:00.000Z` — are a shape the protocol's own type rejects: an item the kernel
+    // would call invalid. Both forms can render one, so the ceiling is on the resolved epoch rather than
+    // on the numeric input alone, and a value past it is a dropped row like any other unrepresentable one.
+    expect(firstItem(message({ timestamp: 253_402_300_799_999 })).sentAt).toBe(
+      "9999-12-31T23:59:59.999Z",
+    );
+    expect(normalize(message({ timestamp: 253_402_300_800_000 }))).toEqual([]);
+    expect(normalize(message({ timestamp: 8.64e15 }))).toEqual([]);
+    expect(normalize(message({ timestamp: "+275760-09-13T00:00:00.000Z" }))).toEqual([]);
   });
 
   it("yields nothing for a chat payload, which carries no message content", () => {

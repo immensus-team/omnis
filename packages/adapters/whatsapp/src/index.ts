@@ -214,6 +214,13 @@ function attachmentsOf(raw: unknown): Attachment[] {
  *  is ~1.7e12, so a genuine millisecond stamp is three orders of magnitude clear of the floor. */
 const EPOCH_MS_FLOOR = 1e12;
 
+/** The last millisecond whose ISO-8601 rendering keeps a four-digit year (9999-12-31T23:59:59.999Z).
+ *  Past it `toISOString()` switches to an extended year — `253402300800000` renders `+010000-01-01T…` —
+ *  and `sentAt` is `z.string().datetime()` (packages/protocol/src/adapter.ts:104), whose year is exactly
+ *  four digits. Without this bound the adapter emits an item that the protocol's own type calls invalid.
+ *  Beeper's real stamps are ~1.7e12, so year 9999 is three orders of magnitude of headroom. */
+const EPOCH_MS_CEIL = 253_402_300_799_999;
+
 /** `sentAt` must be a valid ISO string. Beeper sends ISO-8601, but the WS `ts` field is epoch
  *  milliseconds (the docs' own example: `ts: 1739320000000`), and a client that forwards the frame
  *  verbatim can hand either one over — so both are read. Anything else yields no item rather than a
@@ -223,12 +230,15 @@ function parseSentAt(value: unknown): string | null {
   // A number is epoch milliseconds by definition, so it is measured against the floor rather than
   // trusted: an epoch-*seconds* value is the one way a numeric `ts` can be silently mis-dated instead
   // of dropped. The floor is a plain range check and deliberately not an early return — `toISOString()`
-  // throws RangeError outside the Date range, so the shared `Number.isFinite(getTime())` guard below
-  // has to stay the thing that decides renderability for numbers and strings alike.
+  // throws RangeError outside the Date range, so the `Number.isFinite(getTime())` guard below stays the
+  // thing that decides renderability for numbers and strings alike.
   if (typeof value === "number" && (!Number.isFinite(value) || value < EPOCH_MS_FLOOR)) return null;
   if (typeof value !== "string" && typeof value !== "number") return null;
   const ms = new Date(value).getTime();
-  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+  // The ceiling is checked on the resolved epoch rather than on the numeric input, because the string
+  // form reaches an extended year too (`"+275760-09-13T00:00:00.000Z"` resolves to 8.64e15).
+  if (!Number.isFinite(ms) || ms > EPOCH_MS_CEIL) return null;
+  return new Date(ms).toISOString();
 }
 
 const EVENT_TYPES = new Set<string>([
@@ -366,6 +376,13 @@ export function createWhatsAppAdapter(deps: WhatsAppAdapterDeps = {}): Adapter {
   let pollGeneration = 0;
   let unsubscribe: (() => void) | undefined;
   let up = false;
+
+  /** True once a running pass no longer belongs to the live session: disconnect() took the adapter down
+   *  (`up`), or a re-subscribe started a new chain (`generation`). Both land while a chat page is in
+   *  flight, which is why it is asked per chat and per message instead of only at the pass's start. */
+  function superseded(generation: number): boolean {
+    return !up || generation !== pollGeneration;
+  }
 
   function alreadySeen(hash: string): boolean {
     if (seen.has(hash)) return true;
@@ -505,16 +522,24 @@ export function createWhatsAppAdapter(deps: WhatsAppAdapterDeps = {}): Adapter {
 
   // A1 §2.6: the WS is the realtime path and the poll is the safety net beneath it. Everything either
   // one delivers goes through emit(), so a message both saw is stored once (sourceHash).
-  async function pollOnce(): Promise<void> {
+  async function pollOnce(generation = pollGeneration): Promise<void> {
     const active = client;
     // `up` is checked as well as the timer being cleared: disconnect() is what makes this adapter stop
     // reading, so a chain that survived a re-subscribe must not reach the client after it.
-    if (active === undefined || !up) return;
+    if (active === undefined || superseded(generation)) return;
     const startedAt = now().toISOString();
     try {
       for (const chat of await listWhatsAppChats(active)) {
-        for (const message of await messagesOf(active, chat.id, pollAfter))
+        // Re-checked per chat, not only at the top: the guard above cannot see a disconnect() or a
+        // re-subscribe that lands while the chat list, or an earlier chat's page, is still in flight.
+        // Without this the superseded pass walks the rest of the list and emits what it reads.
+        if (superseded(generation)) return;
+        for (const message of await messagesOf(active, chat.id, pollAfter)) {
+          // A page is up to MESSAGE_PAGE_LIMIT messages, so the check is repeated here too: this is what
+          // makes "nothing is emitted once this pass is superseded" true, rather than "at most one page".
+          if (superseded(generation)) return;
           emit({ ...recordOf(message), chat });
+        }
       }
       // The cursor only moves on a fully successful pass: a partial one leaves it where it was and the
       // next pass re-reads the same span, which dedupe makes free.
@@ -532,9 +557,9 @@ export function createWhatsAppAdapter(deps: WhatsAppAdapterDeps = {}): Adapter {
   // pollTimer doing so, leaving a chain that disconnect() can no longer reach. A pass from a superseded
   // generation therefore never re-schedules.
   function schedulePoll(generation = pollGeneration): void {
-    if (!up || generation !== pollGeneration) return;
+    if (superseded(generation)) return;
     pollTimer = setTimeout(() => {
-      void pollOnce().finally(() => schedulePoll(generation));
+      void pollOnce(generation).finally(() => schedulePoll(generation));
     }, pollMs);
   }
 
@@ -570,7 +595,10 @@ export function createWhatsAppAdapter(deps: WhatsAppAdapterDeps = {}): Adapter {
       // The previous session's failure is not this one's: the warm-up below either succeeds (healthy)
       // or records its own error, so a reconnect cannot report a fault that has already been cleared.
       failure = undefined;
-      // A new session also supersedes any poll chain the last one left behind.
+      // A new session also supersedes any poll chain the last one left behind. It deliberately does not
+      // start one: polling is what subscribe() turns on, so connect() with no subscribe() to follow is a
+      // session with no reader. That pairing is the caller's — apps/hub/src/adapters.ts:203 always
+      // subscribes right after connecting — and the bump here is only ever an invalidation.
       pollGeneration += 1;
       lastEventAt = now().toISOString();
       // Warm the chat cache before any WS event can arrive: it is what lets a group's first WS message

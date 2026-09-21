@@ -426,11 +426,46 @@ describe("WhatsApp subscribe()", () => {
     open(); // the held pass finishes now — and must not schedule a chain of its own
 
     await vi.advanceTimersByTimeAsync(POLL_MS);
-    // Two WhatsApp chats per pass: the held pass (2) plus the replacement chain's single pass (2).
-    // A second chain surviving would make it six.
-    expect(vi.mocked(fake.client.listMessages).mock.calls).toHaveLength(4);
+    // The held pass stops at the chat it was already inside (1), and the replacement chain runs one pass
+    // over the two WhatsApp chats (2). A second chain surviving would make it five, and the held pass
+    // walking to the end of the list instead of stopping would make it four.
+    expect(vi.mocked(fake.client.listMessages).mock.calls).toHaveLength(3);
 
     await adapter.disconnect();
+  });
+
+  // The other half of "disconnect() stops reading": clearing the timer only reaches a pass that has not
+  // started. A pass already inside the chat list keeps walking it and keeps emitting, so the consumer
+  // that disconnect() was told to stop gets items after it is gone.
+  it("stops a pass in flight when disconnect() lands mid-pass", async () => {
+    vi.useFakeTimers();
+    let open: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    const fake = fakeClient({
+      listMessages: vi.fn(async () => {
+        await gate;
+        return [message()];
+      }),
+    });
+    const time = clock();
+    const adapter = createWhatsAppAdapter({ client: fake.client, now: time.now });
+    await adapter.connect(auth);
+    const iterator = adapter.subscribe()[Symbol.asyncIterator]();
+    await iterator.next(); // the `connected` event
+
+    await vi.advanceTimersByTimeAsync(POLL_MS); // the pass starts and blocks on the gate
+    expect(vi.mocked(fake.client.listMessages).mock.calls).toHaveLength(1);
+
+    void adapter.disconnect(); // its whole body runs synchronously, up to the await it does not have
+    open(); // the held read now comes back with a message the pass must not deliver
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+
+    // The second chat is never read, and the message the first read returned is never emitted: without
+    // the re-check inside the pass both happen, and this is 2 calls with an item on the queue.
+    expect(vi.mocked(fake.client.listMessages).mock.calls).toHaveLength(1);
+    expect(await stillPending(iterator.next())).toBe(true);
   });
 
   // "chat.upserted → threadMeta" (backlog US-C11): a chat the adapter has not listed is learned from the
