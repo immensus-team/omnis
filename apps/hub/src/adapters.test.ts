@@ -104,7 +104,7 @@ describe("buildAdapters", () => {
       channel: "gmail",
       accountExternalId: "me@example.com",
       keychainService: "omnis.gmail.refresh.me@example.com",
-      keychainAccount: "281932556+jinhologankim@users.noreply.github.com",
+      keychainAccount: "omnis",
     });
   });
 

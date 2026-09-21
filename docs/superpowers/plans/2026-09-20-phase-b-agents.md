@@ -3374,7 +3374,7 @@ export function vapidFromEnv(env: NodeJS.ProcessEnv = process.env): VapidKeys {
   return {
     publicKey: env.OMNIS_WEBPUSH_VAPID_PUBLIC ?? "",
     privateKey: env.OMNIS_WEBPUSH_VAPID_PRIVATE ?? "",
-    subject: env.OMNIS_WEBPUSH_SUBJECT ?? "mailto:281932556+jinhologankim@users.noreply.github.com",
+    subject: env.OMNIS_WEBPUSH_SUBJECT ?? "mailto:omnis@localhost",
   };
 }
 

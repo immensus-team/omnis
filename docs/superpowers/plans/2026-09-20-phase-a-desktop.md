@@ -16,7 +16,7 @@
 - migrations are append-only files `packages/db/migrations/000N_<name>.sql` with tracking table `_omnis_migrations` (A3 §8) — this plan creates no migration (reference only).
 - no irreversible tool(send/delete/delegate/calendar_write) wired before the approval gate exists (A7 §7 shared prohibitions) — `ApprovalCard`'s `onDecide` calls hub `/approvals/:id/decide` only after a human explicitly presses it, and the client cannot flip `pending_approvals` to `executed` on its own (A3 §7 Zero permission rule).
 - provider SDKs only inside their adapter package — not applicable here because this plan creates no adapter; `@omnis/desktop` does not directly import any channel provider SDK.
-- Keychain item naming per A1 / interfaces contract §9 (base form `omnis.<channel>.<kind>.<external_id>`; bridge token `omnis.bridge.token.<host>`) — onboarding (US-A31) writes to the Keychain using this scheme. **With exactly two exceptions (contract §9, contract review M7·M8)**: the Google family (`gmail`/`gcal`) shares a single `omnis.gmail.<email>` item and omits the `<kind>` segment, while Slack uses two items, `omnis.slack.xoxb.<team_id>` (bot) and `omnis.slack.xoxb.<team_id>.app` (app), both with account `<team_id>` — the simple rule that account is always the fixed `281932556+jinhologankim@users.noreply.github.com` does not apply to Slack.
+- Keychain item naming per A1 / interfaces contract §9 (base form `omnis.<channel>.<kind>.<external_id>`; bridge token `omnis.bridge.token.<host>`) — onboarding (US-A31) writes to the Keychain using this scheme. **With exactly two exceptions (contract §9, contract review M7·M8)**: the Google family (`gmail`/`gcal`) shares a single `omnis.gmail.<email>` item and omits the `<kind>` segment, while Slack uses two items, `omnis.slack.xoxb.<team_id>` (bot) and `omnis.slack.xoxb.<team_id>.app` (app), both with account `<team_id>` — the simple rule that account is always the fixed `omnis` does not apply to Slack.
 - story tier per A7 §4 and every DeepSeek diff reviewed by Sonnet+ — every story in this plan (US-A22, A24~A31) is **Sonnet** tier (A7 §4 table), so there is no DeepSeek delegation procedure in this plan.
 - commit messages end with `Co-Authored-By: Claude Sonnet <noreply@anthropic.com>` (the same rule as the kernel plan — A7-D8 · interfaces contract §9's actual format `Co-Authored-By: Claude <tier> <noreply@anthropic.com>` with this plan's uniform story tier, Sonnet, substituted in; the same reading as `2026-09-20-phase-a-kernel-and-db.md` Global Constraints: contract §9 is authoritative, and of the work order's `Claude Fable 5.1`/`<story-id>: <one-line summary>` + acceptance-criteria body instructions only the commit body structure is adopted — the "Claude Fable 5.1" in the work order directly contradicts A7-D6's explicit exclusion of fable from the headless development loop, so it was not adopted. The reasoning is recorded in open_questions).
 
@@ -1856,7 +1856,7 @@ The interfaces contract §1 pins `@omnis/ui`'s dependencies to "React only". A5 
 **Verification command (A7 §7)**: `pnpm --filter @omnis/desktop test`
 **Tier**: Sonnet
 **Depends on**: A12~A14 (adapters, another plan — this task does not call the adapters' `connect(auth)` directly; it only builds the UI that stores OAuth tokens in the Keychain), A24
-**Spec to read**: A5 §7.1 (the 5 onboarding steps), A6 §9 and interfaces contract §9 (Keychain naming rule `omnis.<channel>.<kind>.<external_id>` — except the Google family, which omits the `<kind>` segment and shares a single `omnis.gmail.<email>` item, and Slack, which uses two items, `omnis.slack.xoxb.<team_id>` (bot) and `omnis.slack.xoxb.<team_id>.app` (app), both with `<team_id>` as the account field — the earlier assumption that account is `281932556+jinhologankim@users.noreply.github.com` for every channel was corrected for Slack by contract review M7)
+**Spec to read**: A5 §7.1 (the 5 onboarding steps), A6 §9 and interfaces contract §9 (Keychain naming rule `omnis.<channel>.<kind>.<external_id>` — except the Google family, which omits the `<kind>` segment and shares a single `omnis.gmail.<email>` item, and Slack, which uses two items, `omnis.slack.xoxb.<team_id>` (bot) and `omnis.slack.xoxb.<team_id>.app` (app), both with `<team_id>` as the account field — the earlier assumption that account is `omnis` for every channel was corrected for Slack by contract review M7)
 **Important (corrected in this task)**: the work order said "Tauri keychain plugin named in A5/A6", but no third-party Tauri keychain plugin is named anywhere in A5 or A6 (verified by grep — A6 §9 specifies secret retrieval only as a `security find-generic-password` **CLI call**). This task therefore adds no new unverified crate and simply wraps the `/usr/bin/security` CLI pattern A6 already settled on as a Tauri command (ponytail: reuse the pattern the spec already defines; add no new dependency).
 **Won't do (YAGNI)**: the actual OAuth PKCE flow (browser redirect, token exchange) is already the channel adapters' job (US-A12~14) via `connect(auth)`, and it exceeds this story's deliverable file list (a single `Onboarding.tsx`) — this screen receives an injected `OAuthClient` interface, renders only the "connected/connecting/failed" state, and puts the returned secrets into the Keychain.
 
@@ -1958,9 +1958,9 @@ The interfaces contract §1 pins `@omnis/ui`'s dependencies to "React only". A5 
      beforeEach(() => vi.clearAllMocks());
      it("invokes keychain_set with the Google identifier for a gmail service", async () => {
        const { invoke } = await import("@tauri-apps/api/core");
-       await storeChannelSecret("omnis.gmail.281932556+jinhologankim@users.noreply.github.com", "281932556+jinhologankim@users.noreply.github.com", "secret-token");
+       await storeChannelSecret("omnis.gmail.you@example.com", "omnis", "secret-token");
        expect(invoke).toHaveBeenCalledWith("keychain_set", {
-         service: "omnis.gmail.281932556+jinhologankim@users.noreply.github.com", account: "281932556+jinhologankim@users.noreply.github.com", secret: "secret-token",
+         service: "omnis.gmail.you@example.com", account: "omnis", secret: "secret-token",
        });
      });
      it("invokes keychain_set with the team_id as account for a slack bot-token service (contract §9 Slack exception)", async () => {
@@ -2008,7 +2008,7 @@ The interfaces contract §1 pins `@omnis/ui`'s dependencies to "React only". A5 
            { keychainService: "omnis.slack.xoxb.T123", account: "T123", secret: "xoxb-bot-token" },
            { keychainService: "omnis.slack.xoxb.T123.app", account: "T123", secret: "xoxb-app-token" },
          ]
-       : [{ keychainService: `omnis.${channel}.281932556+jinhologankim@users.noreply.github.com`, account: "281932556+jinhologankim@users.noreply.github.com", secret: "s" }],
+       : [{ keychainService: `omnis.${channel}.you@example.com`, account: "omnis", secret: "s" }],
    );
 
    describe("Onboarding (A5 §7.1, the 3 channels Phase A requires)", () => {

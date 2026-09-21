@@ -1648,7 +1648,7 @@ export async function ensureSelfModelRepo(): Promise<string> {
   await run("git", ["-C", dir, "init", "-q", "-b", "main"]);
   // Pin a repo-local identity so commits work on machines with no global git config (CI).
   await run("git", ["-C", dir, "config", "user.name", "omnis"]);
-  await run("git", ["-C", dir, "config", "user.email", "281932556+jinhologankim@users.noreply.github.com"]);
+  await run("git", ["-C", dir, "config", "user.email", "me@example.com"]);
   for (const f of SELF_MODEL_FILES) {
     await writeFile(join(dir, f), SEED[f], { flag: "wx" }).catch(() => undefined);
   }
@@ -1783,7 +1783,7 @@ import { handleNorm, initialsFor } from "../src/identity.js";
 
 describe("handleNorm — gmail/outlook (A3 §10)", () => {
   it("lowercases, strips the +tag and removes dots in the gmail local part", () => {
-    expect(handleNorm("gmail", "Jinho.Logan.Kim+omnis@Gmail.com")).toBe("jinhologankim@gmail.com");
+    expect(handleNorm("gmail", "First.Last+omnis@Gmail.com")).toBe("firstlast@gmail.com");
   });
 
   it("keeps dots for outlook (only gmail collapses them)", () => {

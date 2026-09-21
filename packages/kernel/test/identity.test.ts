@@ -3,7 +3,7 @@ import { handleNorm, initialsFor } from "../src/identity.js";
 
 describe("handleNorm — gmail/outlook (A3 §10)", () => {
   it("lowercases, strips the +tag and removes dots in the gmail local part", () => {
-    expect(handleNorm("gmail", "Jinho.Logan.Kim+omnis@Gmail.com")).toBe("jinhologankim@gmail.com");
+    expect(handleNorm("gmail", "First.Last+omnis@Gmail.com")).toBe("firstlast@gmail.com");
   });
 
   it("keeps dots for outlook (only gmail collapses them)", () => {

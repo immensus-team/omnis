@@ -841,7 +841,7 @@ settings:
 1. https://api.slack.com/apps → Create New App → From an app manifest → paste `manifest.yaml`.
 2. Install it into the workspace under OAuth & Permissions (admin approval) and obtain the `xoxb-...` token.
 3. Issue an `xapp-...` token with the `connections:write` scope under Basic Information → App-Level Tokens.
-4. Store both tokens in the Keychain as `security add-generic-password -s omnis.slack.xoxb.gate09 -a 281932556+jinhologankim@users.noreply.github.com -w '<xoxb>'` and `omnis.slack.xapp.gate09` (A1 naming rule; this is not a production app reused later — a spike-only throwaway app).
+4. Store both tokens in the Keychain as `security add-generic-password -s omnis.slack.xoxb.gate09 -a omnis -w '<xoxb>'` and `omnis.slack.xapp.gate09` (A1 naming rule; this is not a production app reused later — a spike-only throwaway app).
 5. After running `listen.ts`, send one test message from any DM channel.
 ```
 
@@ -852,7 +852,7 @@ import { SocketModeClient } from "@slack/socket-mode";
 import { execSync } from "node:child_process";
 
 const appToken = execSync(
-  "security find-generic-password -s omnis.slack.xapp.gate09 -a 281932556+jinhologankim@users.noreply.github.com -w",
+  "security find-generic-password -s omnis.slack.xapp.gate09 -a omnis -w",
 ).toString().trim();
 
 const client = new SocketModeClient({ appToken });
@@ -1034,7 +1034,7 @@ EOF
 
 1. Install Beeper Desktop on the mini and QR-pair the WhatsApp secondary number (the Q2 default — not a number in real use).
 2. Issue a local REST API token under Beeper Settings → Integrations.
-3. Store it in the Keychain with `security add-generic-password -s omnis.beeper.token -a 281932556+jinhologankim@users.noreply.github.com -w '<token>'` (A6 §9 naming rule).
+3. Store it in the Keychain with `security add-generic-password -s omnis.beeper.token -a omnis -w '<token>'` (A6 §9 naming rule).
 4. Send one message with `send-test.ts` to the secondary number itself or to a test counterpart.
 5. Watch for 24 hours whether the secondary-number account keeps working normally (no logout, no warning messages).
 ```
@@ -1045,7 +1045,7 @@ EOF
 import { execSync } from "node:child_process";
 
 const token = execSync(
-  "security find-generic-password -s omnis.beeper.token -a 281932556+jinhologankim@users.noreply.github.com -w",
+  "security find-generic-password -s omnis.beeper.token -a omnis -w",
 ).toString().trim();
 
 const chatID = process.argv[2];

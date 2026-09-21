@@ -32,5 +32,6 @@ In order. Finishing just the three Phase A items (Slack/Gmail/Calendar) complete
   `...xoxb.<team_id>` and the `...xoxb.<team_id>.app` item before it reports `keychain=ok`.
 - `api=fail`: the token was revoked or the scopes are insufficient — the `detail` column prints the error
   message verbatim (the token value itself is never printed).
-- Values are never written down anywhere a second time — if one is wrong, re-run `keychain-add.sh` (`-U`
-  overwrites it).
+- Values are never written down anywhere a second time — if one is wrong, re-run `keychain-add.sh`. It
+  deletes every item for that service and stores the new value under the neutral account `omnis`; the old
+  item is replaced, not left beside a new one.

@@ -64,11 +64,7 @@ export function createGoogleCalendarAdapter(deps: GoogleCalendarAdapterDeps): Ad
       } else {
         // A1 §2.3: Calendar uses the same Cloud project/client as Gmail, so
         // auth.keychainService is passed omnis.gmail.<email> verbatim by the caller (reuse).
-        const refreshToken = await readKeychainSecret(
-          auth.keychainService,
-          auth.keychainAccount,
-          CHANNEL,
-        );
+        const refreshToken = await readKeychainSecret(auth.keychainService, CHANNEL);
         oauth = new google.auth.OAuth2(deps.oauthClientId, deps.oauthClientSecret);
         oauth.setCredentials({ refresh_token: refreshToken });
       }

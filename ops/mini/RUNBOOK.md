@@ -9,7 +9,7 @@ Everything is **LaunchAgents, no sudo**. From the MacBook, `ssh <hub-user>@<hub-
 | plist source | `ops/mini/com.omnis.*.plist` (templates) → `~/Library/LaunchAgents/` (install.sh substitutes them) |
 | Entry point | `ops/mini/run.sh <service>` — sources `ops/mini/env.sh` to export Keychain secrets, then execs |
 | Logs | `~/Library/Logs/omnis/{hub,zero-cache,local-agent}.{log,err.log}` |
-| DB | `postgres://vigor@127.0.0.1:5432/omnis` (miniflux shares this cluster — do not touch it) |
+| DB | `postgres://<hub-user>@127.0.0.1:5432/omnis` (miniflux shares this cluster — do not touch it) |
 | External exposure | `https://your-hub.your-tailnet.ts.net/…` → 127.0.0.1:8787 (tailnet only, **no prefix strip** — the path arrives exactly as the hub route) |
 
 > **Do not touch the mini's existing infrastructure**: Hermes/omh/buzz (`~/.hermes`, port 8642), colima, miniflux, recap-server (:8090).
@@ -32,8 +32,8 @@ cd /Users/vigor/omnis && pnpm install --prod=false --frozen-lockfile && pnpm bui
 createdb -U vigor omnis
 psql -U vigor -d omnis -c "CREATE SCHEMA IF NOT EXISTS zero_cvr"
 psql -U vigor -d postgres -c "ALTER SYSTEM SET wal_level='logical'" && brew services restart postgresql@17
-DATABASE_URL="postgres://vigor@127.0.0.1:5432/omnis" pnpm db:migrate
-ZERO_UPSTREAM_DB="postgres://vigor@127.0.0.1:5432/omnis" OMNIS_USER_ID=logan pnpm zero:deploy-permissions
+DATABASE_URL="postgres://<hub-user>@127.0.0.1:5432/omnis" pnpm db:migrate
+ZERO_UPSTREAM_DB="postgres://<hub-user>@127.0.0.1:5432/omnis" OMNIS_USER_ID=logan pnpm zero:deploy-permissions
 ```
 
 ### 4) Secrets (A6 §9)
@@ -51,8 +51,23 @@ Three items — the names follow the A1/A6 §9 scheme exactly:
 | `omnis.zero.auth_secret` | hub `ZERO_AUTH_SECRET` ↔ zero-cache (the values must match) |
 | `omnis.zero.admin_password` | zero-cache production mode boot condition |
 
-The account is `281932556+jinhologankim@users.noreply.github.com` for all of them. Values come from `openssl rand -hex 32` (24 for admin).
+The account is `omnis` for all of them — a fixed, non-identifying label, not a person. Values come from
+`openssl rand -hex 32` (24 for admin).
 **Never leave any value in a log, a commit, or shell history.**
+
+**Migration note (2026-09-21)**: items created before this change carry a personal address in their
+account field instead of `omnis`. Nothing needs re-creating: every reader (`ops/mini/env.sh.example`'s
+`kc()`, `ops/scripts/*.sh`, the hub and local-agent readers, `tools/auth-kit/verify.ts`) looks items up by
+**service name only** — `security find-generic-password -s <service> -w`, with no `-a` — so an item
+resolves whatever account it was stored under. The label is only what a *writer* stamps on a new item.
+
+To normalise an old item, re-run `tools/auth-kit/keychain-add.sh <service>`: it **deletes every item for
+that service first** and then stores what you type under `omnis`, so the old item is replaced rather than
+left beside a new one. That ordering is the point — a Keychain item is keyed by *(service, account)*, so
+writing under a new account without deleting would leave **two** items under one service, and since a read
+resolves by service name alone it would return whichever it finds first, i.e. possibly the stale value.
+(`ops/scripts/gen-vapid.sh --force` replaces the two VAPID items the same way.) Re-running means typing
+the value again; if you no longer have it, just leave the item alone — nothing reads the label.
 
 ### 5) Services
 
@@ -82,7 +97,7 @@ cd <worktree> && rsync -az --delete \
 # mini
 ssh <hub-user>@<hub-host> 'export PATH=/opt/homebrew/bin:$PATH; cd /Users/vigor/omnis &&
   pnpm install --prod=false --frozen-lockfile && pnpm build &&
-  DATABASE_URL="postgres://vigor@127.0.0.1:5432/omnis" pnpm db:migrate &&
+  DATABASE_URL="postgres://<hub-user>@127.0.0.1:5432/omnis" pnpm db:migrate &&
   for s in hub zero-cache local-agent; do launchctl kickstart -k "gui/501/com.omnis.$s"; done'
 ```
 If `packages/kernel/src/zero-schema.ts` or `OMNIS_USER_ID` changed, run `pnpm zero:deploy-permissions` once more
@@ -144,8 +159,11 @@ by putting a one-shot LaunchAgent into gui/501 and running it.
 1. **Issue new values** — `bash ops/scripts/gen-vapid.sh --force` (in a gui/501 session). The script generates a
    new P-256 key pair with `node:crypto`. Unlike other secrets that require reissuing from a channel console,
    the issuing authority here is ourselves.
-2. **Store** — the same command overwrites Keychain `omnis.webpush.vapid_public` / `…vapid_private`
-   (`-U`). In this repo, Keychain takes the place of the `sops secrets/<host>.enc.yaml` step from the original A6 §9.
+2. **Store** — the same command replaces Keychain `omnis.webpush.vapid_public` / `…vapid_private`: for each
+   service it deletes every existing item first, then stores the new value under `omnis`. The delete is what
+   makes it a replacement — an item is keyed by *(service, account)*, so writing under a new account without
+   it would add a second item on the same service, and a read (service name only) could return the old key.
+   In this repo, Keychain takes the place of the `sops secrets/<host>.enc.yaml` step from the original A6 §9.
 3. **git commit — not applicable.** The VAPID keys do not exist as files, so there is nothing to commit. If a value
    lands in a diff, a log, or shell history, that itself is the leak. The only thing worth committing is a procedure
    change (this document).
@@ -177,10 +195,13 @@ First time only (mini, gui session):
 ```bash
 brew install restic                                    # pg_dump is already in postgresql@17
 # 4 Keychain items — do not paste the values, enter them at the prompt (omit -w). Refused from an ssh shell (see "4) Secrets").
+# The delete comes first on purpose: an item is keyed by (service, account), so adding under `omnis` while an
+# older item survives would leave two items on one service and a service-only read could return the stale one.
 for s in omnis.restic.repository omnis.restic.password omnis.b2.account_id omnis.b2.account_key; do
-  security add-generic-password -U -s "$s" -a 281932556+jinhologankim@users.noreply.github.com -w
+  security delete-generic-password -s "$s" 2>/dev/null
+  security add-generic-password -s "$s" -a omnis -w
 done
-restic -r "$(security find-generic-password -s omnis.restic.repository -a 281932556+jinhologankim@users.noreply.github.com -w)" init
+restic -r "$(security find-generic-password -s omnis.restic.repository -w)" init
 bash ops/scripts/omnis-backup.sh --check               # checks pg_dump, restic, and the 4 Keychain items only
 ops/mini/install.sh backup                             # schedules 03:00 (no kickstart — it only loads the job)
 ```
@@ -248,7 +269,7 @@ done
 psql -U vigor -d omnis -Atc "SELECT pg_drop_replication_slot('zero_0_a')"   # slot first. Otherwise WAL accumulates
 dropdb -U vigor omnis
 rm -rf /Users/vigor/omnis /Users/vigor/omnis-var ~/.omnis ~/Library/Logs/omnis
-# The 3 Keychain items, from a GUI session: security delete-generic-password -s omnis.bridge.token.mini -a 281932556+jinhologankim@users.noreply.github.com
+# The 3 Keychain items, from a GUI session: security delete-generic-password -s omnis.bridge.token.mini
 ```
 `wal_level=logical` is not reverted — reverting it would require `ALTER SYSTEM RESET wal_level` + a Postgres restart,
 and miniflux would drop along with it.

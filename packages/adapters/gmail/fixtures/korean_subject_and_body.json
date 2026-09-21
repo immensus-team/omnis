@@ -14,7 +14,7 @@
       "headers": [
         {
           "name": "From",
-          "value": "김진호 <281932556+jinhologankim@users.noreply.github.com>"
+          "value": "김진호 <me@example.com>"
         },
         {
           "name": "To",
@@ -47,7 +47,7 @@
         "kind": "email",
         "author": {
           "kind": "person",
-          "id": "281932556+jinhologankim@users.noreply.github.com"
+          "id": "me@example.com"
         },
         "body": "Subject: 스프린트 리뷰 일정 안내\n\n안녕하세요, 옴니스 팀입니다. 이번 스프린트 리뷰는 화요일 오전 10시에 진행합니다.",
         "attachments": [],
@@ -60,7 +60,7 @@
           "title": "스프린트 리뷰 일정 안내",
           "participants": [
             {
-              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "externalId": "me@example.com",
               "displayName": "김진호"
             },
             {

@@ -2,11 +2,12 @@
 # US-B42: 15 healthchecks.io pings + ntfy critical/warning + dual exposure to items(kind=system) (A6 §8).
 set -euo pipefail
 
-ACCOUNT="281932556+jinhologankim@users.noreply.github.com"
-kc() { security find-generic-password -s "$1" -a "$ACCOUNT" -w 2>/dev/null; }
+# No `-a`: reads resolve by service name alone, so items stamped with any account still match.
+kc() { security find-generic-password -s "$1" -w 2>/dev/null; }
 
 NTFY_URL="${OMNIS_NTFY_URL:-http://127.0.0.1:2586}"
-DATABASE_URL="${DATABASE_URL:-postgres://vigor@127.0.0.1:5432/omnis}"
+# The mini's Postgres role is its login user, so derive it rather than naming anyone (A6 §9).
+DATABASE_URL="${DATABASE_URL:-postgres://$(id -un)@127.0.0.1:5432/omnis}"
 
 # slug|check_cmd|tier(critical|warning) — exactly the A6 §8 table. check_cmd exits 0 on success.
 # check_cmd itself contains '|' (pipes), so it must not be split with `IFS='|' read` — trim it from

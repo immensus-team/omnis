@@ -17,7 +17,7 @@
         },
         {
           "name": "To",
-          "value": "Logan Kim <281932556+jinhologankim@users.noreply.github.com>"
+          "value": "Logan Kim <me@example.com>"
         },
         {
           "name": "Subject",
@@ -66,7 +66,7 @@
               "displayName": "GitHub"
             },
             {
-              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "externalId": "me@example.com",
               "displayName": "Logan Kim"
             }
           ],

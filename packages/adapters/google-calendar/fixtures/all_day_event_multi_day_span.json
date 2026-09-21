@@ -8,11 +8,11 @@
     "location": "Jeju Shilla Hotel",
     "description": "Check in at 14:00 on day one, check out at 11:00 on the last day.",
     "creator": {
-      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "email": "me@example.com",
       "self": true
     },
     "organizer": {
-      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "email": "me@example.com",
       "self": true
     },
     "start": {

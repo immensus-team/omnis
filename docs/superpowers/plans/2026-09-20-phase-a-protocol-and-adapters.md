@@ -2394,7 +2394,7 @@ Slack is a channel that supports edit/delete, so A1 §1.7 requires two additiona
       "id": "18c2f4a1b2d3e4f6", "threadId": "18c2f4a1b2d3e4f0",
       "payload": {
         "headers": [
-          { "name": "From", "value": "Logan Kim <281932556+jinhologankim@users.noreply.github.com>" },
+          { "name": "From", "value": "Logan Kim <me@example.com>" },
           { "name": "Subject", "value": "Re: omnis launch sync" },
           { "name": "Message-Id", "value": "<CAFakeMsgId002@mail.gmail.com>" },
           { "name": "In-Reply-To", "value": "<CAFakeMsgId001@mail.gmail.com>" },
@@ -2407,7 +2407,7 @@ Slack is a channel that supports edit/delete, so A1 §1.7 requires two additiona
     "expected": {
       "items": [{
         "threadExternalId": "18c2f4a1b2d3e4f0", "externalId": "18c2f4a1b2d3e4f6", "kind": "email",
-        "author": { "kind": "person", "id": "Logan Kim <281932556+jinhologankim@users.noreply.github.com>" },
+        "author": { "kind": "person", "id": "Logan Kim <me@example.com>" },
         "body": "Subject: Re: omnis launch sync\n\nSounds good.",
         "attachments": [], "sentAt": "2023-11-14T22:20:00.000Z", "status": "received",
         "sourceHash": "<CAFakeMsgId002@mail.gmail.com>"

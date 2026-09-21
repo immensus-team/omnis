@@ -471,7 +471,7 @@ Backups (`pg_dump`·restic) and healthcheck pings are **launchd, not the `jobs` 
 | `OMNIS_OLLAMA_EMBED_MODEL` | `nomic-embed-text-v1.5` | `@omnis/memory` embed |
 | `OMNIS_ANTHROPIC_API_KEY` | — | T2 (Claude Sonnet 5) + Message Batches. Without it the T2 path is skipped and a system Item appears |
 | `OMNIS_WEBPUSH_VAPID_PUBLIC` / `OMNIS_WEBPUSH_VAPID_PRIVATE` | — | hub Web Push sending. When unset, `/push/*` returns 503 |
-| `OMNIS_WEBPUSH_SUBJECT` | `mailto:281932556+jinhologankim@users.noreply.github.com` | VAPID `sub` claim |
+| `OMNIS_WEBPUSH_SUBJECT` | `mailto:omnis@localhost` | VAPID `sub` claim |
 | `OMNIS_WEB_PORT` | `5173` | `apps/web` dev and static-serving port (the serve target in A6 §3) |
 | `OMNIS_GITHUB_TOKEN` | — | GitHub ETag polling (PAT; the App is S-A4-6) |
 | `OMNIS_OUTLOOK_CLIENT_ID` / `OMNIS_OUTLOOK_TENANT` | — / `common` | Outlook OAuth |
@@ -480,7 +480,7 @@ Backups (`pg_dump`·restic) and healthcheck pings are **launchd, not the `jobs` 
 | `OMNIS_OPENROUTER_API_KEY` | — | synchronous T2 (`anthropic/claude-sonnet-5`) and T1 extraction. To avoid a new SDK pin, synchronous T2 goes through OpenRouter and only the Batch API uses a direct Anthropic `fetch` — the US-B44 report must account for `agent_runs.provider` being recorded as `openrouter` on synchronous T2. An empty value skips that path (B-D5 test fallback) |
 | `OMNIS_NTFY_URL` | `http://127.0.0.1:2586` | self-hosted ntfy. Two topics, `omnis-critical`/`omnis-warning` (A6 §8). `@omnis/kernel`'s `sendNtfy` (channels) and `ops/scripts/healthcheck-ping.sh` (ops) use the same value |
 
-**Keychain entries** (A6 §9 dotted scheme `omnis.<service>.<kind>`, account = `281932556+jinhologankim@users.noreply.github.com`):
+**Keychain entries** (A6 §9 dotted scheme `omnis.<service>.<kind>`, account = `omnis`):
 
 `omnis.webpush.vapid_private` · `omnis.webpush.vapid_public` · `omnis.anthropic.api_key` · `omnis.github.pat` · `omnis.outlook.<upn>` · `omnis.telegram.session_key` · `omnis.hermes.api_key.mini` · `omnis.hermes.api_key.macbook` (the last two are already reserved in Phase A contract §8). `omnis.openrouter.api_key`(synchronous T2 and T1 extraction) · `omnis.healthchecks.<slug>`(ping UUIDs for 15 checks) · `omnis.restic.repo_password` · `omnis.b2.app_key`(backups, US-B41). The DeepSeek key reads the existing `deepseek-api` entry as-is (A6 §9 reuse-existing-assets rule).
 

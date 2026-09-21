@@ -22,7 +22,7 @@ Versions use the contract §2 workspace-wide pins (FIXED) as-is — do not loose
 - Until the approval gate (US-A07) exists, do not wire the irreversible tools (`send`/`delete`/`delegate`/`calendar_write`) to anything (A7 §7 common prohibitions). `delegate.run` in this plan goes only as far as **declaration plus refusal**.
 - Do not delete or skip tests to make them pass (A7 §7 common prohibitions).
 - Import provider SDKs only inside their own adapter package (A7 §7 common prohibitions). `apps/local-agent` imports no internal package other than `@omnis/protocol`.
-- Keychain item names follow the A1 rule `omnis.<channel>.<kind>.<external_id>`; bridge tokens are `omnis.bridge.token.<host>` (A2 §2.1). The account field is `281932556+jinhologankim@users.noreply.github.com`.
+- Keychain item names follow the A1 rule `omnis.<channel>.<kind>.<external_id>`; bridge tokens are `omnis.bridge.token.<host>` (A2 §2.1). The account field is `omnis`.
 - Story tiers follow A7 §4 (US-A16/A18/A19 = Opus, US-A17/A19b/A20 = Sonnet), and every DeepSeek diff is reviewed by Sonnet or above.
 - Commit messages are `<story-id>: <one-line summary>` (A7 §6) plus the acceptance criteria met in the body, and the last line is `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`. (Contract §9 requires recording the actual execution model as `Co-Authored-By: Claude <tier>` / `Co-Authored-By: DeepSeek V4.1 Flash <noreply@deepseek.com>` — the `git commit` commands under each task below are written in the contract §9 format. The mismatch is left as an open question.)
 
@@ -1331,7 +1331,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 const run = promisify(execFile);
-export const KEYCHAIN_ACCOUNT = "281932556+jinhologankim@users.noreply.github.com";
+export const KEYCHAIN_ACCOUNT = "omnis";
 
 /** Never put the value in logs, events, or error messages (A2 §7.2). */
 export async function readKeychainSecret(

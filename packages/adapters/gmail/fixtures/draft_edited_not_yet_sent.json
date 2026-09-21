@@ -14,7 +14,7 @@
       "headers": [
         {
           "name": "From",
-          "value": "Logan Kim <281932556+jinhologankim@users.noreply.github.com>"
+          "value": "Logan Kim <me@example.com>"
         },
         {
           "name": "Subject",
@@ -42,7 +42,7 @@
         "kind": "email",
         "author": {
           "kind": "person",
-          "id": "281932556+jinhologankim@users.noreply.github.com"
+          "id": "me@example.com"
         },
         "body": "Subject: Draft: pricing follow-up\n\nStill editing — do not send yet.",
         "attachments": [],
@@ -55,7 +55,7 @@
           "title": "Draft: pricing follow-up",
           "participants": [
             {
-              "externalId": "281932556+jinhologankim@users.noreply.github.com",
+              "externalId": "me@example.com",
               "displayName": "Logan Kim"
             }
           ],

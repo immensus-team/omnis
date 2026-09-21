@@ -30,7 +30,7 @@
 - Provider SDKs only inside their adapter — this plan creates no adapter.
 - Never put real-account credentials in tests (B-D5). Every shell-script test plants fake `security`/`tailscale`/`launchctl`/`pg_dump` binaries on the `PATH` so it never touches the real Keychain, network, or launchd.
 - Commit messages: `US-Bxx: <one-line summary>` + the acceptance criteria satisfied in the body + the final two lines `Implemented-by: Claude <tier>` / `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` (session rule). Branch `ralph/<story-id>`.
-- Keychain item names use the A1/A6 §9 dotted scheme `omnis.<service>.<kind>`, with account always `281932556+jinhologankim@users.noreply.github.com` (exactly the `kc()` idiom from `ops/mini/env.sh.example`). Never leave values in shell history, logs, or commits.
+- Keychain item names use the A1/A6 §9 dotted scheme `omnis.<service>.<kind>`, with account always `omnis` (exactly the `kc()` idiom from `ops/mini/env.sh.example`). Never leave values in shell history, logs, or commits.
 - The `agent_runs`/`digests`/`jobs`/`accounts` column names are exactly contract §4 (Phase A) — no new columns (Task 6 only merges into the existing `digests.metrics` jsonb).
 
 **`exactOptionalPropertyTypes` pitfall** (applies to Task 6 only): when `deps.now` is optional, always build a fallback such as `const now = deps.now ?? (() => new Date())` — never pass `{ now: undefined }` through as-is.
@@ -52,7 +52,7 @@
 
 **Interfaces:**
 - Consumes: `security find-generic-password`/`add-generic-password`(macOS Keychain CLI) · `node:crypto`(stdlib).
-- Produces: Keychain items `omnis.webpush.vapid_public` · `omnis.webpush.vapid_private` (both base64url, account `281932556+jinhologankim@users.noreply.github.com`) — exactly the names delta §9 pins. The values the hub reads as `OMNIS_WEBPUSH_VAPID_PUBLIC`/`…PRIVATE` (US-B17 does that wiring, outside this plan).
+- Produces: Keychain items `omnis.webpush.vapid_public` · `omnis.webpush.vapid_private` (both base64url, account `omnis`) — exactly the names delta §9 pins. The values the hub reads as `OMNIS_WEBPUSH_VAPID_PUBLIC`/`…PRIVATE` (US-B17 does that wiring, outside this plan).
 
 #### Steps
 
@@ -117,7 +117,7 @@ Expected failure: `ops/scripts/gen-vapid.sh: No such file or directory`.
 # Built directly with node:crypto instead of the web-push npm package — VAPID is just a P-256 EC key pair.
 set -euo pipefail
 
-ACCOUNT="281932556+jinhologankim@users.noreply.github.com"
+ACCOUNT="omnis"
 PUB_SERVICE="omnis.webpush.vapid_public"
 PRIV_SERVICE="omnis.webpush.vapid_private"
 
@@ -455,7 +455,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **Story US-B41** — Goal: daily 03:00 `pg_dump` + restic → B2 backup, a forget policy (7 days/4 weeks/6 months), a quarterly restore drill script (restore onto scratch port 5433 + verify `items`/`threads`/`pending_approvals` row counts + the latest `sent_at`) and a drill log. Deliverables: `ops/scripts/omnis-backup.sh`, `ops/scripts/restore-drill.sh`, `ops/mini/LaunchDaemons/*.plist`, `backup/restore-drills.md`. Verification: `bash ops/scripts/restore-drill.sh --dry-run`. Tier: Sonnet.
 
-**Read:** A6 §4 (the backup/restore-drill source text — the forget policy and commands are adjusted to this repo's measured conventions), `ops/mini/RUNBOOK.md` (the measured fact that the DB is `postgres://vigor@127.0.0.1:5432/omnis`, and the LaunchAgent-only, no-sudo principle).
+**Read:** A6 §4 (the backup/restore-drill source text — the forget policy and commands are adjusted to this repo's measured conventions), `ops/mini/RUNBOOK.md` (the measured fact that the DB is `postgres://<hub-user>@127.0.0.1:5432/omnis`, and the LaunchAgent-only, no-sudo principle).
 
 **Won't build (YAGNI)**: healthchecks.io pings for backup success/failure — that belongs to US-B42 (Task 4); this script signals success/failure through its exit code alone (launchd `StandardErrorPath` + US-B42 consume that exit code). The initial restic `init` (repository creation) is done by hand once (`restic -r ... init`; rare as rotation — putting it in the script would add an existence check on every run and make things more complex, not less).
 
@@ -516,12 +516,12 @@ Expected failure: `ops/scripts/restore-drill.sh: No such file or directory`.
 # execs this script as-is at 03:00. A GUI session is required (reading the Keychain — see the RUNBOOK "existing setup on the mini" section).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-ACCOUNT="281932556+jinhologankim@users.noreply.github.com"
+ACCOUNT="omnis"
 kc() { security find-generic-password -s "$1" -a "$ACCOUNT" -w; }
 
 BACKUP_DIR="${OMNIS_BACKUP_DIR:-$HOME/omnis-var/backup}"
 PG_DIR="$BACKUP_DIR/pg"
-DATABASE_URL="${DATABASE_URL:-postgres://vigor@127.0.0.1:5432/omnis}"
+DATABASE_URL="${DATABASE_URL:-postgres://<hub-user>@127.0.0.1:5432/omnis}"
 
 do_check() {
   command -v pg_dump >/dev/null || { echo "FAIL: pg_dump not on PATH" >&2; return 1; }
@@ -763,11 +763,11 @@ Expected failure: `ops/scripts/healthcheck-ping.sh: No such file or directory`.
 # US-B42: 15 healthchecks.io pings + ntfy critical/warning + items(kind=system) dual exposure (A6 §8).
 set -euo pipefail
 
-ACCOUNT="281932556+jinhologankim@users.noreply.github.com"
+ACCOUNT="omnis"
 kc() { security find-generic-password -s "$1" -a "$ACCOUNT" -w 2>/dev/null; }
 
 NTFY_URL="${OMNIS_NTFY_URL:-http://127.0.0.1:2586}"
-DATABASE_URL="${DATABASE_URL:-postgres://vigor@127.0.0.1:5432/omnis}"
+DATABASE_URL="${DATABASE_URL:-postgres://<hub-user>@127.0.0.1:5432/omnis}"
 
 # slug|check_cmd|tier(critical|warning) — exactly the A6 §8 table. check_cmd exits 0 on success.
 # check_cmd itself contains '|' (pipes), so `IFS='|' read` must not be used to split it — trim from both ends instead (parse_job).
@@ -1116,7 +1116,7 @@ check_ollama() {
 }
 check_slot() {
   local active
-  active="$(psql "${DATABASE_URL:-postgres://vigor@127.0.0.1:5432/omnis}" -Atc \
+  active="$(psql "${DATABASE_URL:-postgres://<hub-user>@127.0.0.1:5432/omnis}" -Atc \
     "select coalesce(bool_and(active), true) from pg_replication_slots" 2>/dev/null || echo f)"
   [ "$active" = "t" ] || FAILS+=("replication slot inactive")
 }

@@ -9,7 +9,6 @@ describe("runVerify", () => {
         channel: "slack",
         account: "T0FAKE",
         keychainServices: ["omnis.slack.xoxb.T0FAKE", "omnis.slack.xoxb.T0FAKE.app"],
-        keychainAccount: "T0FAKE",
         checkApi: async () => {
           called = true;
           return { ok: true };
@@ -39,7 +38,6 @@ describe("runVerify", () => {
         channel: "slack",
         account: "T0FAKE",
         keychainServices: ["omnis.slack.xoxb.T0FAKE", "omnis.slack.xoxb.T0FAKE.app"],
-        keychainAccount: "T0FAKE",
         checkApi: async () => {
           called = true;
           return { ok: true };
@@ -69,7 +67,6 @@ describe("runVerify", () => {
         channel: "gmail",
         account: "logan@example.com",
         keychainServices: ["omnis.gmail.logan@example.com"],
-        keychainAccount: "logan@example.com",
         checkApi: async () => ({ ok: true, detail: "logan@example.com" }),
       },
     ];
@@ -94,7 +91,6 @@ describe("runVerify", () => {
         channel: "gcal",
         account: "logan@example.com",
         keychainServices: ["omnis.gmail.logan@example.com"],
-        keychainAccount: "logan@example.com",
         checkApi: async () => {
           throw new Error("invalid_grant");
         },

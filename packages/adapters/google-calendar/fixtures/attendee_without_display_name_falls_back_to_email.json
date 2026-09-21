@@ -6,11 +6,11 @@
     "status": "confirmed",
     "summary": "External Vendor Meeting",
     "creator": {
-      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "email": "me@example.com",
       "self": true
     },
     "organizer": {
-      "email": "281932556+jinhologankim@users.noreply.github.com",
+      "email": "me@example.com",
       "self": true
     },
     "start": {

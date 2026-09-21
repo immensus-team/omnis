@@ -2101,7 +2101,7 @@ Expected: `200` means the live path (step 2); anything else (`000`/`no-hermes`/n
 - [ ] 2. (Live path only) Capture one chunk of events. **Never write the token into the shell directly** — read it from Keychain and pass it only as an environment variable.
 
 ```bash
-HERMES_KEY="$(security find-generic-password -s omnis.hermes.api_key.mini -a 281932556+jinhologankim@users.noreply.github.com -w)" \
+HERMES_KEY="$(security find-generic-password -s omnis.hermes.api_key.mini -a omnis -w)" \
   timeout 15 curl -sS -N http://127.0.0.1:8642/v1/responses \
   -H "Authorization: Bearer $HERMES_KEY" \
   -H 'content-type: application/json' \
@@ -3297,7 +3297,7 @@ describe("buildAdapters", () => {
       channel: "gmail",
       accountExternalId: "me@example.com",
       keychainService: "omnis.gmail.refresh.me@example.com",
-      keychainAccount: "281932556+jinhologankim@users.noreply.github.com",
+      keychainAccount: "omnis",
     });
   });
 
@@ -3369,7 +3369,7 @@ import type { Adapter, AdapterEvent, AuthRef, Channel, NormalizedItem } from "@o
 import type { Logger } from "@omnis/kernel";
 
 /** A6 §9: the Keychain account is common to every item. */
-const KEYCHAIN_ACCOUNT = "281932556+jinhologankim@users.noreply.github.com";
+const KEYCHAIN_ACCOUNT = "omnis";
 
 export interface AccountRow {
   id: string;

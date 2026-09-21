@@ -18,7 +18,7 @@
         },
         {
           "name": "To",
-          "value": "281932556+jinhologankim@users.noreply.github.com"
+          "value": "me@example.com"
         },
         {
           "name": "Subject",
@@ -80,8 +80,8 @@
               "displayName": "scanner@office.example.com"
             },
             {
-              "externalId": "281932556+jinhologankim@users.noreply.github.com",
-              "displayName": "281932556+jinhologankim@users.noreply.github.com"
+              "externalId": "me@example.com",
+              "displayName": "me@example.com"
             }
           ],
           "lastItemAt": "2023-11-15T19:40:00.000Z",

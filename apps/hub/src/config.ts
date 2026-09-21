@@ -56,7 +56,6 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): HubConfig {
     ntfyUrl: env.OMNIS_NTFY_URL ?? "http://127.0.0.1:2586",
     webpushVapidPublic: env.OMNIS_WEBPUSH_VAPID_PUBLIC ?? "",
     webpushVapidPrivate: env.OMNIS_WEBPUSH_VAPID_PRIVATE ?? "",
-    webpushSubject:
-      env.OMNIS_WEBPUSH_SUBJECT ?? "mailto:281932556+jinhologankim@users.noreply.github.com",
+    webpushSubject: env.OMNIS_WEBPUSH_SUBJECT ?? "mailto:omnis@localhost",
   };
 }
