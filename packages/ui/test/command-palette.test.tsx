@@ -546,6 +546,31 @@ describe('CommandPalette mode="inline" keyboard (loop-r1-08 L-15)', () => {
 
     expect(perform).toHaveBeenCalledOnce();
   });
+
+  it("ignores the Enter that commits an IME composition", () => {
+    const onSelectHit = vi.fn();
+    render(
+      <CommandPalette
+        mode="inline"
+        open
+        onOpenChange={vi.fn()}
+        actions={actions}
+        search={{ groups, loading: false, onQueryChange: vi.fn(), onSelectHit }}
+      />,
+    );
+    const input = askInput();
+    fireEvent.change(input, { target: { value: "PoC" } });
+
+    // Enter is also how an IME commits a composition, and it arrives marked as such — `isComposing`
+    // everywhere, `keyCode 229` on the IMEs that still send it. Neither is a request to open a row:
+    // cmdk never dispatches on them (its root computes `e.nativeEvent.isComposing || e.keyCode ===
+    // 229` before its key switch), and the rows on screen at that moment are the debounced answer to
+    // the keystrokes *before* the composition, so acting here opens the wrong hit mid-word.
+    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+    fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
+
+    expect(onSelectHit).not.toHaveBeenCalled();
+  });
 });
 
 describe('CommandPalette mode="inline" commands filter while typing (loop-r1-08 L-16, NC-13)', () => {

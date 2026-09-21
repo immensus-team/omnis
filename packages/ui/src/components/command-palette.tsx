@@ -393,6 +393,14 @@ function InlinePalette({
       // US-B27: same reason as the dialog — those rows are not cmdk's to filter (see `manualFilter`).
       shouldFilter={!manualFilter}
       onKeyDown={(e) => {
+        // loop-r1-08: an IME owns Enter and Escape while it is composing — that Enter commits the
+        // composition and is not a request to open a row, and that Escape is the IME's own "cancel".
+        // cmdk 1.1.1 ignores both keys in that state (its root computes `e.nativeEvent.isComposing ||
+        // e.keyCode === 229` before its key switch), but it runs this handler *first*, so without the
+        // same guard the inline palette would act on keys the dialog never sees: the rows on screen
+        // mid-composition are the debounced answer to the keystrokes before it, so the press opens
+        // the previous query's row — a Korean name typed into the hub's search opens a thread.
+        if (e.nativeEvent.isComposing || e.keyCode === 229) return;
         if (e.key === "Escape") {
           e.preventDefault();
           onOpenChange(false);
