@@ -560,51 +560,202 @@ along with every other frame the scripts own, and all 22 now carry mtimes after 
 `inbox-glass.png` and `ai-panel-commands.png` are US-D01 artifacts (`7f979b8`) that no current script
 writes; they are not part of this count and are left as the D01 record.
 
-## motion-OSS — five libraries vetted, two slices of seven adopted, and an evidence script that could not run (2026-09-21)
+## motion-OSS — five libraries adopted across five of seven slices, and the Playwright evidence they land with (2026-09-21)
 
 Logan asked for the hand-rolled motion physics to be replaced with battle-tested open-source motion.
 Five MIT libraries were vetted and installed — `motion@13.4.0`, `vaul@1.1.2`,
 `@use-gesture/react@10.3.1`, `@formkit/auto-animate@0.10.0`, `sonner@2.0.8` — and the wave ran as
 seven slices.
 
-**Two landed, four were evaluated and declined. §c.1.1 of DESIGN-DIRECTION-v3 is the authority for
-every one of those calls** — slice by slice, with the probe or the bundle reading behind each — and it
-is not repeated here. In one line each: **S1** (the libraries, `TIER_MS`/`SPRING` mirroring the
-`--dur-*` rungs with a drift test that reads `tokens.css` off disk, `useMotionPrefs()`, `MotionConfig`
-at the root) and **S6** (the app's first toast, `auto-animate` on the two lists whose *membership*
-changes on a user action) landed; **S2, S3, S4 and S5** — the rail reorder, the inbox row's leave and
-swipe, the detail pane's rubber band, the sheets — did not. In each of those four the port moved
-behaviour the suite currently *checks* into a library the suite cannot drive (jsdom has no layout
-engine: `Reorder`'s drag fired `onReorder` zero times under a full synthetic gesture) or introduced a
-reduced-motion regression this repo's convention forbids (`vaul` has no `prefers-reduced-motion`
-handling at all; motion's `reducedMotion="user"` keeps a transition's duration where `tokens.css`
-collapses it to 80ms).
+**Five landed (S1, S3, S4, S5, S6), one was declined (S2), and the row swipe stays on
+`pointer-drag.ts` on purpose. §c.1.1 of DESIGN-DIRECTION-v3 is the authority for every one of those
+calls** — slice by slice, with the probe or the measurement behind each — and it is not repeated
+here. In one line each: **S1** (the libraries, `TIER_MS`/`SPRING` mirroring the `--dur-*` rungs with
+a drift test that reads `tokens.css` off disk, `useMotionPrefs()`, `MotionConfig` at the root), **S3**
+(the divider drag is `useDrag`, the width maths stays in `lib/detail-pane.ts`), **S4** (the leaving
+row collapses through `motion`'s `animate`, and `useCollapseHeight` is deleted), **S5** (the `<900`
+sheet is `vaul`'s drawer with `snapPoints={[0.5, 0.92]}`) and **S6** (the app's first toast,
+`auto-animate` on the two lists whose *membership* changes on a user action) landed; **S2** — the
+rail's reorder — did not, and §c.1.1 gives its two reasons: `Reorder` would replace the FLIP and
+nothing else (every gesture gate around it, ~70 lines, is still needed by the row swipe), and its own
+drag could not be driven in jsdom, so a port would need its own Playwright sequence before anything
+could be believed about it.
 
-So the honest summary is that **most of the hand-rolled motion is still hand-rolled**, deliberately.
-`SPRING`, `TIER_MS` and `useMotionPrefs` have no consumer in `apps/` yet; §c.1.1 calls them
-scaffolding, which is what they are, rather than letting a dependency list read as adoption.
+**This entry replaced an earlier version of itself, and what it corrected is worth keeping visible,
+because each of the three was a claim that read as a finding.** (1) It said two slices landed and
+four were declined; the tree it described had S3, S4 and S5 open, and they have since landed. (2) It
+said `vaul` and `@use-gesture/react` "reach no bundle at all, because nothing imports them" — true
+of that tree and false of this one, since both now have importers; the bundle section below is
+re-measured. (3) It declined the screen transitions with the reason that the brief's alternative,
+`AnimateView`, "is a motion+ (paid) component and is not in the MIT `motion` package". That is
+false — `AnimateView` ships in `motion@13.4.0` — and §c.1.1 now carries the real reason, which is in
+the library's own typings: it requires React and React DOM 19.3 or later, and this repo is on
+18.3.1. The decline stands; the reason was wrong.
 
-### Bundle cost — the real number, not the target
+**And the rule that decided those declines is gone.** The previous version adopted a rule —
+"`motion` owns the animation layer where its *completion* is reachable in the test environment" —
+that had been invented mid-wave, that no slice had been judged by before it was written, and that
+would have declined S3, S4 and S5 whether or not they worked: jsdom has no layout engine and its
+`Element.prototype.animate` is a stub this repo's setup deliberately never finishes, so almost
+nothing "completes" there, and a criterion written against completion is a criterion against
+adopting anything. §c.1.1's rule is now the honest version of the same instinct: **a harness that
+cannot see an animation is a gap in the harness, not a reason the library does not apply** — and the
+gap is closed by `tools/e2e/`, which is what the rest of this entry is about. `SPRING.move`,
+`useMotionPrefs()` and `motionMs(LEAVE_MS)` are read by `inbox-row.tsx`; `TIER_MS` is consumed
+through `lib/motion.ts`'s own `PANEL_MS`/`LEAVE_MS`/`spring(tier)`. The presets are no longer
+scaffolding, and that is a change from the previous entry's summary.
 
-Built at the pre-wave commit `ce580af` in a scratch `git worktree` and at the current tree, reading
-the gzip column:
+### Bundle cost — rebuilt on both sides, and it is over the brief's target
+
+Both sides were built today in `vite` production mode and read off the gzip column: the current tree
+with `pnpm --filter @omnis/desktop vite:build`, the baseline at the pre-wave commit `ce580af` in a
+scratch `git worktree` at `/tmp/omnis-baseline-ce580af`.
 
 | asset | baseline `ce580af` | current | delta |
 | --- | --- | --- | --- |
-| `index-*.js` | 267.72 kB | 280.70 kB | **+12.98 kB** |
+| `index-*.js` | 267.72 kB | 338.41 kB | **+70.69 kB** |
 | `lazy-inspector-*.js` | 4.12 kB | 4.12 kB | 0 |
-| `index-*.css` | 12.28 kB | 14.97 kB | **+2.69 kB** |
-| **total** | **284.12 kB** | **299.79 kB** | **+15.67 kB** |
+| `index-*.css` | 12.28 kB | 15.14 kB | **+2.86 kB** |
+| **total** | **284.12 kB** | **357.67 kB** | **+73.55 kB** |
 
-Against the brief's ≤ +60 kB target. The JS is `motion` + `sonner` + `auto-animate`; the CSS is
-essentially sonner's own stylesheet plus the `omnis-toast*` token rules. `vaul` and
-`@use-gesture/react` reach no bundle at all, because nothing imports them — the four declined slices
-are exactly why.
+**That is 13.6 kB over the brief's ≤ +60 kB.** The previous version of this entry recorded +15.67 kB
+against the same baseline, and the difference between the two entries is not a measurement error:
+that number was taken on a tree where `vaul` and `@use-gesture/react` had no importers and S3, S4 and
+S5 had not landed. It was the cost of two slices, reported as if it were the cost of the wave.
 
-The brief's command for this, `pnpm --filter @omnis/desktop build`, **does not exist**;
-`@omnis/desktop`'s script is `vite:build` (`tsc --build && vite build`), and that is what was run.
+Where the 73.6 kB went, measured by bundling each library's reachable graph with `esbuild --minify`
+(React external) and taking `gzip -9` — so each figure is the library's whole graph, and they sum to
+more than the app's delta because the app imports neither `Reorder` nor `AnimatePresence`:
 
-### An evidence script that could not run
+| library | gzip |
+| --- | --- |
+| `motion` (`motion`, `MotionConfig`, `AnimatePresence`, `Reorder`) | 46.0 kB |
+| `vaul` (`Drawer`) | 21.8 kB |
+| `sonner` (`Toaster`, `toast`) | 9.7 kB |
+| `@use-gesture/react` (`useDrag`) | 6.9 kB |
+| `@formkit/auto-animate` | 3.1 kB |
+
+Two lines carry most of it, and both are load-bearing: `motion` is the runtime S1, S4 and S6 sit on,
+and `vaul` is 21.8 kB for one drawer — the price of S5's snap points, `handleOnly` drag and
+drag-to-dismiss, where the hand-rolled sheet was a CSS keyframe and a `pointerDrag` swipe. If the
+number has to come down, `vaul` is the one to re-open (a `pointerDrag({ axis: "y" })` dismissal is
+already in the repo's vocabulary at §c.6); the report is that it is over, not that it should be
+smoothed over.
+
+The CSS delta is sonner's own stylesheet plus the `omnis-toast*` token rules.
+
+### S6 shipped its toast styled by sonner, not by the design tokens — and every fault was specificity
+
+S6's styling lost to sonner's own rules rather than to anything this repo wrote, and it was the
+frames that caught it: `row-leave-1440-239ms.png` from the first run shows sonner's 16px padding, its
+13px type and a **dark-grey Undo** where v3 §b.1's blue belongs. Four faults, all one kind — a
+selector weaker than the rule it was overriding:
+
+- `[data-sonner-toaster]` (0,1,0) against sonner's `[data-sonner-toaster][data-sonner-theme='light']`
+  (0,2,0): none of `--normal-bg`, `--normal-text`, `--normal-border` or `--border-radius` reached the
+  toast at all. It was sonner's `#fff` and `#171717`-ish `--gray12`, not `--bg-elevated` and
+  `--text-primary`.
+- `.omnis-toast` (0,1,0) against `[data-sonner-toast][data-styled='true']` (0,2,0), and
+  `.omnis-toast__action` (0,1,0) against `… [data-button]` (0,3,0). The 14px type, the 10px/12px
+  padding, `--shadow-glass` and the accent Undo were **all dead declarations**. A class-only rule
+  reads correctly and does nothing, which is why three frames of a real toast did not show it.
+- The narrow-tier offset was written to `--offset-bottom` alone. sonner reads
+  `--mobile-offset-bottom` below its own 600px breakpoint (`styles.css`'s `@media (max-width: 600px)`),
+  and `assignOffset` writes **both** inline — 24px and 16px — with no `offset` prop passed. So at 390
+  the rule changed a variable nothing read, and at 600–899px the sum it did use,
+  `--bar-h + --bar-gap + 8px` = 72px, landed **inside** the BottomBar's band on the very press that
+  raises the toast. Both `row-leave-390-*` frames show it on the Inbox tile.
+
+Each is fixed by repeating sonner's own chain and adding the class, or by setting both offset
+variables to §c.9's whole band — `56px + var(--bar-h) + var(--bar-gap) * 2 + 8px`, 140px at the
+tokens' current values, against a band whose top is 132px. Three of the four now win on specificity
+by construction; the toast's own box rides on app.css being imported after sonner's stylesheet, which
+`main.tsx` fixes deliberately in that order (sonner's CSS, then `tokens.css`, then `app.css`).
+
+**And each fix carries an assertion in the shot script**, because a class that renders and a class
+that does nothing make the same three frames: `toastGeometry()` measures the toast's bottom edge
+against the BottomBar's top edge, and `toastUndoColour()` resolves `--accent` through a throwaway
+element and fails unless the Undo's computed background is that value. The frames are the half of
+this a person can read; these two are the half they cannot, and the run prints both numbers.
+
+Two methods notes, because both were gotchas: the brief's command for this,
+`pnpm --filter @omnis/desktop build`, **does not exist** — `@omnis/desktop`'s script is `vite:build`
+(`tsc --build && vite build`). In the scratch worktree `tsc --build` refuses to run at all (its
+referenced projects have no declaration output there, and `Cannot find module '@omnis/kernel/zero'`
+follows), so the baseline was built with `pnpm exec vite build` after copying in the built `dist` of
+the five packages that are **unchanged** between `ce580af` and `HEAD` — `agents`, `db`, `kernel`,
+`memory`, `protocol`; `packages/ui` is the package the wave changed and is resolved from source by
+its exports map, so it needed nothing. The safety check on that shortcut is that the rebuild
+reproduced the previously recorded baseline to the byte: 267.72 / 4.12 / 12.28.
+
+### The evidence, and the one thing it cannot show
+
+`pnpm tsx tools/e2e/shots-motion-oss.ts` exits 0 and writes **27 frames** into
+`docs/design/screens/motion-oss/` — three-frame (and, for the rail, five-frame) sequences of the four
+gestures the wave touched, at both tiers, plus one frame of the tier the divider does not exist on:
+
+- **reorder** — 5 frames at 1440 and 5 at 390 (`reorder-{1440,390}-*`): the lifted tile, the
+  neighbours' travel parked at 0/110/219ms of the 220ms settle (48px at 1440, 64px at 390), and the
+  tile settling into the slot it just took.
+- **row leave** — 3 at each tier (`row-leave-*`), parked on a `page.clock` fake so the JS-driven
+  collapse advances one frame at a time.
+- **sheet open** — 3 at 390 (`sheet-open-390-150/325/499ms`, the `vaul` drawer) and 3 at 1440
+  (`sheet-open-1440-*`, the same component as the centred dialog).
+- **divider drag** — 4 at 1440 (`divider-drag-1440-{a-inside,b-at-limit,c-band,d-release-120ms}`)
+  and 1 at 390 (`divider-drag-390-no-grip`).
+
+Each sequence asserts what the pictures cannot: the rail's order string actually changes
+(`Slack System Gmail Google Calendar Agent` → `Slack Gmail System Google Calendar Agent` at 1440, and
+`Slack Gmail System Google Calendar` → `Slack System Gmail Google Calendar` at 390), the row's box
+falls from frame to frame, the drawer's top rises (575 → 507 → 498px), and the pane beyond its ceiling
+draws less than the pointer asked for (900px asked, 777.6px drawn against a 720px ceiling) and then
+settles back **to** the ceiling rather than snapping. The two leave sequences carry S6's assertions as
+well, because the press that starts a row leaving is the same press that raises the toast: the toast's
+bottom edge is above the BottomBar's top edge (860.0px against 878.0px at 390 — the only tier with a
+bar, so at 1440 that half is skipped), and the Undo's computed background is `--accent` at both tiers
+(`oklch(0.48 0.18 255)`, resolved through a throwaway element rather than compared as token text).
+Each frame is also parked by a helper that names what it parked — `CSSTransition[transform]` for the
+rail's FLIP, a `CSSTransition[transform]` plus a `CSSAnimation[opacity]` for the drawer,
+`CSSTransition[width]` for the divider's release, `CSSTransition[paddingTop]`/`[paddingBottom]` for
+the row — because "2 animations parked" does not say whether the one the sequence is about was among
+them.
+
+**That last detail is how the row's leave turned out to be half-visible, and it is recorded rather
+than papered over.** The three leave frames show the collapse — 71.5 → 13.6 → 8.3px at 1440 and
+73.0 → 14.2 → 10.2px at 390 — with the row at `opacity: 0` in five of the six. The fade is not an
+animation the fake clock drives: `motion` runs it on the Web Animations API, whose clock is the
+browser's, so it keeps running in real time between this driver's calls while the collapse — driven by
+`motion`'s own `requestAnimationFrame` loop — stays frozen at the fake clock's `0ms`. Whether the fade
+can still be parked by the time the first frame is taken is therefore a race, and the two tiers came
+out differently in this run: at 1440 the first park finds only the two padding transitions, and the
+row already renders at 0 because motion has written `opacity: 0` into its inline style; at 390 it
+finds a third, `Animation[opacity]`, parks it at 0ms, and that first frame really is opaque
+(`row-leave-390-0ms.png`, logged as `opacity 1, style "height: 49px; opacity: 1;"`) — the one frame of
+the six with any of the fade in it. Every frame prints its rendered opacity and inline style, so which
+of the two the run got is in the log rather than inferred, and both sequences assert the row is *still
+opaque* before they start (`opacity > 0.99`, logged with the style `"height: auto; opacity: 1;"`), so
+the fade is live and begins at 1 — what the frames cannot show is the middle of it. The
+reduced-motion branch, which is the fade with the travel dropped, is the branch the unit suite pins
+(`packages/ui/test/inbox-row-leave.test.tsx`). That a parked Web Animations opacity animation loses to
+motion's own style write at one tier and not the other is the measurement; *why* is a hypothesis and
+is not claimed here.
+
+Frames read back rather than assumed, which is the point of committing them: `reorder-1440-1-lift`
+shows the lifted tile plated, scaled and shadowed in its own slot with the order unchanged;
+`reorder-390-4-cross-219ms` shows the neighbour that was to its right now to its left, mid-settle;
+`sheet-open-390-150ms` shows the drawer a quarter of the way up with its Show list already readable
+and `sheet-open-390-499ms` the same drawer at rest showing the View and Labels groups the earlier
+frame cut off; `divider-drag-1440-a-inside` shows a 660px pane that has followed the pointer
+one-for-one and `divider-drag-1440-c-band` a 778px pane that has not.
+
+And the two frames this entry was rewritten for: `row-leave-1440-239ms` and `row-leave-390-239ms`
+show the toast that press raised — **a blue Undo on both**, where the first run of this script shot
+sonner's dark-grey one, and at 390 the toast sitting above the BottomBar's line of controls rather
+than on the Inbox tile it covered before. Both are now assertions as well as pictures; the section
+above records what was wrong and why three frames of a real toast could not show it.
+
+`measureOverflow` reports **0px at each of 390, 768, 1024 and 1440**, and the script asserts that
+rather than printing it.
 
 `tools/e2e/shots.ts` was **already broken at `ce580af`**, before this wave touched anything: it waited
 30s for a button named `"More details"` that exists nowhere in the tree. The label was real when
@@ -614,12 +765,10 @@ into the "Thread options" menu, and the script was never updated. `af2edcf` is a
 so this is not this wave's breakage, but it is why S7's screenshot evidence was unobtainable until it
 was fixed, and it means the claim four paragraphs up that both shot scripts "exit 0" had stopped
 being true a wave later. This is the second time an evidence line in this log outlived the thing it
-described.
-
-The fix is the two steps the menu now needs, with `exact: true` — load-bearing because the pane's own
-toggle is named "Expand details" / "Collapse details" and `getByRole` matches accessible names as
-case-insensitive *substrings* by default. The frame it was blocking, `detail-pane.png`, now actually
-shows the open key-value table, which is the entire reason that click is in the script.
+described. The fix is the two steps the menu now needs, with `exact: true` — load-bearing because the
+pane's own toggle is named "Expand details" / "Collapse details" and `getByRole` matches accessible
+names as case-insensitive *substrings* by default. The frame it was blocking, `detail-pane.png`, now
+actually shows the open key-value table, which is the entire reason that click is in the script.
 
 **`shots-accent.ts` is still red, and is deliberately left alone.** It times out at
 `shots-accent.ts:273` waiting for the narrow rail's `More` trigger. The locator is valid —
