@@ -3,14 +3,15 @@ import { cn } from "../lib/cn.js";
 import { ContextMenu, type ContextMenuGroup } from "./context-menu.js";
 import { GlassSurface } from "./glass-surface.js";
 
-// US-D09 §c.5 / §c.9 — M103 (toolbars). One capsule of icon buttons, in two tiers: the detail pane's
-// sticky bar at 900 and above, and the <900 floating action bar that sits in the BottomBar's line
-// between the filters circle and the compose circle.
+// US-D09 §c.5 / §c.9 — M103 (toolbars). One bar of icon buttons with three shapes: the detail pane's
+// sticky glass capsule in the wide tier, the same controls as the sheet's own chrome row in the
+// 900–1279.98 tier (where the pane is itself glass — `variant="chrome"`), and the <900 floating
+// action bar that sits in the BottomBar's line between the filters circle and the compose circle.
 //
-// It is one component rather than two because §c.5's two bars differ in exactly two numbers — their
-// height and where they are positioned — and everything else about them is the same claim: glass,
-// a capsule, icon buttons that each carry a label. Two components would have drifted into two
-// button sizes and two hover states within a story.
+// It is one component rather than two because §c.5's bars differ in exactly two numbers — their
+// height and where they are positioned — and everything else about them is the same claim: a row of
+// icon buttons that each carry a label. Two components would have drifted into two button sizes and
+// two hover states within a story.
 //
 // No `role="toolbar"`: that role announces a widget whose arrow keys move between its controls, and
 // nothing here implements roving focus. The buttons are ordinary buttons in a row, reachable with
@@ -38,14 +39,18 @@ export interface ThreadToolbarProps {
    *  the trigger and the panel, so a screen reader hears the same word the tooltip shows. */
   menu?: { label: string; groups: ContextMenuGroup[] };
   className?: string;
+  /** `glass` (the default) is the bar's own material: a capsule of the chrome layer. `chrome` is
+   *  the same bar with **no material of its own**, for the one place it stands on a surface that is
+   *  already glass — the 900–1279.98 pane, which app.css draws as a floating glass sheet. A glass
+   *  capsule inside a glass sheet is the nesting ACCENT §4.4 rejects, and taking the recipe off by
+   *  CSS alone would leave the class on the element: the sheet's own field is what the buttons then
+   *  stand on, which is what "the sheet's chrome" means. */
+  variant?: "glass" | "chrome";
 }
 
-export function ThreadToolbar({ actions, menu, className }: ThreadToolbarProps) {
-  return (
-    // The glass is the bar's own field, and the bar does not declare a background: the fill, the
-    // blur and the lift are tokens.css's recipe, which is what keeps this capsule and the BottomBar's
-    // circles the same material. `slot="toolbar"` is honest in both tiers — a bar of controls.
-    <GlassSurface slot="toolbar" className={cn("thread-toolbar", className)}>
+export function ThreadToolbar({ actions, menu, className, variant = "glass" }: ThreadToolbarProps) {
+  const content = (
+    <>
       {actions.map((action) => {
         const Icon = action.icon;
         return (
@@ -82,6 +87,23 @@ export function ThreadToolbar({ actions, menu, className }: ThreadToolbarProps) 
           }
         />
       )}
+    </>
+  );
+
+  if (variant === "chrome") {
+    // Deliberately not a GlassSurface, and deliberately not given a fill to stand in for one: it is
+    // a row of the sheet's chrome, and the sheet is what is behind it.
+    return (
+      <div className={cn("thread-toolbar", "thread-toolbar--chrome", className)}>{content}</div>
+    );
+  }
+
+  // The glass is the bar's own field, and the bar does not declare a background: the fill, the
+  // blur and the lift are tokens.css's recipe, which is what keeps this capsule and the BottomBar's
+  // circles the same material. `slot="toolbar"` is honest in both tiers — a bar of controls.
+  return (
+    <GlassSurface slot="toolbar" className={cn("thread-toolbar", className)}>
+      {content}
     </GlassSurface>
   );
 }

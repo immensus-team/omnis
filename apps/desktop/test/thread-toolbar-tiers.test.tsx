@@ -113,16 +113,25 @@ vi.mock("@rocicorp/zero/react", () => ({
 
 const { Thread } = await import("../src/screens/Thread");
 
-/** The narrow tier is a JS breakpoint (lib/media-query.ts), not CSS, because Thread.tsx has to
- *  choose *where* to render the bar rather than hide one of two. */
+/** Both shell tiers are JS breakpoints (lib/media-query.ts), not CSS, because Thread.tsx has to
+ *  choose *where* to render the bar rather than hide one of two. jsdom has no layout, so the two
+ *  queries are answered by hand: a tier is the pair of answers they get.
+ *
+ *  `wide` is the real jsdom default (matchMedia reports nothing as matching), kept as an explicit
+ *  case so every test states its tier rather than relying on that. */
 const REAL_MATCH_MEDIA = window.matchMedia;
 afterEach(() => {
   window.matchMedia = REAL_MATCH_MEDIA;
 });
-function stubNarrow(): void {
+function stubTier(tier: "wide" | "floating" | "narrow"): void {
   window.matchMedia = ((query: string) => ({
     media: query,
-    matches: true,
+    matches:
+      query.includes("899.98") === true
+        ? tier === "narrow"
+        : query.includes("1279.98") === true
+          ? tier !== "wide"
+          : false,
     addEventListener: () => {},
     removeEventListener: () => {},
   })) as unknown as typeof window.matchMedia;
@@ -144,6 +153,7 @@ function nestedGlass(): Element[] {
 
 describe("Thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
   it("wide: one sticky bar in the pane, and it is the glass", () => {
+    stubTier("wide");
     renderThread();
 
     expect(toolbars()).toHaveLength(1);
@@ -154,13 +164,49 @@ describe("Thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
     // The floating tier's class is what app.css positions by; carrying both would put the wide bar
     // in the BottomBar's row.
     expect(bar).not.toHaveClass("thread-toolbar--floating");
+    // The pane is an opaque grid column at this tier, so the bar is a child of it — that is the
+    // arrangement the glass recipe is for.
+    expect(document.querySelector(".thread-screen")?.contains(bar ?? null)).toBe(true);
     // archive is the one write this screen owns; reply is gated on Phase B.
     expect(screen.getByRole("button", { name: "Archive thread" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Reply" })).toBeDisabled();
   });
 
+  // 900–1279.98: `@container shell (max-width: 1279.98px)` makes the pane itself a glass sheet, so
+  // the bar may not be a second glass layer inside it (ACCENT §4.4). It becomes the sheet's chrome
+  // row instead: the same buttons, no material, and no `.glass-surface` on the element at all —
+  // which is what makes the nesting absent from the DOM rather than merely overridden by CSS.
+  it("floating pane: one bar, with no material of its own and outside the scroller", () => {
+    stubTier("floating");
+    renderThread();
+
+    expect(toolbars()).toHaveLength(1);
+    const bar = document.querySelector(".thread-toolbar--pane");
+    expect(bar).not.toBeNull();
+    expect(bar).toHaveClass("thread-toolbar--chrome");
+    expect(bar).not.toHaveClass("glass-surface");
+    expect(bar).not.toHaveAttribute("data-glass-slot");
+    expect(bar).not.toHaveClass("thread-toolbar--floating");
+    // A sibling of the scroller, not a row inside it: app.css turns the pane into a column at this
+    // tier and `.thread-screen` into the scroller, so a bar left in the flow would scroll away with
+    // the message — and a sticky one with no field behind it would let the message travel through
+    // the glyphs.
+    const scroller = document.querySelector(".thread-screen");
+    expect(scroller?.contains(bar ?? null)).toBe(false);
+    // Above the scroller in document order too, which is the other half of "chrome row": app.css
+    // right-aligns it as the pane's first flex item.
+    expect(
+      scroller !== null &&
+        bar !== null &&
+        (bar.compareDocumentPosition(scroller) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+    ).toBe(true);
+    // Same controls as the wide tier, so nothing is lost by the material change.
+    expect(screen.getByRole("button", { name: "Archive thread" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Reply" })).toBeDisabled();
+  });
+
   it("narrow: one floating bar, portaled out of the pane", () => {
-    stubNarrow();
+    stubTier("narrow");
     renderThread();
 
     expect(toolbars()).toHaveLength(1);
@@ -175,11 +221,11 @@ describe("Thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
     expect(document.querySelector(".thread-screen")?.contains(bar ?? null)).toBe(false);
   });
 
-  it("never puts a glass surface inside another one, in either tier", () => {
-    for (const narrow of [false, true]) {
-      if (narrow) stubNarrow();
+  it("never puts a glass surface inside another one, in any tier", () => {
+    for (const tier of ["wide", "floating", "narrow"] as const) {
+      stubTier(tier);
       const { unmount } = renderThread();
-      expect(nestedGlass()).toEqual([]);
+      expect(nestedGlass(), `tier ${tier}`).toEqual([]);
       unmount();
     }
   });

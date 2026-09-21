@@ -86,6 +86,19 @@ describe("App shell responsive contract (US-D02b)", () => {
     expect(fromTs).toBeDefined();
     expect(css).toContain(`@container shell (max-width: ${fromTs}px)`);
   });
+
+  // US-D09 §c.5: the pane has a *second* shape. 900–1279.98 is a floating pane too, so the bar §c.5
+  // puts inside it has to stop being glass there — and React cannot read a container query, so the
+  // cut is held in TS as well. Same drift as the narrow shell's, one tier up: change either side
+  // alone and the bar keeps its material on a pane that is already a glass sheet.
+  it("uses the same floating-pane breakpoint in app.css and lib/media-query.ts", () => {
+    const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
+    const ts = readFileSync(join(TEST_DIR, "../../../packages/ui/src/lib/media-query.ts"), "utf8");
+    const fromTs = ts.match(/FLOATING_PANE_QUERY = "\(max-width: ([\d.]+)px\)"/)?.[1];
+
+    expect(fromTs).toBeDefined();
+    expect(css).toContain(`@container shell (max-width: ${fromTs}px)`);
+  });
 });
 
 /** US-D08 §c.9's sum, in the three places it is written: what the list reserves at the bottom, what
@@ -210,6 +223,18 @@ function atRuleBody(header: string): string {
   return css.slice(start, css.indexOf("\n}", start));
 }
 
+/** US-D09's chrome-row tier. This header is written twice in app.css — the pre-existing `>=900`
+ *  grid tier shares it — so `atRuleBody` would return the wrong block; the chrome row is the later
+ *  of the two, which is also what makes it win the cascade. */
+const CHROME_ROW_HEADER = "@container shell (min-width: 900px) and (max-width: 1279.98px) {";
+
+function chromeRowTier(): string {
+  const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
+  const start = css.lastIndexOf(CHROME_ROW_HEADER);
+  expect(start, `${CHROME_ROW_HEADER} is not in app.css`).toBeGreaterThan(-1);
+  return css.slice(start, css.indexOf("\n}", start));
+}
+
 describe("App shell thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
   // The wide tier's bar is a row of the conversation that stays put, not a floating panel: `sticky`
   // keeps it in the scrolling flow, and `margin-left: auto` with `width: max-content` pins a block
@@ -277,6 +302,41 @@ describe("App shell thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
     );
     expect(solid).toContain("background: var(--bg-base);");
     expect(solid).toMatch(/backdrop-filter: none;/);
+  });
+
+  // 900–1279.98 is the tier the rejected pass was caught in. The pane is a glass sheet there (the
+  // test above asserts the recipe), so the bar inside it gives up its material and becomes the
+  // sheet's own chrome row. Three declarations carry that, and each one is load-bearing:
+  //   - `.thread-toolbar--pane` is `position: static`, or the `>=900` sticky rule above would still
+  //     apply — both blocks have the same specificity, so source order is the only thing deciding;
+  //   - the pane is a flex column and `.thread-screen` is the scroller, so a static row can sit
+  //     above the conversation instead of being scrolled away with it;
+  //   - and no fill, blur or shadow of its own, because the sheet behind it is the material §4.4
+  //     means. A fill here would be the nesting again, one token deep.
+  it("makes the bar the sheet's own chrome row at 900–1279.98, with the scroller under it", () => {
+    const block = chromeRowTier();
+
+    const pane = ruleBody(block, ".app-shell__detail");
+    expect(pane).toContain("display: flex;");
+    expect(pane).toContain("flex-direction: column;");
+
+    expect(ruleBody(block, ".thread-screen")).toContain("overflow-y: auto;");
+
+    const bar = ruleBody(block, ".thread-toolbar--pane");
+    expect(bar).toContain("position: static;");
+    expect(bar).toContain("align-self: flex-end;");
+    expect(bar).not.toMatch(/background:|backdrop-filter:|box-shadow:/);
+  });
+
+  // Source order is what makes the block above win, and it is also the reason the helper cannot use
+  // a plain `indexOf`: app.css declares this same at-rule header twice (the pre-existing `>=900`
+  // grid tier is the other one). If the chrome-row block ever moves above the sticky block, the bar
+  // silently goes back to being sticky *and* glass.
+  it("writes the chrome-row tier after the sticky rule it overrides", () => {
+    const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
+    expect(css.lastIndexOf(CHROME_ROW_HEADER)).toBeGreaterThan(
+      css.indexOf("@container shell (min-width: 900px) {"),
+    );
   });
 
   // The compose circle is the bar's *trailing* piece, and the auto margin is what keeps it there:

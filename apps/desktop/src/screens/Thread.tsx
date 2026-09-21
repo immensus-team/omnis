@@ -22,6 +22,7 @@ import {
   ToolCallBadge,
   type ToolCallState,
   type UiItemStatus,
+  useFloatingPane,
   useNarrowShell,
 } from "@omnis/ui";
 import { formatRelativeTime } from "@omnis/ui/lib/relative-time";
@@ -158,6 +159,9 @@ export function Thread({
   // the call site rather than CSS hiding one of them, so the DOM never carries two toolbars and the
   // reviewer inspecting for nested glass never finds one inside the other either.
   const narrow = useNarrowShell();
+  // §c.5: the pane's second shape — the floating glass sheet of 900–1279.98. Only the bar's home and
+  // material depend on it; the two are decided together below so the DOM never carries two bars.
+  const floatingPane = useFloatingPane();
   const [segment, setSegment] = useState<ThreadSegment>("conversation");
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [metaOpen, setMetaOpen] = useState(false);
@@ -275,10 +279,17 @@ export function Thread({
     ],
   };
 
-  // The pane's bar, wide tier: reply · archive · more.
+  // The pane's bar: reply · archive · more. It is one element with one material per tier, because
+  // the surface it stands on changes. Wide (>=1280) the pane is an opaque grid column, so the bar
+  // is the glass capsule §c.5 specs. From 900 to 1279.98 the pane is itself a floating glass sheet
+  // (`@container shell (max-width: 1279.98px)`), and a glass capsule inside a glass sheet is the
+  // nesting ACCENT §4.4 rejects — there the bar drops its material and becomes the sheet's chrome
+  // row, which is also why it is rendered outside `.thread-screen` in that tier: a scroller's
+  // content would otherwise slide under a bar that no longer has a field to hide it.
   const paneToolbar = (
     <ThreadToolbar
       className="thread-toolbar--pane"
+      variant={floatingPane ? "chrome" : "glass"}
       actions={[replyAction, archiveAction]}
       menu={toolbarMenu}
     />
@@ -311,112 +322,130 @@ export function Thread({
     />
   );
 
+  // One bar, three homes and never two at once. `narrow` wins over `floatingPane` because the <900
+  // tier is also a floating pane — there the bar belongs to the BottomBar's row, not to the sheet.
+  const toolbarHome = narrow ? "floating" : floatingPane ? "chrome" : "flow";
+
   return (
-    <div className="thread-screen">
-      {narrow ? createPortal(floatingToolbar, document.body) : paneToolbar}
-      {archived !== null && (
-        <div className="thread-screen__archived-banner">
-          <span>Archived</span>
-          <button type="button" onClick={() => void setThreadArchived(threadId, false)}>
-            Restore
-          </button>
-        </div>
-      )}
-      <header className="thread-header">
-        {/* §c.5's sender block: 40px avatar, name, "To: me", and the date right-aligned to the
+    <>
+      {/* The sheet's chrome row: a child of the pane, a sibling of the scroller. It carries no
+          material because the sheet behind it is the material. */}
+      {toolbarHome === "chrome" && paneToolbar}
+      <div className="thread-screen">
+        {toolbarHome === "floating"
+          ? createPortal(floatingToolbar, document.body)
+          : toolbarHome === "flow"
+            ? paneToolbar
+            : null}
+        {archived !== null && (
+          <div className="thread-screen__archived-banner">
+            <span>Archived</span>
+            <button type="button" onClick={() => void setThreadArchived(threadId, false)}>
+              Restore
+            </button>
+          </div>
+        )}
+        <header className="thread-header">
+          {/* §c.5's sender block: 40px avatar, name, "To: me", and the date right-aligned to the
             first line, closed by one hairline. It replaced the old title-plus-subline header —
             the title moved down to the subject below it, where a 24px line belongs. */}
-        <div className="thread-header__sender">
-          <span
-            className="thread-header__avatar"
-            style={{ background: pastelFromName(senderName) }}
-            aria-hidden="true"
-          >
-            {initialsFromName(senderName)}
-          </span>
-          <span className="thread-header__who">
-            <span className="thread-header__name">{senderName}</span>
-            <span className="thread-header__to">To: me</span>
-          </span>
-          {senderTime !== null && (
-            <time className="thread-header__date" dateTime={new Date(senderAt ?? 0).toISOString()}>
-              {senderTime}
-            </time>
-          )}
+          <div className="thread-header__sender">
+            <span
+              className="thread-header__avatar"
+              style={{ background: pastelFromName(senderName) }}
+              aria-hidden="true"
+            >
+              {initialsFromName(senderName)}
+            </span>
+            <span className="thread-header__who">
+              <span className="thread-header__name">{senderName}</span>
+              <span className="thread-header__to">To: me</span>
+            </span>
+            {senderTime !== null && (
+              <time
+                className="thread-header__date"
+                dateTime={new Date(senderAt ?? 0).toISOString()}
+              >
+                {senderTime}
+              </time>
+            )}
+          </div>
+          <h2 className="thread-header__subject">{title}</h2>
+        </header>
+        <div className="thread-header__segments">
+          <SegmentedControl
+            options={THREAD_SEGMENTS}
+            value={segment}
+            onChange={setSegment}
+            label="Thread view"
+          />
         </div>
-        <h2 className="thread-header__subject">{title}</h2>
-      </header>
-      <div className="thread-header__segments">
-        <SegmentedControl
-          options={THREAD_SEGMENTS}
-          value={segment}
-          onChange={setSegment}
-          label="Thread view"
-        />
-      </div>
-      {(labelsOpen || metaOpen) && (
-        <div className="thread-header__labels">
-          {labelsOpen && (
-            <KeyValueTable rows={[{ label: "Labels", value: labelNames.join(", ") || "None" }]} />
-          )}
-          {metaOpen && <KeyValueTable rows={metaRows} />}
-        </div>
-      )}
-      {children}
-      {segment === "summary" && (
-        <p className="thread-panel">{thread?.meta?.summary ?? "No summary for this thread yet."}</p>
-      )}
-      {segment === "notes" && (
-        <div className="thread-panel">
-          {notes.length === 0 ? (
-            <p className="thread-panel__empty">No notes on this thread yet.</p>
-          ) : (
-            notes.map((note) => (
-              <div key={note.id} className="thread-panel__note">
-                <span className="thread-panel__note-time">
-                  {formatRelativeTime(note.created_at)}
-                </span>
-                {note.body}
-              </div>
-            ))
-          )}
-        </div>
-      )}
-      {segment === "conversation" && (
-        <>
-          {flow.map((node) =>
-            node.kind === "approval" ? (
-              // §c.5: inline, in document order, opaque. The card keeps its own component; only its
-              // container changed — it used to be a stack above the conversation.
-              <ApprovalCardView
-                key={`approval-${node.approval.id}`}
-                interrupt={node.approval}
-                className="thread-screen__approval"
-                onDecide={(decision, decidedArgs) =>
-                  onDecide?.(node.approval.id, decision, decidedArgs)
-                }
-              />
+        {(labelsOpen || metaOpen) && (
+          <div className="thread-header__labels">
+            {labelsOpen && (
+              <KeyValueTable rows={[{ label: "Labels", value: labelNames.join(", ") || "None" }]} />
+            )}
+            {metaOpen && <KeyValueTable rows={metaRows} />}
+          </div>
+        )}
+        {children}
+        {segment === "summary" && (
+          <p className="thread-panel">
+            {thread?.meta?.summary ?? "No summary for this thread yet."}
+          </p>
+        )}
+        {segment === "notes" && (
+          <div className="thread-panel">
+            {notes.length === 0 ? (
+              <p className="thread-panel__empty">No notes on this thread yet.</p>
             ) : (
-              <ThreadItem key={node.item.id} item={node.item} />
-            ),
-          )}
-          {draft && (
-            <DraftCard
-              body={draft.body}
-              rationale="memory, past threads"
-              onEditAndSend={() => {
-                /* Composer wiring is out of this story's scope (YAGNI) */
-              }}
-              onDiscard={() => zero.mutate.items.update({ id: draft.id, status: "archived" })}
-              onRegenerate={() => {
-                /* Re-requesting propose_draft belongs to packages/agents; this screen only exposes
+              notes.map((note) => (
+                <div key={note.id} className="thread-panel__note">
+                  <span className="thread-panel__note-time">
+                    {formatRelativeTime(note.created_at)}
+                  </span>
+                  {note.body}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+        {segment === "conversation" && (
+          <>
+            {flow.map((node) =>
+              node.kind === "approval" ? (
+                // §c.5: inline, in document order, opaque. The card keeps its own component; only its
+                // container changed — it used to be a stack above the conversation.
+                <ApprovalCardView
+                  key={`approval-${node.approval.id}`}
+                  interrupt={node.approval}
+                  className="thread-screen__approval"
+                  onDecide={(decision, decidedArgs) =>
+                    onDecide?.(node.approval.id, decision, decidedArgs)
+                  }
+                />
+              ) : (
+                <ThreadItem key={node.item.id} item={node.item} />
+              ),
+            )}
+            {draft && (
+              <DraftCard
+                body={draft.body}
+                rationale="memory, past threads"
+                onEditAndSend={() => {
+                  /* Composer wiring is out of this story's scope (YAGNI) */
+                }}
+                onDiscard={() => zero.mutate.items.update({ id: draft.id, status: "archived" })}
+                onRegenerate={() => {
+                  /* Re-requesting propose_draft belongs to packages/agents; this screen only exposes
                    the trigger. */
-              }}
-            />
-          )}
-        </>
-      )}
-    </div>
+                }}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </>
   );
 }
 
