@@ -39,6 +39,10 @@ function previewElement() {
   // `digest` (US-B32): same reason — the screen has to be photographable in the real shell, and the
   // rail that switches screens is still not built.
   if (screen === "digest") return <App screen="digest" />;
+  // `settings` (US-B33): same reason — and the screen cannot be photographed from the rail either,
+  // because the rail's Settings tile is still the Phase B disabled one (ChannelRail's PHASE_B_TITLE
+  // note); wiring the rail is the shell's story, not this screen's.
+  if (screen === "settings") return <App screen="settings" />;
   return <App />;
 }
 
