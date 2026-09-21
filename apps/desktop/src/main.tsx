@@ -1,3 +1,4 @@
+import { MotionConfig } from "motion/react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "@omnis/ui/tokens.css";
@@ -17,7 +18,17 @@ loadZeroToken()
     console.error("zero auth token unavailable — rows will not sync", e);
   })
   .finally(() => {
-    createRoot(root).render(<StrictMode>{previewElement()}</StrictMode>);
+    createRoot(root).render(
+      // The motion wave's root config. `reducedMotion="user"` hands every `motion` transition in the
+      // tree to the user's `prefers-reduced-motion` answer: motion replaces transform-driven
+      // animations with opacity ones rather than removing them, so a surface still arrives and
+      // still leaves instead of blinking in and out. It is set here rather than in App.tsx because
+      // the onboarding preview below is rendered *instead of* App, and a screen outside the config
+      // would be the one place the preference is ignored.
+      <StrictMode>
+        <MotionConfig reducedMotion="user">{previewElement()}</MotionConfig>
+      </StrictMode>,
+    );
   });
 
 /** `?screen=<name>` opens a screen for looking at and for screenshots. There is no URL router in

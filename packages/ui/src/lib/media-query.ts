@@ -58,3 +58,17 @@ export function useNarrowShell(): boolean {
 export function useFloatingPane(): boolean {
   return useMatch(FLOATING_PANE_QUERY);
 }
+
+// The motion-OSS wave: `prefers-reduced-transparency` is the second accessibility query motion has
+// to honour, and it is a *media* query, not a motion one — so it lives here beside the breakpoints
+// rather than in lib/motion.ts. Same `useMatch` as the two above, which is the whole reason this is
+// one line: the re-read-on-change, the jsdom fallback and the listener cleanup are already solved.
+export const REDUCED_TRANSPARENCY_QUERY = "(prefers-reduced-transparency: reduce)";
+
+/** True when the user has asked the platform for less transparency. Glass surfaces read this to
+ *  fall back to an opaque fill (ACCENT §4.4's recipe at 100% rather than 78%); it is deliberately
+ *  *not* folded into `reducedMotion`, because the two are separate requests — someone can want the
+ *  blur gone and the springs kept. */
+export function useReducedTransparency(): boolean {
+  return useMatch(REDUCED_TRANSPARENCY_QUERY);
+}
