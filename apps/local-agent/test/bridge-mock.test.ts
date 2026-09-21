@@ -151,6 +151,7 @@ describe("bridge contract invariants (A2 §8.2)", () => {
       runtimeIds: new Map([["claude_code", "9c2d1f4b-2e6a-4d1f-8b0c-1a2b3c4d5e6f"]]),
       logger: createLogger("@omnis/local-agent", { sink: () => {} }),
       host: "macbook",
+      token: "test-token",
       sinkFor: () => hubSink,
     });
     await dispatch(
@@ -193,6 +194,7 @@ describe("bridge contract invariants (A2 §8.2)", () => {
       runtimeIds: new Map([["claude_code", "9c2d1f4b-2e6a-4d1f-8b0c-1a2b3c4d5e6f"]]),
       logger: createLogger("@omnis/local-agent", { sink: () => {} }),
       host: "macbook",
+      token: "test-token",
     });
     await expect(
       dispatch(

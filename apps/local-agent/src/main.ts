@@ -93,6 +93,8 @@ export async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<void
     connect: (url, headers) => new WebSocket(url, { headers }) as unknown as SocketLike,
     dispatch: createDispatcher({
       registry,
+      // The same secret authenticates the socket and verifies delegation signatures (A2 §5.1).
+      token,
       adapters,
       allowedRoots,
       runtimeIds,
