@@ -199,3 +199,83 @@ describe("App shell ask bar placement (US-D08 §c.9)", () => {
     expect(screen.getByRole("button", { name: "Compose" })).toBeInTheDocument();
   });
 });
+
+/** The body of a top-level at-rule: from its header to the `}` that closes it in column 0 (inner
+ *  rules close indented). The header is matched with its brace, so `(min-width: 900px) {` does not
+ *  also match the `(min-width: 900px) and (max-width: 1279.98px) {` block above it. */
+function atRuleBody(header: string): string {
+  const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
+  const start = css.indexOf(header);
+  expect(start, `${header} is not in app.css`).toBeGreaterThan(-1);
+  return css.slice(start, css.indexOf("\n}", start));
+}
+
+describe("App shell thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
+  // The wide tier's bar is a row of the conversation that stays put, not a floating panel: `sticky`
+  // keeps it in the scrolling flow, and `margin-left: auto` with `width: max-content` pins a block
+  // child to the pane's trailing edge without a wrapper element.
+  it("sticks the pane's bar in the conversation's own flow", () => {
+    const body = ruleBody(
+      atRuleBody("@container shell (min-width: 900px) {"),
+      ".thread-toolbar--pane",
+    );
+    expect(body).toMatch(/position: sticky;/);
+    expect(body).toMatch(/margin-left: auto;/);
+  });
+
+  // §c.5 pins the narrow tier's bar at `bottom: var(--bar-gap)`, which is where §c.9 leaves the rail
+  // bar — the same adaptation the BottomBar needed. These three numbers have to be the BottomBar's
+  // own: the bar stands in that row, between its 44px filters circle and its 52px compose circle, so
+  // the insets that clear them are what keeps it from covering either.
+  it("floats it in the BottomBar's row, clear of both circles", () => {
+    const body = ruleBody(
+      atRuleBody("@media (max-width: 899.98px) {"),
+      ".thread-toolbar--floating",
+    );
+
+    expect(body).toMatch(/position: fixed;/);
+    expect(body).toContain("bottom: calc(56px + var(--bar-gap));");
+    expect(body).toContain("left: calc(var(--bar-gap) + 44px + 8px);");
+    expect(body).toContain("right: calc(var(--bar-gap) + 52px + 8px);");
+  });
+
+  // §c.5/M103: 36px in the capsule at the desk, 44px on a touch screen — the BottomBar's own circle
+  // size. The base rule is the wide tier's, because it is the one that applies everywhere.
+  it("sizes the buttons for the pointer: 36px wide, 44px narrow", () => {
+    const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
+    // The base rule is top-level, so it sits at column 0 and ruleBody's two-space match would not
+    // find it; the narrow tier's is indented inside its at-rule.
+    const start = css.indexOf("\n.thread-toolbar__button {");
+    expect(start, ".thread-toolbar__button is not declared at the top level").toBeGreaterThan(-1);
+    const wide = css.slice(start, css.indexOf("}", start));
+    expect(wide).toMatch(/width: 36px;/);
+    expect(wide).toMatch(/height: 36px;/);
+
+    const narrow = ruleBody(
+      atRuleBody("@media (max-width: 899.98px) {"),
+      ".thread-toolbar--floating .thread-toolbar__button",
+    );
+    expect(narrow).toMatch(/width: 44px;/);
+    expect(narrow).toMatch(/height: 44px;/);
+  });
+
+  // Reviewer check 2 starts above the toolbar: the pane itself must not be a glass surface, or the
+  // toolbar §c.5 puts inside it is glass in glass. US-D09 therefore moved the <=1279.98 sheet's
+  // recipe out of a `.glass-surface` class and into that block — so the escape hatch at >=1280 has
+  // nothing left to undo, and both halves of this pair can be asserted.
+  it("keeps the pane's glass on the floating tier only, not on a class", () => {
+    const fading = ruleBody(
+      atRuleBody("@container shell (max-width: 1279.98px) {"),
+      ".app-shell__detail",
+    );
+    expect(fading).toContain("background: var(--bg-overlay);");
+    expect(fading).toContain("backdrop-filter: blur(24px) saturate(1.4);");
+
+    const solid = ruleBody(
+      atRuleBody("@container shell (min-width: 1280px) {"),
+      ".app-shell__detail",
+    );
+    expect(solid).toContain("background: var(--bg-base);");
+    expect(solid).toMatch(/backdrop-filter: none;/);
+  });
+});

@@ -1611,42 +1611,13 @@ body {
   overflow-wrap: anywhere;
 }
 
-/* The right-aligned icon actions. Ghost buttons: they are secondary to the subject, and an outlined
-   row of three at the top of the pane would read as a toolbar rather than as actions on this
-   thread. */
-.thread-header__actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 2px;
-}
+/* US-D09 §c.5 removed the header's own icon row: the three actions moved into the pane's glass
+   toolbar (.thread-toolbar), which is where a row of controls belongs — the header is the message,
+   the toolbar is what can be done with it. */
 
-.thread-header__action {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-tertiary);
-  cursor: pointer;
-}
-
-.thread-header__action:hover {
-  background: var(--state-hover);
-  color: var(--text-primary);
-}
-
-.thread-header__action[aria-pressed="true"] {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-}
-
-/* The panel the Label and More actions disclose: the thread's labels and the thread's own facts,
-   inline under the header rather than in a popover floating over the thing being described. Two
-   closures of the same kind, so one container with a gap between them. */
+/* The panel §c.7's "Labels" and "Details" rows disclose: the thread's labels and the thread's own
+   facts, inline under the header rather than in a popover floating over the thing being described.
+   Two closures of the same kind, so one container with a gap between them. */
 .thread-header__labels {
   display: flex;
   flex-direction: column;
@@ -2281,10 +2252,10 @@ body {
    ========================================================================================== */
 
 /* >=1280: the layout as it has always been. Here the detail pane is a grid column rather than a
-   floating surface, so it takes the glass off — glass belongs to the sidebar, toolbar, sheet,
-   palette and floating panels only (DESIGN-DIRECTION). The TSX attaches .glass-surface
-   unconditionally because it cannot know the width, so this override undoes it (there is nothing
-   to undo for position/inset — `fixed` only appears in the blocks below). */
+   floating surface, and glass belongs to the sidebar, toolbar, sheet, palette and floating panels
+   only (DESIGN-DIRECTION) — so the pane is the plain column the base rule makes it. There is nothing
+   to undo: US-D09 moved the glass into the block below rather than leaving a class on the pane for
+   this one to strip, which is also what keeps the pane's toolbar the only glass inside it. */
 @container shell (min-width: 1280px) {
   .app-shell__detail {
     background: var(--bg-base);
@@ -2295,11 +2266,22 @@ body {
   }
 }
 
-/* <=1279.98: the detail pane becomes a glass sheet floating over the list (the glass itself
-   already comes from the TSX's .glass-surface). 900–1279 is two columns and below 900 is one, but
-   the sheet's skeleton is the same in both — only its width is overridden by the <900 block. */
+/* <=1279.98: the detail pane becomes a glass sheet floating over the list. US-D09: the glass is
+   written out here rather than taken from a `.glass-surface` class on the TSX. The class used to be
+   unconditional on the pane and this block relied on it, but §c.5 puts a glass toolbar inside the
+   pane, and a glass surface inside a glass surface is a reject (ACCENT §4.4, reviewer check 2) —
+   and the >=1280 rule above only undid the *look*, not the class. So the pane is opaque by default
+   and is glass only where it actually floats; the recipe is tokens.css's, unmodified, so the sheet
+   is still the same material as the rail and the sheets. 900–1279 is two columns and below 900 is
+   one, but the sheet's skeleton is the same in both — only its width is overridden by the <900
+   block. */
 @container shell (max-width: 1279.98px) {
   .app-shell__detail {
+    background: var(--bg-overlay);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    border: var(--hairline);
+    box-shadow: inset 0 1px 0 var(--glass-highlight), var(--shadow-glass);
     position: fixed;
     top: 16px;
     right: 16px;
@@ -3271,4 +3253,92 @@ body {
 .context-menu__item[data-destructive="true"],
 .context-menu__item[data-destructive="true"] .context-menu__icon {
   color: var(--danger-500);
+}
+
+/* US-D09 §c.5/§c.9 — M103 (toolbars). One capsule of icon buttons in two tiers. Its geometry is
+   here and its two call sites are in Thread.tsx; the fill, the blur and the lift are tokens.css's
+   `.glass-surface`, which is what makes this capsule and the BottomBar's circles one material. */
+.thread-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  min-height: 40px;
+  border-radius: 999px;
+}
+
+.thread-toolbar__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 36px inside a 40px capsule: the 2px of padding each side is what leaves the capsule's hairline
+     visible around the button's hover fill instead of the fill running into the edge. */
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.thread-toolbar__button:hover:not(:disabled) {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}
+
+.thread-toolbar__button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* §c.5's Phase-B gates stay legible as controls but read as unavailable — the same --text-tertiary
+   the rail's own gated tiles use. */
+.thread-toolbar__button:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+
+/* >=900: the pane's bar, right-aligned over the scrolling body. `sticky` rather than `fixed` — it is
+   a row of the conversation's own flow that happens to stay put, so it scrolls with the thread
+   instead of hovering over the whole window. `margin-left: auto` with `width: max-content` pins a
+   block child to the end without a wrapper element. */
+@container shell (min-width: 900px) {
+  .thread-toolbar--pane {
+    position: sticky;
+    top: 8px;
+    z-index: 2;
+    width: max-content;
+    margin-left: auto;
+  }
+}
+
+/* <900: the floating action bar. §c.5 pins it at `bottom: var(--bar-gap)`, which is where §c.9
+   leaves the rail bar — the same adaptation the BottomBar needed, one rail-height above it. It fills
+   the band the ask pill otherwise occupies, between the BottomBar's 44px filters circle and its 52px
+   compose circle, so the three pieces read as one Mail line rather than as a fourth row of chrome.
+   `@media`, not `@container`: Thread.tsx portals it to the body, outside #root and outside the
+   `shell` container, so the shell query would never match it. The numbers are the same ones the
+   BottomBar's own rules use, which is the point — a `@media` block has to restate them. */
+@media (max-width: 899.98px) {
+  .thread-toolbar--floating {
+    position: fixed;
+    left: calc(var(--bar-gap) + 44px + 8px);
+    right: calc(var(--bar-gap) + 52px + 8px);
+    bottom: calc(56px + var(--bar-gap));
+    height: var(--bar-h);
+    min-height: var(--bar-h);
+    /* §c.9's bar is the tier's own line of controls, on top of the pane it floats over — the
+       BottomBar's stacking order, since it stands in the BottomBar's row. */
+    z-index: 30;
+    justify-content: space-around;
+  }
+
+  /* §c.5/M103: 44px icon buttons in this tier, against the wide tier's 36px — a touch target, and
+     the size the BottomBar's own circles already are. */
+  .thread-toolbar--floating .thread-toolbar__button {
+    width: 44px;
+    height: 44px;
+  }
 }

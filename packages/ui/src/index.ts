@@ -24,6 +24,7 @@ export * from "./components/status-pill.js";
 export * from "./components/group-header.js";
 export * from "./components/filter-chip-bar.js";
 export * from "./components/context-menu.js";
+export * from "./components/thread-toolbar.js";
 export * from "./components/key-value-table.js";
 export * from "./components/segmented-control.js";
 export * from "./components/person-card.js";
@@ -34,6 +35,10 @@ export { MoreHorizontal as MoreHorizontalIcon } from "lucide-react";
 // The apps (desktop/gallery) do not depend on lucide-react directly — app screens that need an
 // icon take it through @omnis/ui, the same way ChannelGlyph fronts the brand assets.
 export { Archive as ArchiveIcon } from "lucide-react";
+export { RotateCcw as RotateCcwIcon } from "lucide-react";
+export { Reply as ReplyIcon } from "lucide-react";
+export { FolderInput as FolderInputIcon } from "lucide-react";
+export { Info as InfoIcon } from "lucide-react";
 // US-D08 §c.3: the Mail category chips. A chip is icon + label at every width because the label is
 // the half that folds away below 560px of list pane — an icon-less chip would collapse to an empty
 // pill. These five are the only ones the row needs; they are aliased so the app's import sites read

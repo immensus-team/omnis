@@ -126,6 +126,11 @@ function Shell() {
   // only when there is something to look at. (Keeping an empty pane open shrinks the Inbox card
   // into a sidebar taking a third of the window.)
   const detail = open !== null || approvals.length > 0;
+  // §c.5: a thread — not the approval queue, and not an agent session, which draws no toolbar —
+  // owns the narrow tier's action-band when one is open. It is the same condition Thread.tsx uses
+  // to decide whether to portal its floating bar, and it has to be, or the band would hold both the
+  // pill and the bar.
+  const threadOpen = open !== null && !open.agentSession;
 
   const askBar = (
     <CommandPalette
@@ -157,19 +162,21 @@ function Shell() {
       {/* §c.9: the narrow tier's bar, above the rail bar rather than stacked into it. It is
           `position: fixed` in app.css, so being the last child of the shell costs nothing in the
           grid; it lives inside <main> because that is what makes it a descendant of the container
-          the shell's container queries are measured on. */}
-      {narrow ? <BottomBar>{askBar}</BottomBar> : null}
-      {/* US-D02b: the detail pane always renders with the sheet's glass, whatever the width. In
-          the narrow shells (<=1279.98px) that is what it actually is — a glass sheet floating over
-          the list — and in the wide shell app.css's `@container shell (min-width: 1280px)` takes
-          the glass back off, returning it to today's opaque column. With no JS branch on width,
-          there is only one place to change. */}
+          the shell's container queries are measured on.
+
+          US-D09 §c.5: with a thread open in this tier the middle piece is not the ask pill — that
+          band belongs to the thread's floating action bar, which Thread.tsx portals to the body so
+          it can sit in the BottomBar's line between the two circles. Rendering the pill as well
+          would put two controls in one slot (§e guard 11 wants a twin, not a duplicate). */}
+      {narrow ? <BottomBar>{threadOpen ? null : askBar}</BottomBar> : null}
+      {/* US-D02b/US-D09: the detail pane no longer carries `.glass-surface`. It used to, and app.css
+          took the glass back off at >=1280 — but the class itself stayed in the DOM, and §c.5 puts a
+          glass toolbar inside the pane, which would then be a glass surface nested in a glass
+          surface (ACCENT §4.4, reviewer check 2). The <=1279.98 look — a sheet floating over the
+          list — is the same recipe, and it now lives in that block in app.css where it can be read
+          next to the width and the radius it belongs to. */}
       {detail && (
-        <section
-          data-testid="detail-pane"
-          className="app-shell__detail glass-surface"
-          data-glass-slot="sheet"
-        >
+        <section data-testid="detail-pane" className="app-shell__detail">
           {/* US-D03: one approval is the expanded card, the rest are one-line rows under a count.
               The scope is the open thread — an approval that belongs to the conversation in front
               of you is the one you are working on; with nothing open the whole queue is the scope.

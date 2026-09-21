@@ -6,20 +6,29 @@ import {
   AttachmentCardView,
   type AttachmentItem,
   DraftCard,
+  FolderInputIcon,
+  InfoIcon,
   type KeyValueRow,
   KeyValueTable,
-  MoreHorizontalIcon,
+  PHASE_B_TITLE,
+  ReplyIcon,
+  RotateCcwIcon,
   SegmentedControl,
   StatusBadge,
+  THREAD_TOOLBAR_FLOATING_CLASS,
   TagIcon,
+  ThreadToolbar,
+  type ThreadToolbarAction,
   ToolCallBadge,
   type ToolCallState,
   type UiItemStatus,
+  useNarrowShell,
 } from "@omnis/ui";
 import { formatRelativeTime } from "@omnis/ui/lib/relative-time";
 import { type CHANNEL_LABEL, initialsFromName, pastelFromName } from "@omnis/ui/lib/row-meta";
 import { useQuery } from "@rocicorp/zero/react";
 import { type ReactNode, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { setThreadArchived } from "../api/threads.js";
 import { useZeroClient } from "../zero-client.js";
 
@@ -145,6 +154,10 @@ export function Thread({
   children?: ReactNode;
 }) {
   const zero = useZeroClient();
+  // §c.5's two toolbars are one element in one of two places, never both: the JS breakpoint picks
+  // the call site rather than CSS hiding one of them, so the DOM never carries two toolbars and the
+  // reviewer inspecting for nested glass never finds one inside the other either.
+  const narrow = useNarrowShell();
   const [segment, setSegment] = useState<ThreadSegment>("conversation");
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [metaOpen, setMetaOpen] = useState(false);
@@ -219,8 +232,88 @@ export function Thread({
       ]
     : [];
 
+  // §c.5: archive is the one real state change on this screen. Reply and move are controls whose
+  // destination does not exist yet, so they are disabled with the reason rather than announced as
+  // actionable and doing nothing — the same gate the rail's tiles and the BottomBar's circles use.
+  const archiveAction: ThreadToolbarAction = {
+    id: "archive",
+    label: archived !== null ? "Restore thread" : "Archive thread",
+    icon: archived !== null ? RotateCcwIcon : ArchiveIcon,
+    onSelect: () => void setThreadArchived(threadId, archived === null),
+  };
+  const replyAction: ThreadToolbarAction = {
+    id: "reply",
+    label: "Reply",
+    icon: ReplyIcon,
+    onSelect: () => {},
+    disabled: true,
+    title: PHASE_B_TITLE,
+  };
+
+  // §c.7's menu, shared by both tiers' bars. The two header disclosures moved into it: an icon whose
+  // job is to open a panel is a menu row, and the pane's overflow is where they belong now that the
+  // header carries no controls of its own.
+  const toolbarMenu = {
+    label: "Thread options",
+    groups: [
+      {
+        items: [
+          {
+            id: "labels",
+            label: "Labels",
+            icon: TagIcon,
+            onSelect: () => setLabelsOpen((v) => !v),
+          },
+          {
+            id: "details",
+            label: "Details",
+            icon: InfoIcon,
+            onSelect: () => setMetaOpen((v) => !v),
+          },
+        ],
+      },
+    ],
+  };
+
+  // The pane's bar, wide tier: reply · archive · more.
+  const paneToolbar = (
+    <ThreadToolbar
+      className="thread-toolbar--pane"
+      actions={[replyAction, archiveAction]}
+      menu={toolbarMenu}
+    />
+  );
+
+  // The <900 bar: archive · move · reply, in the BottomBar's own line between the filters circle and
+  // the compose circle. It carries the same `more` menu as the wide tier's, so the two disclosures
+  // are reachable in this tier too instead of being a wide-layout privilege.
+  //
+  // It is portaled to the body rather than rendered inside the pane. At this tier the pane is a fixed
+  // sheet that carries `backdrop-filter`, which makes it a containing block for its fixed
+  // descendants — an element inside it would position against the sheet's own box and land a row too
+  // high, above the BottomBar instead of in its line.
+  const floatingToolbar = (
+    <ThreadToolbar
+      className={THREAD_TOOLBAR_FLOATING_CLASS}
+      actions={[
+        archiveAction,
+        {
+          id: "move",
+          label: "Move to folder",
+          icon: FolderInputIcon,
+          onSelect: () => {},
+          disabled: true,
+          title: PHASE_B_TITLE,
+        },
+        replyAction,
+      ]}
+      menu={toolbarMenu}
+    />
+  );
+
   return (
     <div className="thread-screen">
+      {narrow ? createPortal(floatingToolbar, document.body) : paneToolbar}
       {archived !== null && (
         <div className="thread-screen__archived-banner">
           <span>Archived</span>
@@ -252,40 +345,6 @@ export function Thread({
           )}
         </div>
         <h2 className="thread-header__subject">{title}</h2>
-        {/* The three icon actions from the reference's card header. Archive is a real state change;
-            Label and More are disclosures rather than icon-shaped decoration — an icon that does
-            nothing when pressed is worse than no icon. §c.5 moves them into the pane's toolbar. */}
-        <div className="thread-header__actions">
-          <button
-            type="button"
-            className="thread-header__action"
-            aria-label={archived !== null ? "Restore thread" : "Archive thread"}
-            title={archived !== null ? "Restore" : "Archive"}
-            onClick={() => void setThreadArchived(threadId, archived === null)}
-          >
-            <ArchiveIcon size={16} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className="thread-header__action"
-            aria-label="Labels"
-            title="Labels"
-            aria-pressed={labelsOpen}
-            onClick={() => setLabelsOpen((v) => !v)}
-          >
-            <TagIcon size={16} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className="thread-header__action"
-            aria-label="More details"
-            title="More details"
-            aria-pressed={metaOpen}
-            onClick={() => setMetaOpen((v) => !v)}
-          >
-            <MoreHorizontalIcon size={16} aria-hidden="true" />
-          </button>
-        </div>
       </header>
       <div className="thread-header__segments">
         <SegmentedControl
