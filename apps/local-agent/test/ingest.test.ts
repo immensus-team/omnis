@@ -164,6 +164,7 @@ describe("createDispatcher — ingest methods are no longer blocked by the Phase
       runtimeIds: new Map(),
       logger,
       host: "macbook",
+      token: "test-token",
     });
     const res = (await dispatch("ingest.scan", {
       roots: [allowed],

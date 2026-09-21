@@ -1,11 +1,12 @@
 import { mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
-import { withMeta } from "@omnis/protocol";
+import { signApproval, withMeta } from "@omnis/protocol";
 import { describe, expect, it, vi } from "vitest";
 import { createLogger } from "../src/logger.js";
 import { createDispatcher } from "../src/rpc-dispatch.js";
 import { SessionRegistry } from "../src/session-registry.js";
 
+const TOKEN = "test-bridge-token";
 const spawn = vi.fn();
 const adapter = {
   kind: "codex" as const,
@@ -39,6 +40,7 @@ const dispatch = () =>
     runtimeIds: new Map([["codex", "7f1f0c6a-1b9e-4c0b-9a6f-2c3d4e5f6071"]]),
     logger: createLogger("@omnis/local-agent", { sink: () => {} }),
     host: "mini",
+    token: TOKEN,
   });
 
 describe("rpc dispatcher", () => {
@@ -65,21 +67,41 @@ describe("rpc dispatcher", () => {
     await expect(dispatch()("turn.explode", withMeta({}))).rejects.toMatchObject({ code: -32601 });
   });
 
-  it("rejects delegate.run without an approval_id and never spawns (A2 §5.1)", async () => {
+  // US-C02: the Phase A gate (-32003) is gone. delegate.run reaches runDelegation, which checks the hub's
+  // HMAC first (the execution half lives in delegate.test.ts) — an unsigned brief still never spawns.
+  const brief = () => ({
+    approval_id: "3c9e5a11-6d0b-4f2e-8a71-5b3c9d0e1f22",
+    target: { runtime: "codex", host: "mini", cwd: "/tmp" },
+    goal: "do it",
+    inputs: [],
+    verify: "true",
+    output: "report",
+    timeout_ms: 900000,
+  });
+
+  it("rejects delegate.run without a hub signature this bridge can reproduce, and never spawns (A2 §5.1)", async () => {
     spawn.mockClear();
+    const b = brief();
+    const unsigned = { brief: b };
+    // A signature made with another token is the "forged approval" case -32006 exists for.
+    const forged = { brief: b, sig: signApproval("another-token", b.approval_id, b) };
+    for (const params of [unsigned, forged]) {
+      await expect(dispatch()("delegate.run", withMeta(params))).rejects.toMatchObject({
+        code: -32006,
+      });
+    }
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it("routes a signed brief to the path gate: a cwd outside allowed_roots is -32005, not the old -32003", async () => {
+    spawn.mockClear();
+    const b = { ...brief(), target: { runtime: "codex", host: "mini", cwd: "/etc" } };
     await expect(
       dispatch()(
         "delegate.run",
-        withMeta({
-          target: { runtime: "codex", host: "mini", cwd: "/tmp" },
-          goal: "do it",
-          inputs: [],
-          verify: "true",
-          output: "report",
-          timeout_ms: 900000,
-        }),
+        withMeta({ brief: b, sig: signApproval(TOKEN, b.approval_id, b) }),
       ),
-    ).rejects.toMatchObject({ code: -32006 });
+    ).rejects.toMatchObject({ code: -32005 });
     expect(spawn).not.toHaveBeenCalled();
   });
 

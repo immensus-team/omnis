@@ -21,6 +21,7 @@ import {
   TurnStartParams,
   assertProtocolVersion,
 } from "@omnis/protocol";
+import { runDelegation } from "./delegate.js";
 import { handleIngestRead, handleIngestScan } from "./ingest.js";
 import type { Logger } from "./logger.js";
 import { assertPathAllowed } from "./paths.js";
@@ -52,6 +53,8 @@ export interface RuntimeAdapter {
 
 export interface DispatchDeps {
   registry: SessionRegistry;
+  /** The hub bridge token: the hub signs a delegation brief with it, the bridge verifies (A2 §5.1, US-C02). */
+  token: string;
   adapters: Map<RuntimeKind, RuntimeAdapter>;
   allowedRoots: Map<RuntimeKind, string[]>;
   runtimeIds: Map<RuntimeKind, string>;
@@ -63,6 +66,11 @@ export interface DispatchDeps {
   afterTurn?: (turnId: string) => void;
   turnCap?: TurnCap;
 }
+
+/** Same rule as `turn.start`: a host with no sink wired is a bug, and the runtime must not be started for it. */
+const missingSink = (): EventSink => {
+  throw new BridgeError(JSONRPC_ERRORS.INTERNAL, "no event sink wired");
+};
 
 export function createDispatcher(
   deps: DispatchDeps,
@@ -188,21 +196,14 @@ export function createDispatcher(
         });
       }
 
-      case "delegate.run": {
-        // A2 §5.1: without a hub-signed approval_id it is rejected on the wire. Phase A has no execution branch.
-        const approvalId = (params as { approval_id?: unknown }).approval_id;
-        if (typeof approvalId !== "string" || approvalId.length === 0) {
-          deps.logger.error("delegate.run without approval_id", { host: deps.host });
-          throw new BridgeError(
-            BRIDGE_ERRORS.APPROVAL_REQUIRED,
-            "delegate.run requires a hub-signed approval_id",
-          );
-        }
-        throw new BridgeError(
-          BRIDGE_ERRORS.CAPABILITY_UNSUPPORTED,
-          "delegation execution lands with the approval gate (US-A07)",
-        );
-      }
+      case "delegate.run":
+        // A2 §5.1: the trust boundary is the HMAC the hub put over the brief — runDelegation checks it,
+        // then the path, and only then starts a runtime.
+        return runDelegation(params, {
+          ...deps,
+          adapterFor,
+          sinkFor: deps.sinkFor ?? missingSink,
+        });
 
       default:
         throw new BridgeError(JSONRPC_ERRORS.METHOD_NOT_FOUND, `unhandled method: ${method}`);
