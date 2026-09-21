@@ -1124,6 +1124,14 @@ body {
   flex: 0 0 auto;
   display: flex;
   gap: 4px;
+  /* US-D08 §c.4: the chips end at column 3's edge and column 4's Archive pill is absolute and wider
+     than column 4 itself, so on a row that carries labels the pill painted *over* the last chip —
+     it read as a word cut in half ("laun" and then an opaque pill). Nothing else in the row reaches
+     that edge: the summary truncates with an ellipsis well short of it. So the chips reserve the
+     pill's overhang instead: 57.3px of pill over a 20px mark column is 37.3px, rounded up. Those
+     two numbers are measured rather than trusted — the D8 pass in tools/e2e asserts that the last
+     chip's right edge stays clear of the pill's left one, and prints both when it does not. */
+  padding-right: 38px;
 }
 
 .inbox-row__side {
@@ -1157,7 +1165,9 @@ body {
    the row's `--state-hover` fill. `pointer-events` rides along with `opacity` so the invisible
    pill is not a click target — this also keeps it reachable by keyboard, which `display: none`
    would not (a display:none button is not focusable, so the row's `:focus-within` rule could
-   never fire). The narrow tier still switches it off entirely; see the <900px block. */
+   never fire). US-D08 §c.4: the narrow tier no longer switches it off — the swipe is that tier's
+   archive gesture, and this pill is the half of it a gesture cannot be (focusable, named, reachable
+   by a screen reader); see the <900px block. */
 .inbox-row__action {
   position: absolute;
   top: 50%;
