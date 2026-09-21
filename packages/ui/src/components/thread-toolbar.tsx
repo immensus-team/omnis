@@ -24,9 +24,11 @@ export interface ThreadToolbarAction {
   label: string;
   icon: LucideIcon;
   onSelect: () => void;
-  /** A control whose destination does not exist yet is disabled with the reason in its title
-   *  rather than announced as actionable and doing nothing — the pattern the rail's tiles and the
-   *  BottomBar's circles already use (channel-rail.tsx's PHASE_B_TITLE). */
+  /** A control whose destination does not exist is disabled with the reason in its title rather than
+   *  announced as actionable and doing nothing. The pair is generic — a caller with a control it
+   *  cannot offer says so. (The one string the bars used to share for this, "not wired up yet —
+   *  Phase B", is gone from the product: loop-r2-03 wired the last control that used it, and the
+   *  compose circle it also gated is no longer rendered at all.) */
   disabled?: boolean;
   /** The tooltip, when it has more to say than the name — a disabled control saying *why* it is
    *  disabled. Defaults to `label`, so the ordinary case states one string once. */

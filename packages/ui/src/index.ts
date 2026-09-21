@@ -6,6 +6,7 @@ export * from "./types.js";
 export * from "./components/status-badge.js";
 export * from "./components/digest-card.js";
 export * from "./components/draft-card.js";
+export * from "./components/reply-composer.js";
 export * from "./components/command-palette.js";
 export * from "./components/ask-panel.js";
 export * from "./lib/ask-model.js";
