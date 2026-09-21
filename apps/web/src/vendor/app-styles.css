@@ -1301,6 +1301,15 @@ body {
   border-radius: 10px;
 }
 
+/* loop-r2-07/L2-32: a row for omnis itself wears the omnis mark. No fill, because the PNG carries
+   its own tile (the same reason ChannelGlyph draws no tile behind it), and the squircle corner the
+   other brand tiles have rather than a person's circle — the mark is in the avatar's own slot at
+   the avatar's own size, so `overflow: hidden` must clip it to the tile's shape, not to a disc. */
+.inbox-row__avatar--omnis {
+  background: none;
+  border-radius: 10px;
+}
+
 .inbox-row__avatar-img {
   width: 100%;
   height: 100%;
@@ -2057,6 +2066,18 @@ body {
   margin: 0;
   color: var(--text-secondary);
   font-size: 14px;
+}
+
+/* loop-r2-07/L2-06: why a blocked session is blocked when omnis is holding nothing to decide. One
+   paragraph under the transcript, secondary ink — the same register as the empty line above it and
+   deliberately not a card, an icon or a warning tone: the session is not broken, it is waiting on a
+   terminal this screen cannot see, and a callout would make that read as an error. */
+.agent-session-screen__blocked {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+  text-wrap: pretty;
 }
 
 .agent-session-screen__empty-dot {

@@ -472,6 +472,10 @@ export function Inbox({
           : item.author_person_id
             ? "person"
             : "system";
+      // loop-r2-07: hoisted out of the row literal, which used to spell the fallback inline. The
+      // channel now decides the avatar as well as the right-hand mark, and both ends have to agree
+      // about what the row is — a thread whose account has not synced reads as "system" at both.
+      const channel = channelByAccount.get(item.account_id) ?? "system";
       const title = inboxRowTitle({
         personName: item.author?.display_name ?? null,
         threadTitle: item.thread?.title ?? null,
@@ -492,14 +496,22 @@ export function Inbox({
           title,
         }),
         isDraft: (item.status as UiItemStatus) === "draft",
-        channel: channelByAccount.get(item.account_id) ?? "system",
+        channel,
         timestamp: formatRelativeTime(item.sent_at),
         sentAt: item.sent_at,
         unread: (item.thread?.unread_count ?? 0) > 0,
         unreadCount: item.thread?.unread_count ?? 0,
         labels: chipsByThread.get(item.thread_id) ?? [],
+        // loop-r2-07/L2-32: omnis's own row and a session omnis itself runs wear the omnis mark.
+        // Both used to draw an invented one — a pastel "OM" monogram and a black "O" tile — while
+        // the rail and Settings next to them showed the real mark. Every other row keeps the
+        // runtime logo or the initials it had.
         avatar:
-          runtime !== undefined ? { kind: "runtime", runtime } : { kind: "initials", name: title },
+          channel === "system" || runtime === "omnis"
+            ? { kind: "omnis" }
+            : runtime !== undefined
+              ? { kind: "runtime", runtime }
+              : { kind: "initials", name: title },
         // The persons row travels with items.author, so the hover card's relationship state and
         // VIP chip are read, not guessed. Authorless rows (agent sessions, system) have none.
         person: item.author

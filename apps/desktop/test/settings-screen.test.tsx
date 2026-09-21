@@ -158,16 +158,41 @@ describe("autonomy.rules (A5 §3.9: every target is off by default)", () => {
 describe("accountStatusLabel (A5 §3.9: a read-only channel says so instead of claiming to be connected)", () => {
   it("prefers the capability over the connection state", () => {
     expect(
-      accountStatusLabel({ state: "active", capabilities: { read: true, write: false } }),
+      accountStatusLabel({
+        state: "active",
+        capabilities: { read: true, write: false },
+        channel: "kakaotalk",
+      }),
     ).toBe("Read only");
-    expect(accountStatusLabel({ state: "active", capabilities: { read: true, write: true } })).toBe(
-      "Connected",
-    );
+    expect(
+      accountStatusLabel({
+        state: "active",
+        capabilities: { read: true, write: true },
+        channel: "slack",
+      }),
+    ).toBe("Connected");
   });
 
   it("names the account's own state when it can send", () => {
-    expect(accountStatusLabel({ state: "paused", capabilities: {} })).toBe("Paused");
-    expect(accountStatusLabel({ state: "broken", capabilities: null })).toBe("Broken");
+    expect(accountStatusLabel({ state: "paused", capabilities: {}, channel: "gmail" })).toBe(
+      "Paused",
+    );
+    expect(accountStatusLabel({ state: "broken", capabilities: null, channel: "outlook" })).toBe(
+      "Broken",
+    );
+  });
+
+  // loop-r2-07/L2-32: omnis is the app this list is drawn in, not an account anybody connected.
+  // It answers first and unconditionally — even an active, writable system account is "Built in",
+  // because "Connected" would claim a link nobody made.
+  it("reads the omnis account as built in, whatever its state says", () => {
+    expect(
+      accountStatusLabel({
+        state: "active",
+        capabilities: { read: true, write: true },
+        channel: "system",
+      }),
+    ).toBe("Built in");
   });
 });
 
@@ -359,6 +384,28 @@ describe("Settings screen (A5 §3.9)", () => {
     expect(within(rows[0] as HTMLElement).getByText("Connected")).toBeInTheDocument();
     // A5 §3.9's mockup: a channel that cannot send reads "read only", not "connected".
     expect(within(rows[1] as HTMLElement).getByText("Read only")).toBeInTheDocument();
+  });
+
+  it("draws the omnis account as built in, on the neutral tone (loop-r2-07/L2-32)", async () => {
+    ROWS.accounts = [
+      ...ACCOUNTS,
+      {
+        id: "a3",
+        channel: "system",
+        external_id: "omnis",
+        display: "omnis",
+        capabilities: { read: true, write: true },
+        state: "active",
+        created_at: 0,
+      },
+    ];
+    render(<Settings />);
+    await ready();
+    const rows = document.querySelectorAll<HTMLElement>(".settings-screen__account");
+    expect(within(rows[2] as HTMLElement).getByText("Built in")).toBeInTheDocument();
+    expect(within(rows[2] as HTMLElement).queryByText("Connected")).not.toBeInTheDocument();
+    // A green pill would read as a channel that is up and sending.
+    expect(rows[2]?.querySelector(".status-pill")).toHaveAttribute("data-tone", "neutral");
   });
 
   it("shows the month's spend, the cap input and the reserve beside each other", async () => {

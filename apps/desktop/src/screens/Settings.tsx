@@ -215,8 +215,18 @@ export interface AccountRow {
 
 /** A5 §3.9's mockup draws one status per account. "Read only" is the honest one for a channel the
  *  adapter cannot send on — the row's own state says the connection is fine, which is a different
- *  fact and would read as "you can reply here". */
-export function accountStatusLabel(account: { state: string; capabilities: unknown }): string {
+ *  fact and would read as "you can reply here".
+ *
+ *  loop-r2-07/L2-32: the `system` account is not a connection at all, so it answers first and
+ *  unconditionally. omnis is the app the list is drawn in — the account row exists so the omnis
+ *  thread has somewhere to hang, and calling it "Connected" says somebody linked an account when
+ *  nobody did. */
+export function accountStatusLabel(account: {
+  state: string;
+  capabilities: unknown;
+  channel: string;
+}): string {
+  if (account.channel === "system") return "Built in";
   const caps =
     typeof account.capabilities === "object" && account.capabilities !== null
       ? (account.capabilities as { write?: unknown })
@@ -228,9 +238,11 @@ export function accountStatusLabel(account: { state: string; capabilities: unkno
   return account.state;
 }
 
-function accountTone(account: { state: string; capabilities: unknown }) {
+function accountTone(account: { state: string; capabilities: unknown; channel: string }) {
   const label = accountStatusLabel(account);
-  if (label === "Read only") return "neutral" as const;
+  // "Built in" is not a connection state either — a green pill for omnis would read as a channel
+  // that is up and sending. Neutral is what the app being present looks like.
+  if (label === "Read only" || label === "Built in") return "neutral" as const;
   if (label === "Connected") return "success" as const;
   if (label === "Broken") return "danger" as const;
   return "warning" as const;

@@ -98,7 +98,13 @@ export const RUNTIME_ICON: Partial<Record<AgentRuntimeKind, ElementType>> = {
 
 /** The letter fallback for a runtime with no mark in RUNTIME_ICON (today: hermes, omnis) — the same
  * idea as the avatar fallback (initialsFromName), one runtime initial instead of a person's
- * (DESIGN-DIRECTION.md P1: Hermes -> "H"). */
+ * (DESIGN-DIRECTION.md P1: Hermes -> "H").
+ *
+ * loop-r2-07: the "omnis" entry is now unreachable. An omnis-runtime session's row draws the omnis
+ * mark itself (RowAvatarView's `omnis` kind — the same `system` brand PNG the rail and Settings
+ * draw), so no surface asks this map for "O" any more. The key stays because this is a
+ * `Record<AgentRuntimeKind, string>` and a missing key is a compile error, and it stays correct
+ * rather than empty in case a future caller draws an omnis runtime tile unchecked. */
 export const RUNTIME_LETTER: Record<AgentRuntimeKind, string> = {
   claude_code: "C",
   claude_ds: "DS",

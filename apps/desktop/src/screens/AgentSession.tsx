@@ -6,7 +6,7 @@ import {
   ToolCallBadge,
   type ToolCallState,
 } from "@omnis/ui";
-import type { AgentRuntimeKind } from "@omnis/ui/lib/row-meta";
+import { type AgentRuntimeKind, RUNTIME_LABEL } from "@omnis/ui/lib/row-meta";
 import { useQuery } from "@rocicorp/zero/react";
 import type { ReactNode } from "react";
 import { useZeroClient } from "../zero-client.js";
@@ -26,7 +26,10 @@ export interface SessionToolMeta {
 
 export interface SessionQueryItem {
   id: string;
-  kind: "agent_turn" | "tool_call" | "system";
+  /** loop-r2-07: 'message' is in here too. It is the kind a session's *own* prose arrives as, and
+   *  it is what the inbox row has always been reading — the row's summary is this thread's latest
+   *  message, so leaving the kind out of the pane was the pane showing less than the row above it. */
+  kind: "agent_turn" | "tool_call" | "system" | "message";
   tool: SessionToolMeta | null;
   body: string;
 }
@@ -63,14 +66,47 @@ export function hasToolArgs(args: unknown): boolean {
   return typeof args === "object" && args !== null && Object.keys(args).length > 0;
 }
 
+/** loop-r2-07/L2-06: why a blocked session is blocked, when omnis is not holding the question.
+ *
+ *  A session reads `waiting_approval` in two very different situations, and the pane used to answer
+ *  both with "Blocked · nothing to decide here yet" — a sentence that is only ever true of the
+ *  second one, and reads as a contradiction next to a row that says "Waiting for approval of the
+ *  reply wording". The two are told apart by the approvals the shell hands this screen: the bridge
+ *  links an approval to the *asking session's* thread (`onApprovalRequested`), so a linked approval
+ *  is the first case and the caller renders the card instead of this note.
+ *
+ *  With nothing linked, the runtime is blocked somewhere omnis cannot see — its own terminal is the
+ *  only place left that can answer, and naming the runtime and its host is the whole of what this
+ *  screen honestly knows. `session.summary` leads when there is one: the row above the pane already
+ *  says it, and a pane that opens with less than its own row is the defect this line closes.
+ *
+ *  `waiting_approval` is read off the DB state and not off the kinso mapper: this note is about
+ *  *what the session is waiting for*, and `failed` (which the pill folds into blocked, and which the
+ *  brief puts with idle/done here) is a different sentence. */
+function blockedNote(session: SessionRow | undefined, runtime: RuntimeRow | undefined): ReactNode {
+  if (session?.state !== "waiting_approval") return null;
+  const said = session.summary?.trim() ?? "";
+  const head = said === "" ? "Blocked ·" : `Blocked · ${/[.!?]$/.test(said) ? said : `${said}.`}`;
+  // The runtime row is a second read, and a session whose runtime has not synced yet draws its
+  // header without one (above). This line still has to name *something*: the sentence is about
+  // where the question went, and "somewhere omnis cannot see" is the same fact either way.
+  const asker =
+    runtime === undefined ? "The runtime" : RUNTIME_LABEL[runtime.runtime as AgentRuntimeKind];
+  const where = runtime === undefined ? "" : ` on ${runtime.host}`;
+  return (
+    <p className="agent-session-screen__blocked" role="note">
+      {`${head} No approval is waiting in omnis. ${asker} may be asking in its own terminal${where}.`}
+    </p>
+  );
+}
+
 /** loop-r1-07/L-10: what a session with no transcript says instead of nothing at all. A working
  *  session used to open a completely blank pane — the one state where "nothing has happened yet" is
  *  the expected answer and the pane still has to say so.
  *
- *  `blocked` is read off the DB state and not off the kinso mapper: this line is about *what the
- *  session is waiting for*, and `failed` (which the pill folds into blocked, and which the brief
- *  puts with idle/done here) is a different sentence. */
-function emptyLine(state: string | undefined, hasApproval: boolean): ReactNode {
+ *  `blocked` is the note above, already built (see `blockedNote`); it arrives here as an element so
+ *  that the same sentence can be drawn under a transcript that *did* record something. */
+function emptyLine(state: string | undefined, hasApproval: boolean, blocked: ReactNode): ReactNode {
   if (state === "starting" || state === "running") {
     return (
       <p className="agent-session-screen__empty">
@@ -83,11 +119,19 @@ function emptyLine(state: string | undefined, hasApproval: boolean): ReactNode {
     // With a card above it this line would contradict what is already on screen — the approval *is*
     // what it is waiting for.
     if (hasApproval) return null;
-    return <p className="agent-session-screen__empty">Blocked · nothing to decide here yet</p>;
+    return blocked;
   }
   return <p className="agent-session-screen__empty">No activity recorded for this session.</p>;
 }
 
+/** One agent session — its header, its transcript and whatever it is waiting on.
+ *
+ *  **A decision here does not unblock the session, and this screen does not pretend it does.** The
+ *  state is the hub's: after a decision the bridge's `settleState` recomputes it from the runtime's
+ *  own report (`turn.completed`, an approval still open, …) and it arrives through Zero like every
+ *  other row. Nothing in the desktop writes an agent session's state — a pane that flipped the pill
+ *  itself would be claiming a runtime resumed work it was never told about, and the row behind it
+ *  would disagree. */
 export function AgentSession({
   sessionThreadId,
   approvals,
@@ -112,10 +156,14 @@ export function AgentSession({
   // Deviation from the plan's step 7 (packages/kernel/src/zero-schema.ts is the source of truth):
   // items' timestamp column is snake_case `sent_at`, not camelCase `sentAt` — Thread.tsx (Task 5)
   // already fixed this for the same reason.
+  // loop-r2-07: 'message' joined the list. The query used to take only the three transcript kinds,
+  // and a session's own line — the one the row above the pane summarises it with — is a 'message'
+  // item, so the pane drew strictly less than its own row. The same three kinds still carry their
+  // own rendering below; a message is a turn.
   const [items] = useQuery(
     zero.query.items
       .where("thread_id", "=", sessionThreadId)
-      .where("kind", "IN", ["agent_turn", "tool_call", "system"])
+      .where("kind", "IN", ["agent_turn", "tool_call", "system", "message"])
       .orderBy("sent_at", "asc"),
   );
   // The four reads below are unconditional, and the two that need an id the first read supplies
@@ -134,6 +182,9 @@ export function AgentSession({
 
   const typedItems = items as unknown as SessionQueryItem[];
   const waiting = (approvals ?? []).filter((a) => a.thread_id === sessionThreadId);
+  // loop-r2-07: a linked approval *is* what the session is waiting for, and the card below says it
+  // in the words of the action itself — so the note is drawn only when nothing is linked.
+  const blocked = waiting.length === 0 ? blockedNote(session, runtime) : null;
   // The header is the session's own facts, so it needs the session row and the runtime that ran it.
   // A thread whose session has not synced yet draws its timeline without a header rather than a
   // header full of placeholders.
@@ -160,7 +211,9 @@ export function AgentSession({
           puts its own — under the title of the thing it is about. */}
       {waiting.length > 0 && onDecide !== undefined && (
         <section className="agent-session-screen__waiting">
-          <p className="agent-session-screen__waiting-label">Waiting on you</p>
+          {/* loop-r2-07: "Waiting on you" named the section but not the connection — the session is
+              blocked *on this approval*, and the label now says which of the two things it means. */}
+          <p className="agent-session-screen__waiting-label">Waiting for your approval</p>
           <ApprovalStack
             approvals={waiting}
             openThreadId={sessionThreadId}
@@ -172,9 +225,15 @@ export function AgentSession({
           />
         </section>
       )}
-      {typedItems.length === 0
-        ? emptyLine(session?.state, waiting.length > 0)
-        : typedItems.map((item) => {
+      {/* loop-r2-07: the note comes *after* the transcript, never before it. "✓ Turn completed" is
+          how the pane's own record ends, and the reason the session is still blocked is the answer
+          to it — drawing the note above (where the old empty-state line lived) would put the
+          conclusion before the evidence and leave the transcript as the last word again. */}
+      {typedItems.length === 0 ? (
+        emptyLine(session?.state, waiting.length > 0, blocked)
+      ) : (
+        <>
+          {typedItems.map((item) => {
             if (isSystemExecutionLog(item)) {
               return (
                 <p key={item.id} className="agent-session-screen__system-log">
@@ -208,12 +267,17 @@ export function AgentSession({
                 </details>
               );
             }
+            // loop-r2-07: everything else is a turn — 'agent_turn' and now 'message' both arrive
+            // here, whatever the session said in its own words.
             return (
               <p key={item.id} className="agent-session-screen__turn">
                 {item.body}
               </p>
             );
           })}
+          {blocked}
+        </>
+      )}
     </div>
   );
 }

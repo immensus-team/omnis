@@ -5,6 +5,7 @@ import {
   ArchiveIcon,
   AttachmentCardView,
   type AttachmentItem,
+  ChannelGlyph,
   DraftCard,
   InfoIcon,
   type KeyValueRow,
@@ -466,13 +467,21 @@ export function Thread({
             first line, closed by one hairline. It replaced the old title-plus-subline header —
             the title moved down to the subject below it, where a 24px line belongs. */}
           <div className="thread-header__sender">
-            <span
-              className="thread-header__avatar"
-              style={{ background: pastelFromName(senderName) }}
-              aria-hidden="true"
-            >
-              {initialsFromName(senderName)}
-            </span>
+            {/* loop-r2-07/L2-32: omnis's own thread is not a person, so it does not get a person's
+                avatar. The mark is the channel's own PNG (the same one the row's right-hand slot
+                draws for this channel) — initials over a pastel disc spelled "OM" for the one
+                product in the app whose mark is already in the asset set. */}
+            {channel === "system" ? (
+              <ChannelGlyph channel="system" size={40} />
+            ) : (
+              <span
+                className="thread-header__avatar"
+                style={{ background: pastelFromName(senderName) }}
+                aria-hidden="true"
+              >
+                {initialsFromName(senderName)}
+              </span>
+            )}
             <span className="thread-header__who">
               <span className="thread-header__name">{senderName}</span>
               <span className="thread-header__to">To: me</span>
