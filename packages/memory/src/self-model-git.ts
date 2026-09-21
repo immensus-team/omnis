@@ -46,7 +46,13 @@ export async function ensureSelfModelRepo(): Promise<string> {
   await run("git", ["-C", dir, "init", "-q", "-b", "main"]);
   // Pins a repo-local identity so commits work even on machines without a global git config (CI).
   await run("git", ["-C", dir, "config", "user.name", "omnis"]);
-  await run("git", ["-C", dir, "config", "user.email", "281932556+jinhologankim@users.noreply.github.com"]);
+  await run("git", [
+    "-C",
+    dir,
+    "config",
+    "user.email",
+    "281932556+jinhologankim@users.noreply.github.com",
+  ]);
   for (const f of SELF_MODEL_FILES) {
     await writeFile(join(dir, f), SEED[f], { flag: "wx" }).catch(() => undefined);
   }
