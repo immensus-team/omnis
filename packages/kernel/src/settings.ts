@@ -17,7 +17,10 @@ export type SettingKey =
   | "ingest.drive_folders"
   | "ingest.github_repos"
   | "autonomy.rules"
-  | "kakao.send_enabled_at";
+  | "kakao.send_enabled_at"
+  // The decision tier's provider switch — "llm" (default) or "jev".
+  // See docs/decisions/2026-09-21-jev-decision-tier.md.
+  | "agents.decision_provider";
 
 export const SETTING_DEFAULTS: Readonly<Record<SettingKey, unknown>> = {
   "cost.cap_usd": 60,
@@ -33,6 +36,7 @@ export const SETTING_DEFAULTS: Readonly<Record<SettingKey, unknown>> = {
   "ingest.github_repos": [],
   "autonomy.rules": [],
   "kakao.send_enabled_at": null,
+  "agents.decision_provider": "llm",
 };
 
 export async function getSetting<T>(pool: Pool, key: SettingKey, fallback: T): Promise<T> {

@@ -17,7 +17,8 @@ export interface RecordRunInput {
   trigger_kind: "event" | "cron" | "manual";
   trigger_ref?: string;
   model_tier: "T0" | "T1" | "T2" | "T3";
-  provider: "local" | "deepseek" | "anthropic" | "openrouter";
+  /** "vercel-ai-gateway" is the Jev decision tier — see docs/decisions/2026-09-21-jev-decision-tier.md. */
+  provider: "local" | "deepseek" | "anthropic" | "openrouter" | "vercel-ai-gateway";
   model: string;
   tokens_in?: number;
   tokens_out?: number;
