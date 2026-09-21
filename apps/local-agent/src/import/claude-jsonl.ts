@@ -8,7 +8,7 @@
 // exists, and nothing under it is opened anyway — only the transcript file itself is read.
 import type { Dirent } from "node:fs";
 import { readFile, readdir, stat } from "node:fs/promises";
-import { basename, join, resolve, sep } from "node:path";
+import { basename, isAbsolute, join, resolve, sep } from "node:path";
 import type { ImportedSession, ImportedTurn } from "@omnis/protocol";
 
 /** `ImportedTurn.text` is `.max(1000)` in packages/protocol/src/bridge.ts; keep the two in step. */
@@ -132,6 +132,11 @@ export function parseClaudeJsonl(text: string): {
 }
 
 export function insideAnyRoot(cwd: string, roots: string[]): boolean {
+  // A relative cwd is resolved against the *daemon's* working directory, so containment would be
+  // decided against a location the transcript never named — and the emitted item would carry a
+  // relative path, which every later check resolves somewhere else again. Both vendors record an
+  // absolute cwd, so anything else is malformed input: refuse it rather than guess a base.
+  if (!isAbsolute(cwd)) return false;
   const resolved = resolve(cwd);
   return roots.some((root) => {
     const r = resolve(root);

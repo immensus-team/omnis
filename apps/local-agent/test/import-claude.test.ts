@@ -11,6 +11,7 @@ import { ImportScanResult, withMeta } from "@omnis/protocol";
 import { describe, expect, it } from "vitest";
 import {
   type ImportDeps,
+  insideAnyRoot,
   maskSecrets,
   parseClaudeJsonl,
   scanClaudeProjects,
@@ -51,6 +52,16 @@ describe("maskSecrets", () => {
 
   it("ignores an empty known secret instead of wiping the text", () => {
     expect(maskSecrets("nothing to hide", [""])).toBe("nothing to hide");
+  });
+});
+
+describe("insideAnyRoot", () => {
+  it("refuses a cwd that is not absolute", () => {
+    // Shared by both scanners (US-C15's Codex scanner imports it). A relative path resolves against
+    // the *daemon's* working directory, so containment would be decided against a directory the
+    // transcript never named; both vendors record an absolute cwd, so anything else is malformed.
+    expect(insideAnyRoot("omnis", [process.cwd()])).toBe(false);
+    expect(insideAnyRoot(process.cwd(), [process.cwd()])).toBe(true);
   });
 });
 

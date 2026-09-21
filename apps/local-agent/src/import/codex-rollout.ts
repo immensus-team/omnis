@@ -1,6 +1,8 @@
 // US-C15 (C-D7): read-only import of Codex CLI rollouts, pulled by the hub — the sibling of
 // `claude-jsonl.ts`, and deliberately the same shape: enumerate one vendor directory, read only the
 // files it names, keep the sessions whose cwd is inside this host's allowed_roots, mask on the way out.
+// A cwd that is not absolute is refused rather than resolved against the daemon's own directory — the
+// rule lives in `insideAnyRoot`, so both scanners share it.
 //
 // The bridge opens exactly one path shape — `codexHome/sessions/**/rollout-*.jsonl`, which in practice
 // sits `<YYYY>/<MM>/<DD>/` deep but is walked at any depth — and never enumerates `codexHome` itself,
@@ -53,8 +55,15 @@ function textOf(content: unknown): string {
  * `session_meta` is assumed to come first, so a message without a timestamp can fall back to it —
  * which is also what `startedAt` ends up being in that case. A rollout with no readable turn at all,
  * or a turn with no timestamp to fall back to, has `startedAt === null` and is dropped by the scanner.
+ *
+ * `fallbackId` is the rollout file's own identity, and it is required rather than defaulted: a turn
+ * key has to be unique across every rollout a host imports, and a constant default would silently
+ * reintroduce the collision it exists to prevent. Only an id-less `session_meta` ever uses it.
  */
-export function parseCodexRollout(text: string): {
+export function parseCodexRollout(
+  text: string,
+  fallbackId: string,
+): {
   cwd: string | null;
   sessionId: string | null;
   startedAt: string | null;
@@ -111,9 +120,11 @@ export function parseCodexRollout(text: string): {
   }
 
   turns.forEach((turn, index) => {
-    // Stable across re-imports (the hub dedupes on the turn key) and unique per session, so two
-    // rollouts cannot collide on the same key the way a bare line number would.
-    if (turn.source_id.length === 0) turn.source_id = `${sessionId ?? "codex"}:${index}`;
+    // Stable across re-imports (the hub dedupes on the turn key) and unique across the rollouts of a
+    // host, not merely within one: the prefix is the vendor's session id when it supplied one, and the
+    // rollout file's identity otherwise. A bare `codex:<index>` would be the same key in every id-less
+    // rollout, and the hub's item dedupe is not scoped to a single session.
+    if (turn.source_id.length === 0) turn.source_id = `${sessionId ?? fallbackId}:${index}`;
   });
 
   // A rollout with nothing readable in it is not a session — same rule as the Claude scanner.
@@ -152,6 +163,9 @@ export async function scanCodexSessions(
 
   const found: { session: ImportedSession; mtimeMs: number }[] = [];
   for (const path of paths) {
+    // The rollout's own identity, and the fallback for both the session key and its turn keys. The
+    // walk admits `rollout-*.jsonl` only, so the stem is never empty; the uuid in it keeps it unique.
+    const fileId = basename(path, ".jsonl");
     let mtimeMs: number;
     let text: string;
     try {
@@ -161,7 +175,7 @@ export async function scanCodexSessions(
     } catch {
       continue; // a file that vanished or is unreadable between listing and opening
     }
-    const parsed = parseCodexRollout(text);
+    const parsed = parseCodexRollout(text, fileId);
     if (parsed.cwd === null || parsed.startedAt === null) continue;
     // Containment is decided on the rollout's own cwd, before masking rewrites it for the item.
     if (!insideAnyRoot(parsed.cwd, deps.allowedRoots)) continue;
@@ -170,7 +184,7 @@ export async function scanCodexSessions(
         runtime: "codex",
         // The filename is `rollout-<timestamp>-<uuid>.jsonl` and always non-empty: the walk admits
         // only names with the `rollout-` prefix, so `source_id` (`.min(1)`) can never come out blank.
-        source_id: maskSecrets(parsed.sessionId ?? basename(path, ".jsonl"), deps.secrets),
+        source_id: maskSecrets(parsed.sessionId ?? fileId, deps.secrets),
         // Masked like the turn text: any rollout-supplied string that reaches the hub is a channel.
         cwd: maskSecrets(parsed.cwd, deps.secrets),
         started_at: parsed.startedAt,

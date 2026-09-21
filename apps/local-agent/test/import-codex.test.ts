@@ -23,7 +23,9 @@ const here = new URL(".", import.meta.url).pathname;
 const CLAUDE_HOME = join(here, "fixtures", "claude-home");
 const CODEX_HOME = join(here, "fixtures", "codex-home");
 const SESSIONS = join(CODEX_HOME, "sessions");
-const ROLLOUT = join(SESSIONS, "2026", "09", "21", "rollout-2026-09-21T10-00-00-0b6c1d2e.jsonl");
+/** The rollout's file identity — what the scanner passes to the parser as the turn-key fallback. */
+const ROLLOUT_ID = "rollout-2026-09-21T10-00-00-0b6c1d2e";
+const ROLLOUT = join(SESSIONS, "2026", "09", "21", `${ROLLOUT_ID}.jsonl`);
 /** A non-rollout `.jsonl` beside the rollout: C-D7 admits `rollout-*.jsonl` only. */
 const HISTORY = join(SESSIONS, "2026", "09", "21", "history.jsonl");
 const AUTH = join(CODEX_HOME, "auth.json");
@@ -90,7 +92,7 @@ const callLine = (name: string) =>
 
 describe("parseCodexRollout", () => {
   it("keeps the session meta and the message turns, and skips every other record type", async () => {
-    const parsed = parseCodexRollout(await readFile(ROLLOUT, "utf8"));
+    const parsed = parseCodexRollout(await readFile(ROLLOUT, "utf8"), ROLLOUT_ID);
 
     expect(parsed.cwd).toBe("/repo/omnis");
     expect(parsed.sessionId).toBe(CODEX_SESSION);
@@ -129,7 +131,7 @@ describe("parseCodexRollout", () => {
   });
 
   it("reports nulls for a file with nothing usable in it", () => {
-    expect(parseCodexRollout('not JSON\n\n{"type":"event_msg","payload":{}}')).toEqual({
+    expect(parseCodexRollout('not JSON\n\n{"type":"event_msg","payload":{}}', ROLLOUT_ID)).toEqual({
       cwd: null,
       sessionId: null,
       startedAt: null,
@@ -144,6 +146,7 @@ describe("parseCodexRollout", () => {
         msgLine("user", "stamped", {}, { timestamp: "2026-09-21T10:00:02.000Z" }),
         msgLine("assistant", "unstamped"),
       ].join("\n"),
+      ROLLOUT_ID,
     );
 
     expect(parsed.startedAt).toBe("2026-09-21T10:00:02.000Z");
@@ -160,9 +163,27 @@ describe("parseCodexRollout", () => {
         msgLine("assistant", "named", { id: "item-1" }),
         msgLine("assistant", "anonymous"),
       ].join("\n"),
+      ROLLOUT_ID,
     );
 
     expect(parsed.turns.map((t) => t.source_id)).toEqual(["item-1", `${CODEX_SESSION}:1`]);
+  });
+
+  it("keys turns by the rollout file's identity when session_meta named no session", () => {
+    const parsed = parseCodexRollout(
+      [
+        metaLine({ id: undefined }),
+        msgLine("user", "no id on the meta"),
+        msgLine("assistant", "still none"),
+      ].join("\n"),
+      ROLLOUT_ID,
+    );
+
+    // The session id keys the turns when the vendor supplied one. When it did not, the fallback has to
+    // be the *file's* identity: a bare `codex:<index>` would be the same key in every id-less rollout,
+    // and the hub's item dedupe is not scoped to one session.
+    expect(parsed.sessionId).toBeNull();
+    expect(parsed.turns.map((t) => t.source_id)).toEqual([`${ROLLOUT_ID}:0`, `${ROLLOUT_ID}:1`]);
   });
 
   it("attaches a function call to the agent turn it follows, or to the next one", () => {
@@ -176,6 +197,7 @@ describe("parseCodexRollout", () => {
         callLine("third_call"), // follows the agent turn above
         JSON.stringify({ type: "response_item", payload: { type: "function_call" } }), // no name
       ].join("\n"),
+      ROLLOUT_ID,
     );
 
     expect(parsed.turns.map((t) => t.role)).toEqual(["user", "agent"]);
@@ -290,7 +312,7 @@ describe("scanCodexSessions", () => {
     // real date directory beside the rollout, and a walk widened to any `.jsonl` would import it (it
     // parses, and its cwd is inside the allowed root) without tripping the path rules above. Reading
     // it here proves the decoy is not inert — the same lesson the Claude suite learned the hard way.
-    expect(parseCodexRollout(await readFile(HISTORY, "utf8")).cwd).toBe("/repo/omnis");
+    expect(parseCodexRollout(await readFile(HISTORY, "utf8"), "history").cwd).toBe("/repo/omnis");
   });
 
   it("returns an empty list when the host has no ~/.codex/sessions", async () => {
@@ -375,6 +397,52 @@ describe("scanCodexSessions", () => {
     // answer, so the codex scanner has to run the same mask-then-cut pair the Claude one does.
     expect(sessions[0]?.turns[0]?.text).toHaveLength(1000);
     expect(ImportScanResult.parse({ sessions }).sessions).toHaveLength(1);
+  });
+
+  it("keeps two id-less rollouts apart in one sweep", async () => {
+    const body = (text: string) => [metaLine({ id: undefined }), msgLine("user", text)].join("\n");
+    const older = "rollout-2026-09-21T09-00-00-0b6c1d2e-0000-4000-8000-0000000000c1";
+    const newer = "rollout-2026-09-22T09-00-00-0b6c1d2e-0000-4000-8000-0000000000c2";
+    const home = await tempCodexHome({
+      [`sessions/2026/09/21/${older}.jsonl`]: body("first"),
+      [`sessions/2026/09/22/${newer}.jsonl`]: body("second"),
+    });
+
+    const sessions = await scanCodexSessions(
+      null,
+      10,
+      deps({ codexHome: home, allowedRoots: ["/"] }),
+    );
+
+    // Neither rollout named a session, so both fall back to their own file. Anything shared between
+    // them (a bare `codex:0`) would make the hub's item dedupe treat one rollout's first turn as the
+    // other's — and the second scan of the same pair would settle on whichever file it read first.
+    expect(sessions).toHaveLength(2);
+    const keys = sessions.flatMap((s) => s.turns.map((t) => t.source_id));
+    expect(new Set(keys).size).toBe(2);
+    expect(keys).toContain(`${older}:0`);
+    expect(keys).toContain(`${newer}:0`);
+    expect(sessions.map((s) => s.source_id).sort()).toEqual([older, newer]);
+  });
+
+  it("drops a rollout whose cwd is not absolute instead of resolving it against the daemon's own", async () => {
+    const home = await tempCodexHome({
+      "sessions/2026/09/21/rollout-2026-09-21T09-00-00-0b6c1d2e-0000-4000-8000-0000000000d1.jsonl":
+        [metaLine({ cwd: "omnis" }), msgLine("user", "relative cwd")].join("\n"),
+    });
+
+    // `resolve("omnis")` is this process's own directory plus one segment, so an allowed root that
+    // happens to *be* that directory would admit a rollout that named no real location at all — and
+    // the item would carry a relative `cwd` into the hub, where every later path check resolves it
+    // against whatever directory the hub happens to run in.
+    const sessions = await scanCodexSessions(
+      null,
+      10,
+      deps({ codexHome: home, allowedRoots: [process.cwd()] }),
+    );
+
+    expect(sessions).toEqual([]);
+    expect(ImportScanResult.parse({ sessions }).sessions).toEqual([]);
   });
 });
 
