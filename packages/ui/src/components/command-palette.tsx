@@ -1,5 +1,5 @@
 import { Command } from "cmdk";
-import { AtSign, ChevronDown, Paperclip } from "lucide-react";
+import { AtSign, ChevronDown } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
   ASK_MODELS,
@@ -74,17 +74,39 @@ export function matchesAnyAction(query: string, actions: PaletteAction[]): boole
   return actions.some((a) => a.name.toLowerCase().includes(q));
 }
 
-/** US-B27: the search-results body of the palette. Server order is not trusted — the groups are
- *  rendered in SEARCH_GROUP_ORDER, and a group the hub did not send (or sent empty) is skipped
- *  rather than drawn as a bare header. */
-function SearchResultList({ query, search }: { query: string; search: CommandPaletteSearch }) {
-  const empty = !search.loading && search.groups.every((g) => g.results.length === 0);
+/** The body of the palette's second tab once there is something to answer: the commands the words
+ *  match, then the hub's hits. Server order is not trusted — the search groups are rendered in
+ *  SEARCH_GROUP_ORDER, and a group the hub did not send (or sent empty) is skipped rather than
+ *  drawn as a bare header.
+ *
+ *  loop-r1-08 (L-16): the two used to be alternatives, so a query that matched a command could
+ *  never also be a search and a query that matched nothing showed no commands at all. The commands
+ *  come first because they are the rows that do something locally; `>` is how a user asks for them
+ *  without the search (`search` is then undefined and no request is ever made). */
+function QueryResultList({
+  term,
+  search,
+  commands,
+}: {
+  /** The words the query is made of — the copy above the list quotes them back. A `>` is not one. */
+  term: string;
+  /** `undefined` for a commands-only query, where nothing was asked of the hub. */
+  search: CommandPaletteSearch | undefined;
+  /** The rows for the matching commands, in the caller's order. Rendered before the hub's hits. */
+  commands: ReactNode[];
+}) {
+  const loading = search?.loading === true;
+  const groups = search?.groups ?? [];
+  const hits = groups.reduce((total, group) => total + group.results.length, 0);
+  // "No results" has to mean the list is empty, and the commands are part of the list now: a query
+  // that found no thread but did find "Go to Settings" is not a dead end.
+  const empty = !loading && commands.length === 0 && hits === 0;
   return (
     <Command.List>
-      {search.loading && <div className="palette-search__state">Searching…</div>}
-      {empty && <div className="palette-search__state">{`No results for ${query.trim()}`}</div>}
+      {loading && commands.length === 0 && <div className="palette-search__state">Searching…</div>}
+      {commands.length > 0 && <Command.Group heading="Commands">{commands}</Command.Group>}
       {SEARCH_GROUP_ORDER.map((kind) => {
-        const group = search.groups.find((g) => g.kind === kind);
+        const group = groups.find((g) => g.kind === kind);
         if (!group || group.results.length === 0) return null;
         return (
           <Command.Group key={kind} heading={group.label}>
@@ -100,7 +122,7 @@ function SearchResultList({ query, search }: { query: string; search: CommandPal
                 className="palette-search__hit"
                 disabled={result.deepLinkDisabled}
                 onSelect={() => {
-                  if (!result.deepLinkDisabled) search.onSelectHit(result);
+                  if (!result.deepLinkDisabled) search?.onSelectHit(result);
                 }}
               >
                 {/* A5 §2.5's memory badge — where this memory came from (inbox/calendar/file/…). */}
@@ -116,6 +138,11 @@ function SearchResultList({ query, search }: { query: string; search: CommandPal
           </Command.Group>
         );
       })}
+      {empty && (
+        <div className="palette-search__state">
+          {term === "" ? "No results" : `No results for ${term}`}
+        </div>
+      )}
     </Command.List>
   );
 }
@@ -159,17 +186,58 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const groups = groupBy(actions, (a) => a.group);
-  const showSearch = search !== undefined && !matchesAnyAction(query, actions);
+  // loop-r1-08 (L-16): one grammar for the second tab. A leading `>` asks for the commands alone;
+  // anything else is a search that also matches the commands against the same words, so typing
+  // "go to" narrows the command list instead of leaving it as a museum piece.
+  const trimmed = query.trim();
+  const commandsOnly = trimmed.startsWith(">");
+  const term = (commandsOnly ? trimmed.slice(1) : trimmed).trim();
+  // A5 §2.5's action names are matched here rather than by cmdk for exactly the rows cmdk cannot
+  // see: with a query the list also carries the hub's hits, so cmdk's filter is off and only this
+  // decides which commands are on screen.
+  const matchedActions =
+    term === ""
+      ? actions
+      : actions.filter((a) => a.name.toLowerCase().includes(term.toLowerCase()));
+  /** The list the second tab shows when a query is being typed. Absent a `search` prop the palette
+   *  is action-only (the gallery, Phase A call sites) and this stays false however you type. */
+  const searched = search !== undefined && !commandsOnly && term !== "";
+  /** cmdk may not filter a list that was filtered here: the raw query is not what these rows are
+   *  matched against — a `>` is grammar, and a hit the hub found by its body need not contain the
+   *  words that found it. */
+  const manualFilter = searched || commandsOnly;
+  /** US-B27: the tab is named by what it shows. The hub's hits are all there is only when nothing
+   *  in the command list answers the same words. */
+  const searchActive = searched && !matchesAnyAction(term, actions);
   const onQueryChange = search?.onQueryChange;
-  // A5 §2.5's 180ms debounce. Only a query that actually puts the palette in search mode is worth a
-  // round trip — a query that matches an action is answered from the action list. The dependency is
-  // the callback, not the `search` object: a consumer that builds that object inline hands over a
-  // new identity every render, which would restart the timer each time and never fire.
+  // A5 §2.5's 180ms debounce. The dependency is the callback, not the `search` object: a consumer
+  // that builds that object inline hands over a new identity every render, which would restart the
+  // timer each time and never fire.
   useEffect(() => {
-    if (!open || !showSearch || onQueryChange === undefined) return;
+    if (!open || !searched || onQueryChange === undefined) return;
     const timer = setTimeout(() => onQueryChange(query), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [open, showSearch, query, onQueryChange]);
+  }, [open, searched, query, onQueryChange]);
+  /** One row per command, shared by both lists below so the two cannot drift: the name, its
+   *  shortcut in the `<kbd>` the row already ends with, and the palette's own close on select. */
+  const commandItems = matchedActions.map((action) => (
+    <Command.Item
+      key={action.id}
+      // The name is the row's identity. cmdk falls back to the rendered text, which folds the
+      // shortcut in with the name — so "Go to Inbox" and "g i" would be one value, and cmdk's own
+      // filter would match a row on its shortcut as readily as on its name.
+      value={action.name}
+      onSelect={() => {
+        action.perform();
+        onOpenChange(false);
+      }}
+    >
+      <span>{action.name}</span>
+      {action.shortcut && <kbd>{action.shortcut}</kbd>}
+    </Command.Item>
+  ));
+  /** The grouped action list, for the surfaces cmdk still filters itself: the dialog, the gallery,
+   *  and an inline palette opened onto the Commands tab with nothing typed. */
   const actionList = (
     <Command.List>
       <Command.Empty>No results</Command.Empty>
@@ -178,6 +246,7 @@ export function CommandPalette({
           {items.map((action) => (
             <Command.Item
               key={action.id}
+              value={action.name}
               onSelect={() => {
                 action.perform();
                 onOpenChange(false);
@@ -192,8 +261,8 @@ export function CommandPalette({
     </Command.List>
   );
   const resultList =
-    showSearch && search !== undefined ? (
-      <SearchResultList query={query} search={search} />
+    searched || commandsOnly ? (
+      <QueryResultList term={term} search={searched ? search : undefined} commands={commandItems} />
     ) : (
       actionList
     );
@@ -207,7 +276,11 @@ export function CommandPalette({
         commands={resultList}
         query={query}
         onQueryChange={setQuery}
-        searchActive={showSearch}
+        searchActive={searchActive}
+        manualFilter={manualFilter}
+        // loop-r1-08: what the panel offers when it has no suggestion for the context it is in —
+        // the first four commands, so the tab is never a row of disabled buttons.
+        recentActions={actions.slice(0, 4)}
         threadSelected={threadSelected}
         threadSummary={threadSummary}
         threadTitle={threadTitle}
@@ -216,15 +289,16 @@ export function CommandPalette({
   }
 
   return (
-    // `shouldFilter` is off in search mode: those rows are already the hub's answer to this query,
-    // and cmdk's client-side filter would hide the ones whose text does not literally contain it
-    // (a thread found by its body, say) — or all of them, for a memory whose snippet is unrelated
-    // to the words that found it.
+    // `shouldFilter` is off for a query this component answered itself: cmdk's client-side filter
+    // would hide the hits whose text does not literally contain the words (a thread found by its
+    // body, say) — or all of them, for a memory whose snippet is unrelated to the words that found
+    // it — and it would hide every row of a `>` query, which starts with the one character no
+    // command name contains.
     <Command.Dialog
       open={open}
       onOpenChange={onOpenChange}
       label="omnis command palette"
-      shouldFilter={!showSearch}
+      shouldFilter={!manualFilter}
     >
       <GlassSurface slot="palette">
         <Command.Input
@@ -235,6 +309,18 @@ export function CommandPalette({
         {resultList}
       </GlassSurface>
     </Command.Dialog>
+  );
+}
+
+/** The row an Enter press acts on at this moment: the one cmdk has highlighted, or — when the
+ *  highlight was lost (see the Enter handler in InlinePalette) — the first row that has somewhere to
+ *  go. Scoped to the palette's own root rather than the document, so a second palette, a test's
+ *  neighbour or a stray `cmdk-item` elsewhere on the page is not what the key runs. */
+function highlightedRow(root: HTMLElement | null): HTMLElement | null {
+  if (root === null) return null;
+  return (
+    root.querySelector<HTMLElement>('[cmdk-item][aria-selected="true"]') ??
+    root.querySelector<HTMLElement>('[cmdk-item]:not([aria-disabled="true"])')
   );
 }
 
@@ -252,6 +338,8 @@ function InlinePalette({
   query,
   onQueryChange,
   searchActive,
+  manualFilter,
+  recentActions,
   threadSelected,
   threadSummary,
   threadTitle,
@@ -263,8 +351,12 @@ function InlinePalette({
   /** US-B27: owned by CommandPalette — the action-vs-search decision is made there. */
   query: string;
   onQueryChange: (query: string) => void;
-  /** US-B27: the list below is search results, not the action list (the panel's tab says so). */
+  /** US-B27: the hub's hits are all the list holds (the panel's tab says so). */
   searchActive: boolean;
+  /** loop-r1-08: the list was built and filtered by CommandPalette, so cmdk must not filter it. */
+  manualFilter: boolean;
+  /** What the panel offers when the context has no suggestion of its own. */
+  recentActions: PaletteAction[];
   threadSelected: boolean;
   threadSummary: string | null;
   threadTitle: string | null;
@@ -278,6 +370,14 @@ function InlinePalette({
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
+  // loop-r1-08 (NC-12): ⌘K always opens empty. The query goes when the panel is *gone* rather than
+  // the moment it starts leaving — the close spring holds it in the DOM for --dur-panel, and
+  // swapping the list out from under a panel that is still on screen is a flash of the wrong
+  // content at the one moment the user is watching it. Every close path lands here: a selected row,
+  // Escape, an outside click.
+  useEffect(() => {
+    if (!open && !closing) onQueryChange("");
+  }, [open, closing, onQueryChange]);
   useEffect(() => {
     if (!open) return;
     function onPointerDown(e: PointerEvent) {
@@ -299,12 +399,37 @@ function InlinePalette({
       ref={ref}
       className="ask-bar"
       label="omnis ask/search"
-      // US-B27: same reason as the dialog — search rows are the hub's answer, not cmdk's filter input.
-      shouldFilter={!searchActive}
+      // US-B27: same reason as the dialog — those rows are not cmdk's to filter (see `manualFilter`).
+      shouldFilter={!manualFilter}
       onKeyDown={(e) => {
+        // loop-r1-08: an IME owns Enter and Escape while it is composing — that Enter commits the
+        // composition and is not a request to open a row, and that Escape is the IME's own "cancel".
+        // cmdk 1.1.1 ignores both keys in that state (its root computes `e.nativeEvent.isComposing ||
+        // e.keyCode === 229` before its key switch), but it runs this handler *first*, so without the
+        // same guard the inline palette would act on keys the dialog never sees: the rows on screen
+        // mid-composition are the debounced answer to the keystrokes before it, so the press opens
+        // the previous query's row — a Korean name typed into the hub's search opens a thread.
+        if (e.nativeEvent.isComposing || e.keyCode === 229) return;
         if (e.key === "Escape") {
           e.preventDefault();
           onOpenChange(false);
+          return;
+        }
+        // loop-r1-08 (L-15): Enter runs the highlighted row. cmdk's own Enter dispatches to
+        // whatever holds `aria-selected="true"`, and that row is chosen by comparing a *value
+        // string* it remembers against each row's `data-value` — which is written a layout effect
+        // after the row registers. Two consequences, both measured on the live stack: a list whose
+        // rows changed under a surviving value has no selected row at all (type "PoC", reopen, type
+        // "Dana" — the one Dana row reads aria-selected="false"), and in that state cmdk's Enter has
+        // nothing to dispatch to, so the press is silently swallowed. Reading the highlight off the
+        // DOM, and falling back to the first row a press can act on, is what makes the key mean what
+        // the picture says. A disabled row is skipped: it is a row with nowhere to go.
+        if (e.key === "Enter") {
+          const row = highlightedRow(ref.current);
+          if (row !== null) {
+            e.preventDefault();
+            row.click();
+          }
         }
       }}
     >
@@ -341,16 +466,6 @@ function InlinePalette({
             >
               <AtSign size={15} aria-hidden="true" />
             </button>
-            {/* There is no upload path to attach to — disabled, with title="Phase B" (story fallback). */}
-            <button
-              type="button"
-              className="ask-bar__composer-button"
-              aria-label="Attach file"
-              title="Phase B"
-              disabled
-            >
-              <Paperclip size={15} aria-hidden="true" />
-            </button>
             <ModelPicker />
           </>
         )}
@@ -365,6 +480,7 @@ function InlinePalette({
         <AskPanel
           open={open}
           commands={commands}
+          recentActions={recentActions}
           threadSelected={threadSelected}
           threadTitle={threadTitle}
           summary={threadSummary}

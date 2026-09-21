@@ -6,9 +6,11 @@
    changes, re-copy the whole file below this comment — verbatim, do not hand-pick a subset, or a
    screen composing an unlisted selector silently loses its styling.
 
-   Source: apps/desktop/src/app.css at the motion-OSS-into-main merge (6398 lines). A commit cannot
+   Source: apps/desktop/src/app.css at the loop-r1 merge (6404 lines). A commit cannot
    cite its own sha, so the header names the merge that produced this copy instead of a hash it
-   would have to be amended to learn — the same reason the S5 copy named its wave.
+   would have to be amended to learn — the same reason the S5 copy named its wave. The count moved
+   from 6398 to 6404 when loop-r1-08 added §c.5's `.ask-panel__action kbd` rule — and the gallery's
+   copy, which the same header rule binds and no test guards, was re-copied with it.
    apps/web/test/vendor-css.test.ts is what holds the line: it compares everything below this
    comment against that file byte for byte, so forgetting to re-copy fails a test rather than
    shipping a half-styled screen. */
@@ -765,6 +767,12 @@ body {
 .ask-panel__action svg {
   flex: 0 0 auto;
   color: var(--text-secondary);
+}
+
+/* loop-r1-08: a command's shortcut, at the row's right edge — the same edge the tag took before it
+   (the row is a flex line, so `auto` is the whole of it). */
+.ask-panel__action kbd {
+  margin-left: auto;
 }
 
 /* The line that says what the panel is working on — the reference puts its conversation area

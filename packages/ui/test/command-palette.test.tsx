@@ -249,7 +249,9 @@ describe('CommandPalette mode="inline" typing path (US-D01 regression)', () => {
     render(<CommandPalette mode="inline" open onOpenChange={vi.fn()} actions={actions} />);
     fireEvent.change(askInput(), { target: { value: "Inbox" } });
     fireEvent.change(askInput(), { target: { value: "" } });
-    expect(screen.getByRole("button", { name: "Draft a reply" })).toBeInTheDocument();
+    // loop-r1-08 (L-35, NC-40): the tab no longer holds disabled "Phase B" buttons, so what it
+    // returns to is the recent commands — the same row, pressable, that the Commands tab runs.
+    expect(screen.getByRole("button", { name: /Go to Inbox/ })).toBeInTheDocument();
   });
 });
 
@@ -535,6 +537,177 @@ describe('CommandPalette mode="inline" search mode (US-B27)', () => {
       "true",
     );
     expect(screen.getByText("Go to Inbox")).toBeInTheDocument();
+  });
+});
+
+describe('CommandPalette mode="inline" keyboard (loop-r1-08 L-15)', () => {
+  const actions: PaletteAction[] = [
+    { id: "go-inbox", name: "Go to Inbox", group: "Navigate", perform: vi.fn() },
+  ];
+  const groups: UiSearchGroup[] = [
+    {
+      kind: "threads",
+      label: "Threads",
+      results: [
+        hit("thread", "t1", "PoC kickoff", "the plan"),
+        hit("thread", "t2", "PoC retro", "what we learned"),
+      ],
+    },
+  ];
+
+  it("ArrowDown then Enter opens the highlighted hit", () => {
+    const onSelectHit = vi.fn();
+    render(
+      <CommandPalette
+        mode="inline"
+        open
+        onOpenChange={vi.fn()}
+        actions={actions}
+        search={{ groups, loading: false, onQueryChange: vi.fn(), onSelectHit }}
+      />,
+    );
+    const input = askInput();
+    fireEvent.change(input, { target: { value: "PoC" } });
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(onSelectHit).toHaveBeenCalledWith(hit("thread", "t2", "PoC retro", "what we learned"));
+  });
+
+  it("Enter runs the highlighted command", () => {
+    const perform = vi.fn();
+    const commandActions: PaletteAction[] = [
+      { id: "go-inbox", name: "Go to Inbox", group: "Navigate", perform },
+    ];
+    render(
+      <CommandPalette
+        mode="inline"
+        open
+        onOpenChange={vi.fn()}
+        actions={commandActions}
+        search={{ groups, loading: false, onQueryChange: vi.fn(), onSelectHit: vi.fn() }}
+      />,
+    );
+    fireEvent.change(askInput(), { target: { value: "inbox" } });
+
+    fireEvent.keyDown(askInput(), { key: "Enter" });
+
+    expect(perform).toHaveBeenCalledOnce();
+  });
+
+  it("ignores the Enter that commits an IME composition", () => {
+    const onSelectHit = vi.fn();
+    render(
+      <CommandPalette
+        mode="inline"
+        open
+        onOpenChange={vi.fn()}
+        actions={actions}
+        search={{ groups, loading: false, onQueryChange: vi.fn(), onSelectHit }}
+      />,
+    );
+    const input = askInput();
+    fireEvent.change(input, { target: { value: "PoC" } });
+
+    // Enter is also how an IME commits a composition, and it arrives marked as such — `isComposing`
+    // everywhere, `keyCode 229` on the IMEs that still send it. Neither is a request to open a row:
+    // cmdk never dispatches on them (its root computes `e.nativeEvent.isComposing || e.keyCode ===
+    // 229` before its key switch), and the rows on screen at that moment are the debounced answer to
+    // the keystrokes *before* the composition, so acting here opens the wrong hit mid-word.
+    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+    fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
+
+    expect(onSelectHit).not.toHaveBeenCalled();
+  });
+});
+
+describe('CommandPalette mode="inline" commands filter while typing (loop-r1-08 L-16, NC-13)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  const actions: PaletteAction[] = [
+    { id: "go-inbox", name: "Go to Inbox", group: "Navigate", perform: vi.fn() },
+    { id: "go-settings", name: "Go to Settings", group: "Navigate", perform: vi.fn() },
+    { id: "toggle-detail-pane", name: "Toggle detail pane", group: "View", perform: vi.fn() },
+  ];
+  /** The hub answers nothing; these tests are about which commands survive the query. */
+  const noHits = (onQueryChange = vi.fn()) => ({
+    groups: [] as UiSearchGroup[],
+    loading: false,
+    onQueryChange,
+    onSelectHit: vi.fn(),
+  });
+
+  it('typing "go" lists every command whose name contains it', () => {
+    render(
+      <CommandPalette
+        mode="inline"
+        open
+        onOpenChange={vi.fn()}
+        actions={actions}
+        search={noHits()}
+      />,
+    );
+
+    fireEvent.change(askInput(), { target: { value: "go" } });
+
+    expect(screen.getByText("Go to Inbox")).toBeInTheDocument();
+    expect(screen.getByText("Go to Settings")).toBeInTheDocument();
+    expect(screen.queryByText("Toggle detail pane")).not.toBeInTheDocument();
+  });
+
+  it('">set" shows only "Go to Settings" and asks the hub nothing', () => {
+    vi.useFakeTimers();
+    const onQueryChange = vi.fn();
+    render(
+      <CommandPalette
+        mode="inline"
+        open
+        onOpenChange={vi.fn()}
+        actions={actions}
+        search={noHits(onQueryChange)}
+      />,
+    );
+
+    fireEvent.change(askInput(), { target: { value: ">set" } });
+
+    expect(screen.getByText("Go to Settings")).toBeInTheDocument();
+    expect(screen.queryByText("Go to Inbox")).not.toBeInTheDocument();
+
+    // The debounce is the only path to a request, and a `>` query never starts one — the words
+    // after the `>` are command grammar, not something the hub indexes.
+    act(() => vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS * 2));
+    expect(onQueryChange).not.toHaveBeenCalled();
+  });
+
+  it("reopening the palette gives an empty input", () => {
+    vi.useFakeTimers();
+    const props = { mode: "inline" as const, onOpenChange: vi.fn(), actions };
+    const { rerender } = render(<CommandPalette {...props} open />);
+    fireEvent.change(askInput(), { target: { value: "PoC" } });
+    expect(askInput()).toHaveValue("PoC");
+
+    // The query goes when the panel is gone — the close spring holds it in the DOM for --dur-panel.
+    rerender(<CommandPalette {...props} open={false} />);
+    act(() => vi.advanceTimersByTime(PANEL_MS));
+    rerender(<CommandPalette {...props} open />);
+
+    expect(askInput()).toHaveValue("");
+  });
+
+  it("a press on a tab leaves the focus in the input", () => {
+    render(<CommandPalette mode="inline" open onOpenChange={vi.fn()} actions={actions} />);
+    const input = askInput();
+    input.focus();
+    const commandsTab = screen.getByRole("button", { name: "Commands" });
+
+    // jsdom does not move focus on a click the way a browser does, so the assertion that holds
+    // here is the one the browser itself acts on: the mousedown's default is cancelled (fireEvent
+    // returns false exactly when it was), which is what keeps the focus off the button.
+    expect(fireEvent.mouseDown(commandsTab, { bubbles: true })).toBe(false);
+    fireEvent.click(commandsTab);
+
+    expect(document.activeElement).toBe(input);
   });
 });
 

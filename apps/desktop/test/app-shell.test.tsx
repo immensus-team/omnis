@@ -54,8 +54,17 @@ const queue: unknown = new Proxy(() => queue, {
   get: () => queue,
   apply: () => queue,
 });
+// loop-r1-08: `persons` is the second relation a test can put rows into, so that a person hit can
+// be followed to a PersonDetail that names someone rather than to its empty state. It answers `[]`
+// until a case fills it, which is what keeps every test above unchanged.
+const persons: { rows: unknown[] } = { rows: [] };
+const personQuery: unknown = new Proxy(() => personQuery, {
+  get: () => personQuery,
+  apply: () => personQuery,
+});
 const chain: unknown = new Proxy(() => chain, {
-  get: (_target, prop) => (prop === "pending_approvals" ? queue : chain),
+  get: (_target, prop) =>
+    prop === "pending_approvals" ? queue : prop === "persons" ? personQuery : chain,
   apply: () => chain,
 });
 vi.mock("../src/zero-client.js", () => ({
@@ -64,7 +73,10 @@ vi.mock("../src/zero-client.js", () => ({
   loadZeroToken: async () => {},
 }));
 vi.mock("@rocicorp/zero/react", () => ({
-  useQuery: (q: unknown) => [q === queue ? approvals.rows : [], { type: "complete" }],
+  useQuery: (q: unknown) => [
+    q === queue ? approvals.rows : q === personQuery ? persons.rows : [],
+    { type: "complete" },
+  ],
   useZero: () => chain,
   ZeroProvider: ({ children }: { children: unknown }) => children,
 }));
@@ -163,7 +175,12 @@ describe("App shell screen navigation (loop-r1-01)", () => {
 });
 
 describe("App shell search mode (US-B27)", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  // `persons` is module-level state shared by every test in this file, so the row a case fills in
+  // goes back to empty with its fetch stub.
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    persons.rows = [];
+  });
 
   /** The hub's GET /search answer for one item hit. */
   const searchAnswer = (): Response =>
@@ -209,24 +226,86 @@ describe("App shell search mode (US-B27)", () => {
     expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/search?q=launch");
   });
 
-  it("does not ask the hub while the query still matches an action", async () => {
+  // loop-r1-08 (L-16) replaces the either/or this case used to assert. The old rule was "a query
+  // that matches an action is answered from the action list, so the hub is not asked", and it is
+  // exactly what made typing "go to" a dead end: the command list never narrowed and no search
+  // ever ran. Now the words are both — the matching commands on top of the hub's hits — so the row
+  // appearing is no longer a reason to stay quiet, and `>` becomes the way to say "commands only".
+  it("lists the matching command, asks the hub too, and stays quiet for a `>` query", async () => {
     const fetchMock = vi.fn(async () => searchAnswer());
     vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+    const input = () => screen.getByPlaceholderText("Start typing to ask or search");
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    fireEvent.change(input(), { target: { value: "inbox" } });
+
+    expect(screen.getByText("Go to Inbox")).toBeInTheDocument();
+    // Scoped to /search: the shell's own settings read (US-D10's pane layout, restored on mount) is
+    // also a hub call, and the palette's round trip is the one this test is about.
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.filter((call) => String(call[0]).includes("/search")),
+      ).toHaveLength(1),
+    );
+
+    // The same words behind a `>` are command grammar, not a search — so the count above stays 1.
+    fireEvent.change(input(), { target: { value: ">inbox" } });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(fetchMock.mock.calls.filter((call) => String(call[0]).includes("/search"))).toHaveLength(
+      1,
+    );
+    expect(screen.getByText("Go to Inbox")).toBeInTheDocument();
+  });
+
+  it("opens the person detail when a person hit is selected (loop-r1-08 L-15, NC-12)", async () => {
+    const personId = "3f1b2c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            q: "dana",
+            took_ms: 2,
+            truncated: false,
+            groups: [
+              {
+                kind: "people",
+                total: 1,
+                results: [
+                  {
+                    kind: "person",
+                    id: personId,
+                    score: 1,
+                    title: "Dana Whitfield",
+                    snippet: "Northwind",
+                    at: null,
+                    channel: null,
+                    // The shape the hub has been sending all along: `openHit` used to follow only
+                    // `screen === "thread"`, so this row was drawn and then refused.
+                    deep_link: { screen: "person", person_id: personId },
+                  },
+                ],
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    persons.rows = [{ id: personId, display_name: "Dana Whitfield", item_count: 4 }];
     render(<App />);
 
     fireEvent.keyDown(window, { key: "k", metaKey: true });
     fireEvent.change(screen.getByPlaceholderText("Start typing to ask or search"), {
-      target: { value: "inbox" },
+      target: { value: "dana" },
     });
+    await waitFor(() => expect(screen.getByText("Dana Whitfield")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Dana Whitfield"));
 
-    // Wait past the debounce window: the request that must not happen has had its chance.
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    // Scoped to /search: the shell's own settings read (US-D10's pane layout, restored on mount) is
-    // also a hub call, and "the palette stayed quiet" is the claim this test makes.
-    expect(fetchMock.mock.calls.filter((call) => String(call[0]).includes("/search"))).toHaveLength(
-      0,
-    );
-    expect(screen.getByText("Go to Inbox")).toBeInTheDocument();
+    // The pane swaps to PersonDetail, the same surface the Network screen opens — not the approval
+    // stack it fell back to while the person branch was missing.
+    expect(await screen.findByRole("heading", { name: "Dana Whitfield" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Conversations" })).toBeInTheDocument();
   });
 });
 

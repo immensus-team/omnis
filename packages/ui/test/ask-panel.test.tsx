@@ -16,9 +16,12 @@ const tab = (name: string) => screen.getByRole("button", { name });
 const summarize = () => screen.getByRole("button", { name: "Summarize this thread" });
 
 describe("AskPanel suggested actions (US-D01)", () => {
-  it("disables Summarize this thread while no thread is selected", () => {
+  it("offers no Summarize this thread while no thread is selected", () => {
     render(panel(false, null));
-    expect(summarize()).toBeDisabled();
+    // loop-r1-08 (L-35, NC-40): the button used to be drawn disabled under a "Thread required" tag.
+    // A suggestion that cannot be pressed is not a suggestion, and with no thread there is nothing
+    // to summarize — so the row is not there at all, and the recent commands stand in its place.
+    expect(screen.queryByRole("button", { name: "Summarize this thread" })).not.toBeInTheDocument();
   });
 
   it("enables Summarize this thread once a thread is selected", () => {
@@ -26,13 +29,37 @@ describe("AskPanel suggested actions (US-D01)", () => {
     expect(summarize()).not.toBeDisabled();
   });
 
-  it('keeps Draft a reply / Extract to-dos disabled with title="Phase B" regardless of selection', () => {
-    render(panel(true, "Test summary"));
+  it("shows no Phase B placeholders, whatever is selected", () => {
+    const { rerender } = render(panel(true, "Test summary"));
     for (const name of ["Draft a reply", "Extract to-dos"]) {
-      const action = screen.getByRole("button", { name });
-      expect(action).toBeDisabled();
-      expect(action).toHaveAttribute("title", "Phase B");
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
     }
+
+    rerender(panel(false, null));
+    // And the panel says no such thing anywhere: a roadmap's phase number is not product copy.
+    expect(screen.queryByText(/Phase B/)).not.toBeInTheDocument();
+  });
+
+  it("falls back to the recent commands when the context has no suggestion of its own", () => {
+    const perform = vi.fn();
+    render(
+      <AskPanel
+        commands={null}
+        recentActions={[
+          { id: "go-inbox", name: "Go to Inbox", group: "Navigate", shortcut: "g i", perform },
+        ]}
+        threadSelected={false}
+        summary={null}
+        onClose={vi.fn()}
+      />,
+    );
+
+    // Real and pressable — the same row the Commands tab runs, which is what makes the tab teach
+    // the one next to it rather than advertise a phase the product is not in.
+    const row = screen.getByRole("button", { name: /Go to Inbox/ });
+    expect(row).not.toBeDisabled();
+    fireEvent.click(row);
+    expect(perform).toHaveBeenCalledOnce();
   });
 });
 
