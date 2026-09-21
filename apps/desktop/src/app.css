@@ -2049,13 +2049,18 @@ body {
   color: var(--text-tertiary);
 }
 
-/* Four lines to start, ten at most: `rows` is the floor and `field-sizing: content` grows the box
-   with the text up to the cap, so a one-line reply is one line tall and a long one scrolls at ten.
+/* Four lines to start, ten at most. `field-sizing: content` grows the box with the text up to the
+   cap, so a long message scrolls at ten and a short one does not open a band of emptiness.
+   The floor is NOT the markup's `rows={4}`: Chromium ignores `rows` the moment `field-sizing:
+   content` applies, so the editor opened one line tall (~46px) in the browser that actually runs
+   this app, whatever the attribute said. The floor is written out in the same arithmetic as the
+   cap — 4 lines of 15px/1.45 plus the field's 8px vertical padding and 1px border, twice.
    No resize handle — the box already sizes itself, and a manual grabber inside a card is a second,
    worse answer to the same question. */
 .approval-card__editor {
   resize: none;
   field-sizing: content;
+  min-height: calc(4 * 1.45 * 15px + 18px);
   max-height: calc(10 * 1.45 * 15px + 18px);
   overflow-y: auto;
 }
@@ -2138,6 +2143,20 @@ body {
   color: var(--text-primary);
   font: inherit;
   cursor: pointer;
+}
+
+/* loop-r2-01/L2-37: the primary decision has to read as primary. `Button`'s variant is Tailwind
+   utilities and apps/desktop compiles no Tailwind, so the class string on the element resolved to
+   nothing and every decision in this row wore the same hairline ghost — the round-2 complaint
+   verbatim ("four equal buttons, and Approve is not primary"). The variant is now on the element as
+   `data-variant` (button.tsx) and the fill is the app's own confirm pill — accent + inverse text
+   (`.confirm-prompt__button--confirm`, §c.8) — with the hairline dropped rather than drawn around
+   the edge of a filled button. Read, edit and respond each lead with their primary; the ghosts
+   after it keep the hairline. */
+.approval-card__actions button[data-variant="primary"] {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-fg);
 }
 
 /* A disabled decision has to look disabled. `Button` says so with Tailwind's `disabled:opacity-50`,

@@ -22,6 +22,9 @@
 //   5. The second card names its own thread, with all four buttons (the round-2 "four equal buttons"
 //      complaint was on the card nobody could tell apart from its neighbours).
 //   6. No horizontal overflow at 1440, 390 or 320 — the sweep runs with that four-button card up.
+//   6b. The two things the first attempt was rejected on, both measured on the running page because
+//       both are invisible to jsdom: the row's first button is filled against the ghosts beside it
+//       (L2-37), and the editor opens at its four-line floor rather than collapsing to one line.
 //   7. Respond opens a reply field and sends nothing until there is something to send, or until it
 //      is entered — then the decision is 'respond' and carries the reply.
 //
@@ -33,7 +36,7 @@
 // the thread it actually lives on — found by the row's `data-thread-id`, never by position.
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { type Page, chromium } from "@playwright/test";
+import { type Locator, type Page, chromium } from "@playwright/test";
 import { Pool, query } from "../../packages/db/src/index.js";
 import { describeOverflow, measureOverflow } from "./overflow.js";
 import { REPO_ROOT, loadOrCreateEnv } from "./stack.js";
@@ -138,6 +141,46 @@ function cardFor(page: Page, description: string) {
   return page.locator(".approval-card").filter({ hasText: description }).first();
 }
 
+/** The paint and the box of a control, measured on the running page.
+ *
+ *  The first attempt at this story was rejected on two claims that no test in this repo could see:
+ *  "Approve and Save & send are not visually primary" and "the editor does not open at 4 rows". Both
+ *  are true only in a browser — jsdom has no CSS, and the two causes are silent there and in review:
+ *  `Button`'s `primary` variant is Tailwind utilities while neither app compiles Tailwind (so the
+ *  class string on the element resolves to nothing), and `field-sizing: content` makes Chromium
+ *  ignore the `rows` attribute (so the markup's floor is not a floor). So both are measured here,
+ *  in the frame each screenshot is about, rather than asserted about in a stylesheet nobody runs. */
+async function paint(locator: Locator): Promise<{ background: string; height: number }> {
+  return locator.evaluate((el) => {
+    const style = getComputedStyle(el);
+    return { background: style.backgroundColor, height: el.getBoundingClientRect().height };
+  });
+}
+
+/** No fill at all — Chromium reports a transparent background as either spelling depending on which
+ *  longhand won, so both count. */
+function isClear(background: string): boolean {
+  return background === "rgba(0, 0, 0, 0)" || background === "transparent";
+}
+
+/** L2-37: the row's first button is the decision, and it has to be filled against the ghosts beside
+ *  it. Checked as a pair — a fill on both, or on neither, is the same defect. */
+async function assertPrimary(card: Locator, label: string, ghostLabel: string): Promise<void> {
+  const primary = await paint(card.getByRole("button", { name: label }));
+  const ghost = await paint(card.getByRole("button", { name: ghostLabel }));
+  if (isClear(primary.background)) {
+    throw new Error(`"${label}" is not painted — it wears the same transparent fill as a ghost`);
+  }
+  if (primary.background === ghost.background) {
+    throw new Error(`"${label}" and "${ghostLabel}" are both ${primary.background}: no hierarchy`);
+  }
+  if (!isClear(ghost.background)) {
+    throw new Error(
+      `"${ghostLabel}" is filled (${ghost.background}) — the ghost should be a hairline`,
+    );
+  }
+}
+
 async function main(): Promise<void> {
   mkdirSync(OUT, { recursive: true });
   // tools/e2e/.env is written once and keeps whichever database the *first* stack in this worktree
@@ -228,7 +271,20 @@ async function main(): Promise<void> {
           `decision='${afterEditClick.decision ?? "null"}' — nothing was sent, but the row changed`,
       );
     }
-    console.log("  2. Edit opened the message; no /decide was sent and the row is still pending");
+    // Step 5's "4 rows min, growing to 10" is a claim about the box, and `rows` does not carry it:
+    // the browser drops the attribute the moment `field-sizing: content` applies, so a pre-filled
+    // one-liner would open ~46px tall. Measured against the 4-line height itself (15px/1.45), which
+    // is what the CSS floor is written from.
+    const editorBox = await paint(editor);
+    if (editorBox.height < 4 * 1.45 * 15) {
+      throw new Error(
+        `the editor opened ${editorBox.height}px tall — under the 4-line floor (${4 * 1.45 * 15}px)`,
+      );
+    }
+    await assertPrimary(replyCard, "Save & send", "Cancel");
+    console.log(
+      `  2. Edit opened the message ${Math.round(editorBox.height)}px tall; no /decide was sent and the row is still pending`,
+    );
     await page.screenshot({ path: join(OUT, "1440.png") });
 
     // ---- 3. The read state at 390, in the phone sheet ----------------------------------------------
@@ -271,6 +327,9 @@ async function main(): Promise<void> {
     if ((await replyCard.locator(".approval-card__body").count()) === 0) {
       throw new Error("the card at 390 is not quoting its message");
     }
+    // L2-37's other half: at the phone width the row still has to say which decision is the primary
+    // one. Asserted in the frame the 390 shot captures.
+    await assertPrimary(replyCard, "Approve", "Edit");
     await page.screenshot({ path: join(OUT, "390.png") });
     console.log(`  3. at 390 the sheet shows "${phoneHeader}" over the quoted message`);
 
@@ -371,6 +430,7 @@ async function main(): Promise<void> {
     if (decided.length !== sentBeforeRespond) {
       throw new Error("typing a reply sent it — nothing sends until it is sent");
     }
+    await assertPrimary(agreementCard, "Send to agent", "Cancel");
     await field.press("Enter");
     const answered = await poll(
       async () => state(pool, agreement.id),
