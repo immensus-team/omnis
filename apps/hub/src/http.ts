@@ -27,6 +27,7 @@ import { setThreadArchived } from "./archive.js";
 import type { HubConfig } from "./config.js";
 import { NOTE_MAX_CHARS, createNote, decideNoteRouting } from "./notes.js";
 import { removeSubscription, saveSubscription } from "./push.js";
+import { REPLY_ERROR, proposeReply } from "./reply.js";
 import { createSearchDeps, runSearch } from "./search.js";
 import { isValidSettingKey } from "./settings.js";
 import { TASK_TITLE_MAX_CHARS, createTask } from "./tasks.js";
@@ -205,6 +206,34 @@ export function createHubServer(deps: HubServerDeps): Server {
       );
       if (result === null) return send(res, 404, { error: "thread not found" });
       return send(res, 200, result);
+    }
+
+    // loop-r2-03: the reply composer's one write, beside the archive route and with the same
+    // optional /api prefix. A reply is never sent directly — this proposes the `send` approval the
+    // thread's inline card then carries — so the answer is 201 with the new approval's id and not a
+    // 200 about a message that went out.
+    const replyRoute = /^(?:\/api)?\/threads\/([0-9a-fA-F-]{36})\/reply$/.exec(path);
+    if (replyRoute !== null) {
+      if (method !== "POST") return send(res, 405, { error: "method not allowed" });
+      const id = replyRoute[1];
+      if (id === undefined) return send(res, 400, { error: "bad id" });
+      let body: unknown;
+      try {
+        body = await readJson(req);
+      } catch {
+        return send(res, 400, { error: "invalid json body" });
+      }
+      // A body that is not a string is refused with the same sentence the length rule uses: from the
+      // composer's side there is one thing wrong with the request, and it is the reply.
+      const text = (body as { body?: unknown } | null)?.body;
+      if (typeof text !== "string") return send(res, 400, { error: REPLY_ERROR });
+      const result = await proposeReply({ pool, approvals: kernel.approvals }, id, text);
+      if (!result.ok) {
+        return result.reason === "not_found"
+          ? send(res, 404, { error: "thread not found" })
+          : send(res, 400, { error: REPLY_ERROR });
+      }
+      return send(res, 201, { approval_id: result.approval_id });
     }
 
     // US-B32 (delta §7). The per-item restore: the same kernel `undoArchive` the thread route's
