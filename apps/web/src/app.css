@@ -1,0 +1,169 @@
+/* The PWA shell's own layout. Colour, type, radii and motion come from
+   @omnis/ui/tokens.css (imported before this file in main.tsx) — nothing here invents a token.
+   apps/gallery/src/vendor/app-styles.css is the same split for the gallery.
+
+   Two things make this shell different from apps/desktop's, and they are the whole point of the
+   app (A5 §4):
+     1. One column at every width. The phone layout is the layout — there is no third tier here,
+        and the list is the screen.
+     2. Its chrome is held clear of the notch and the home indicator (UX-28). That is what
+        index.html's `viewport-fit=cover` turns on: without it every env() below resolves to 0 and
+        the tab bar sits on the home indicator. */
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+#root {
+  height: 100%;
+}
+
+/* 100dvh, not 100vh: Safari's collapsing toolbar makes the *large* viewport taller than the
+   visible one, and a shell sized to it puts the tab bar below the fold. The vh line is the
+   fallback for engines without dvh. The body stays opaque ground — the card holds the list. */
+.web-shell {
+  display: grid;
+  /* top bar | scrolling list | tab bar. `minmax(0, 1fr)` is what lets the middle row scroll
+     instead of growing the grid: a bare `1fr` refuses to shrink below its content. */
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100vh;
+  height: 100dvh;
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.web-shell__topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* 52px is the bar's own height; the safe-area padding is added to it, so an installed app on a
+     notched phone does not paint the title under the status bar. */
+  min-height: 52px;
+  padding-top: env(safe-area-inset-top);
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+
+.web-shell__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* The reading column is capped, the chrome is not. At 1440 the list stays a column you can read
+   while the bars span the window — the alternative, a phone-width shell floating in the middle of
+   a desktop browser, is the fake-device frame the anti-slop checklist bans. */
+.web-shell__body {
+  overflow-y: auto;
+  min-width: 0;
+  padding: 0 16px 16px;
+  padding-left: max(16px, env(safe-area-inset-left), calc((100% - 720px) / 2));
+  padding-right: max(16px, env(safe-area-inset-right), calc((100% - 720px) / 2));
+}
+
+/* Glass is chrome: the bar floats over the list it navigates, so it takes the material, and it is
+   flush with the bottom and both sides, so it takes one hairline at the top instead of the
+   four-sided one .glass-surface draws (a drawn border around the viewport reads as a frame). */
+.tab-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  padding: 6px 8px;
+  padding-bottom: max(6px, env(safe-area-inset-bottom));
+  padding-left: max(8px, env(safe-area-inset-left));
+  padding-right: max(8px, env(safe-area-inset-right));
+  border: none;
+  border-top: var(--hairline);
+  border-radius: 0;
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+.tab-bar__tab {
+  /* Every slot is the same width however long its word is, and a word that still does not fit is
+     clipped rather than allowed to push the bar wider than the phone (the 320px check). */
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px; /* the touch target A5 §4.2's gestures assume */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color var(--dur-base) var(--ease-spring);
+}
+
+/* The selected slot is the ink pill — the same selected-state grammar the rail uses for the Inbox
+   tile, so one glance says where you are at both ends of the app. */
+.tab-bar__tab[aria-selected="true"] {
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 600;
+}
+
+.tab-bar__tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* A5 §4.5: the install guide is an inline card at the top of the list, in the flow — it is body,
+   so it is opaque and it pushes the list down rather than covering it. */
+.install-card {
+  border: var(--hairline);
+  border-radius: 20px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-row-selected);
+}
+
+.install-card__title {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.install-card__steps {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  color: var(--text-secondary);
+}
+
+.install-card__step {
+  margin-bottom: 4px;
+}
+
+/* One entrance, not a fade-up on everything (SKILLS.md checklist 9), and nothing at all under
+   prefers-reduced-motion (checklist 10). */
+@keyframes web-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.install-card {
+  animation: web-card-in var(--dur-move) var(--ease-spring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
