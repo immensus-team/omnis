@@ -62,6 +62,12 @@ export interface BridgeDeps {
   token: string;
   heartbeatMs?: number;
   callTimeoutMs?: number;
+  /** US-C03: called after a turn.completed is committed, so the delegation executor can attach the
+   *  result to the thread that asked for the work (A2 §5.3). */
+  onTurnCompleted?: (host: HostId, p: Record<string, unknown>) => void;
+  /** US-C03: called once a host's bridge is attached. The delegation executor re-drives the
+   *  approvals that were left decided while that host was offline (A2 §5.4). */
+  onHostConnected?: (host: HostId) => void;
 }
 
 export interface BridgeHub {
@@ -118,6 +124,16 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
 
   function send(ws: WebSocket, msg: Record<string, unknown>): void {
     if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg));
+  }
+
+  /** Fire-and-forget hooks (US-C03's delegation executor). The runtime has already sent the
+   *  notification, so a hook that throws must not fail the method or travel back to the bridge. */
+  function fire(fn: () => void): void {
+    try {
+      fn();
+    } catch (e) {
+      logger.warn("bridge hook threw", { err: e instanceof Error ? e.message : String(e) });
+    }
   }
 
   async function markOffline(host: HostId): Promise<void> {
@@ -274,6 +290,10 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
       session.turnOpen = false;
       session.settled = ok ? HERDR_STATE.done : "failed";
       await settleState(session, sessionKey);
+      // US-C03: after the turn line and the session state are committed, the delegation executor
+      // (if any) decides what this turn means for the approval that started it.
+      const hook = deps.onTurnCompleted;
+      if (hook !== undefined) fire(() => hook(host, params));
       return;
     }
 
@@ -523,6 +543,9 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
         logger.info("bridge disconnected", { host });
       });
       logger.info("bridge connected", { host, protocolVersion: PROTOCOL_VERSION });
+      // US-C03: the host is attached again — the delegations that waited for it can be re-driven.
+      const hook = deps.onHostConnected;
+      if (hook !== undefined) fire(() => hook(host));
     });
   }
 
