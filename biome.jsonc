@@ -3,15 +3,27 @@
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   // .claude/** is vendored (skills, templates, fixtures) — not our code; the skills tsconfig
   // templates/fixtures were blocking `pnpm lint` with 136 errors (since 353f0a7).
+  // docs/planning/** holds Workflow-tool scripts: they are the top-level body of a workflow, not
+  // modules, so they use a bare `return` and the tool's own `agent()`/`phase()` globals. Biome parses
+  // them as modules and fails on the `return` alone — 17 errors (since ce580af).
   "files": {
-    "ignore": ["**/dist/**", "**/node_modules/**", ".claude/**", ".omc/**", "tools/spikes/**"]
+    "ignore": [
+      "**/dist/**",
+      "**/node_modules/**",
+      ".claude/**",
+      ".omc/**",
+      "tools/spikes/**",
+      "docs/planning/**"
+    ]
   },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
   "linter": { "enabled": true, "rules": { "recommended": true } },
   "javascript": { "formatter": { "quoteStyle": "double", "semicolons": "always" } },
   "overrides": [
     {
-      // US-B07 / A4 §1.1: @omnis/agents는 커널(특히 egress)을 import하지 않는다(계약 §1).
+      // US-B07 / A4 §1.1: @omnis/agents does not import the kernel (egress in particular) (contract §1).
+      // (The two Korean comments and the four Korean messages below were translated as part of the
+      // privacy/English-only pass; this file was edited, so the repo rule applies to it.)
       "include": ["packages/agents/**"],
       "linter": {
         "rules": {
@@ -20,10 +32,10 @@
               "level": "error",
               "options": {
                 "paths": {
-                  "@omnis/kernel": "packages/agents는 @omnis/kernel을 의존하지 않는다(계약 §1). LoopKernel 구조적 타입을 쓴다.",
-                  "@omnis/kernel/egress": "egress는 커널 소유다(A4 §1.1).",
-                  "../../kernel/src/egress.js": "egress는 커널 소유다(A4 §1.1).",
-                  "../../../kernel/src/egress.js": "egress는 커널 소유다(A4 §1.1)."
+                  "@omnis/kernel": "packages/agents does not depend on @omnis/kernel (contract §1). Use the LoopKernel structural type.",
+                  "@omnis/kernel/egress": "egress is kernel-owned (A4 §1.1).",
+                  "../../kernel/src/egress.js": "egress is kernel-owned (A4 §1.1).",
+                  "../../../kernel/src/egress.js": "egress is kernel-owned (A4 §1.1)."
                 }
               }
             }
