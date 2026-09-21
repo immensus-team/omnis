@@ -32,8 +32,12 @@ if (typeof Element.prototype.scrollIntoView === "undefined") {
 // a plain Event with no `button`/`pointerType` on it and the primitive sees `button === undefined`
 // on every gesture and returns before it starts.
 // PointerEvent extends jsdom's real MouseEvent, so clientX/Y, button and the event plumbing are the
-// real ones and only the pointer fields are filled in. Capture is a no-op: jsdom does not retarget
-// events by pointer id anyway, and the tests dispatch straight at the element.
+// real ones and only the pointer fields are filled in.
+// The capture trio below is a no-op that exists to be *spied on*, not to be used: lib/pointer-drag.ts
+// binds its listeners on `window` precisely because capturing the element would end the gesture at
+// the first reorder (see its header), and pointer-drag.test.tsx asserts `setPointerCapture` is never
+// called. Removing the stubs would make that assertion pass for the wrong reason — an undefined
+// method cannot be called either.
 // ponytail: no capture state, no implicit release. Add it if a test ever asserts retargeting.
 if (typeof globalThis.PointerEvent === "undefined") {
   class PointerEventStub extends MouseEvent {

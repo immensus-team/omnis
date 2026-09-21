@@ -1,8 +1,10 @@
 import type * as React from "react";
 
-// D7 §c.1: the one drag primitive. Pointer Events, no dependency — `motion`, `framer-motion` and
-// `dnd-kit` are not installed and §e guard 6 rejects them. Two consumers: the rail's reorder (D7)
-// and the row's swipe (D8). No second drag implementation may appear.
+// D7 §c.1: the one drag primitive. Pointer Events and the FLIP in its consumers, no dependency —
+// DESIGN-DIRECTION-v3 §b checked every package.json and §e guard 6 rejects adding an animation or
+// drag library. The check is a grep for those package names, so this header deliberately does not
+// spell them: a comment naming a banned dependency reads as a use of one. Two consumers: the rail's
+// reorder (D7) and the row's swipe (D8). No second drag implementation may appear.
 
 export interface DragHandlers {
   onStart(): void;
@@ -36,12 +38,22 @@ const START_SLOP_PX = 6;
 
 /** Binds one pointer to an element. Returns the `onPointerDown` handler.
  *
- *  - `setPointerCapture` on down, so the gesture survives leaving the element.
+ *  - Listeners go on `window`, not on the element — see below.
  *  - `holdMs > 0` arms a long-press timer; touch only.
  *  - Ignores `button !== 0` and a non-primary pen contact.
  *  - `Escape` cancels a running gesture, and abandons a pending hold.
- *  - Releases capture and clears the timer on up/cancel, and on the element leaving the document —
- *    a detached element is a gesture with no surface left under it.
+ *  - Every event is filtered to the `pointerId` the gesture started with, so a second finger
+ *    cannot drive a drag its press never started.
+ *
+ *  Why `window` and not `setPointerCapture` on the element: both consumers reorder or remove the
+ *  element they are dragging *while the drag is running* — the rail splices the lifted tile to a
+ *  new slot on every crossing so its neighbours can animate (FLIP needs the real DOM order), and
+ *  the swipe's row unmounts on archive. React performs a keyed reorder with `insertBefore`, which
+ *  is a remove-and-reinsert; per spec that fires `lostpointercapture` on the captured element, and
+ *  Chromium then stops retargeting to it. Capture would therefore end the gesture at the first
+ *  crossing — measured, not assumed: with capture the rail's drag reported one `pointermove`, then
+ *  `lostpointercapture`, then nothing, and no `pointerup` at all. Window listeners track the
+ *  pointer for as long as it is down, whatever the tree does underneath.
  *
  *  What it does not do: `preventDefault`. Touch scrolling has to keep working until the gesture has
  *  actually started, which is the whole point of the hold.
@@ -73,28 +85,22 @@ export function pointerDrag(
         clearTimeout(timer);
         timer = null;
       }
-      el.removeEventListener("pointermove", onMove);
-      el.removeEventListener("pointerup", onUp);
-      el.removeEventListener("pointercancel", onAbort);
-      el.removeEventListener("lostpointercapture", onAbort);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onAbort);
+      window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("keydown", onKeyDown);
-      try {
-        el.releasePointerCapture(pointerId);
-      } catch {
-        /* jsdom has no pointer capture, and a real one may already be gone. Either way there is
-           nothing left to release. */
-      }
     };
 
-    /** Finish once: `finished` is the latch every handler checks, so the up that ends a gesture and
-     *  the `lostpointercapture` the release then fires cannot both report an outcome. */
+    /** Finish once: `finished` is the latch every handler checks, so a `pointerup` that follows a
+     *  `pointercancel` (or a late second event of any kind) cannot report a second outcome. */
     const end = (): void => {
       finished = true;
       release();
     };
 
     const onMove = (ev: PointerEvent): void => {
-      if (finished) return;
+      if (finished || ev.pointerId !== pointerId) return;
       lastX = ev.clientX;
       lastY = ev.clientY;
       const dx = lastX - startX;
@@ -111,8 +117,8 @@ export function pointerDrag(
       handlers.onMove(dx, dy);
     };
 
-    const onUp = (): void => {
-      if (finished) return;
+    const onUp = (ev: PointerEvent): void => {
+      if (finished || ev.pointerId !== pointerId) return;
       const dx = lastX - startX;
       const dy = lastY - startY;
       const dragged = started;
@@ -120,19 +126,37 @@ export function pointerDrag(
       if (dragged) handlers.onEnd(dx, dy);
     };
 
-    const onAbort = (): void => {
+    /** Touch only, and only once the gesture has started. A touchmove the browser can still cancel
+     *  is one it is about to turn into a scroll — and taking the gesture for a scroll fires
+     *  `pointercancel`, which would end the drag the moment the user actually moves the tile. That
+     *  was measured on the narrow rail: a long-press held, the lift appeared, the first move landed
+     *  the tile under the finger, and then the order snapped back to where it started, because the
+     *  move had been read as a scroll.
+     *
+     *  Gated on `started` on purpose: before the hold fires this gesture is not ours, so scrolling
+     *  has to keep working — that is the whole point of the hold. `passive: false` because window
+     *  touch listeners default to passive, and a passive listener's `preventDefault` does nothing. */
+    const onTouchMove = (ev: TouchEvent): void => {
+      if (started && ev.cancelable) ev.preventDefault();
+    };
+
+    /** The one cancel path. `onAbort` is the pointer-event wrapper that adds the pointerId filter;
+     *  Escape reaches it directly. */
+    const cancel = (): void => {
       if (finished) return;
       const dragged = started;
       end();
       if (dragged) handlers.onCancel();
     };
 
+    const onAbort = (ev: PointerEvent): void => {
+      if (ev.pointerId === pointerId) cancel();
+    };
+
     const onKeyDown = (ev: KeyboardEvent): void => {
-      if (ev.key !== "Escape") return;
       // Escape during the hold abandons the press with no cancel callback: nothing was lifted, so
       // there is nothing for a consumer to put back.
-      if (started) onAbort();
-      else end();
+      if (ev.key === "Escape") cancel();
     };
 
     if (holdMs > 0) {
@@ -149,15 +173,13 @@ export function pointerDrag(
       }, holdMs);
     }
 
-    try {
-      el.setPointerCapture(pointerId);
-    } catch {
-      /* see release() */
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onAbort);
+    if (e.pointerType === "touch") {
+      // A mouse gesture cannot be stolen by a scroll, so this listener is touch-only.
+      window.addEventListener("touchmove", onTouchMove, { passive: false });
     }
-    el.addEventListener("pointermove", onMove);
-    el.addEventListener("pointerup", onUp);
-    el.addEventListener("pointercancel", onAbort);
-    el.addEventListener("lostpointercapture", onAbort);
     window.addEventListener("keydown", onKeyDown);
   };
 }
