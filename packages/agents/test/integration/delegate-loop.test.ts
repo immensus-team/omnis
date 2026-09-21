@@ -1,12 +1,6 @@
 import { Pool } from "pg";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import {
-  AUTONOMY_MAX_MINUTES,
-  autonomyAllows,
-  configureAgents,
-  delegateLoop,
-  renderBrief,
-} from "../../src/index.js";
+import { configureAgents, delegateLoop, renderBrief } from "../../src/index.js";
 import { returningId } from "./returning-id.js";
 
 const pool = new Pool({
@@ -57,59 +51,10 @@ describe("renderBrief (A4 §5.3)", () => {
   });
 });
 
-describe("autonomyAllows (A4 §4.4, B-D6)", () => {
-  it("is off by default", () => {
-    expect(
-      autonomyAllows({
-        rules: [],
-        runtime: "claude_ds",
-        repo: "/Users/logankim/x",
-        estMinutes: 5,
-        hasEgress: false,
-      }),
-    ).toBe(false);
-  });
-
-  it("still requires approval for long, out-of-repo or egress work", () => {
-    const rules = [{ runtime: "claude_ds", repo: "/Users/logankim/x" }];
-    expect(
-      autonomyAllows({
-        rules,
-        runtime: "claude_ds",
-        repo: "/Users/logankim/x",
-        estMinutes: 5,
-        hasEgress: false,
-      }),
-    ).toBe(true);
-    expect(
-      autonomyAllows({
-        rules,
-        runtime: "claude_ds",
-        repo: "/Users/logankim/x",
-        estMinutes: AUTONOMY_MAX_MINUTES + 1,
-        hasEgress: false,
-      }),
-    ).toBe(false);
-    expect(
-      autonomyAllows({
-        rules,
-        runtime: "claude_ds",
-        repo: "/Users/other",
-        estMinutes: 5,
-        hasEgress: false,
-      }),
-    ).toBe(false);
-    expect(
-      autonomyAllows({
-        rules,
-        runtime: "claude_ds",
-        repo: "/Users/logankim/x",
-        estMinutes: 5,
-        hasEgress: true,
-      }),
-    ).toBe(false);
-  });
-});
+// US-C04: the `autonomyAllows` block that used to live here moved to
+// packages/kernel/test/delegation-rules.test.ts along with the implementation
+// (`delegationAllowed`). Every assertion it made — off by default, over 30 minutes,
+// outside the repo, egress — is in that file's table, plus the guards it did not cover.
 
 describe("delegateLoop (A4 §5)", () => {
   it("is T2, fires on an unrouted agent task, and cannot propose hermes", () => {

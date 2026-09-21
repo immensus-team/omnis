@@ -354,12 +354,15 @@ describe("heartbeat", () => {
       version: "1.0.0",
       capabilities: {},
     });
+    // Wait for *this* registration, not merely "some row is online": other integration files seed
+    // claude_ds@macbook as online in their beforeAll, and matching that row would let terminate()
+    // race runtime.registered — the upsert would then write online back over markOffline.
     await until(async () => {
-      const rows = await query<{ state: string }>(
+      const rows = await query<{ state: string; version: string | null }>(
         pool,
-        "SELECT state FROM agent_runtimes WHERE runtime = 'claude_ds' AND host = 'macbook'",
+        "SELECT state, version FROM agent_runtimes WHERE runtime = 'claude_ds' AND host = 'macbook'",
       );
-      return rows[0]?.state === "online" ? true : null;
+      return rows[0]?.state === "online" && rows[0]?.version === "1.0.0" ? true : null;
     });
 
     client.ws.terminate();

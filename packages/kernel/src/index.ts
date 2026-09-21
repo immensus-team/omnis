@@ -8,7 +8,20 @@ export {
 } from "./archive.js";
 export type { ArchivedByMeta, ArchivedGroup } from "./archive.js";
 export { ApprovalStateError, createApprovals } from "./approvals.js";
-export type { ApprovalConfig, Approvals, ApprovalsDeps, PendingApproval } from "./approvals.js";
+export type {
+  ApprovalActor,
+  ApprovalConfig,
+  Approvals,
+  ApprovalsDeps,
+  PendingApproval,
+} from "./approvals.js";
+export {
+  AUTONOMY_MAX_MINUTES,
+  DelegationRule,
+  delegationAllowed,
+  parseDelegationRules,
+} from "./delegation-rules.js";
+export type { DelegationFacts, DelegationRuleT, DelegationVerdict } from "./delegation-rules.js";
 export { countUnapprovedSends, createAudit } from "./audit.js";
 export type { Audit, AuditEntry } from "./audit.js";
 export { nextRunAt } from "./cron.js";

@@ -1,31 +1,14 @@
 // A4 §5. No path runs without approval — this loop's only output is a single pending_approvals row.
+// US-C04: the allow-rule implementation (`delegationAllowed`, `AUTONOMY_MAX_MINUTES`) lives in
+// packages/kernel/src/delegation-rules.ts — one implementation, read by the hub's delegate
+// executor. This package cannot re-export it (biome.jsonc contract §1: no @omnis/kernel import
+// under packages/agents), so the guard coverage lives in the kernel's own test file.
 import { z } from "zod";
 import { buildContext } from "../context/assemble.js";
 import { renderBrief } from "../delegate/brief.js";
 import { registerLoop } from "../loop/registry.js";
 import type { LoopSpec, TriggerContext } from "../loop/spec.js";
 import { PROPOSE_TOOLS } from "../tools/propose.js";
-
-/** A4 §4.4: even with autonomy rules open, anything over 30 minutes goes through approval. */
-export const AUTONOMY_MAX_MINUTES = 30;
-
-export interface AutonomyRule {
-  runtime: string;
-  repo: string;
-}
-
-export function autonomyAllows(i: {
-  rules: AutonomyRule[];
-  runtime: string;
-  repo: string | null;
-  estMinutes: number;
-  hasEgress: boolean;
-}): boolean {
-  if (i.hasEgress) return false;
-  if (i.estMinutes > AUTONOMY_MAX_MINUTES) return false;
-  if (i.repo === null) return false;
-  return i.rules.some((r) => r.runtime === i.runtime && i.repo === r.repo);
-}
 
 export const DelegateOutput = z.object({
   runtime: z.enum(["claude_code", "codex", "claude_ds", "omnis"]), // B-D7: no hermes

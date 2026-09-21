@@ -301,7 +301,9 @@ describe("hub delegation executor (US-C03)", () => {
     await kernel.approvals.decide(id, { decision: "accept" });
     await exec.execute(id);
 
-    await until(async () => ((await approvalRow(id)).state !== "decided" ? true : null));
+    // Wait for the settled state, not for "no longer decided": the claim (`executing`) is a
+    // transient step before failExecution, and polling on `!== "decided"` can catch it.
+    await until(async () => ((await approvalRow(id)).state === "failed" ? true : null));
     const row = await approvalRow(id);
     expect(row.state).toBe("failed");
     expect(row.fail_reason).toBe("kill switch");
