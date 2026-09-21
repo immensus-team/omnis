@@ -17,7 +17,6 @@
 <p align="center">
   <img alt="Platform" src="https://img.shields.io/badge/PLATFORM-MACOS%20%C2%B7%20IPHONE-0EA5E9?style=for-the-badge&labelColor=555555">
   <img alt="Self-hosted" src="https://img.shields.io/badge/SELF--HOSTED-YOUR%20MACHINE-64748B?style=for-the-badge&labelColor=555555">
-  <a href="README.ko.md"><img alt="Korean" src="https://img.shields.io/badge/LANG-%ED%95%9C%EA%B5%AD%EC%96%B4-E11D48?style=for-the-badge&labelColor=555555"></a>
   <a href="README.md"><img alt="English" src="https://img.shields.io/badge/LANG-ENGLISH-2563EB?style=for-the-badge&labelColor=555555"></a>
 </p>
 
@@ -159,11 +158,11 @@ Evidence lands in [`tools/e2e/REPORT.md`](tools/e2e/REPORT.md). Without a hub, t
 
 **Phase A — done.** 35 stories: `@omnis/db`, `@omnis/kernel` (event bus, scheduler, approvals, kill switch, audit), `@omnis/protocol`, `@omnis/ui`, `@omnis/agents`, the first three adapters, and the `hub`, `local-agent` and `desktop` apps.
 
-**Phase B — W0 through W5 merged.** Migrations 0009–0013, the memory layer and identity resolution, local/Drive/GitHub ingestion, the loop runtime and tool palette, auto-archive and notifications, tasks, drafts, network, the nightly digest, cost reporting, settings, transcripts, unified search, and the hub's adapter registry. W4b — the remaining screens — is in progress.
+**Phase B — complete.** 45 stories, US-B01–US-B45, across W0–W5: migrations 0009–0014, the memory layer and identity resolution, local/Drive/GitHub ingestion, the loop runtime and tool palette, drafts, auto-archive and notifications, tasks, delegation, network, the nightly digest, cost reporting, settings, transcripts, unified search, the PWA and Web Push, the Outlook and Telegram adapters, the Hermes read-only session, the ops scripts, and the hub's adapter registry.
 
-**Evidence on main.** 193 test files / 1,568 tests passing; `pnpm lint` and `pnpm typecheck` clean; `pnpm e2e:phase-a` 38/38 across two consecutive runs, which is the idempotence check. Per-story status: [`docs/superpowers/plans/README.md`](docs/superpowers/plans/README.md).
+**Evidence on main.** 221 test files passing (1 skipped) / 1,956 tests passing (2 skipped); `pnpm lint` and `pnpm typecheck` clean; `pnpm e2e:phase-a` 34/34 across two consecutive runs, which is the idempotence check. Per-story status and what is deferred: [`docs/superpowers/plans/README.md`](docs/superpowers/plans/README.md).
 
-**Not yet true.** No message in this repo ever came from a live account. The iPhone client is a planned PWA, not a shipped binary. What is real is the gate: anything that would leave the machine is blocked on your approval, and that is implemented rather than aspirational.
+**Not yet true.** No message in this repo ever came from a live account — connecting one is the next step, and the Phase B exit metrics stay unmeasured until it happens. The iPhone client is a PWA served by the hub, not a shipped binary. What is real is the gate: anything that would leave the machine is blocked on your approval, and that is implemented rather than aspirational.
 
 ## Docs
 
