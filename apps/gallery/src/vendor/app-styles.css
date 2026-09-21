@@ -1685,6 +1685,7 @@ body {
 .agent-session-screen__system-log,
 .tool-call-badge,
 .approval-card,
+.reply-composer,
 .digest-card,
 .draft-card {
   margin-bottom: 12px;
@@ -1982,13 +1983,18 @@ body {
   color: var(--text-secondary);
 }
 
-.approval-card {
+.approval-card,
+.reply-composer {
   border: 1px solid var(--border-hairline-strong);
   border-radius: 12px;
   /* loop-r2-01/L2-37: the card's first paragraph used to carry the browser's 1em above it, so the
      card opened with a band of empty space before its own first line. The header below has no
      margin and the top padding is the trimmed one; the sides keep the 12px, so the header lines up
-     with the description and the body rather than sitting in its own indent. */
+     with the description and the body rather than sitting in its own indent.
+     loop-r2-03: the reply composer is in the same box. It becomes one of these cards the moment the
+     proposal lands — the card is drawn by the flow and this box is gone — so a box with a different
+     radius or padding would be a visible jump at the exact moment the person is watching for their
+     reply to appear. */
   padding: 8px 12px 12px;
 }
 
@@ -2044,9 +2050,12 @@ body {
 }
 
 /* The edit and respond fields. Opaque and one hairline, like every other input (v3 §e.4 — glass is
-   chrome, and a field is not chrome); `--bg-base` is the fill the rest of the app's inputs use. */
+   chrome, and a field is not chrome); `--bg-base` is the fill the rest of the app's inputs use.
+   loop-r2-03: the reply composer's textarea is the same field — one input style in the product, so
+   the selector was extended rather than a second copy written beside it. */
 .approval-card__editor,
-.approval-card__respond {
+.approval-card__respond,
+.reply-composer__editor {
   display: block;
   box-sizing: border-box;
   width: 100%;
@@ -2062,7 +2071,8 @@ body {
 }
 
 .approval-card__editor::placeholder,
-.approval-card__respond::placeholder {
+.approval-card__respond::placeholder,
+.reply-composer__editor::placeholder {
   color: var(--text-tertiary);
 }
 
@@ -2083,7 +2093,8 @@ body {
 }
 
 .approval-card__editor:focus-visible,
-.approval-card__respond:focus-visible {
+.approval-card__respond:focus-visible,
+.reply-composer__editor:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -2135,7 +2146,8 @@ body {
    primary decision — wherever the break happened to fall; the brief asks for one line with Approve
    first and primary. So the row stays on one line and, when it genuinely cannot fit, it scrolls
    inside the card (`overflow-x`) instead of pushing the card, or the pane, wider. */
-.approval-card__actions {
+.approval-card__actions,
+.reply-composer__actions {
   display: flex;
   flex-wrap: nowrap;
   gap: 8px;
@@ -2155,7 +2167,8 @@ body {
    because only this selector was written — so the rule is shared rather than copied, and the two
    cards cannot drift apart later. */
 .approval-card__actions button,
-.draft-card__actions button {
+.draft-card__actions button,
+.reply-composer__actions button {
   white-space: nowrap;
   border: var(--hairline);
   border-radius: 8px;
@@ -2174,7 +2187,8 @@ body {
    (`.confirm-prompt__button--confirm`, §c.8) — with the hairline dropped rather than drawn around
    the edge of a filled button. Read, edit and respond each lead with their primary; the ghosts
    after it keep the hairline. */
-.approval-card__actions button[data-variant="primary"] {
+.approval-card__actions button[data-variant="primary"],
+.reply-composer__actions button[data-variant="primary"] {
   border-color: transparent;
   background: var(--accent);
   color: var(--accent-fg);
@@ -2183,9 +2197,76 @@ body {
 /* A disabled decision has to look disabled. `Button` says so with Tailwind's `disabled:opacity-50`,
    and apps/desktop compiles no Tailwind — the utility is inert here, so the same intent is written
    out. Without it "Save & send" on an empty editor is a live-looking button that does nothing. */
-.approval-card__actions button:disabled {
+.approval-card__actions button:disabled,
+.reply-composer__actions button:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* loop-r2-03 — the reply composer. The box, the field and the buttons are the approval card's
+   (the rules above were extended to reach them); what is written here is only what the composer has
+   and the card does not: the destination line, the error line, the send chord's hint, and the
+   composer's own 3-to-12-row field. */
+.reply-composer__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* A long thread title shortens the text block, not the card — the same guard the card's header
+   carries. */
+.reply-composer__header-text {
+  min-width: 0;
+}
+
+/* A failed proposal is the one thing on this card that is not a decision, so it gets no pill: one
+   12px line under the field in the app's failure colour, the same one the quick-add's notice uses
+   for its failed half. The text above it is untouched — that is the point of showing it here. */
+.reply-composer__error {
+  margin: 6px 0 0;
+  color: var(--danger-500);
+  font-size: 12px;
+}
+
+/* The send chord, at the far end of the action row. `margin-left: auto` is the right alignment; on
+   a row that overflows (320px) an auto margin resolves to zero and this costs nothing. */
+.reply-composer__hint {
+  margin-left: auto;
+  align-self: center;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+/* The keys are not a table lookup — they are part of the sentence beside them, so they take its
+   font rather than the browser's monospace. No key cap: no border, no fill, no second radius (v3 §e
+   guard 11). */
+.reply-composer__hint kbd {
+  font: inherit;
+}
+
+/* Three lines to start, twelve at most. Same arithmetic as the card's editor (15px/1.45 plus the
+   field's 8px vertical padding and 1px border, twice), and the floor is written out rather than left
+   to `rows`: Chromium ignores `rows` the moment `field-sizing: content` applies. Three and not the
+   editor's four because a reply to a message in front of you is shorter than the message itself. */
+.reply-composer__editor {
+  resize: none;
+  field-sizing: content;
+  min-height: calc(3 * 1.45 * 15px + 18px);
+  max-height: calc(12 * 1.45 * 15px + 18px);
+  overflow-y: auto;
+}
+
+/* A phone has no ⌘ key. Telling a thumb about a chord it cannot press is noise, so the hint is not
+   drawn on a coarse pointer — the button beside it is the whole affordance there. The `kbd`s are
+   decoration on top of that and the hint is not a control, so nothing becomes unlabelled. */
+@media (pointer: coarse) {
+  .reply-composer__hint {
+    display: none;
+  }
 }
 
 /* US-D03 — the approval stack. It used to be a wall: every pending approval drew the identical
@@ -3497,8 +3578,10 @@ body {
   }
 
   /* §c.9 gives the pill `height: var(--bar-h)` here rather than the 44px it has at the top of the
-     list. Beside a 44px and a 52px circle, a 44px pill would sit 4px above the compose circle's
-     own centre and read as a different control. */
+     list: the band the list reserves for this bar is 56px + `--bar-h` + two gaps, and the pill is
+     the piece that fills the second term. loop-r2-03 took the 52px compose circle out of the row
+     (there is no recipient picker for a new message), so the pill is the only piece left that is
+     not a 44px circle — its height is now the bar's own height. */
   .bottom-bar .ask-bar__pill {
     height: var(--bar-h);
   }
@@ -3520,19 +3603,11 @@ body {
     cursor: pointer;
   }
 
-  /* §c.9's 52px compose circle — the one piece bigger than the pill's own radius would suggest,
-     because it is the bar's primary action.
-     `margin-left: auto` is what makes it the bar's *trailing* piece. While the ask pill is in the
-     row the pill's `flex: 1 1 auto` already takes every spare pixel, so this margin is zero and the
-     two are equivalent; it is kept for the case the slot is rendered without one, where the circle
-     would otherwise slide left to sit 8px after the filters. (The shell used to hand the bar no pill
-     whenever a thread was open — S5 removed that: the pane is a modal drawer now, so the ask bar
-     stays in the BottomBar and is covered by the scrim rather than replaced.) */
-  .bottom-bar__piece--compose {
-    width: 52px;
-    height: 52px;
-    margin-left: auto;
-  }
+  /* loop-r2-03/NC2-03: §c.9's 52px compose circle and its `margin-left: auto` are gone. The circle
+     was never rendered enabled — a new message needs a recipient picker that does not exist, so all
+     it could be was a disabled glyph under a tooltip that explained a phase — and the reviewers read
+     that as an unfinished product rather than as a gate. The ask pill's `flex: 1 1 auto` above is
+     what takes the width it gave back. */
 
   /* The same 0.55 floor the rail's gated tiles and the ask panel's un-wired actions use (the
      hallmark slop-test's floor): below it a control stops reading as gated and starts reading as

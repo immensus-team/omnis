@@ -401,14 +401,14 @@ describe("App shell bottom bars (US-D08 §c.9)", () => {
     expect(baseRule("[data-vaul-drawer].ask-panel")).toContain("bottom: 0;");
   });
 
-  // §c.9's three pieces: a 44px circle, a pill of --bar-h, a 52px circle. The pill's height is the
-  // one that has to be said here — it is 44px at the top of the list (`.ask-bar__pill`) and the
-  // bar's own rule is what raises it.
-  it("sizes the pieces as the brief does: 44px, --bar-h, 52px", () => {
+  // §c.9's pieces: a 44px circle and a pill of --bar-h. The pill's height is the one that has to be
+  // said here — it is 44px at the top of the list (`.ask-bar__pill`) and the bar's own rule is what
+  // raises it. loop-r2-03 removed the third piece (the 52px compose circle), so the two that remain
+  // are asserted and nothing else is.
+  it("sizes the pieces as the brief does: a 44px circle and a pill of --bar-h", () => {
     const css = narrowTier();
     expect(ruleBody(css, ".bottom-bar .ask-bar__pill")).toContain("height: var(--bar-h);");
     expect(ruleBody(css, ".bottom-bar__piece")).toMatch(/width: 44px;/);
-    expect(ruleBody(css, ".bottom-bar__piece--compose")).toMatch(/width: 52px;/);
   });
 
   // The panel used to open upward inside the shell, pinned to the bar's own gutters (a panel clipped
@@ -458,10 +458,12 @@ describe("App shell ask bar placement (US-D08 §c.9)", () => {
     expect(document.querySelector(".bottom-bar > .ask-bar")).not.toBeNull();
     expect(document.querySelectorAll(".ask-bar")).toHaveLength(1);
     // Both bars of the tier are on screen: the rail's fixed bar and, above it, the BottomBar with
-    // its two circles.
+    // the filters circle and the ask pill. NC2-03: no compose circle — a new message needs a
+    // recipient picker that does not exist, so the circle is not rendered rather than shown disabled,
+    // and the pill takes the width it used to share.
     expect(document.querySelector(".channel-rail")).not.toBeNull();
     expect(screen.getByRole("button", { name: "Filters" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Compose" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Compose" })).toBeNull();
   });
 });
 
@@ -616,14 +618,13 @@ describe("App shell thread toolbar tiers (US-D09 §c.5/§c.9)", () => {
     );
   });
 
-  // The compose circle is the bar's *trailing* piece, and the auto margin is what keeps it there.
-  // The pill's `flex: 1 1 auto` already takes every spare pixel, so with the ask bar in the row the
-  // margin is zero and the two are equivalent — it is kept for the case the slot is rendered without
-  // one, which is how the circle ended up 8px after the filters once before. (S5 removed the
-  // floating action bar that used to stand there, so that shot cannot repeat; the rule stays because
-  // the BottomBar takes its middle piece as children and is not the shell's private component.)
-  it("keeps the compose circle at the bar's trailing edge whatever the slot holds", () => {
-    expect(ruleBody(narrowTier(), ".bottom-bar__piece--compose")).toContain("margin-left: auto;");
+  // loop-r2-03/NC2-03: the compose circle is not rendered and its rules are gone with it. They were
+  // the 52px box and the `margin-left: auto` that made it the bar's trailing piece; leaving them in
+  // app.css would be a rule for a control that no longer exists, which is the dead-code half of the
+  // same defect the reviewers named (a disabled glyph under a tooltip explaining a phase). The pill
+  // is the bar's only grown piece now, which the rule above it already states.
+  it("leaves no compose circle in the bar or in app.css", () => {
+    expect(narrowTier()).not.toContain(".bottom-bar__piece--compose");
   });
 
   // S5's two new drawers, stated as the box `vaul` needs rather than as a look. The full height is
