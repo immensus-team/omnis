@@ -2329,6 +2329,115 @@ body {
 }
 
 /* ==========================================================================================
+   US-B29 §3.5 TaskRow — one todo, with where it came from.
+
+   The row is flat at rest: no hairline, no shadow, no card. A list of eight todos is read by
+   scanning the checkboxes down the left edge, and chrome on every row is what stops that scan
+   (SKILLS checklist 12 — the kinso rule that only the selected row elevates).
+
+   Nothing here is sized in a way that assumes a wide column: the row wraps, and every text slot
+   carries `overflow-wrap: anywhere`, because a task title is model-extracted from a message and
+   arrives as one long unbroken run often enough that `overflow-wrap` is not optional.
+   ========================================================================================== */
+.task-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  padding: 7px 6px;
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.task-row:hover {
+  background: var(--state-hover);
+}
+
+/* The native control, kept native (A5 §3.5: "not custom — native is safest for screen
+   reader/keyboard compatibility"). `align-self` puts the box back on the first line's centre: the
+   row aligns on the baseline so a wrapped second line does not drag the checkbox down with it. */
+.task-row__checkbox {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.task-row__kind {
+  flex: 0 0 auto;
+  align-self: center;
+  color: var(--text-secondary);
+}
+
+.task-row__title {
+  flex: 1 1 12ch;
+  min-width: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+/* A5 §3.5: the strikethrough is the visible half of done and the checkbox is the announced half. */
+.task-row__title[data-done="true"] {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+}
+
+.task-row__due,
+.task-row__source,
+.task-row__delegation-state,
+.task-row__session {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.task-row__due {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A5 §3.5's dashed underline for `due_basis='inferred'`: the date came from the model's reading of
+   the message, not from a person writing it down, and the two must not look alike. Dashed rather
+   than dotted at this size — a dotted 1px line under 12px text reads as a rendering artifact. */
+.task-row__due[data-due-basis="inferred"] {
+  text-decoration: underline dashed;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.task-row__source,
+.task-row__session {
+  border: none;
+  padding: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.task-row__source:hover,
+.task-row__session:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.task-row__source:focus-visible,
+.task-row__session:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+.task-row--blocked .task-row__delegation-state {
+  color: var(--warn-500);
+}
+
+/* ==========================================================================================
    US-B28 §3.4 Today — the morning briefing, today's schedule and the pending-approval strip on one
    screen. It is the Inbox card's twin: same 20px radius, same surface, same place in the shell's
    main column, so switching screens does not move the ground under the reader. The difference is
