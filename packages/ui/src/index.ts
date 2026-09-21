@@ -14,6 +14,7 @@ export * from "./components/sheet.js";
 export * from "./components/confirm-prompt.js";
 export * from "./lib/pointer-drag.js";
 export * from "./lib/rail-order.js";
+export * from "./lib/detail-pane.js";
 export * from "./lib/media-query.js";
 export * from "./components/approval-card.js";
 export * from "./components/attachment-card.js";
