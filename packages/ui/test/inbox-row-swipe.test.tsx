@@ -76,6 +76,14 @@ function move(row: HTMLElement, dx: number): void {
 function release(row: HTMLElement, dx: number): void {
   fireEvent.pointerUp(row, { pointerId: 1, clientX: 300 + dx, clientY: 100 });
 }
+/** A whole tap: down, up, and the click the browser adds at the end of it. Nothing moves, so the
+ *  primitive never starts a drag and the click is an ordinary one — which is the difference between
+ *  this and the click that follows a swipe (see the drag-click test below). */
+function tap(row: HTMLElement): void {
+  press(row, 0);
+  release(row, 0);
+  fireEvent.click(row);
+}
 
 function setup(over: Partial<typeof baseProps> = {}) {
   const { container } = render(<InboxRow {...baseProps} {...over} />);
@@ -152,6 +160,67 @@ describe("InboxRow swipe (US-D08 §c.4)", () => {
     expect(container.querySelector(".inbox-row--revealed")).not.toBeNull();
   });
 
+  // The browser's own order, which the tests above were missing: a release *also* delivers a click,
+  // because the press and the release share a target and the content sliding sideways does not
+  // change that. Measured in Chromium at 390: the point under the finger after a 60px swipe is
+  // inside `.inbox-row__action`'s box — the button rides the content, so it moves with it, and
+  // `opacity: 0` is not `pointer-events: none` — so every swipe ended by pressing the row's Archive
+  // button and archived the row it had only meant to reveal. The row swallows that click in the
+  // capture phase instead, wherever in the row it landed.
+  it("ignores the click the browser sends after its own drag, even on the row's action", () => {
+    const onArchive = vi.fn();
+    const onSelect = vi.fn();
+    const { container, row, at } = setup({ onArchive, onSelect });
+
+    press(row, -60);
+    release(row, -60);
+    // What a real 60px drag puts under the finger: the row's own button, which has slid with the
+    // content. Dispatched at the button, so it is the button's handler that would run first.
+    const action = container.querySelector(".inbox-row__action") as HTMLElement;
+    fireEvent.click(action);
+
+    expect(onArchive).not.toHaveBeenCalled();
+    expect(onSelect).not.toHaveBeenCalled();
+    // Still the revealed row, not the closed one the click would have produced.
+    expect(at()).toBe(-88);
+    expect(container.querySelector(".inbox-row--revealed")).not.toBeNull();
+
+    // And the swallow is spent: the next plain tap is an ordinary one.
+    tap(row);
+    expect(onSelect).not.toHaveBeenCalled(); // a revealed row closes on the first press
+    tap(row);
+    expect(onSelect).toHaveBeenCalledWith("thread-1");
+  });
+
+  // The latch is per gesture, and a gesture the browser takes away is still a gesture. A swipe that
+  // ends in `pointercancel` — the platform deciding the touch was a scroll after all — delivers no
+  // click, so nothing consumes the latch and the next, unrelated tap would be swallowed with it: a
+  // row that silently stops responding until it is swiped again.
+  it("does not let a swipe the browser cancelled swallow the next tap", () => {
+    const onSelect = vi.fn();
+    const { row } = setup({ onSelect });
+
+    press(row, -60);
+    fireEvent.pointerCancel(row, { pointerId: 1 });
+
+    tap(row);
+    expect(onSelect).toHaveBeenCalledWith("thread-1");
+  });
+
+  // The other side of the same latch: a tap that never became a drag must still reach the buttons
+  // inside the row, or the row's own Archive button would be pressable only after some other row
+  // had been swiped.
+  it("leaves a plain tap on the row's action alone", () => {
+    const onArchive = vi.fn();
+    const { container, row } = setup({ onArchive });
+
+    press(row, -3);
+    release(row, -3);
+    fireEvent.click(container.querySelector(".inbox-row__action") as HTMLElement);
+
+    expect(onArchive).toHaveBeenCalledWith("thread-1");
+  });
+
   // §c.4: "one row open at a time — opening a second closes the first." The two rows share no
   // props and no parent state, so this is the assertion that keeps the store they do share.
   it("closes the row that was revealed when another one is revealed", () => {
@@ -179,7 +248,7 @@ describe("InboxRow swipe (US-D08 §c.4)", () => {
 
   // The way back that does not depend on remembering the gesture — and the reason a revealed row is
   // not a row you can get stuck in.
-  it("closes the reveal on the next press instead of opening the thread", () => {
+  it("closes the reveal on the next tap instead of opening the thread", () => {
     const onSelect = vi.fn();
     const { row, at } = setup({ onSelect });
 
@@ -187,12 +256,13 @@ describe("InboxRow swipe (US-D08 §c.4)", () => {
     release(row, -60);
     expect(at()).toBe(-88);
 
-    fireEvent.click(row);
+    // A tap, not a bare click: the click that ends the swipe itself is the next test's business.
+    tap(row);
     expect(onSelect).not.toHaveBeenCalled();
     expect(at()).toBe(0);
 
-    // And the press after that is an ordinary one.
-    fireEvent.click(row);
+    // And the tap after that is an ordinary one.
+    tap(row);
     expect(onSelect).toHaveBeenCalledWith("thread-1");
   });
 

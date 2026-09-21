@@ -1,6 +1,13 @@
 import * as HoverCard from "@radix-ui/react-hover-card";
 import { Archive, RotateCcw } from "lucide-react";
-import { type CSSProperties, type RefObject, useEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { cn } from "../lib/cn.js";
 import { useNarrowShell } from "../lib/media-query.js";
 import { closeRow, openRow, useRowOpen } from "../lib/open-row.js";
@@ -209,11 +216,19 @@ export function InboxRow(props: InboxRowProps) {
   // resting state — it is what makes "one row open at a time" mean anything); anything shorter
   // springs back to nothing. Clamping is the whole of the other direction: a swipe begun on a
   // revealed row closes it on the same arithmetic, with no second code path for a right swipe.
-  const onPointerDown = swipeable
+  /** Whether the gesture that is currently running moved the row at all. `pointerDrag` calls
+   *  `onStart` only after its own 6px start slop, so an `onMove` is proof of a drag and a tap never
+   *  sets this — the primitive's threshold is the single source, and no second number is written
+   *  here. */
+  const dragged = useRef(false);
+  const startDrag = swipeable
     ? pointerDrag(
         {
           onStart: () => setDragX(0),
-          onMove: (dx) => setDragX(dx),
+          onMove: (dx) => {
+            dragged.current = true;
+            setDragX(dx);
+          },
           onEnd: (dx) => {
             setDragX(null);
             const landed = Math.min(0, Math.max(-SWIPE_OPEN_PX, restX + dx));
@@ -233,6 +248,32 @@ export function InboxRow(props: InboxRowProps) {
         { axis: "x" },
       )
     : undefined;
+
+  /** The latch belongs to one gesture, and a gesture begins at `pointerdown` — the same instant
+   *  `pointerDrag` starts tracking one. Clearing it here and not only when a drag starts is what
+   *  keeps a swipe that produced no click of its own (a `pointercancel` the browser took for a
+   *  scroll, an Escape mid-gesture) from swallowing the next tap's click: that tap is a new
+   *  gesture, and its own pointerdown is what says so. */
+  const onPointerDown =
+    startDrag === undefined
+      ? undefined
+      : (e: ReactPointerEvent): void => {
+          dragged.current = false;
+          startDrag(e);
+        };
+
+  /** A release after a swipe still delivers a click: the browser sends one whenever the press and
+   *  the release share a target, and the content sliding 60px sideways does not change the target.
+   *  Measured in Chromium at 390, and it is not cosmetic — after a 60px swipe the point under the
+   *  finger is inside `.inbox-row__action`'s own box (the button rides the content, so it moves
+   *  with it), and `opacity: 0` is not `pointer-events: none`. Every swipe therefore ended in a
+   *  click on the row's Archive button and archived a row the user only meant to reveal. Capture
+   *  phase, so it runs before the target's own handler wherever in the row the click landed. */
+  const swallowAfterDrag = (e: React.MouseEvent): void => {
+    if (!dragged.current) return;
+    dragged.current = false;
+    e.stopPropagation();
+  };
 
   /** §c.4: on a revealed row the first press closes the reveal instead of opening the thread — the
    *  way back that does not depend on remembering the gesture. At 900 and above nothing is ever
@@ -270,6 +311,7 @@ export function InboxRow(props: InboxRowProps) {
             x !== 0 && "inbox-row--revealed",
           )}
           onPointerDown={onPointerDown}
+          onClickCapture={swallowAfterDrag}
           onClick={activate}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
