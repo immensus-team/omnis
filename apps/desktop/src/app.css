@@ -3605,3 +3605,267 @@ button.today-screen__event-title:focus-visible {
     animation-name: fade-out;
   }
 }
+
+/* ==========================================================================================
+   US-B32 §3.8 Digest — the night's auto-archive, by category.
+   The accordion is the screen: a category line with its count, opening onto the items the
+   digest listed for it. Rows are flat (SKILLS checklist 12 — the kinso rule the Notes list
+   follows too); what marks an open category is the chevron and the samples under it, not a
+   surface, which is also what lets the shared count chip keep its --bg-elevated tint.
+   ========================================================================================== */
+.digest-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  /* Vertical only, as on Network/Notes/Tasks: `hidden` on the cross axis turns a wrapping miss
+     into a visible defect instead of a page-level scrollbar at 390. */
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 16px 20px;
+  border-radius: 20px;
+  box-shadow: var(--shadow-row-selected);
+}
+
+.digest-screen__banner {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.digest-screen__banner[data-state="error"] {
+  color: var(--danger-500);
+}
+
+.digest-screen__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.digest-screen__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* A restore that worked and one that did not are different sentences in the same slot: a status is
+   a fact (A5 §3.8 asks for role="status"), an alert is a fault. */
+.digest-screen__notice {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.digest-screen__notice[role="alert"] {
+  color: var(--danger-500);
+}
+
+.digest-screen__waiting,
+.digest-screen__empty {
+  margin: 0;
+  padding: 8px 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 60ch;
+}
+
+.digest-screen__groups {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.digest-screen__group {
+  min-width: 0;
+}
+
+.digest-screen__group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-width: 0;
+}
+
+/* The category line is the accordion control, and it holds a pill rather than a bare word: the
+   GroupHeader grammar (a tinted label plus a grey count chip) is what the Inbox groups its lists
+   with, and a category header is the same object. */
+.digest-screen__group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 3px 6px 3px 2px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.digest-screen__group-toggle:hover {
+  background: var(--state-hover);
+}
+
+.digest-screen__group-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* A reason is a free string of up to 40 characters (A4 §9.1), and the pill does not wrap; the cap
+   keeps a long one ellipsised inside the row instead of pushing the button past the viewport. */
+.digest-screen__group-toggle .status-pill {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.digest-screen__chevron {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+  transition: transform var(--dur-base) var(--ease-spring);
+}
+
+.digest-screen__group-toggle[aria-expanded="true"] .digest-screen__chevron {
+  transform: rotate(90deg);
+}
+
+/* The same grey chip .group-header__count draws (a number outside the pill, carrying density and
+   no tone) — see the comment above .status-pill. */
+.digest-screen__count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  text-align: center;
+}
+
+.digest-screen__action {
+  flex: 0 0 auto;
+  border: var(--hairline);
+  border-radius: 999px;
+  padding: 3px 12px;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.digest-screen__action:hover {
+  border-color: var(--border-hairline-strong);
+  background: var(--state-hover);
+}
+
+.digest-screen__action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* The count line sits under the label it belongs to, so it is indented past the chevron. */
+.digest-screen__samples {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  list-style: none;
+  margin: 2px 0 6px;
+  padding: 0 0 0 22px;
+  min-width: 0;
+}
+
+.digest-screen__sample {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 10px;
+  min-width: 0;
+  padding: 3px 0;
+}
+
+.digest-screen__sample-line {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  /* A snippet is cut to 90 characters server-side and can still hold an unbroken run. */
+  overflow-wrap: anywhere;
+}
+
+/* Restored items stay on screen — the digest is a record of the night and does not edit itself —
+   but they say so in words, not only in colour (§9 accessibility). */
+.digest-screen__sample[data-restored="true"] .digest-screen__sample-line {
+  color: var(--text-tertiary);
+}
+
+.digest-screen__sample-state {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.digest-screen__more {
+  padding: 3px 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.digest-screen__group[data-restored="true"] .digest-screen__count {
+  color: var(--text-tertiary);
+}
+
+/* A5 §3.8's monthly cost report — the UI exposure point of master §14's cost policy. The same
+   "the system has something to report" strip the Notes suggestion uses; the numbers are tabular so
+   month-to-date does not jitter when it changes. */
+.digest-screen__cost {
+  margin-top: auto;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+}
+
+.digest-screen__cost-line {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+@container shell (max-width: 899.98px) {
+  /* At 390 the label and its Restore button share about 320px; the button drops to its own line
+     rather than squeezing the category into an ellipsis. */
+  .digest-screen__group-head {
+    justify-content: flex-start;
+  }
+
+  .digest-screen__group-head .digest-screen__action {
+    margin-left: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .digest-screen__chevron {
+    transition: none;
+  }
+}

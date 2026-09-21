@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { decideApproval } from "./api/approvals.js";
 import { type SearchHit, search, toUiSearchGroups } from "./api/search.js";
 import { AgentSession } from "./screens/AgentSession.js";
+import { Digest } from "./screens/Digest.js";
 import { Inbox, type OpenTarget } from "./screens/Inbox.js";
 import { Network, PersonDetail } from "./screens/Network.js";
 import { Notes } from "./screens/Notes.js";
@@ -48,7 +49,7 @@ function useCommandPaletteKey(toggle: () => void) {
 
 /** The screens the shell can show. The rail switches between them by screen, not by route —
  *  there is no URL router in the desktop app (src-tauri loads one documents). */
-export type ShellScreen = "inbox" | "today" | "tasks" | "network" | "notes";
+export type ShellScreen = "inbox" | "today" | "tasks" | "network" | "notes" | "digest";
 
 export function App({ screen = "inbox" }: { screen?: ShellScreen }) {
   // Without ZeroProvider, useQuery dies with "useZero must be used within a ZeroProvider".
@@ -251,6 +252,11 @@ function Shell({ screen }: { screen: ShellScreen }) {
           // US-B31: no navigation leaves this screen — a note's target is a label, not a link (A5
           // §3.7), and the routing decision is taken in place.
           <Notes />
+        ) : screen === "digest" ? (
+          // US-B32: restoring here is an undo of the night's auto-archive, not navigation — the
+          // Thread header banner that would follow the restore is §3.2's story, so nothing is
+          // passed in for it yet.
+          <Digest />
         ) : screen === "tasks" ? (
           <Tasks
             onOpenSource={setSourceItemId}
