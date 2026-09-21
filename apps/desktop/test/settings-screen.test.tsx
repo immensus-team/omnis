@@ -3,6 +3,8 @@
 // environment and setup (the same situation as digest-screen.test.tsx and notes-screen.test.tsx).
 import "./setup";
 
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -23,6 +25,8 @@ import {
   quietHoursOf,
   settingsState,
 } from "../src/screens/Settings.js";
+
+const TEST_DIR = dirname(new URL(import.meta.url).pathname);
 
 // ─── the pure functions ─────────────────────────────────────────────────────────────────────────
 
@@ -173,6 +177,41 @@ describe("settingsState (the read's own state, the same shape Digest uses)", () 
     expect(settingsState(["complete", "unknown"])).toBe("loading");
     expect(settingsState(["complete"])).toBe("ready");
     expect(SETTINGS_BANNER.ready).toBe("");
+  });
+});
+
+// ─── the column's own layout contract ───────────────────────────────────────────────────────────
+
+// The settings card is one scrolling column: the head, the panes (sub-nav + section body) and the
+// kill switch. `.settings-screen__panes` used to be `flex: 1 1 auto; min-height: 0`, and `min-height:
+// 0` is exactly what lets a flex item shrink past its content — the panes' box shrank to the space
+// left over while the body inside kept `min-height: auto` and its full height, so the body spilled
+// out and the kill section (later in the DOM, pinned by `margin-top: auto`) painted over it. At 1440
+// that hid the GitHub repos input; at 390 the MacBook folders block came through the panel. Neither
+// horizontal reading moved, because nothing got wider.
+//
+// jsdom computes no layout, so this can only assert the declaration; the geometry — kill.top never
+// before body.bottom — is measured in a browser by `assertNoKillOverlap` in
+// tools/e2e/shots-w4b-settings.ts, on both frames and on all four slop-test widths.
+describe("the settings column (the kill switch must not paint over the body)", () => {
+  const css = readFileSync(join(TEST_DIR, "../src/app.css"), "utf8");
+  // Anchored at a line start, so the wide-shell `@container` redeclaration (indented) is not the one
+  // read — the same match the inbox strip's stylesheet cases use.
+  const ruleFor = (selector: string): string =>
+    css.match(new RegExp(`\\n${selector} \\{([^}]*)\\}`))?.[1] ?? "";
+
+  it("keeps the panes at their content height, so the body can never spill out", () => {
+    const panes = ruleFor("\\.settings-screen__panes");
+    expect(panes).toContain("flex: 0 0 auto");
+    expect(panes).not.toContain("min-height: 0");
+  });
+
+  it("scrolls the screen itself and keeps the kill switch pinned when the section is short", () => {
+    // The `0 0 auto` above only works because something still scrolls: with the panes at content
+    // height, the card is the scroll container. `margin-top: auto` is what puts the kill switch at
+    // the foot when the content does not fill the screen — the behaviour the shrink used to fake.
+    expect(ruleFor("\\.settings-screen")).toContain("overflow-y: auto");
+    expect(ruleFor("\\.settings-screen__kill")).toContain("margin-top: auto");
   });
 });
 

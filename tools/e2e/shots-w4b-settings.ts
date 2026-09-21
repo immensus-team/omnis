@@ -352,13 +352,56 @@ async function verify(page: Page, after: Seeded, wrote: boolean): Promise<void> 
   }
 }
 
-/** One frame plus the horizontal-overflow reading. Measured before the shutter, not after: at 1440 and
- *  at 390 anything past the edge is a defect, and a run that fails on it should not leave the frame
- *  behind for someone to commit. */
+/** The vertical half of the frame's geometry, and the defect no horizontal reading can see.
+ *
+ *  `.settings-screen` is a scrolling column flex box, and `.settings-screen__panes` was `flex: 1 1
+ *  auto; min-height: 0` inside it. `min-height: 0` is what lets a flex item shrink past its content:
+ *  the panes' *box* shrank to the space left over, while the body inside them kept `min-height:
+ *  auto` and its full content height, so the body spilled out of the panes and the Kill switch —
+ *  later in the DOM, pinned to the foot by `margin-top: auto` — painted on top of it. Both frames of
+ *  the previous attempt show it and neither overflow reading moves, because nothing got wider: at
+ *  1440 the GitHub repos input hid under the panel, at 390 the MacBook folders block came through it.
+ *
+ *  So the two boxes are compared directly. `killTop` must not come before `bodyBottom`; when it does,
+ *  the body's last pixels are painted over. Measured before the shutter, for the same reason the
+ *  overflow reading is: a run that fails here should not leave a frame behind to be committed.
+ *
+ *  `page.evaluate` ships this source to the page, and `tsx`'s esbuild pass rewrites a nested arrow
+ *  into `__name(arrow, ...)`, which does not exist there — so the body stays inline (see
+ *  tools/e2e/overflow.ts, which hit exactly that). */
+function measureKillOverlap(): { killTop: number; bodyBottom: number } | null {
+  const kill = document.querySelector(".settings-screen__kill");
+  const body = document.querySelector(".settings-screen__body");
+  if (kill === null || body === null) return null;
+  return {
+    killTop: kill.getBoundingClientRect().top,
+    bodyBottom: body.getBoundingClientRect().bottom,
+  };
+}
+
+/** Throw when the kill section starts above the body's last pixel. The tolerance is for subpixel
+ *  rounding only — a correct layout puts the two boxes a `gap` apart, never within half a pixel. */
+function assertNoKillOverlap(
+  where: string,
+  report: { killTop: number; bodyBottom: number } | null,
+): void {
+  if (report === null) {
+    throw new Error(`the settings body or kill section is missing at ${where}`);
+  }
+  if (report.killTop < report.bodyBottom - 0.5) {
+    throw new Error(
+      `the kill section covers the settings body at ${where}: it starts at y=${report.killTop.toFixed(1)} ` +
+        `but the body ends at y=${report.bodyBottom.toFixed(1)}`,
+    );
+  }
+}
+
+/** One frame plus both geometry readings. */
 async function shoot(page: Page, label: string): Promise<void> {
   await page.waitForTimeout(700);
   const overflow = await page.evaluate(measureOverflow);
   assertNoOverflow(`settings at ${label}px`, overflow);
+  assertNoKillOverlap(`settings at ${label}px`, await page.evaluate(measureKillOverlap));
   console.log(`  settings-${label}.png — ${describeOverflow(overflow)}`);
   await page.screenshot({ path: join(OUT, `settings-${label}.png`) });
 }
@@ -379,6 +422,13 @@ async function sweep(browser: Browser, pool: Pool): Promise<void> {
       for (const label of ["Accounts", "Autonomy", "Model tiers", "General"]) {
         await openTab(page, label);
         const overflow = await page.evaluate(measureOverflow);
+        // The overlap is section-dependent — the tallest body (Autonomy's allowlist) is the one that
+        // spills out of a shrunken panes box — so every section is checked at every width, not just
+        // the two the frames are of.
+        assertNoKillOverlap(
+          `settings / ${label} at ${String(width)}px`,
+          await page.evaluate(measureKillOverlap),
+        );
         assertNoOverflow(`settings / ${label} at ${String(width)}px`, overflow);
         console.log(`  ${String(width)}px ${label} — ${describeOverflow(overflow)}`);
       }

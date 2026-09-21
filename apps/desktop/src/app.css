@@ -3921,13 +3921,20 @@ button.today-screen__event-title:focus-visible {
 
 /* The sub-nav and the section body. One column at every width: a settings form is a list of
    labelled controls, and splitting it into cards is the "SaaS card kit" the design checklist rules
-   out. The wide shell turns this wrapper into the reference's two-column layout. */
+   out. The wide shell turns this wrapper into the reference's two-column layout.
+
+   `0 0 auto`, not `1 1 auto` + `min-height: 0`. This wrapper sits in the scrolling column
+   `.settings-screen`, and `min-height: 0` is exactly what lets a flex item shrink past its content:
+   the box shrank to the space left over while `.settings-screen__body` kept `min-height: auto` and
+   its full content height, so the body spilled out of this box and the Kill switch — later in the
+   DOM, pinned to the foot by `margin-top: auto` — painted over it (the GitHub repos input at 1440,
+   the MacBook folders block at 390). At its content height the screen scrolls as one column and the
+   kill section follows the body; `margin-top: auto` still pins it when the section is short. */
 .settings-screen__panes {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
   min-width: 0;
 }
 
