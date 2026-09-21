@@ -374,12 +374,19 @@ function InlinePalette({
    *  before `onFocus` opens the panel, so by the time this runs the input *is* the active element —
    *  and storing it would make Escape focus what it is already focused on, which is the same as
    *  leaving focus where the (now closed) panel put it. The previous answer is kept instead: press
-   *  the bar while reading a thread and Escape still returns to the thread's row. */
+   *  the bar while reading a thread and Escape still returns to the thread's row.
+   *
+   *  And `<body>` is the same case said another way: it is what "nothing is focused" looks like, and
+   *  it is connected, so storing it makes the check below pass and the fallback unreachable — a
+   *  cold ⌘K (`document.activeElement` on `<body>`) would put the caret back on `<body>`, which is
+   *  the bug this function exists to fix. Nothing is what the previous answer keeps. */
   const openerRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (!open) return;
     const active = document.activeElement;
-    if (active instanceof HTMLElement && active !== inputRef.current) openerRef.current = active;
+    if (active instanceof HTMLElement && active !== document.body && active !== inputRef.current) {
+      openerRef.current = active;
+    }
   }, [open]);
 
   /** loop-r2-08/L2-14: Escape gives the focus back. Without this, closing the panel dropped it to
@@ -395,7 +402,14 @@ function InlinePalette({
    *  open from a row that a `g`-key has since replaced, and a `focus()` on a detached node is a
    *  silent no-op that leaves the focus on `<body>` again — the bug, quietly restored. The row is
    *  found exactly the way the Inbox finds it (`[role="option"]` with `aria-selected="true"`), so
-   *  the two cannot disagree about which row "the selected one" is. */
+   *  the two cannot disagree about which row "the selected one" is.
+   *
+   *  Scoped to `#inbox-list`, and that is load-bearing rather than tidy: cmdk's own items are
+   *  `role="option"` with `aria-selected="true"` as well, they sit *earlier* in the document than
+   *  the list does (the ask bar is above the screen body, and the wide tier's panel is a card rather
+   *  than a portal), and cmdk puts no `tabindex` on them — so a document-wide query matches one of
+   *  those first and `.focus()` on it is a silent no-op. The fallback would then do nothing on
+   *  exactly the close it exists for. */
   function returnFocusAfterClose(): void {
     const opener = openerRef.current;
     openerRef.current = null;
@@ -404,7 +418,9 @@ function InlinePalette({
       opener.focus();
       return;
     }
-    document.querySelector<HTMLElement>('[role="option"][aria-selected="true"]')?.focus();
+    document
+      .querySelector<HTMLElement>('#inbox-list [role="option"][aria-selected="true"]')
+      ?.focus();
   }
   /** loop-r2-04 (L2-13): a press on the bar is what opens the panel, and this is the flag that tells
    *  the press's focus from a focus nobody pressed for. Tab onto the bar used to open the panel,

@@ -675,8 +675,17 @@ export function Inbox({
         // Deferred a frame for the same reason `moveTo` is: the row only returns to the list on
         // this commit, and the virtualiser mounts it a layout effect later.
         requestAnimationFrame(() => {
-          const row = document.querySelector(`[data-thread-id="${undoEntry.id}"]`);
-          if (row instanceof HTMLElement) row.focus({ preventScroll: true });
+          // loop-r2-08/L2-28, one key over from the `u` path above: an undo made *while the Archived
+          // view is up* takes its thread out of the list that is on screen. The row is still mounted
+          // for its leave animation, so focusing it works — and then the leave timer unmounts it and
+          // the focus falls to `<body>`, which is the symptom requirement 7 exists for. A restored
+          // row is never a target worth keeping here, so the screen's own `h1` takes the focus
+          // instead: same element, and the same reading, as the empty Archived list's fallback.
+          const target =
+            view === "archived"
+              ? document.querySelector(".inbox-card__title")
+              : document.querySelector(`[data-thread-id="${undoEntry.id}"]`);
+          if (target instanceof HTMLElement) target.focus({ preventScroll: true });
         });
       }
 
@@ -695,7 +704,7 @@ export function Inbox({
         },
       });
     },
-    [notify, threadRows],
+    [notify, threadRows, view],
   );
 
   /** The keyboard's undo — `z` and ⌘Z, the toast's twin. It takes the newest entry off the stack and

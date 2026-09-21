@@ -13,7 +13,7 @@
 //   OMNIS_E2E_DB=omnis_test_loop_r2_impl pnpm tsx tools/e2e/shots-loop-r2-08.ts
 //   (desktop http://127.0.0.1:5673, the same stack r2-05..r2-07 shot against)
 //
-// Seven checks, in the order a person hits them:
+// Eight checks, in the order a person hits them:
 //   1. `j j` (row 2 selected), `g t`: the focus is Today's `h1` and the words are the greeting's —
 //      it used to be `<body>`, so the next Tab restarted at the top of the document.
 //   2. `g i`: the focus is back on row 2, the row that was left (L2-09, NC2-10). The Inbox
@@ -26,6 +26,10 @@
 //   5. Row 2, `⌘K`, `Esc`: the caret is back on row 2. The palette captured the opener on open and
 //      returns it on close; `returnFocusToOpener` on the *drawer* stays off, because a reopen loop
 //      is what that flag's default buys below 900.
+//  5b. The same close with nothing focused: `⌘K`, `Esc` lands on the Inbox's own selected row. The
+//      fallback is the half that a document-wide query gets wrong — cmdk's rows are `role="option"`
+//      with `aria-selected="true"` too and sit earlier in the document, and they have no tabindex,
+//      so `.focus()` on one of those does nothing at all.
 //   6. `e`, `j`, `e`, `⌘Z`, `⌘Z`: both threads are `archived_at IS NULL` again, and a third `⌘Z`
 //      posts nothing. The undo used to be a one-level toggle that re-armed itself with the inverse,
 //      so the second `⌘Z` re-archived the thread the first had just restored (L2-10, NC2-09).
@@ -414,6 +418,23 @@ async function main(): Promise<void> {
     console.log(
       `  the palette closed back onto ${returned.threadId ?? "?"}, the row it was opened over`,
     );
+
+    // ---- 5b. and the other half of the restore: nothing was focused to return to ---------------
+    // The opener is half the answer. The other half is the Inbox's own selected row, for the close
+    // where the opener is gone — a cold ⌘K (nothing focused), or a row a `g`-key has since replaced.
+    // `blur()` is the cold state said exactly: `document.activeElement` back on `<body>`.
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    const nothingFocused = await selectedId(page);
+    if (nothingFocused === null) throw new Error("no row is selected to fall back to");
+    await page.keyboard.press("Meta+k");
+    await page.locator(".ask-panel__glass").first().waitFor({ timeout: 10_000 });
+    await page.keyboard.press("Escape");
+    const fellBack = await waitForFocus(
+      page,
+      (a) => a.threadId === nothingFocused,
+      "`⌘K` with nothing focused, then `Esc`, lands on the Inbox's selected row",
+    );
+    console.log(`  the fallback closed onto ${fellBack.threadId ?? "?"}, the list's own selection`);
 
     // ---- 6a. archive with `e`: the toast names the thread, the next row takes the focus --------
     const firstId = beforePalette.threadId;

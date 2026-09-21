@@ -193,6 +193,42 @@ describe("Inbox archive/restore (US-A36)", () => {
     expect(document.activeElement).toBe(heading);
   });
 
+  /** loop-r2-08/L2-28: requirement 7 is not only the `u` key's path. The undo stack restores a
+   *  thread from the Archived view as well, and the row it brings back *leaves that list* — so the
+   *  row is a target that exists for one leave animation and then unmounts, taking the focus to
+   *  `<body>` with it: the same symptom, one key over. Real timers, because what has to be shown is
+   *  the focus *after* the animation has run out. */
+  const settleLeave = async (): Promise<void> => {
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, LEAVE_MS + 60));
+    });
+  };
+
+  it("moves the focus to the heading when ⌘Z restores out of the Archived view (L2-28)", async () => {
+    renderInbox();
+    // An archive to take back, made where a user makes one — and then the Archived view, which is
+    // where that thread now is and where the restore therefore happens.
+    fireEvent.click(screen.getByRole("option", { name: /New mail/ }));
+    fireEvent.keyDown(window, { key: "e" });
+    expect(url(0)).toContain(`/api/threads/${THREAD_A}/archive`);
+    await settleLeave();
+
+    fireEvent.click(archivedPill());
+    expect(rowNames()).toEqual(["New mail", "Older mail"]);
+    fireEvent.keyDown(window, { key: "z", metaKey: true });
+    expect(url(1)).toContain(`/api/threads/${THREAD_A}/unarchive`);
+
+    // The frame the row is back on is not the answer: it is still mounted for its leave animation,
+    // so the row would be focused here and the unmount below would be what loses it.
+    await nextFrame();
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(document.activeElement).toBe(heading);
+
+    await settleLeave();
+    expect(document.activeElement).toBe(heading);
+    expect(rowNames()).toEqual(["Older mail"]);
+  });
+
   it("the hover action archives the row it belongs to without opening it", () => {
     vi.useFakeTimers();
     const onOpen = vi.fn();

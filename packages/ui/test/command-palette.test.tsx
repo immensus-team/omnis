@@ -224,6 +224,105 @@ describe('CommandPalette mode="inline", the narrow tier (motion-OSS S5)', () => 
   });
 });
 
+// loop-r2-08 (L2-14, NC2-11): the other half of the restore above — Escape hands the caret back to
+// what had it. Two things make that a restore rather than a hope, and neither had a test. The opener
+// is only worth storing if it is something the user was *on*: `<body>` is what "nothing is focused"
+// looks like, it is connected, and `body.focus()` puts the caret back on nothing — so a cold ⌘K would
+// have made the fallback below unreachable. And the fallback has to resolve to the Inbox's row rather
+// than to one of the palette's own options: cmdk's items are `role="option"` with
+// `aria-selected="true"` too, they sit *earlier* in the document than the list does (the ask bar is
+// above the screen body, and the wide tier's panel is a card rather than a portal), and cmdk puts no
+// `tabindex` on them — so a document-wide query matches one of those first, and `.focus()` on a
+// `role="option"` div without a tabindex is a silent no-op that leaves the caret exactly where the
+// bug left it. The fake list below is the Inbox's own shape: the scroller carries `#inbox-list`
+// (Inbox.tsx) and the rows are its `aria-selected` options.
+describe('CommandPalette mode="inline", Escape hands the focus back (loop-r2-08)', () => {
+  /** The Inbox's selected row, in the shape the fallback reads it: inside `#inbox-list` (the id the
+   *  Inbox puts on the scroller) and `aria-selected`. `tabIndex={-1}` is what makes a `role="option"`
+   *  div focusable at all — the roving tab stop the Inbox builds, and the reason a `focus()` on it
+   *  lands where a `focus()` on cmdk's own options does not. */
+  const inboxList = (
+    <div id="inbox-list">
+      <div role="option" aria-selected="true" tabIndex={-1} data-testid="inbox-row" />
+    </div>
+  );
+
+  /** The panel's own rows, one query away: `actions={[]}` makes any query a search, and a hit is a
+   *  cmdk item — a `role="option"` with `aria-selected="true"` and no tabindex, the decoy the scope
+   *  exists for. This is the real markup rather than a stand-in for it. It is rendered first, the
+   *  way the ask bar sits above the screen body in App.tsx. */
+  const groups: UiSearchGroup[] = [
+    { kind: "threads", label: "Threads", results: [hit("thread", "t1", "omnis launch sync", "")] },
+  ];
+
+  /** `open` follows `onOpenChange`, so Escape really closes it — and the palette is opened by a
+   *  click on a plain button rather than by a press on the bar, which is the cold case: a click in
+   *  jsdom leaves `document.activeElement` on `<body>`. */
+  function Harness() {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)}>
+          open the palette
+        </button>
+        <CommandPalette
+          mode="inline"
+          open={open}
+          onOpenChange={setOpen}
+          actions={[]}
+          search={{ groups, loading: false, onQueryChange: () => {}, onSelectHit: () => {} }}
+        />
+      </>
+    );
+  }
+
+  it("falls back to the Inbox's selected row when nothing was focused to return to", () => {
+    render(
+      <>
+        <Harness />
+        {inboxList}
+      </>,
+    );
+    expect(document.activeElement).toBe(document.body);
+
+    fireEvent.click(screen.getByText("open the palette"));
+    fireEvent.change(askInput(), { target: { value: "launch" } });
+    // The precondition that makes the scope load-bearing rather than tidy: the document-wide query
+    // the fallback used to run resolves to one of the panel's own rows, not to the Inbox's.
+    expect(document.querySelector('[role="option"][aria-selected="true"]')).not.toBe(
+      screen.getByTestId("inbox-row"),
+    );
+
+    fireEvent.keyDown(askInput(), { key: "Escape" });
+
+    expect(document.activeElement).toBe(screen.getByTestId("inbox-row"));
+  });
+
+  it("gives the caret back to what it was on when the palette opened", async () => {
+    render(
+      <>
+        <Harness />
+        {inboxList}
+      </>,
+    );
+    // A row the user was reading, focused the way the Inbox focuses one, and *not* the row the
+    // fallback would pick — so the two answers cannot be confused for each other.
+    const reading = document.createElement("div");
+    reading.id = "reading";
+    reading.tabIndex = -1;
+    document.body.appendChild(reading);
+    try {
+      await act(async () => reading.focus());
+      fireEvent.click(screen.getByText("open the palette"));
+      fireEvent.keyDown(askInput(), { key: "Escape" });
+
+      expect(document.activeElement).toBe(reading);
+    } finally {
+      reading.remove();
+    }
+  });
+});
+
 describe('CommandPalette mode="inline" model picker persistence (US-D01)', () => {
   // test/setup.ts's in-memory Storage survives for the whole file — empty it between tests.
   beforeEach(() => localStorage.clear());
