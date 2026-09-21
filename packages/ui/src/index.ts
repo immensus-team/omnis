@@ -42,7 +42,12 @@ export * from "./components/approval-stack.js";
 // US-B33: the Settings screen names each connected account's channel and draws its mark. Both
 // already exist (the rail and every inbox row render from them), so they are fronted here rather
 // than copied into the app.
-export { CHANNEL_LABEL } from "./lib/row-meta.js";
+//
+// US-C05: RUNTIME_LABEL is fronted for the same reason — the Settings delegation editor names a
+// runtime, and RUNTIME_LABEL is the app's one set of runtime names (the inbox rows and the agent
+// session badges already render from it). A second map in the app would be a second answer to
+// "what is claude_ds called".
+export { CHANNEL_LABEL, RUNTIME_LABEL } from "./lib/row-meta.js";
 export * from "./components/channel-glyph.js";
 export * from "./components/detail-pane.js";
 export { ChevronRight as ChevronRightIcon } from "lucide-react";

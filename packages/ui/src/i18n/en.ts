@@ -1,7 +1,9 @@
 import type { Dictionary } from "./types.js";
 
-/** A5 §8 마이크로카피 표의 영어 원문 — 병기용이 아니라 코드/aria-label에 실제로 쓰는 값이다.
- * 키 형태는 ko와 동일해야 하며(`const en: Dictionary`), 빠지거나 남으면 컴파일 에러가 난다. */
+/** The English source of A5 §8's microcopy table — these are the strings the UI actually renders,
+ * not a parallel gloss. The key shape has to match ko's exactly (`const en: Dictionary`), so a key
+ * missing here or left over there is a compile error; packages/ui/test/i18n.test.ts checks the same
+ * invariant at runtime, and that the two locales agree on every `{variable}`. */
 export const en: Dictionary = {
   common: {
     draftCard: {
@@ -87,6 +89,22 @@ export const en: Dictionary = {
     },
     autonomy: {
       allowToggle: "Allow autonomy",
+    },
+    // US-C05 / A4 §4.4: the delegation allow-rule editor on the Autonomy tab. The dialog's Cancel
+    // button is not repeated here — `common.dialog.cancel` is the same word, and a second key for
+    // one string is how two copies of it come to disagree.
+    delegation: {
+      title: "Delegation",
+      empty: "No runtime runs without your approval.",
+      add: "Add rule",
+      runtime: "Runtime",
+      host: "Host",
+      repo: "Repository path",
+      remove: "Remove",
+      warning:
+        "Delegations to this runtime in this repository will run without approval. Continue?",
+      allow: "Allow",
+      hermesHint: "Needs the Hermes approval check first",
     },
     modelTiers: {
       spentHeading: "Spend this month",

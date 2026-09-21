@@ -19,6 +19,7 @@ import {
   setKillSwitch,
 } from "../api/settings.js";
 import { type ZeroClient, useZeroClient } from "../zero-client.js";
+import { DelegationRules } from "./settings/DelegationRules.js";
 
 // ─── the four sub-nav sections (A5 §3.9) ────────────────────────────────────────────────────────
 
@@ -520,6 +521,20 @@ export function Settings() {
                   })}
                 </ul>
               </div>
+
+              {/* US-C05: A4 §4.4's delegation rules, the second half of "what may run without
+                  asking". They are their own key (`delegation.allow_rules`), not entries in
+                  `autonomy.rules` above: the hub's delegate executor reads them through the kernel's
+                  `parseDelegationRules`, and the channel switches on this screen write the whole
+                  `autonomy.rules` array — two writers on one key is how a rule goes missing. The
+                  component owns the parsing of whatever the column holds. */}
+              <DelegationRules
+                rules={settings["delegation.allow_rules"]}
+                hermesEnabled={settings["delegation.hermes_enabled"] === true}
+                onSave={async (next) => {
+                  await write("delegation.allow_rules", next, "Delegation rules saved.");
+                }}
+              />
 
               <div className="settings-screen__field">
                 <h2 className="settings-screen__label">Ingest allowlist</h2>

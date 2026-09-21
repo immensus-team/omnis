@@ -113,6 +113,21 @@ export const ko = {
       // §3.9는 "이 채널/사람에게는 …"으로 조금 더 길지만 표가 정본이라 중복 정의하지 않는다.
       allowToggle: "자율 허용",
     },
+    // US-C05 / A4 §4.4: 자율 실행 탭의 위임 허용 규칙 편집기. 다이얼로그의 Cancel 버튼은 여기서
+    // 중복 정의하지 않는다 — common.dialog.cancel이 같은 단어이고, 한 문자열에 키가 둘이면 둘이
+    // 갈라지는 순간이 온다.
+    delegation: {
+      title: "위임",
+      empty: "승인 없이 실행되는 런타임은 없습니다.",
+      add: "규칙 추가",
+      runtime: "런타임",
+      host: "호스트",
+      repo: "저장소 경로",
+      remove: "삭제",
+      warning: "이 저장소에서 이 런타임으로 보내는 위임은 승인 없이 실행됩니다. 계속할까요?",
+      allow: "허용",
+      hermesHint: "Hermes 승인 확인이 먼저 필요합니다",
+    },
     modelTiers: {
       spentHeading: "이번 달 현재 지출",
       spent: "{amount} 사용",

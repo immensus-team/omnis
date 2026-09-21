@@ -5797,6 +5797,15 @@ button.today-screen__event-title:focus-visible {
   font-size: 13px;
 }
 
+/* US-C05: one delegation rule, read as the sentence it is ("Claude Code on the MacBook in
+   /Users/…"). `anywhere` and `min-width: 0` are both load-bearing: an absolute path is one
+   unbroken run and a flex item's automatic minimum size would hold it at its full width, which is
+   SKILLS.md gate 11 — one sideways scrollbar at 320/375/414/768 and the task fails. */
+.settings-screen__rule {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* The switch is the native-looking one this app already draws elsewhere: a track and a knob, state
    on `aria-checked` and never on colour alone (A5 §9). */
 .settings-screen__switch {
