@@ -284,6 +284,8 @@ function settingsPayload(overrides: Record<string, unknown> = {}): Record<string
     "ingest.github_repos": [],
     "autonomy.rules": [],
     "kakao.send_enabled_at": null,
+    // US-C16: seeded false by 0015_phase_c.sql and edited from General.
+    "import.terminal_sessions": false,
     ...overrides,
   };
 }
@@ -567,6 +569,22 @@ describe("Settings screen (A5 §3.9)", () => {
 
     await vi.waitFor(() => {
       expect(vi.mocked(api.putSetting)).toHaveBeenCalledWith("archive.t1_confidence_min", 0.9);
+    });
+  });
+
+  it("ships the terminal-session import off and turns it on from General (US-C16)", async () => {
+    render(<Settings />);
+    await ready();
+    tab("General");
+
+    // C-D7: read-only or not, the import reads someone's terminals, so it is opt-in — the switch
+    // starts off and only the person's own click writes the key the job gates on.
+    const toggle = screen.getByRole("switch", { name: "Show terminal sessions (read-only)" });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    fireEvent.click(toggle);
+    await vi.waitFor(() => {
+      expect(vi.mocked(api.putSetting)).toHaveBeenCalledWith("import.terminal_sessions", true);
     });
   });
 

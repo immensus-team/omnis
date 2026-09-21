@@ -1676,6 +1676,9 @@ body {
 .thread-screen__item,
 .agent-session-screen__turn,
 .agent-session-screen__system-log,
+/* US-C16: the read-only badge is one more block of this timeline's rhythm, not a surface with
+   spacing of its own — the header above it already owns the 16px under the hairline. */
+  .agent-session-screen__readonly,
 .tool-call-badge,
 .approval-card,
 .digest-card,

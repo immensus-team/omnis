@@ -785,6 +785,34 @@ export function Settings() {
                   />
                 </div>
               </div>
+
+              {/* US-C16 (C-D7): reading someone's terminals is opt-in whatever the mode, so this
+                  ships off (`SETTING_DEFAULTS`, 0015_phase_c.sql) and reads as off until a stored
+                  `true` says otherwise. */}
+              <div className="settings-screen__field">
+                <h2 className="settings-screen__label">Terminal sessions</h2>
+                <p className="settings-screen__hint">
+                  Imports Claude Code and Codex transcripts from your hosts every five minutes. They
+                  arrive as read-only sessions, and nothing is sent back to them.
+                </p>
+                <div className="settings-screen__switch-row">
+                  <span>Show terminal sessions (read-only)</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={settings["import.terminal_sessions"] === true}
+                    aria-label="Show terminal sessions (read-only)"
+                    className="settings-screen__switch"
+                    onClick={() =>
+                      void write(
+                        "import.terminal_sessions",
+                        settings["import.terminal_sessions"] !== true,
+                        "Terminal import saved.",
+                      )
+                    }
+                  />
+                </div>
+              </div>
             </section>
           )}
         </div>

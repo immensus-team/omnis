@@ -161,26 +161,33 @@ export interface AgentItemInput {
   session: SessionRow;
   /** items.external_id. The same item arrives twice, started → completed, so it needs an idempotency key. */
   externalId: string;
+  /** items.source_hash, the adapter-side idempotency key (0002). US-C16's import keys on the vendor's
+   *  own turn id; the runtimes' live path leaves it unset. */
+  sourceHash?: string | null;
   kind: "agent_turn" | "tool_call" | "system";
   body: string;
   tool: Record<string, unknown> | null;
 }
 
-export async function writeAgentItem(pool: Pool, i: AgentItemInput): Promise<void> {
-  await tx(pool, async (c) => {
+/** Returns whether this call inserted the row rather than merging into one already there — the
+ *  import job reports what arrived, and a merge is not an arrival. */
+export async function writeAgentItem(pool: Pool, i: AgentItemInput): Promise<boolean> {
+  return await tx(pool, async (c) => {
     // Do not overwrite body with an empty string: started has no body, completed fills it in.
-    await query(
+    const rows = await query<{ inserted: boolean }>(
       c,
-      `INSERT INTO items (thread_id, account_id, external_id, kind, status, author_agent_id,
-                          body, tool, sent_at)
-         VALUES ($1, $2, $3, $4, 'received', $5, $6, $7::jsonb, now())
+      `INSERT INTO items (thread_id, account_id, external_id, source_hash, kind, status,
+                          author_agent_id, body, tool, sent_at)
+         VALUES ($1, $2, $3, $4, $5, 'received', $6, $7, $8::jsonb, now())
          ON CONFLICT (account_id, external_id) WHERE external_id IS NOT NULL DO UPDATE
            SET body = COALESCE(NULLIF(EXCLUDED.body, ''), items.body),
-               tool = COALESCE(EXCLUDED.tool, items.tool)`,
+               tool = COALESCE(EXCLUDED.tool, items.tool)
+         RETURNING (xmax = 0) AS inserted`,
       [
         i.session.threadId,
         i.session.accountId,
         i.externalId,
+        i.sourceHash ?? null,
         i.kind,
         i.session.runtimeId,
         i.body,
@@ -188,5 +195,6 @@ export async function writeAgentItem(pool: Pool, i: AgentItemInput): Promise<voi
       ],
     );
     await query(c, "UPDATE threads SET last_item_at = now() WHERE id = $1", [i.session.threadId]);
+    return rows[0]?.inserted ?? false;
   });
 }

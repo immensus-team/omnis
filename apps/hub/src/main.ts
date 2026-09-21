@@ -34,7 +34,7 @@ import { type DelegateExecutor, startDelegateExecutor } from "./delegate-exec.js
 import { createHubServer } from "./http.js";
 import { registerIngestJobs } from "./ingest-job.js";
 import { linkedinFromGmail } from "./linkedin-email-hook.js";
-import { registerStartupJobs } from "./startup-jobs.js";
+import { registerStartupJobs, registerTerminalImportJob } from "./startup-jobs.js";
 import { registerSummaryJob } from "./summarize-job.js";
 
 export interface RunningHub {
@@ -172,6 +172,9 @@ export async function startHub(env: NodeJS.ProcessEnv = process.env): Promise<Ru
     scheduler: kernel.scheduler,
     bridge,
   });
+  // US-C16: the terminal import rides the same slot, and for the same reason — the row
+  // 0015_phase_c.sql seeds is due immediately, and this handler must not run before listen().
+  registerTerminalImportJob(kernel.scheduler, { pool, bridge, logger });
 
   // US-B45: accounts + account_secrets.auth_ref → live adapters. The hub passes the Keychain item
   // *name* only; each adapter fetches the value (A3-D4). With zero connected accounts this is a

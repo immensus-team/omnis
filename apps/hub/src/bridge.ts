@@ -31,6 +31,7 @@ import {
   ensureSession,
   hasPendingApproval,
   paletteTool,
+  purposeOf,
   runtimeOf,
   setSessionState,
   writeAgentItem,
@@ -573,6 +574,19 @@ export function createBridgeHub(deps: BridgeDeps): BridgeHub {
       throw new BridgeError(
         BRIDGE_ERRORS.CAPABILITY_UNSUPPORTED,
         `${method} is Phase B (contract §8)`,
+      );
+    }
+    // US-C16 (C-D7): `term-*` sessions are imported terminal transcripts — a record of a terminal
+    // that already exited, with no runtime behind it to start a turn. Refused here, before the
+    // connectivity check, because this is a property of the session rather than of the host being
+    // attached: a host that came online must not become a way to type into a read-only transcript.
+    if (
+      method === "turn.start" &&
+      purposeOf(String(params.session_key ?? "")).startsWith("term-")
+    ) {
+      throw new BridgeError(
+        BRIDGE_ERRORS.CAPABILITY_UNSUPPORTED,
+        `${String(params.session_key)} is an imported session and is read-only`,
       );
     }
     // Check connectivity first — do not create session rows or throw on parameters for a host that
