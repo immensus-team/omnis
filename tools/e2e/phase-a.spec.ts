@@ -14,6 +14,10 @@ const SEED = JSON.parse(readFileSync(join(E2E_DIR, ".tmp", "seed.json"), "utf8")
   itemCount: number;
 };
 
+/** The sentence seed.ts writes into its one draft item. A5 reads it back off the screen, which is
+ *  what proves the folded card is showing *that* draft rather than any other card. */
+const SEED_DRAFT_BODY = "Yes, I will review it today.";
+
 interface Assertion {
   name: string;
   ok: boolean;
@@ -228,8 +232,16 @@ test("Phase A seeded smoke", async ({ page }) => {
     await expect(detail.locator(".status-badge").first()).toBeVisible({ timeout: 20_000 });
     const badges = await detail.locator(".status-badge").count();
     expect(badges).toBeGreaterThanOrEqual(2);
-    await expect(detail.locator('.status-badge[data-status="draft"]')).toBeVisible();
-    return `${badges} status badges`;
+    // loop-r2-02: this used to look for a `.status-badge[data-status="draft"]` on the draft's own
+    // bubble. The seed raises the pending `send` over exactly this draft item, and "one reply, one
+    // card" now takes that item out of the flow (`flowItems`, Thread.tsx) and draws the folded card
+    // for the pair instead — so no draft bubble, and no draft badge, is the shipped behaviour.
+    // The card is what represents the draft now, and the assertion follows it to where the draft
+    // actually is: visible, and quoting the sentence the seed put in it.
+    const folded = detail.locator(".thread-screen__draft");
+    await expect(folded).toBeVisible();
+    await expect(folded).toContainText(SEED_DRAFT_BODY);
+    return `${badges} status badges, folded draft card`;
   });
   await shot(page, "03-thread.png");
 
