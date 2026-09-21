@@ -204,10 +204,12 @@ describe("flag on: each call site acts on the answer", () => {
     const itemId = await mkItem();
     const ctx = ctxOf({ item_id: itemId, thread_id: threadId });
 
-    stubJev({ archive: { type: "boolean", probability: 0.95 } });
+    const seen = stubJev({ archive: { type: "boolean", probability: 0.95 } });
     const above = await autoArchiveLoop.decide?.(ctx);
     expect(above?.output).toMatchObject({ archive: true, tier: "T1", reason: "jev_bulk_mail" });
     expect(above?.confidence).toBe(0.95);
+    // T0 rule ④ turns on this flag, so the residue has to carry it too (found by the gate eval).
+    expect(seen[0]?.state).toContain("Logan has replied in this thread: no");
 
     vi.restoreAllMocks();
     stubJev({ archive: { type: "boolean", probability: 0.4 } });

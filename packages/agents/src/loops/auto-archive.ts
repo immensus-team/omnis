@@ -223,6 +223,7 @@ export const autoArchiveLoop: LoopSpec<AutoArchiveOutputT> = {
         subject: row.subject,
         body: row.body,
         hasUnsubscribe: hasUnsubscribe(row.meta),
+        hasReplied: row.i_replied,
       }),
       {},
     );

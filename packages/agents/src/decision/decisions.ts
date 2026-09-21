@@ -76,12 +76,15 @@ export function autoArchiveRequest(i: {
   subject: string | null;
   body: string;
   hasUnsubscribe: boolean;
+  /** T0 rule ④. A thread Logan has replied to is not bulk mail, so the residue needs this too. */
+  hasReplied: boolean;
 }): DecisionRequest {
   return {
     kind: "auto_archive",
     state: [
       `From: ${i.from}`,
       `List-Unsubscribe present: ${i.hasUnsubscribe ? "yes" : "no"}`,
+      `Logan has replied in this thread: ${i.hasReplied ? "yes" : "no"}`,
       `Subject: ${i.subject ?? ""}`,
       "",
       i.body,
